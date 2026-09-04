@@ -36,7 +36,7 @@ fails and an error is raised, unless the `IF NOT EXISTS` clause is included in
 the statement.
 
 Note that new service accounts can only access the database if the necessary
-[endpoint permissions](/docs/security/rbac/#endpoint-permissions) have been
+[endpoint permissions](/docs/security/rbac/authentication/#endpoint-permissions) have been
 granted.
 
 The user creating the service account automatically receives the

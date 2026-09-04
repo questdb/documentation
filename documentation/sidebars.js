@@ -714,9 +714,36 @@ module.exports = {
       type: "category",
       items: [
         {
-          id: "security/rbac",
-          type: "doc",
           label: "Role-Based Access Control (RBAC)",
+          type: "category",
+          link: { type: "doc", id: "security/rbac/index" },
+          items: [
+            {
+              id: "security/rbac/users-and-groups",
+              type: "doc",
+              label: "Users and groups",
+            },
+            {
+              id: "security/rbac/authentication",
+              type: "doc",
+              label: "Authentication and endpoints",
+            },
+            {
+              id: "security/rbac/granting-permissions",
+              type: "doc",
+              label: "Granting permissions",
+            },
+            {
+              id: "security/rbac/permissions-reference",
+              type: "doc",
+              label: "Permissions reference",
+            },
+            {
+              id: "security/rbac/common-scenarios",
+              type: "doc",
+              label: "Common scenarios",
+            },
+          ],
         },
         {
           label: "OpenID Connect (OIDC)",

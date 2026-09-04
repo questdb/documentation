@@ -59,7 +59,7 @@ A role set this way does **not** survive a restart. Update `cold.storage.role` i
 
 ### Permissions
 
-Both statements require database administrator (system admin) privileges, including with `FORCE`. They are not grantable through [RBAC](/docs/security/rbac/) permissions.
+Both statements require the `SYSTEM ADMIN` [permission](/docs/security/rbac/permissions-reference/), including with `FORCE`. There is no narrower grant for the cold storage role: granting `SYSTEM ADMIN` also grants every other system function.
 
 ## Examples
 

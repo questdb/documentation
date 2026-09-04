@@ -221,7 +221,7 @@ By default, `GRANT` does not check whether entities exist, making it possible to
 grant permissions to users, groups or service accounts that are later created.
 
 To make sure that the target entity of the grant statement exists, use
-[verification](/docs/security/rbac/#grant-verification). The
+[verification](/docs/security/rbac/granting-permissions/#grant-verification). The
 `WITH VERIFICATION` clause enables checks on the target entity and causes the
 `GRANT` statement to fail if the entity does not exist.
 
@@ -239,7 +239,7 @@ queries.
 Therefore when a table has a designated timestamp, granting `SELECT` or `UPDATE`
 permissions on any column will automatically extend those permissions to the
 timestamp column. These are known as
-[implicit permissions](/docs/security/rbac/#implicit-permissions), and they're
+[implicit permissions](/docs/security/rbac/granting-permissions/#implicit-permissions), and they're
 indicated by an `I` in the `origin` column of the `SHOW PERMISSIONS` output.
 
 For example, if you grant `UPDATE` permission on the `id` column of the
@@ -373,7 +373,7 @@ recreated as int.
 ### Owner grants
 
 In QuestDB there are no owners of database objects. Instead, there are
-[owner grants](/docs/security/rbac/#owner-grants).
+[owner grants](/docs/security/rbac/granting-permissions/#owner-grants).
 
 An owner grant means:
 

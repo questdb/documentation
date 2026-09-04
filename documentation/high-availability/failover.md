@@ -53,7 +53,7 @@ needs the `SWITCH ROLE` permission.
   table is suspended and the WAL lag is nil.
 - An account with the `SWITCH ROLE` permission and with `PGWIRE` (for SQL) or
   `HTTP` (for the REST endpoint). See
-  [Failover operator](/docs/security/rbac/#failover-operator).
+  [Failover operator](/docs/security/rbac/common-scenarios/#failover-operator).
 - Clients configured with a multi-host address list, so writers follow the
   primary role on their own. See
   [Client failover](/docs/high-availability/client-failover/concepts/).
@@ -391,5 +391,5 @@ A coordinator drives a switch as follows:
   restart-based migration procedures and point-in-time recovery.
 - [Client failover](/docs/high-availability/client-failover/concepts/) for how
   clients follow the primary role.
-- [Failover operator](/docs/security/rbac/#failover-operator) for the account
+- [Failover operator](/docs/security/rbac/common-scenarios/#failover-operator) for the account
   that runs switches.

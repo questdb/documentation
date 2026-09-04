@@ -1,0 +1,185 @@
+---
+title: Role-based Access Control (RBAC)
+sidebar_label: Overview
+slug: /security/rbac
+description:
+  Granular access control from database level down to individual columns and
+  rows. Learn how to secure your QuestDB instance with users, groups, and
+  fine-grained permissions.
+---
+
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Role-based Access Control (RBAC) provides fine-grained permissions for your
+  QuestDB instance.
+</EnterpriseNote>
+
+QuestDB Enterprise provides fine-grained access control that can restrict access
+at **database**, **table**, **column**, and even **row** level (using views).
+
+## Quick start
+
+Here's a complete example to create a read-only analyst user in under a minute:
+
+```questdb-sql
+-- 1. Create the user
+CREATE USER analyst WITH PASSWORD 'secure_password_here';
+
+-- 2. Grant endpoint access (required to connect)
+GRANT PGWIRE, HTTP TO analyst;
+
+-- 3. Grant read access to specific tables
+GRANT SELECT ON trades, prices TO analyst;
+
+-- Done! The analyst can now connect and query trades and prices tables
+```
+
+To verify:
+
+```questdb-sql
+SHOW PERMISSIONS analyst;
+```
+
+## Access control depth
+
+QuestDB's access control operates across two dimensions:
+
+### Data access granularity
+
+Control _what data_ users can access:
+
+| Level        | What you can control            | Example                                               |
+| ------------ | ------------------------------- | ----------------------------------------------------- |
+| **Database** | All tables, global operations   | `GRANT SELECT ON ALL TABLES TO user`                  |
+| **Table**    | Specific tables                 | `GRANT SELECT ON trades TO user`                      |
+| **Column**   | Specific columns within a table | `GRANT SELECT ON trades(ts, price) TO user`           |
+| **Row**      | Specific rows via views         | Create a view with WHERE clause, grant access to view |
+
+### Connection access granularity
+
+Control _how_ users can connect:
+
+| Permission | Protocol                        | Use case                                   |
+| ---------- | ------------------------------- | ------------------------------------------ |
+| `HTTP`     | REST API, Web Console, ILP/HTTP | Interactive users, web applications        |
+| `PGWIRE`   | PostgreSQL Wire Protocol        | SQL clients, BI tools, programmatic access |
+| `ILP`      | InfluxDB Line Protocol (TCP)    | High-throughput data ingestion             |
+
+```questdb-sql
+-- User can connect via PostgreSQL protocol only (not web console)
+GRANT PGWIRE TO analyst;
+
+-- Service can only ingest via ILP, cannot query
+GRANT ILP TO ingest_service;
+
+-- Full interactive access
+GRANT HTTP, PGWIRE TO developer;
+```
+
+These dimensions are independent: a user might have `SELECT` on all tables but
+only be allowed to connect via `PGWIRE`, or have `INSERT` permission but only
+via `ILP`.
+
+## Where to go next
+
+| Page                                                                           | Covers                                                                          |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| [Users, service accounts, and groups](/docs/security/rbac/users-and-groups/)   | The three principal types, and the statements that manage them                  |
+| [Authentication and endpoint access](/docs/security/rbac/authentication/)      | Passwords, JWK and REST tokens, OIDC, and the `HTTP`/`PGWIRE`/`ILP` permissions |
+| [Granting and revoking permissions](/docs/security/rbac/granting-permissions/) | Permission levels, `GRANT ALL`, the grant option, and level re-adjustment       |
+| [Permissions reference](/docs/security/rbac/permissions-reference/)            | Every permission and the level it can be granted at                             |
+| [Common scenarios](/docs/security/rbac/common-scenarios/)                      | Analysts, service accounts, teams, admins, failover operators                   |
+| [OpenID Connect](/docs/security/oidc/)                                         | SSO against an external Identity Provider                                       |
+
+## SQL commands reference
+
+- [ADD USER](/docs/query/sql/acl/add-user/)
+- [ALTER USER](/docs/query/sql/acl/alter-user/)
+- [ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/)
+- [ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/assume-service-account/)
+- [CREATE GROUP](/docs/query/sql/acl/create-group/)
+- [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/)
+- [CREATE USER](/docs/query/sql/acl/create-user/)
+- [DROP GROUP](/docs/query/sql/acl/drop-group/)
+- [DROP SERVICE ACCOUNT](/docs/query/sql/acl/drop-service-account/)
+- [DROP USER](/docs/query/sql/acl/drop-user/)
+- [EXIT SERVICE ACCOUNT](/docs/query/sql/acl/exit-service-account/)
+- [GRANT](/docs/query/sql/acl/grant/)
+- [GRANT ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/grant-assume-service-account/)
+- [REMOVE USER](/docs/query/sql/acl/remove-user/)
+- [REVOKE](/docs/query/sql/acl/revoke/)
+- [REVOKE ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/revoke-assume-service-account/)
+- [SHOW USER](/docs/query/sql/show/#show-user)
+- [SHOW USERS](/docs/query/sql/show/#show-users)
+- [SHOW GROUPS](/docs/query/sql/show/#show-groups)
+- [SHOW SERVICE ACCOUNT](/docs/query/sql/show/#show-service-account)
+- [SHOW SERVICE ACCOUNTS](/docs/query/sql/show/#show-service-accounts)
+- [SHOW PERMISSIONS](/docs/query/sql/show/#show-permissions-for-current-user)
+
+## Permissions reference {#permissions}
+
+Every permission QuestDB supports, and the level each can be granted at, is
+listed on its own page. See
+[Permissions reference](/docs/security/rbac/permissions-reference/).
+
+## Authentication methods {#authentication}
+
+QuestDB accepts passwords, JWK tokens, REST API tokens, and OIDC bearer tokens.
+See
+[Authentication and endpoint access](/docs/security/rbac/authentication/#authentication).
+
+## Endpoint permissions {#endpoint-permissions}
+
+`HTTP`, `PGWIRE` and `ILP` decide which protocol a principal may connect over.
+See
+[Authentication and endpoint access](/docs/security/rbac/authentication/#endpoint-permissions).
+
+## User management {#user-management}
+
+Creating and removing principals, group membership, passwords and tokens, and
+the `SHOW` statements that inspect them. See
+[Users, service accounts, and groups](/docs/security/rbac/users-and-groups/#user-management).
+
+## Failover operator {#failover-operator}
+
+A service account that can move the primary role between nodes and nothing else.
+See [Common scenarios](/docs/security/rbac/common-scenarios/#failover-operator).
+
+## Where each section moved {#moved}
+
+These anchors are kept so that existing links keep working. Prefer the pages
+above when adding new links.
+
+| Section                                                                                    | Now at                                                                                                  |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| <span id="column-level-access"></span> Column-level access                                 | [Granting permissions](/docs/security/rbac/granting-permissions/#column-level-access)                   |
+| <span id="row-level-access-with-views"></span> Row-level access with views                 | [Granting permissions](/docs/security/rbac/granting-permissions/#row-level-access-with-views)           |
+| <span id="common-scenarios"></span> Common scenarios                                       | [Common scenarios](/docs/security/rbac/common-scenarios/)                                               |
+| <span id="read-only-analyst"></span> Read-only analyst                                     | [Common scenarios](/docs/security/rbac/common-scenarios/#read-only-analyst)                             |
+| <span id="application-service-account"></span> Application service account                 | [Common scenarios](/docs/security/rbac/common-scenarios/#application-service-account)                   |
+| <span id="team-based-access-with-groups"></span> Team-based access with groups             | [Common scenarios](/docs/security/rbac/common-scenarios/#team-based-access-with-groups)                 |
+| <span id="column-level-restrictions-hide-sensitive-data"></span> Column-level restrictions | [Common scenarios](/docs/security/rbac/common-scenarios/#column-level-restrictions-hide-sensitive-data) |
+| <span id="row-level-security-multi-tenant"></span> Row-level security                      | [Common scenarios](/docs/security/rbac/common-scenarios/#row-level-security-multi-tenant)               |
+| <span id="database-administrator"></span> Database administrator                           | [Common scenarios](/docs/security/rbac/common-scenarios/#database-administrator)                        |
+| <span id="core-concepts"></span> Core concepts                                             | [Users, service accounts, and groups](/docs/security/rbac/users-and-groups/)                            |
+| <span id="users-and-service-accounts"></span> Users and service accounts                   | [Users and groups](/docs/security/rbac/users-and-groups/#users-and-service-accounts)                    |
+| <span id="why-service-accounts"></span> Why service accounts?                              | [Users and groups](/docs/security/rbac/users-and-groups/#why-service-accounts)                          |
+| <span id="groups"></span> Groups                                                           | [Users and groups](/docs/security/rbac/users-and-groups/#groups)                                        |
+| <span id="built-in-admin"></span> Built-in admin                                           | [Users and groups](/docs/security/rbac/users-and-groups/#built-in-admin)                                |
+| <span id="service-account-assumption"></span> Service account assumption                   | [Users and groups](/docs/security/rbac/users-and-groups/#service-account-assumption)                    |
+| <span id="creating-and-removing-principals"></span> Creating and removing principals       | [Users and groups](/docs/security/rbac/users-and-groups/#creating-and-removing-principals)              |
+| <span id="managing-group-membership"></span> Managing group membership                     | [Users and groups](/docs/security/rbac/users-and-groups/#managing-group-membership)                     |
+| <span id="viewing-information"></span> Viewing information                                 | [Users and groups](/docs/security/rbac/users-and-groups/#viewing-information)                           |
+| <span id="managing-authentication"></span> Managing authentication                         | [Authentication](/docs/security/rbac/authentication/#managing-authentication)                           |
+| <span id="permission-levels"></span> Permission levels                                     | [Granting permissions](/docs/security/rbac/granting-permissions/#permission-levels)                     |
+| <span id="granting-all"></span> Granting ALL                                               | [Granting permissions](/docs/security/rbac/granting-permissions/#granting-all)                          |
+| <span id="the-grant-option"></span> The GRANT option                                       | [Granting permissions](/docs/security/rbac/granting-permissions/#the-grant-option)                      |
+| <span id="owner-grants"></span> Owner permissions                                          | [Granting permissions](/docs/security/rbac/granting-permissions/#owner-grants)                          |
+| <span id="advanced-topics"></span> Advanced topics                                         | [Granting permissions](/docs/security/rbac/granting-permissions/)                                       |
+| <span id="permission-level-re-adjustment"></span> Permission re-adjustment                 | [Granting permissions](/docs/security/rbac/granting-permissions/#permission-level-re-adjustment)        |
+| <span id="implicit-permissions"></span> Implicit timestamp permissions                     | [Granting permissions](/docs/security/rbac/granting-permissions/#implicit-permissions)                  |
+| <span id="grant-verification"></span> Granting on non-existent objects                     | [Granting permissions](/docs/security/rbac/granting-permissions/#grant-verification)                    |
+| <span id="database-permissions"></span> Database permissions                               | [Permissions reference](/docs/security/rbac/permissions-reference/#database-permissions)                |
+| <span id="user-management-permissions"></span> User management permissions                 | [Permissions reference](/docs/security/rbac/permissions-reference/#user-management-permissions)         |
+| <span id="special-permissions"></span> Special permissions                                 | [Permissions reference](/docs/security/rbac/permissions-reference/#special-permissions)                 |

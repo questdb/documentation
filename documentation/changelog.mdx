@@ -50,7 +50,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Reference
 
 - Added the [`node_role()`](/docs/query/functions/meta/#node_role) function, which reports the replication role of the instance to any authenticated session
-- [RBAC](/docs/security/rbac/#failover-operator) - Added the `SWITCH ROLE` permission to the permissions table, a failover operator scenario, and the built-in admin's break-glass role in a replicated cluster
+- [RBAC](/docs/security/rbac/common-scenarios/#failover-operator) - Added the `SWITCH ROLE` permission to the permissions table, a failover operator scenario, and the built-in admin's break-glass role in a replicated cluster
 - [Minimal HTTP server](/docs/operations/logging-metrics/#lifecycle-endpoint) - Documented the `GET /lifecycle` component snapshot and the [`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired) setting
 - [Replication metrics](/docs/operations/logging-metrics/#replication-metrics) - Added `questdb_replication_pending_upload_txn` and `questdb_backup_active_at_last_demote`
 - [Replication configuration](/docs/configuration/database-replication/#replicationrole) - Documented that `replication.role` is the boot role, the `primary-catchup-uploads` value, and the restart hazard after an in-place switch

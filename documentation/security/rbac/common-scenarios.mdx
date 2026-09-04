@@ -1,0 +1,124 @@
+---
+title: RBAC common scenarios
+sidebar_label: Common scenarios
+description:
+  Worked QuestDB Enterprise permission setups for read-only analysts, ingestion
+  service accounts, teams, column and row restrictions, database administrators,
+  and failover operators.
+---
+
+Each scenario below is a complete, runnable setup. Adapt the names and tables;
+the shape of the grants is the part worth copying.
+
+## Read-only analyst
+
+A user who can query data but cannot modify anything:
+
+```questdb-sql
+CREATE USER analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO analyst;
+GRANT SELECT ON ALL TABLES TO analyst;
+```
+
+## Application service account
+
+A service account for an application that ingests data into specific tables:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT ingest_app WITH PASSWORD 'pwd';
+GRANT ILP TO ingest_app;                    -- InfluxDB Line Protocol access
+GRANT INSERT ON sensor_data TO ingest_app;  -- Can only insert into sensor_data
+```
+
+## Team-based access with groups
+
+Multiple users sharing the same permissions:
+
+```questdb-sql
+-- Create a group
+CREATE GROUP trading_team;
+
+-- Grant permissions to the group
+GRANT HTTP, PGWIRE TO trading_team;
+GRANT SELECT ON trades, positions TO trading_team;
+GRANT INSERT ON trades TO trading_team;
+
+-- Add users to the group - they inherit all permissions
+CREATE USER alice WITH PASSWORD 'pwd1';
+CREATE USER bob WITH PASSWORD 'pwd2';
+ADD USER alice TO trading_team;
+ADD USER bob TO trading_team;
+```
+
+## Column-level restrictions (hide sensitive data)
+
+Allow access to a table but hide sensitive columns:
+
+```questdb-sql
+CREATE USER auditor WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO auditor;
+
+-- Grant access to non-sensitive columns only
+GRANT SELECT ON employees(id, name, department, hire_date) TO auditor;
+-- Columns salary and ssn are not granted = invisible to auditor
+```
+
+## Row-level security (multi-tenant)
+
+Different users see different subsets of data:
+
+```questdb-sql
+-- Base table has data for all regions
+CREATE TABLE sales (ts TIMESTAMP, region SYMBOL, amount DOUBLE) TIMESTAMP(ts);
+
+-- Create region-specific views
+CREATE VIEW sales_emea AS (SELECT * FROM sales WHERE region = 'EMEA');
+CREATE VIEW sales_apac AS (SELECT * FROM sales WHERE region = 'APAC');
+
+-- Grant users access to their region only
+CREATE USER emea_manager WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO emea_manager;
+GRANT SELECT ON sales_emea TO emea_manager;
+
+CREATE USER apac_manager WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO apac_manager;
+GRANT SELECT ON sales_apac TO apac_manager;
+```
+
+## Database administrator
+
+A user with full control (but not the built-in admin):
+
+```questdb-sql
+CREATE USER dba WITH PASSWORD 'pwd';
+GRANT DATABASE ADMIN TO dba;
+```
+
+:::warning
+
+`DATABASE ADMIN` grants all current and future permissions. Use sparingly.
+
+:::
+
+## Failover operator
+
+A service account that can move the primary role between nodes, for an external
+coordinator or a runbook, without any other administrative right:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT failover_bot WITH PASSWORD 'pwd';
+GRANT HTTP TO failover_bot;         -- POST /lifecycle/switch on port 9003
+GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
+```
+
+`SYSTEM ADMIN` is neither required nor sufficient for a role switch, and
+`DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
+`node_role()` and `GET /lifecycle` are open to any authenticated principal. See
+[Failover and role switch](/docs/high-availability/failover/).
+
+## See also
+
+- [Granting and revoking permissions](/docs/security/rbac/granting-permissions/) -
+  the semantics behind these grants
+- [Permissions reference](/docs/security/rbac/permissions-reference/) - every
+  permission available

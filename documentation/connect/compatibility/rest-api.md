@@ -890,5 +890,5 @@ curl -G --data-urlencode "query=SELECT 1;" \
     http://localhost:9000/api/v1/sql/execute
 ```
 
-Refer to the [user management](/docs/security/rbac/#user-management) page to
+Refer to the [user management](/docs/security/rbac/users-and-groups/#user-management) page to
 learn more on how to generate a REST API token.

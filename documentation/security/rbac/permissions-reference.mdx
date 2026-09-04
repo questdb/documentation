@@ -1,0 +1,138 @@
+---
+title: QuestDB permissions reference
+sidebar_label: Permissions reference
+description:
+  Every permission QuestDB Enterprise supports, the level each can be granted
+  at, and the operations reserved for SYSTEM ADMIN.
+---
+
+Every permission QuestDB Enterprise supports, and the level each one can be
+granted at. To see the same list from a running instance, including any
+permission added after this page was written:
+
+```questdb-sql
+SELECT * FROM all_permissions();
+```
+
+## Database permissions
+
+| Permission                   | Level                               | Description                                                    |
+| ---------------------------- | ----------------------------------- | -------------------------------------------------------------- |
+| ADD COLUMN                   | Database &#124; Table               | Add columns to tables                                          |
+| ADD INDEX                    | Database &#124; Table &#124; Column | Add index on symbol columns                                    |
+| ALTER COLUMN CACHE           | Database &#124; Table &#124; Column | Enable/disable symbol caching                                  |
+| ALTER COLUMN TYPE            | Database &#124; Table &#124; Column | Change column types                                            |
+| ALTER SYMBOL CAPACITY        | Database &#124; Table &#124; Column | Change the capacity of a symbol column                         |
+| ALTER VIEW                   | Database &#124; Table               | Change a view definition                                       |
+| ATTACH PARTITION             | Database &#124; Table               | Attach partitions                                              |
+| BACKUP DATABASE              | Database                            | Create database backups                                        |
+| BACKUP TABLE                 | Database &#124; Table               | Legacy, grants nothing: there is no `BACKUP TABLE` statement   |
+| CANCEL ANY COPY              | Database                            | Cancel COPY operations                                         |
+| COMPILE VIEW                 | Database &#124; Table               | Recompile a view against the current schema                    |
+| CONVERT PARTITION TO NATIVE  | Database &#124; Table               | Convert Parquet partitions back to native format               |
+| CONVERT PARTITION TO PARQUET | Database &#124; Table               | Convert partitions to Parquet in place                         |
+| CREATE TABLE                 | Database                            | Create tables                                                  |
+| CREATE MATERIALIZED VIEW     | Database                            | Create materialized views                                      |
+| CREATE VIEW                  | Database                            | Create views                                                   |
+| CREATE LIVE VIEW             | Database                            | Create live views                                              |
+| DEDUP ENABLE                 | Database &#124; Table               | Enable deduplication                                           |
+| DEDUP DISABLE                | Database &#124; Table               | Disable deduplication                                          |
+| DETACH PARTITION             | Database &#124; Table               | Detach partitions                                              |
+| DISABLE STORAGE POLICY       | Database &#124; Table               | Disable storage policies                                       |
+| DROP COLUMN                  | Database &#124; Table &#124; Column | Drop columns                                                   |
+| DROP INDEX                   | Database &#124; Table &#124; Column | Drop indexes                                                   |
+| DROP PARTITION               | Database &#124; Table               | Drop partitions                                                |
+| DROP TABLE                   | Database &#124; Table               | Drop tables                                                    |
+| DROP MATERIALIZED VIEW       | Database &#124; Table               | Drop materialized views                                        |
+| DROP VIEW                    | Database &#124; Table               | Drop views                                                     |
+| DROP LIVE VIEW               | Database &#124; Table               | Drop live views                                                |
+| ENABLE STORAGE POLICY        | Database &#124; Table               | Enable storage policies                                        |
+| INSERT                       | Database &#124; Table               | Insert data                                                    |
+| REFRESH MATERIALIZED VIEW    | Database &#124; Table               | Refresh materialized views                                     |
+| REINDEX                      | Database &#124; Table &#124; Column | Reindex columns                                                |
+| REMOVE STORAGE POLICY        | Database &#124; Table               | Remove storage policies                                        |
+| RENAME COLUMN                | Database &#124; Table &#124; Column | Rename columns                                                 |
+| RENAME TABLE                 | Database &#124; Table               | Rename tables                                                  |
+| RESUME WAL                   | Database &#124; Table               | Resume WAL processing                                          |
+| SELECT                       | Database &#124; Table &#124; Column | Read data                                                      |
+| SET PARQUET SETTINGS         | Database &#124; Table               | Set per-column Parquet encoding, compression and bloom filters |
+| SET REFRESH LIMIT            | Database &#124; Table               | Set a materialized view's refresh limit                        |
+| SET REFRESH TYPE             | Database &#124; Table               | Change a materialized view's refresh strategy                  |
+| SET STORAGE POLICY           | Database &#124; Table               | Set storage policies                                           |
+| SET TABLE FORMAT             | Database &#124; Table               | Switch a table's partition format between native and Parquet   |
+| SET TABLE PARAM              | Database &#124; Table               | Set table parameters                                           |
+| SET TABLE TYPE               | Database &#124; Table               | Change table type                                              |
+| SETTINGS                     | Database                            | Change instance settings in Web Console                        |
+| SNAPSHOT                     | Database                            | Create snapshots                                               |
+| SQL ENGINE ADMIN             | Database                            | List/cancel running queries                                    |
+| SWITCH ROLE                  | Database                            | Switch the replication role, read SWITCH STATUS                |
+| SYSTEM ADMIN                 | Database                            | System functions (reload_tls, etc.)                            |
+| TRUNCATE TABLE               | Database &#124; Table               | Truncate tables                                                |
+| UPDATE                       | Database &#124; Table &#124; Column | Update data                                                    |
+| VACUUM TABLE                 | Database &#124; Table               | Reclaim storage                                                |
+
+## Endpoint permissions {#endpoint-permissions}
+
+These control which protocol a principal may connect on. They are covered in
+detail under
+[authentication and endpoint access](/docs/security/rbac/authentication/#endpoint-permissions).
+
+| Permission | Level    | Description                            |
+| ---------- | -------- | -------------------------------------- |
+| HTTP       | Database | REST API, Web Console, ILP over HTTP   |
+| PGWIRE     | Database | PostgreSQL Wire Protocol (port 8812)   |
+| ILP        | Database | InfluxDB Line Protocol TCP (port 9009) |
+
+## User management permissions
+
+| Permission             | Description                             |
+| ---------------------- | --------------------------------------- |
+| ADD EXTERNAL ALIAS     | Create external group mappings          |
+| ADD PASSWORD           | Set user passwords                      |
+| ADD USER               | Add users to groups                     |
+| CREATE GROUP           | Create groups                           |
+| CREATE JWK             | Create JWK tokens                       |
+| CREATE REST TOKEN      | Create REST API tokens                  |
+| CREATE SERVICE ACCOUNT | Create service accounts                 |
+| CREATE USER            | Create users                            |
+| DISABLE USER           | Disable users                           |
+| DROP GROUP             | Drop groups                             |
+| DROP JWK               | Drop JWK tokens                         |
+| DROP REST TOKEN        | Drop REST API tokens                    |
+| DROP SERVICE ACCOUNT   | Drop service accounts                   |
+| DROP USER              | Drop users                              |
+| ENABLE USER            | Enable users                            |
+| LIST USERS             | List users/groups/service accounts      |
+| REMOVE EXTERNAL ALIAS  | Remove external group mappings          |
+| REMOVE PASSWORD        | Remove passwords                        |
+| REMOVE USER            | Remove users from groups                |
+| USER DETAILS           | View user/group/service account details |
+
+## Special permissions
+
+| Permission     | Description                                                                                                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ALL            | All permissions at the granted level (database/table/column). At the database level this includes `DATABASE ADMIN` - see [granting ALL](/docs/security/rbac/granting-permissions/#granting-all) |
+| DATABASE ADMIN | All permissions including future ones; can assume any service account                                                                                                                           |
+
+A few destructive operations have no permission of their own. They are gated by
+`SYSTEM ADMIN`, so the only way to grant them is to grant `SYSTEM ADMIN`, which
+also carries every other system function:
+
+| Operation                                                               | Gated by       | Notes                                                                                                  |
+| ----------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/)     | `SYSTEM ADMIN` | Rebuilds a suspended WAL table under a fresh sequencer. A table-level `RESUME WAL` grant is not enough |
+| [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) | `SYSTEM ADMIN` | Moves the [cold storage](/docs/concepts/cold-storage/) manager role, including with `FORCE`            |
+
+By contrast, [`SWITCH ROLE`](/docs/query/sql/switch-role/), which moves the
+replication role, has its own dedicated permission that can be granted without
+handing over the rest of `SYSTEM ADMIN`.
+
+## See also
+
+- [Granting and revoking permissions](/docs/security/rbac/granting-permissions/) -
+  levels, `WITH GRANT OPTION`, and how grants shift level when you revoke
+- [Authentication and endpoint access](/docs/security/rbac/authentication/) -
+  the `HTTP`, `PGWIRE` and `ILP` permissions in context
+- [`GRANT`](/docs/query/sql/acl/grant/) and
+  [`REVOKE`](/docs/query/sql/acl/revoke/) statement syntax

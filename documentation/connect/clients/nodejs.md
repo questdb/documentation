@@ -88,7 +88,7 @@ const sender = Sender.fromEnv();
 ```
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/security/rbac/#authentication) for more
+Please check the [RBAC docs](/docs/security/rbac/authentication/) for more
 info.
 
 This client does not run an OIDC flow. QuestDB Enterprise also accepts an OIDC

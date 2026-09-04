@@ -112,7 +112,7 @@ Both statements require the `SWITCH ROLE` permission, granted with
 `GRANT SWITCH ROLE TO entity`. `SYSTEM ADMIN` does not imply it; `DATABASE ADMIN`
 does. A denied session receives `Access denied for <principal> [SWITCH ROLE]`.
 When access control is disabled, both statements are open to every session. See
-[Failover operator](/docs/security/rbac/#failover-operator).
+[Failover operator](/docs/security/rbac/common-scenarios/#failover-operator).
 
 Before version 4.0.0, both statements required `SYSTEM ADMIN`.
 
@@ -180,7 +180,7 @@ SELECT node_role();
 - [Failover and role switch](/docs/high-availability/failover/) for the full
   procedure, the REST endpoint, and recovery from a refused switch
 - [`node_role()`](/docs/query/functions/meta/#node_role) for the open role read
-- [RBAC](/docs/security/rbac/#failover-operator) for the `SWITCH ROLE` permission
+- [RBAC](/docs/security/rbac/common-scenarios/#failover-operator) for the `SWITCH ROLE` permission
 - [`replication.role`](/docs/configuration/database-replication/#replicationrole)
   for the boot role
 - [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) for

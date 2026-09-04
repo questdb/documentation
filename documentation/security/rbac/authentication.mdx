@@ -1,0 +1,121 @@
+---
+title: RBAC authentication and endpoint access
+sidebar_label: Authentication and endpoints
+description:
+  The four authentication methods QuestDB Enterprise accepts, the HTTP, PGWIRE
+  and ILP endpoint permissions that gate each protocol, and how to manage
+  passwords and tokens.
+---
+
+import Screenshot from "@theme/Screenshot"
+
+Connecting to QuestDB Enterprise takes two things: a credential the server
+accepts, and the endpoint permission for the protocol you are connecting over. A
+valid password is not enough on its own.
+
+## Authentication methods {#authentication}
+
+<Screenshot
+  alt="Diagram shows authentication and authorization flow in QuestDB"
+  title="Authentication and authorization flow"
+  src="images/docs/acl/auth_flow.webp"
+  width={745}
+/>
+
+QuestDB supports four authentication methods:
+
+| Method                | Use case                    | Endpoints                                                                        |
+| --------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| **Password**          | Interactive users           | REST API, PostgreSQL Wire                                                        |
+| **JWK Token**         | ILP ingestion               | InfluxDB Line Protocol                                                           |
+| **REST API Token**    | Programmatic REST access    | REST API                                                                         |
+| **OIDC bearer token** | SSO users, external clients | REST API and QWP, both under the `HTTP` permission; PostgreSQL Wire once enabled |
+
+The first three are QuestDB's own credentials, created with the statements
+below. An OIDC bearer token is issued by an external Identity Provider instead,
+and the user's group memberships come from the token or the provider's user info
+endpoint; see [OpenID Connect](/docs/security/oidc/) and
+[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
+
+OIDC on the PostgreSQL Wire endpoint is off by default. Enable it with
+[`acl.oidc.pg.token.as.password.enabled`](/docs/configuration/oidc/#acloidcpgtokenaspasswordenabled),
+which accepts the token in the password field, or with
+[`acl.oidc.ropc.flow.enabled`](/docs/configuration/oidc/#acloidcropcflowenabled),
+which has QuestDB exchange the user's SSO credentials for a token itself.
+
+Users can have multiple authentication methods enabled simultaneously:
+
+```questdb-sql
+-- Add JWK token for ILP access
+ALTER USER sensor_writer CREATE TOKEN TYPE JWK;
+
+-- Add REST API token (with 30-day expiry)
+ALTER USER api_user CREATE TOKEN TYPE REST WITH TTL '30d';
+```
+
+:::warning
+
+QuestDB does not store private keys or tokens after creation. Save them
+immediately - they cannot be recovered.
+
+:::
+
+:::tip
+
+Authentication should happen via a [secure TLS connection](/docs/security/tls/)
+to protect credentials in transit.
+
+:::
+
+## Endpoint permissions {#endpoint-permissions}
+
+Before a user can connect, they need endpoint permissions:
+
+| Permission | Allows access to                       |
+| ---------- | -------------------------------------- |
+| `HTTP`     | REST API, Web Console, ILP over HTTP   |
+| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)   |
+| `ILP`      | InfluxDB Line Protocol TCP (port 9009) |
+
+```questdb-sql
+-- Typical setup for an interactive user
+GRANT HTTP, PGWIRE TO analyst;
+
+-- Typical setup for an ingestion service
+GRANT ILP TO ingest_service;
+```
+
+Endpoint permissions are independent of data permissions. A user may hold
+`SELECT` on every table and still be unable to connect, or hold `ILP` and be
+able to ingest but never query.
+
+## Managing authentication {#managing-authentication}
+
+```questdb-sql
+-- Change password
+ALTER USER username WITH PASSWORD 'new_pwd';
+
+-- Remove password (disables password auth)
+ALTER USER username WITH NO PASSWORD;
+
+-- Create tokens
+ALTER USER username CREATE TOKEN TYPE JWK;
+ALTER USER username CREATE TOKEN TYPE REST WITH TTL '30d';
+ALTER USER username CREATE TOKEN TYPE REST WITH TTL '1d' REFRESH;  -- Auto-refresh
+
+-- Remove tokens
+ALTER USER username DROP TOKEN TYPE JWK;
+ALTER USER username DROP TOKEN TYPE REST;  -- Drops all REST tokens
+ALTER USER username DROP TOKEN TYPE REST 'token_value_here';  -- Drop specific token
+```
+
+Removing all authentication methods (password and tokens) effectively disables
+the user - they can no longer connect to the database.
+
+## See also
+
+- [OpenID Connect](/docs/security/oidc/) - SSO against an external Identity
+  Provider
+- [TLS](/docs/security/tls/) - encrypting credentials in transit
+- [Users, service accounts, and groups](/docs/security/rbac/users-and-groups/) -
+  the principals these credentials belong to
