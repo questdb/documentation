@@ -191,12 +191,36 @@ call runs at all without a terminal, differs by client:
 
 | Client | Default prompt | Without a terminal |
 | --- | --- | --- |
-| Java | prints to `System.out` | runs anyway; the client performs no terminal check |
-| Python | prints to stderr, or to the frontend inside an IPython kernel | fails, unless the kernel accepts stdin |
-| Rust, C, C++ | prints to stderr | fails with an interaction-required error |
+| Java | prints to `System.out` | runs anyway |
+| Python | prints to stderr, or to the frontend inside an IPython kernel | runs anyway, except under a notebook executor which refuses stdin |
+| Rust, C, C++ | prints to stderr | runs anyway |
 
-Redirecting output therefore hides the code in Java, while a container with no
-TTY fails outright in the other four.
+None of the clients tests for a TTY. A missing terminal is not evidence of a
+missing human: a pipe into `tee`, a process supervisor, or an IDE which captures
+stderr all still put the code in front of someone. The call therefore prompts
+and waits whatever the process is attached to, until the user approves or the
+device code expires. Redirecting or discarding the output hides the code without
+shortening that wait.
+
+The one client which stops early does so on positive evidence rather than on a
+guess. A notebook executor such as papermill, `nbclient` or
+`jupyter nbconvert --execute` runs a real kernel, but issues every request with
+`allow_stdin=False`, which is the frontend stating that nobody is there to
+answer. The Python client reads that flag and fails with
+[`OidcInteractionRequired`](#interaction-required-errors) instead of polling to
+the device code's deadline.
+
+A headless service or a CI job should say so itself rather than rely on the
+absence of a terminal. Turning the prompt off makes sign-in fail immediately
+with an [interaction-required error](#interaction-required-errors):
+
+| Client | Fail instead of prompting |
+| --- | --- |
+| Java | not available |
+| Python | `interactive=False` |
+| Rust | `.interactive(false)` |
+| C | `questdb_oidc_builder_interactive(builder, false, &error)` |
+| C++ | `.interactive(false)` |
 
 All five clients also try to open the verification URL in a local browser by
 default. That is useful on a workstation and pointless on a remote or headless
@@ -212,16 +236,15 @@ inside a Jupyter kernel. Turn it off explicitly elsewhere:
 | C | `questdb_oidc_builder_open_browser(builder, false, &error)` |
 | C++ | `.open_browser(false)` |
 
-Override the default prompt to render the challenge elsewhere, or declare the
-process interactive anyway:
+Override the default prompt to render the challenge elsewhere:
 
-| Client | Custom prompt | Force interactive |
-| --- | --- | --- |
-| Java | `prompt(...)` | not applicable |
-| Python | `renderer=`, or `qr=True` for a QR code | `interactive=True`, and `interactive=False` to fail rather than prompt |
-| Rust | `.renderer(...)` | `.interactive(true)` |
-| C | `questdb_oidc_builder_event_handler()` | `questdb_oidc_builder_interactive()` |
-| C++ | `.event_handler(...)` | `.interactive(true)` |
+| Client | Custom prompt |
+| --- | --- |
+| Java | `prompt(...)` |
+| Python | `renderer=`, or `qr=True` for a QR code |
+| Rust | `.renderer(...)` |
+| C | `questdb_oidc_builder_event_handler()` |
+| C++ | `.event_handler(...)` |
 
 The Java, C and C++ clients strip terminal controls, bidi marks and zero-width
 characters from the prompt's text fields before the callback sees them. The Rust
