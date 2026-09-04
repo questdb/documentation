@@ -159,7 +159,7 @@ fails at the provider rather than at startup.
 
 QuestDB uses the scopes in the requests it makes itself, in the
 [ROPC flow](#acloidcropcflowenabled), and publishes them on the
-[settings endpoint](/docs/security/oidc/#settings-endpoint) for clients which
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) for clients which
 run the flow themselves.
 
 For the [OIDC device flow](/docs/security/oidc-device-flow/), add
@@ -175,7 +175,7 @@ using it, untouched.
 
 QuestDB publishes [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
 [`acl.oidc.state.required`](#acloidcstaterequired) to clients through the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), and enforces
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), and enforces
 neither. The client generates the code verifier and the `state` value; the
 provider checks the verifier, and the client checks the `state` value it gets
 back.
@@ -219,7 +219,7 @@ the provider.
 Unlike [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
 [`acl.oidc.state.required`](#acloidcstaterequired), this setting is not
 published on the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), so a client cannot
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), so a client cannot
 discover whether the flow is available.
 
 ### acl.oidc.state.required
@@ -234,7 +234,7 @@ requires the `state` parameter, or to add CSRF protection on top of PKCE.
 The [Web Console](/docs/getting-started/web-console/overview/) generates the
 value, sends it in the authorization request, and checks that the provider
 returns it unchanged. See
-[Secret generation](/docs/security/oidc/#1-secret-generation).
+[Secret generation](/docs/security/oidc/how-sign-in-works/#1-secret-generation).
 
 ## Endpoints
 
@@ -258,7 +258,7 @@ Identity Platform.
 OIDC Device Authorization Endpoint. Unlike the other endpoint settings this one
 has no default, and QuestDB never calls it. QuestDB resolves the endpoint and
 publishes it on the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), for clients which
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), for clients which
 implement the
 [OIDC device flow](/docs/security/oidc-device-flow/)
 themselves. The official Java, Python, Rust, C, and C++ clients can discover and
@@ -361,11 +361,12 @@ group memberships of the user. Required when OIDC is enabled.
 
 If the claim is missing from the user information, or it is an empty list,
 authentication fails. See
-[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+[Mapping user permissions](/docs/security/oidc/group-mapping/#mapping-user-permissions).
 
-The name applies to both flows. Set it to `groups` when
-[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,
-because the token validator accepts no other name for the group memberships.
+The name applies to both flows, including when
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`.
+The claim's value is normally an array of group names. A single bare string is
+accepted too, which is how some providers send a lone group.
 
 ### acl.oidc.groups.encoded.in.token
 
@@ -379,8 +380,8 @@ group memberships directly into the token.
 This also changes which token the client has to send: the ID token when the
 setting is `true`, the access token when it is `false`. QuestDB publishes the
 setting on the
-[settings endpoint](/docs/security/oidc/#settings-endpoint) so that clients can
-[pick the right one](/docs/security/oidc/#which-token-to-send).
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) so that clients can
+[pick the right one](/docs/security/oidc/client-discovery/#which-token-to-send).
 
 It changes how tokens are validated too. In the default user info flow QuestDB
 hands the token to the OIDC Provider on every cache miss, so the provider
@@ -394,22 +395,20 @@ the token itself and never asks the provider about it:
 | `aud`, against [`acl.oidc.audience`](#acloidcaudience) | |
 | that `sub` and the group memberships are present | |
 
-Two things have to line up here, because two different components read the
-token. The signature validator deserializes the payload into a fixed structure,
-so the JWT must carry claims named `sub` and `groups` literally, and `groups`
-must be an array of strings. A token without both is rejected whatever the claim
-settings say. QuestDB then reads the principal and the group memberships out of
-that same payload using
+Two components read the token. The signature validator requires the JWT to carry
+`sub`, `aud` and `exp`, and checks the signature, the audience and the expiry
+against them. It does not look at the group memberships. QuestDB then reads the
+principal and the groups out of that same payload using
 [`acl.oidc.sub.claim`](#acloidcsubclaim) and
 [`acl.oidc.groups.claim`](#acloidcgroupsclaim), exactly as it does in the user
 info flow.
 
-So set `acl.oidc.groups.claim=groups`, since that is the only name the validator
-accepts for the group memberships. `acl.oidc.sub.claim` may name any claim the
-token carries: a provider which issues both `sub` and a friendlier claim lets
-you keep the readable one as the principal. The Entra ID walkthrough does this,
-setting `acl.oidc.sub.claim=name` while the token still carries `sub` for the
-validator.
+So `acl.oidc.groups.claim` may name any claim the token carries, `roles` for
+example. `acl.oidc.sub.claim` may name any claim too, though the token must
+still carry `sub` itself for the validator: a provider which issues both `sub`
+and a friendlier claim lets you keep the readable one as the principal. The
+Entra ID walkthrough does this, setting `acl.oidc.sub.claim=name` while the
+token still carries `sub` for the validator.
 
 :::caution
 
@@ -435,7 +434,7 @@ logged for audit purposes.
 If the claim is missing from the user information, or empty, authentication
 fails. The same applies to the claim named by
 [`acl.oidc.groups.claim`](#acloidcgroupsclaim). See
-[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+[Mapping user permissions](/docs/security/oidc/group-mapping/#mapping-user-permissions).
 
 ## Caching and buffers
 

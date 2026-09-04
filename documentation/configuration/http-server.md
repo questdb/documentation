@@ -521,7 +521,7 @@ Context path for the file import service.
 
 Context path for the service that serves server-side settings to clients, such
 as an OIDC client discovering the provider's endpoints from the
-[settings endpoint](/docs/security/oidc/#settings-endpoint).
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
 
 Accepts a comma-separated list of paths. Setting it adds paths rather than
 moving the service: QuestDB keeps serving the default path as well, so the

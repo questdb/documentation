@@ -286,7 +286,7 @@ same credentials as the main HTTP server: HTTP basic authentication, a
 [REST token](/docs/connect/compatibility/rest-api/#authentication-via-token-in-questdb-enterprise)
 as `Authorization: Bearer`, or an OIDC token. Which of the two OIDC tokens to
 send is decided by `acl.oidc.groups.encoded.in.token`; see
-[which token to send](/docs/security/oidc/#which-token-to-send). The principal needs the
+[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send). The principal needs the
 `HTTP` endpoint permission and, for the switch, `SWITCH ROLE`. With access
 control disabled no credentials are needed. TLS for this port is configured with
 the `http.min.tls.*` settings on the [TLS](/docs/configuration/tls/) page.

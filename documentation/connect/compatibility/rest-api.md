@@ -803,7 +803,7 @@ The REST API supports three authentication types:
   travel in the `Authorization: Bearer` header but are issued by an external
   Identity Provider rather than by QuestDB, so they are a different credential
   from the REST API token below. See [OpenID Connect](/docs/security/oidc/) and
-  [which token to send](/docs/security/oidc/#which-token-to-send).
+  [which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
 
 :::note
 

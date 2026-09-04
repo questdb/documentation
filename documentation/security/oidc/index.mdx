@@ -1,0 +1,143 @@
+---
+title: OpenID Connect (OIDC)
+sidebar_label: Overview
+slug: /security/oidc
+description: Integrate QuestDB Enterprise with an external OIDC Identity Provider for Web Console SSO, client authentication, PGWire token authentication, and group mapping.
+---
+
+import Screenshot from "@theme/Screenshot";
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  OpenID Connect (OIDC) enables SSO authentication with external Identity Providers.
+</EnterpriseNote>
+
+OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
+QuestDB.
+
+It is a convenient way to integrate QuestDB into your enterprise environment,
+and it provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/).
+
+Microsoft Active Directory and Azure AD, for example, can be turned into an
+Identity Provider.
+
+Specific installation steps depend on the type of the provider.
+
+## Architecture overview
+
+Altogether, the architecture appears as such:
+
+<Screenshot
+  alt="Overall architecture"
+  src="images/docs/guide/oidc/oidc-architecture.webp"
+  title="Architecture diagram"
+  width={750}
+/>
+
+We can break it down into core components.
+
+### Web Console
+
+QuestDB's interactive UI. Users must authenticate before accessing the database
+via the interface.
+
+The [Web Console](/docs/getting-started/web-console/overview/) uses PKCE (Proof Key for Code Exchange) to
+secure the authentication and authorization flow.
+
+In OAuth2/OIDC terms, the [Web Console](/docs/getting-started/web-console/overview/) is referred to as
+the _client_, and it is assigned an identifier: the **Client Id**.
+
+Each application which integrates via OIDC should be given a different **Client
+Id**.
+
+### OIDC Provider
+
+Typically consists of a number of modules.
+
+We are interested in two of them only.
+
+1. The _Identity Provider_ holds user identities and user information, capable
+   of authenticating users, and to issue an ID Token which uniquely identify
+   them.
+
+2. The _Authorization Server_ grants access to resources, such as a database, in
+   the form of access tokens.
+
+The OIDC Provider usually integrates with a number of applications which require
+different access to a number of resources.
+
+These clients communicate with the OIDC Provider via its endpoints.
+
+It exposes a number of APIs, including the Authorization, Token and User Info
+endpoints.
+
+### QuestDB
+
+The database, in OAuth2/OIDC terms the _protected resource_ or _resource
+server_.
+
+Only processes requests which contain the bearer token selected by its OIDC
+configuration: normally the access token, or the ID token when group memberships
+are encoded in it.
+
+
+## Where to go next
+
+| Page | Covers |
+| --- | --- |
+| [How sign-in works](/docs/security/oidc/how-sign-in-works/) | The Authorization Code Flow with PKCE, step by step |
+| [Client discovery and tokens](/docs/security/oidc/client-discovery/) | The settings endpoint, and which of the two tokens to send |
+| [Device flow](/docs/security/oidc-device-flow/) | Headless sign-in for a CLI, container, or notebook kernel |
+| [Client integration patterns](/docs/security/oidc/client-integration/) | Browser clients, Jupyter, CLI tools, unattended jobs, PGWire |
+| [Mapping groups and permissions](/docs/security/oidc/group-mapping/) | Turning Identity Provider groups into QuestDB permissions |
+| [PingFederate](/docs/security/oidc/pingfederate/) | Provider setup walkthrough |
+| [Microsoft Entra ID](/docs/security/oidc/entra-id/) | Provider setup walkthrough |
+
+For the `acl.oidc.*` settings, see the
+[OIDC settings reference](/docs/configuration/oidc/).
+
+## Settings endpoint {#settings-endpoint}
+
+QuestDB publishes the client ID, scope, and the provider's endpoints on an
+unauthenticated settings endpoint, so a client can discover them instead of
+hard coding them. See
+[Client discovery and tokens](/docs/security/oidc/client-discovery/#settings-endpoint).
+
+## Which token to send {#which-token-to-send}
+
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+decides whether a client sends the access token or the ID token in the
+`Authorization: Bearer` header. See
+[Client discovery and tokens](/docs/security/oidc/client-discovery/#which-token-to-send).
+
+## OIDC device flow {#device-authorization-flow}
+
+For command-line applications, containers, and remote notebook kernels, where
+no browser redirect can reach the client, QuestDB Enterprise supports the
+OAuth 2.0 Device Authorization Grant. QuestDB does not run the flow: the client
+talks to the Identity Provider directly and presents the resulting bearer
+token.
+
+See [OIDC device flow](/docs/security/oidc-device-flow/) for the
+protocol walkthrough, what to configure first, and worked examples for the
+Java, Python, Rust, C and C++ clients.
+
+
+## Where each section moved {#moved}
+
+These anchors are kept so that existing links keep working. Prefer the pages
+above when adding new links.
+
+| Section | Now at |
+| --- | --- |
+| <span id="authentication-and-authorization-flow"></span> Authentication and authorization flow | [How sign-in works](/docs/security/oidc/how-sign-in-works/) |
+| <span id="1-secret-generation"></span> Secret generation | [How sign-in works](/docs/security/oidc/how-sign-in-works/#1-secret-generation) |
+| <span id="user-permissions"></span> User permissions | [Mapping groups and permissions](/docs/security/oidc/group-mapping/) |
+| <span id="mapping-user-permissions"></span> Mapping user permissions | [Mapping groups and permissions](/docs/security/oidc/group-mapping/#mapping-user-permissions) |
+| <span id="interactive-clients"></span> Interactive clients | [Client integration patterns](/docs/security/oidc/client-integration/) |
+| <span id="non-interactive-clients"></span> Non-interactive clients | [Client integration patterns](/docs/security/oidc/client-integration/#non-interactive-clients) |
+| <span id="oidc-for-the-pgwire-endpoint"></span> OIDC for the PGWire endpoint | [Client integration patterns](/docs/security/oidc/client-integration/#oidc-for-the-pgwire-endpoint) |
+| <span id="pingfederate"></span> PingFederate | [PingFederate](/docs/security/oidc/pingfederate/) |
+| <span id="questdb-configuration-for-pingfederate"></span> QuestDB configuration for PingFederate | [PingFederate](/docs/security/oidc/pingfederate/#questdb-configuration) |
+| <span id="microsoft-entraid"></span><span id="questdb-configuration"></span> Microsoft Entra ID | [Microsoft Entra ID](/docs/security/oidc/entra-id/) |
+| <span id="configuration-options"></span> Configuration options | [OIDC settings](/docs/configuration/oidc/) |

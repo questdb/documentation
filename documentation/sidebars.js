@@ -719,14 +719,52 @@ module.exports = {
           label: "Role-Based Access Control (RBAC)",
         },
         {
-          id: "security/oidc",
-          type: "doc",
-          label: "OpenID Connect (OIDC) guide",
-        },
-        {
-          id: "security/oidc-device-flow",
-          type: "doc",
-          label: "OIDC device flow",
+          label: "OpenID Connect (OIDC)",
+          type: "category",
+          link: { type: "doc", id: "security/oidc/index" },
+          items: [
+            {
+              id: "security/oidc/how-sign-in-works",
+              type: "doc",
+              label: "How sign-in works",
+            },
+            {
+              id: "security/oidc/client-discovery",
+              type: "doc",
+              label: "Client discovery and tokens",
+            },
+            {
+              id: "security/oidc-device-flow",
+              type: "doc",
+              label: "Device flow",
+            },
+            {
+              id: "security/oidc/client-integration",
+              type: "doc",
+              label: "Client integration patterns",
+            },
+            {
+              id: "security/oidc/group-mapping",
+              type: "doc",
+              label: "Mapping groups and permissions",
+            },
+            {
+              label: "Provider setup",
+              type: "category",
+              items: [
+                {
+                  id: "security/oidc/pingfederate",
+                  type: "doc",
+                  label: "PingFederate",
+                },
+                {
+                  id: "security/oidc/entra-id",
+                  type: "doc",
+                  label: "Microsoft Entra ID",
+                },
+              ],
+            },
+          ],
         },
         {
           type: "doc",

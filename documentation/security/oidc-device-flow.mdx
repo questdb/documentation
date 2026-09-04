@@ -57,7 +57,7 @@ sequenceDiagram
 The client must respect the polling interval, `slow_down` responses, and the
 device code's expiry. The official clients handle those protocol details,
 choose the access or ID token according to
-[`acl.oidc.groups.encoded.in.token`](/docs/security/oidc/#which-token-to-send), cache it in memory,
+[`acl.oidc.groups.encoded.in.token`](/docs/security/oidc/client-discovery/#which-token-to-send), cache it in memory,
 and refresh it silently when the provider issues a refresh token. They never
 send the device code or the user's Identity Provider password to QuestDB.
 
@@ -100,13 +100,13 @@ Clients reach QuestDB over `https` for discovery, so the HTTP endpoint needs TLS
 enabled with [`http.tls.enabled`](/docs/configuration/tls/#httptlsenabled) and a
 certificate. For setting OIDC up against a specific provider, the OIDC guide has
 walkthroughs for
-[Microsoft Entra ID](/docs/security/oidc/#microsoft-entraid) and
-[PingFederate](/docs/security/oidc/#pingfederate).
+[Microsoft Entra ID](/docs/security/oidc/entra-id/) and
+[PingFederate](/docs/security/oidc/pingfederate/).
 
 ## Official client examples
 
 Each example discovers the OIDC client ID, scope, token-selection mode, and
-provider endpoints from QuestDB's [settings endpoint](/docs/security/oidc/#settings-endpoint), then
+provider endpoints from QuestDB's [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), then
 signs in before opening the database connection.
 
 Discovering the client ID means reusing QuestDB's own registration, which keeps
@@ -459,7 +459,7 @@ OAuth2 library that implements RFC 8628 or by making the two requests yourself,
 then pass it as a static bearer token and replace it before it expires.
 
 Read the client ID, the scope, and the endpoints from the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), including
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), including
 `acl.oidc.device.authorization.endpoint`, which QuestDB publishes without using.
 
 **Request a device code**, by posting `client_id` and `scope` as
@@ -485,7 +485,7 @@ Polling faster than `interval`, or ignoring `slow_down`, gets the client rate
 limited or blocked by the provider.
 
 Send the token your configuration calls for, per
-[which token to send](/docs/security/oidc/#which-token-to-send): the access
+[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send): the access
 token, or the ID token where group memberships are encoded in it. Keep the
 `refresh_token` if the provider issues one, and redeem it with
 `grant_type=refresh_token` rather than making the user sign in again.

@@ -1,0 +1,119 @@
+---
+title: Mapping OIDC groups and permissions
+sidebar_label: Mapping groups and permissions
+description: Map Identity Provider group memberships onto QuestDB groups with EXTERNAL ALIAS, and understand how QuestDB builds a user's access list from OIDC claims.
+---
+
+import Screenshot from "@theme/Screenshot";
+
+QuestDB does not store permissions for an OIDC user. It reads the user's group
+memberships out of the Identity Provider and maps them onto QuestDB groups,
+which carry the permissions. This page covers where those memberships come
+from, how to create the mapping, and what happens when a claim is missing.
+
+## User permissions
+
+QuestDB requires additional user information to be able to construct the user's
+access list.
+
+As a reminder, the access list is the list of permissions that determines what
+the user can and cannot do.
+
+QuestDB itself does not store external users, nor their passwords or any other
+authentication related detail.
+
+External users and their authentication methods are managed by the Identity
+Provider.
+
+Since external users are not managed by QuestDB, permissions cannot be granted
+to them directly.
+
+Instead, the database expects a list of groups, called the _groups claim_ to be
+present in the user information.
+
+These external group names are mapped to QuestDB's own groups.
+
+The access list of the external user consists of the permissions granted to
+those groups:
+
+<Screenshot
+  alt="OpenID setup"
+  src="images/docs/guide/oidc/oidc-setup-3.webp"
+  title="User permissions"
+  width={550}
+/>
+
+### Mapping user permissions
+
+The mappings between external and QuestDB groups are managed with the following
+SQL commands:
+
+```questdb-sql title="Create a group which is mapped to an Active Directory group"
+CREATE GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+```questdb-sql title="Map an Active Directory group to an already existing QuestDB group"
+ALTER GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+```questdb-sql title="Remove an Active Directory mapping without deleting the QuestDB group"
+ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+QuestDB works the list of external groups out from the User Info response
+message.
+
+If we take the example used earlier, we will see that the message contains a
+claim called `groups`. Its name is set with
+[`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim), which
+has no default and must be set whenever OIDC is enabled.
+
+If the groups claim is missing or it is an empty list, authentication fails. The
+same happens when the claim named by
+[`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) is missing or
+empty. Over HTTP QuestDB replies with `401 Unauthorized`, while on the PGWire
+endpoint the client receives an authentication error. Either way the reason is
+only visible in the server log.
+
+The user has to have at least the `HTTP` permission to be able to successfully
+login via the [Web Console](/docs/getting-started/web-console/overview/).
+
+```json title="User info response example with Active Directory groups"
+{
+  "sub": "externalUser",
+  "name": "External User",
+  "groups": [
+    "CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev",
+    "CN=TestGroup2,OU=DC Users,DC=ad,DC=quest,DC=dev"
+  ]
+}
+```
+
+Any change made to the user's group membership in the Identity Provider, QuestDB
+will adjust the user's access list.
+
+:::note
+
+There may be a slight delay due to the User Info Cache.
+
+QuestDB will use the cached information until it becomes stale, and gets
+updated.
+
+:::
+
+The same stands for changes made to the user's status within the Identity
+Provider.
+
+For example, a disabled user will not be kicked out of QuestDB immediately.
+
+The `acl.oidc.cache.ttl` config option drives how often user information should
+be synchronized with the Identity Providers.
+
+It should be set accordingly to your organization's policies.
+
+Other parts of the user information, such as the `sub` and the `name` also used
+by QuestDB.
+
+They could be displayed in the [Web Console](/docs/getting-started/web-console/overview/), or appear in
+the logs, for example.
+

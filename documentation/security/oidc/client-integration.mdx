@@ -1,0 +1,378 @@
+---
+title: OIDC client integration patterns
+sidebar_label: Client integration patterns
+description: How browser clients, Jupyter notebooks, CLI tools, unattended jobs, and PGWire clients authenticate against QuestDB Enterprise with OIDC.
+---
+
+How a client authenticates depends on what it can do: follow a browser
+redirect, prompt a person, or neither. This page covers each case, from a
+browser-based UI running the Authorization Code Flow to an unattended
+ingestion job holding a token it acquired out of band.
+
+## Interactive clients
+
+Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an
+OIDC provider. However, the level of support will vary between these tools.
+
+Interactive clients usually fall into one of the following categories:
+
+- Browser-based clients with support for HTTP redirects; this includes the Web
+  Console or any javascript UI
+- Applications running in a browser without support for redirects, such as
+  Jupyter notebooks
+- Non-browser based clients, usually some kind of command line interface (CLI)
+  or a standalone application, such as Microsoft Access
+
+### Browser-based clients
+
+If the tool is browser based and can handle HTTP redirects, it can implement two
+possible flows to request an access token.:
+
+1. [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+   flow **(Recommended, more secure)**
+
+2. [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth)
+   flow **(deprecated)**. It cannot use PKCE, so it does not satisfy
+   [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired),
+   which is `true` by default.
+
+The client can read the authorization and token endpoints, the client id and
+the scopes from the [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) instead of hard
+coding them.
+
+The Web Console implements the
+[Authorization Code Flow with PKCE](https://oauth.net/2/pkce), which is a
+special version of the Authorization Code flow designed for mobile apps and
+single page applications.
+
+Regardless of which flow is used by the web or mobile application, the requested
+token can be used for authentication and authorization when communicating with
+QuestDB. Select the access or ID token as described in
+[Which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
+
+### Jupyter notebook
+
+Use the official Python client's
+[OIDC device flow](/docs/security/oidc-device-flow/). It works when the browser
+and the notebook kernel are on different machines, and does not put the user's
+password in the notebook.
+
+Note that JupyterHub's OAuth integration (OAuthenticator) is a separate concern:
+it decides who may log in to JupyterHub, and gives the notebook no token to send
+to QuestDB.
+
+For tooling without device-flow support, a last-resort option is the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow. Enabling it usually
+requires additional provider configuration.
+
+:::caution
+
+The Resource Owner Password Credentials flow is legacy, and should be used as a last resort.
+
+:::
+
+The ROPC snippets below assume
+`acl.oidc.groups.encoded.in.token=false` and therefore send the access token. If
+the setting is `true`, the client must send the ID token instead, and the
+provider must issue one for the password grant. The official device-flow client
+selects the correct token automatically.
+
+As a fallback, the code below acquires an access token with ROPC:
+
+```python
+from urllib import request, parse
+import json
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": "testuser",
+    "password": "testpwd",
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+This token can be used to authenticate with QuestDB:
+
+```python
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/api/v1/sql/execute?{query}")
+req.add_header("Authorization", f"Bearer {access_token}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+#### Externalizing credentials
+
+The above example saves the user's credentials into the notebook, potentially
+exposing them to others. One way to improve this is to use environment variables
+or files to externalize the username and password.
+
+Here is an example using the `dotenv` library.
+
+First we need to create a file named `.env` with the settings:
+
+```ini title=".env"
+username=testuser
+password=testpwd
+```
+
+Then load it in our notebook, and use it to request tokens:
+
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request, parse
+import json
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": user,
+    "password": pwd,
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+#### Enable ROPC
+
+The Resource Owner Password Credentials flow can be enabled in QuestDB within
+`server.conf`:
+
+```ini title="server.conf"
+acl.oidc.ropc.flow.enabled=true
+```
+
+> Note that the flow also has to be configured in the OAuth2/OIDC provider!
+
+Now we can use Basic Authentication to simplify our code. We send the
+credentials to QuestDB, and the database will validate the credentials against
+the OAuth2 provider.
+
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request
+import base64
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/api/v1/sql/execute?{query}")
+b64credentials = base64.standard_b64encode(f"{user}:{pwd}".encode()).decode()
+req.add_header("Authorization", f"Basic {b64credentials}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+We can also use a postgres client to connect to the database:
+
+:::note
+
+QuestDB never persists the user's credentials.
+
+:::
+
+```python
+import psycopg as pg
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conn_str = f"user={user} password={pwd} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute("select current_user()")
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+
+### CLI, standalone applications
+
+For a CLI or standalone application built with an official Java, Python, Rust,
+C, or C++ client, use the
+[OIDC device flow](/docs/security/oidc-device-flow/).
+Tools such as `psql` and Microsoft Access cannot run the flow themselves; for
+those tools, acquire a token separately and use
+[PGWire token authentication](#oidc-for-the-pgwire-endpoint), or enable the
+legacy Resource Owner Password Credentials flow.
+
+The user logs in with their SSO credentials, and the server validates the
+details with the OAuth2 provider:
+
+```shell
+% psql -h localhost -p 8812 -U testuser
+Password for user testuser:
+psql (14.2, server 11.3)
+Type "help" for help.
+
+testldap=>
+testldap=>
+```
+
+## Non-interactive clients
+
+Non-interactive clients are usually jobs or standalone applications, such as a
+client for ingesting data. It is practical to manage their credentials via an
+OAuth2 provider too.
+
+As seen in the Jupyter notebook examples, the clients can request a token
+themselves and then use it to authorise data ingestion. QuestDB publishes the
+provider's token endpoint on the [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), so it
+does not have to be hard coded, and the same response tells the client
+[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
+
+The client id and the scopes stay the client's own. `acl.oidc.client.id` and
+`acl.oidc.scope` describe QuestDB's registration with the provider, not the
+job's. As noted in [Architecture overview](/docs/security/oidc/#architecture-overview), each
+application which integrates via OIDC should be given a different Client Id, so
+that the two can be told apart in the provider's audit log and given different
+policies.
+
+:::caution
+
+Both requests must go over `https`. The settings response names the URL this
+code posts the user's password to, so anyone able to tamper with a plaintext
+response can redirect the password grant to a host of their choosing. The same
+applies to the connection below, which carries the resulting token.
+
+:::
+
+```python
+import os
+import requests
+import pandas as pd
+import questdb
+from dotenv import load_dotenv
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+# this job's own registration in the OIDC Provider, not QuestDB's;
+# the openid scope is what makes the provider issue an ID token
+client_id = os.environ.get("client_id")
+scope = "openid"
+
+settings = requests.get("https://questdb.example.com:9000/settings").json()["config"]
+if not settings.get("acl.oidc.enabled"):
+    raise SystemExit("OIDC is not enabled on this QuestDB instance")
+
+# the endpoint keys are absent until QuestDB resolves them
+token_endpoint = settings.get("acl.oidc.token.endpoint")
+if not token_endpoint:
+    raise SystemExit("QuestDB has not resolved the provider's token endpoint")
+
+response = requests.post(token_endpoint,
+                         data={"grant_type": "password",
+                               "client_id": client_id,
+                               "username": user,
+                               "password": pwd,
+                               "scope": scope},
+                         headers={"Content-Type": "application/x-www-form-urlencoded"})
+response.raise_for_status()
+tokens = response.json()
+
+# QuestDB reads the group memberships from the ID token when this is enabled
+token_key = "id_token" if settings["acl.oidc.groups.encoded.in.token"] else "access_token"
+if token_key not in tokens:
+    raise SystemExit(f"the provider did not issue an {token_key} for the password grant")
+token = tokens[token_key]
+
+conf = f"wss::addr=questdb.example.com:9000;token={token};"
+with questdb.connect(conf) as db:
+    df = pd.read_csv("trades.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
+```
+
+:::note
+
+The Resource Owner Password Credentials flow returns an ID token only if the
+provider issues one for the password grant, and only when `openid` is among the
+requested scopes. Check that the provider does before relying on
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+with a non-interactive client.
+
+:::
+
+Alternatively, a user may rely on QuestDB to authenticate them via the OAuth2
+provider when the Resource Owner Password Credentials flow is enabled on the
+server side:
+
+```python
+import os
+import pandas as pd
+import questdb
+from dotenv import load_dotenv
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conf = f"wss::addr=questdb.example.com:9000;username={user};password={pwd};"
+with questdb.connect(conf) as db:
+    df = pd.read_csv("trades.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
+```
+
+## OIDC for the PGWire endpoint
+
+If the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow is not an option, we can still authenticate via OIDC on the PGWire endpoint.
+However, in this case the client's responsibility to source the token required for authentication.
+This method works wherever a Postgres client library is available, including jupyter notebooks.
+
+Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
+
+The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option. Send the token
+selected by [Which token to send](/docs/security/oidc/client-discovery/#which-token-to-send): the access token by
+default, or the ID token when group memberships are encoded in it.
+
+```python
+import psycopg as pg
+
+token = "token_requested_from_the_oauth2_provider"
+
+conn_str = f"user=_sso password={token} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute('select current_user()')
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+

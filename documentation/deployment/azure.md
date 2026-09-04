@@ -345,6 +345,6 @@ QuestDB Enterprise adds production features for Azure:
 - **EntraID SSO** - Single sign-on with Microsoft Entra ID
 
 For EntraID integration, see the
-[Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
+[Microsoft EntraID OIDC guide](/docs/security/oidc/entra-id/).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
