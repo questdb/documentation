@@ -272,6 +272,54 @@ clickable, use the separately vetted browser target instead: `browser_target` on
 the C event struct, `event_view::browser_target()` in C++, `browser_target()` on
 the Rust challenge, and the `browser_target` key on the Python prompt event.
 
+## Docker and Kubernetes
+
+Device flow works from a Docker container or Kubernetes pod because the browser
+can run on the host or another device. The container displays a verification URL
+and user code while making outbound requests to QuestDB and the Identity
+Provider. It does not need an inbound callback port.
+
+For example, a Python container can disable local browser launching and persist
+tokens in a mounted directory:
+
+```python title="Python device flow in a container"
+from questdb.auth import FileTokenStore, OidcDeviceAuth
+
+auth = OidcDeviceAuth.from_questdb(
+    "https://questdb.example.com:9000",
+    open_browser=False,
+    token_store=FileTokenStore("/var/lib/questdb-client/tokens"),
+)
+auth.sign_in()
+```
+
+When running device flow in a container:
+
+- Allow outbound HTTPS access to QuestDB and the Identity Provider.
+- Keep stderr visible through attached output or container logs so the user can
+  read the verification URL and code.
+- Set `open_browser=False`. Launching a browser is best-effort, but is not useful
+  inside most containers.
+- Mount the token-store directory as a persistent, access-restricted volume if
+  credentials should survive container or pod restarts. The file store contains
+  an unencrypted refresh token; see [token persistence](#token-persistence).
+- Call `sign_in()` before creating senders, pools, or database connections.
+
+The clients do not require a TTY. A detached container can start device flow and
+will wait until somebody reads its logs and approves the code, or until the
+device code expires.
+
+:::note Unattended workloads
+
+Device flow always needs a person to approve the sign-in. For production
+services, scheduled jobs, and CI, use a
+[QuestDB service-account token](/docs/security/oidc/client-integration/#non-interactive-clients)
+or an OAuth client-credentials flow. Set `interactive=False` when constructing
+the Python authentication object so missing credentials fail immediately rather
+than waiting for approval.
+
+:::
+
 ## Explicit configuration and endpoint pinning
 
 Discovery supplies the client ID, scope, token-selection mode, and endpoints.

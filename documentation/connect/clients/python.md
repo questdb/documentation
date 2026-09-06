@@ -179,6 +179,11 @@ terminals and remote Jupyter kernels:
 
 <OidcDeviceFlowExample />
 
+Device flow also works in Docker and Kubernetes without an inbound callback
+port. Disable browser launching, expose stderr to the operator, and persist the
+token store on a protected volume; see
+[Docker and Kubernetes](/docs/security/oidc/device-flow/#docker-and-kubernetes).
+
 `oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
 or silently refreshed token for every connection and reconnect. It is mutually
 exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
