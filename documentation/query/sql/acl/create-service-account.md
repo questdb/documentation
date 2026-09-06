@@ -55,6 +55,17 @@ group specified in the clause.
 The `OWNED BY` clause cannot be omitted if the service account is created by
 an external user, because permissions cannot be granted to them.
 
+## Permissions
+
+Creating a service account without a password clause requires `CREATE SERVICE
+ACCOUNT`. The explicit password forms need an additional permission:
+
+- `WITH PASSWORD` requires `ADD PASSWORD`.
+- `WITH NO PASSWORD` requires `REMOVE PASSWORD`.
+
+Omitting the clause and writing `WITH NO PASSWORD` create the same account
+state, but they do not have the same permission requirements.
+
 ## Examples
 
 ```questdb-sql

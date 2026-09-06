@@ -31,21 +31,21 @@ SELECT * FROM all_permissions();
 | COMPILE VIEW                 | Database &#124; Table               | Recompile a view against the current schema                    |
 | CONVERT PARTITION TO NATIVE  | Database &#124; Table               | Convert Parquet partitions back to native format               |
 | CONVERT PARTITION TO PARQUET | Database &#124; Table               | Convert partitions to Parquet in place                         |
-| CREATE TABLE                 | Database                            | Create tables                                                  |
-| CREATE MATERIALIZED VIEW     | Database                            | Create materialized views                                      |
-| CREATE VIEW                  | Database                            | Create views                                                   |
 | CREATE LIVE VIEW             | Database                            | Create live views                                              |
-| DEDUP ENABLE                 | Database &#124; Table               | Enable deduplication                                           |
+| CREATE MATERIALIZED VIEW     | Database                            | Create materialized views                                      |
+| CREATE TABLE                 | Database                            | Create tables                                                  |
+| CREATE VIEW                  | Database                            | Create views                                                   |
 | DEDUP DISABLE                | Database &#124; Table               | Disable deduplication                                          |
+| DEDUP ENABLE                 | Database &#124; Table               | Enable deduplication                                           |
 | DETACH PARTITION             | Database &#124; Table               | Detach partitions                                              |
 | DISABLE STORAGE POLICY       | Database &#124; Table               | Disable storage policies                                       |
 | DROP COLUMN                  | Database &#124; Table &#124; Column | Drop columns                                                   |
 | DROP INDEX                   | Database &#124; Table &#124; Column | Drop indexes                                                   |
+| DROP LIVE VIEW               | Database &#124; Table               | Drop live views                                                |
+| DROP MATERIALIZED VIEW       | Database &#124; Table               | Drop materialized views                                        |
 | DROP PARTITION               | Database &#124; Table               | Drop partitions                                                |
 | DROP TABLE                   | Database &#124; Table               | Drop tables                                                    |
-| DROP MATERIALIZED VIEW       | Database &#124; Table               | Drop materialized views                                        |
 | DROP VIEW                    | Database &#124; Table               | Drop views                                                     |
-| DROP LIVE VIEW               | Database &#124; Table               | Drop live views                                                |
 | ENABLE STORAGE POLICY        | Database &#124; Table               | Enable storage policies                                        |
 | INSERT                       | Database &#124; Table               | Insert data                                                    |
 | REFRESH MATERIALIZED VIEW    | Database &#124; Table               | Refresh materialized views                                     |
@@ -80,8 +80,8 @@ detail under
 | Permission | Level    | Description                               |
 | ---------- | -------- | ----------------------------------------- |
 | HTTP       | Database | REST API, Web Console, QWP, ILP over HTTP |
-| PGWIRE     | Database | PostgreSQL Wire Protocol (port 8812)      |
 | ILP        | Database | InfluxDB Line Protocol TCP (port 9009)    |
+| PGWIRE     | Database | PostgreSQL Wire Protocol (port 8812)      |
 
 ## User management permissions
 

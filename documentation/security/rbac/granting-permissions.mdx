@@ -68,18 +68,18 @@ For row-level security, create a [view](/docs/concepts/views/) that filters
 rows, then grant access to the view instead of the underlying table:
 
 ```questdb-sql
--- Create a view that only shows AAPL trades
-CREATE VIEW aapl_trades AS (
-  SELECT * FROM trades WHERE symbol = 'AAPL'
+-- Create a view that only shows ETH-USDT trades
+CREATE VIEW eth_usdt_trades AS (
+  SELECT * FROM trades WHERE symbol = 'ETH-USDT'
 );
 
 -- Grant access to the view, not the base table
-GRANT SELECT ON aapl_trades TO aapl_analyst;
+GRANT SELECT ON eth_usdt_trades TO eth_analyst;
 -- No GRANT on trades table = user cannot see other symbols
 ```
 
-The user `aapl_analyst` can only see AAPL trades. They have no access to the
-underlying `trades` table.
+The user `eth_analyst` can only see `ETH-USDT` trades. They have no access to
+the underlying `trades` table.
 
 Creating a view needs the `CREATE VIEW` permission; dropping or redefining one
 needs `DROP VIEW` or `ALTER VIEW` on that view.

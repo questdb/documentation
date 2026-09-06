@@ -5,6 +5,11 @@ description: Map Identity Provider group memberships onto QuestDB groups with EX
 ---
 
 import Screenshot from "@theme/Screenshot";
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote";
+
+<EnterpriseNote>
+  OIDC group mapping and authorization are available in QuestDB Enterprise.
+</EnterpriseNote>
 
 QuestDB does not store permissions for an OIDC user. It reads the user's group
 memberships out of the Identity Provider and maps them onto QuestDB groups,

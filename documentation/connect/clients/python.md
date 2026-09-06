@@ -186,8 +186,10 @@ token store on a protected volume; see
 
 `oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
 or silently refreshed token for every connection and reconnect. It is mutually
-exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
-which the provider issues only when `offline_access` was requested; see
+exclusive with a fixed `token=` setting. Silent refresh needs a refresh token.
+Request the provider's refresh-token scope, commonly `offline_access`; the
+client registration, consent, and provider policy still determine whether one
+is issued. See
 [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Transport operations
 never prompt; if they raise `OidcInteractionRequired`, importable from
 `questdb.auth`, call `auth.sign_in()` explicitly on the main or UI thread.

@@ -104,7 +104,7 @@ ALTER USER username WITH NO PASSWORD;
 -- Create tokens
 ALTER USER username CREATE TOKEN TYPE JWK;
 ALTER USER username CREATE TOKEN TYPE REST WITH TTL '30d';
-ALTER USER username CREATE TOKEN TYPE REST WITH TTL '1d' REFRESH;  -- Auto-refresh
+ALTER USER username CREATE TOKEN TYPE REST WITH TTL '1d' REFRESH;  -- Sliding expiry extension
 
 -- Remove tokens
 ALTER USER username DROP TOKEN TYPE JWK;

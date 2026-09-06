@@ -29,7 +29,7 @@ It assumes the `trades` table from the
 CREATE USER analyst WITH PASSWORD 'secure_password_here';
 
 -- 2. Grant endpoint access (required to connect)
-GRANT PGWIRE, HTTP TO analyst;
+GRANT HTTP, PGWIRE TO analyst;
 
 -- 3. Grant read access to specific tables
 GRANT SELECT ON trades TO analyst;
@@ -113,12 +113,12 @@ via `ILP`.
 - [REMOVE USER](/docs/query/sql/acl/remove-user/)
 - [REVOKE](/docs/query/sql/acl/revoke/)
 - [REVOKE ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/revoke-assume-service-account/)
-- [SHOW USER](/docs/query/sql/show/#show-user)
-- [SHOW USERS](/docs/query/sql/show/#show-users)
 - [SHOW GROUPS](/docs/query/sql/show/#show-groups)
+- [SHOW PERMISSIONS](/docs/query/sql/show/#show-permissions-for-current-user)
 - [SHOW SERVICE ACCOUNT](/docs/query/sql/show/#show-service-account)
 - [SHOW SERVICE ACCOUNTS](/docs/query/sql/show/#show-service-accounts)
-- [SHOW PERMISSIONS](/docs/query/sql/show/#show-permissions-for-current-user)
+- [SHOW USER](/docs/query/sql/show/#show-user)
+- [SHOW USERS](/docs/query/sql/show/#show-users)
 
 ## Where each section moved {#moved}
 

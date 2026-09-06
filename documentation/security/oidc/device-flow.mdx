@@ -76,9 +76,12 @@ Before using the flow:
    a provider document containing `device_authorization_endpoint`, or the
    host-based configuration must set
    [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
-3. Keep `openid` in [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope),
-   and add `offline_access` so the provider issues a refresh token. Without one
-   the client must make the user sign in again at every token expiry.
+3. Keep `openid` in [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope)
+   to request OIDC authentication semantics. Also request the provider's
+   refresh-token scope, commonly `offline_access`. The client registration,
+   consent, and provider policy determine whether a refresh token is issued.
+   Without one, the client must ask the user to sign in again after the current
+   token expires.
 
 For example, a host-based configuration can add:
 
@@ -364,7 +367,7 @@ the provider, or when QuestDB does not publish what the client needs:
 | Setting | Set it when |
 | --- | --- |
 | `client_id` | the application has its own registration, which is the recommended setup |
-| `scope` | requesting `offline_access` for this application alone, rather than server-wide |
+| `scope` | requesting the provider's refresh-token scope for this application alone, rather than server-wide |
 | `audience` | the provider requires one, or QuestDB checks `aud` against [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
 | `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads `{issuer}/.well-known/openid-configuration` instead |
 | `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
@@ -431,11 +434,12 @@ let auth = OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
 </TabItem>
 </Tabs>
 
-An endpoint QuestDB advertises must sit under the pinned issuer's origin, or the
-client rejects it. An endpoint the client reads from the provider's own
-`{issuer}/.well-known/openid-configuration` is exempt, which is what makes the
-pin work with providers that host their endpoints outside the issuer, such as
-Microsoft Entra ID and Google.
+An endpoint QuestDB advertises must share the pinned issuer's origin. When the
+issuer contains a path, the endpoint must also remain beneath that path. The
+client rejects an advertised endpoint which fails either check. An endpoint the
+client reads from the provider's own `{issuer}/.well-known/openid-configuration`
+is exempt, which is what makes the pin work with providers that host their
+endpoints outside the issuer, such as Microsoft Entra ID and Google.
 
 ## Token persistence
 
@@ -526,6 +530,9 @@ Catching it and signing in again:
 <TabItem value="python" label="Python">
 
 ```python
+from questdb.auth import OidcInteractionRequired
+
+
 try:
     sender.flush(wait=True)
 except OidcInteractionRequired:
@@ -591,6 +598,9 @@ decide what happens next:
 | `slow_down` | polling too fast; add 5 seconds to `interval`, then poll again |
 | `access_denied` | the user refused; stop |
 | `expired_token` | `expires_in` elapsed; start a new device authorization request |
+
+Treat every other OAuth error as terminal: stop polling and return the failure
+to the caller.
 
 Polling faster than `interval`, or ignoring `slow_down`, gets the client rate
 limited or blocked by the provider.

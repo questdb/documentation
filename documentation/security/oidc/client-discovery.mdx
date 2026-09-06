@@ -4,6 +4,13 @@ sidebar_label: Client discovery and tokens
 description: How a QuestDB client reads the OIDC settings endpoint to discover the provider's endpoints, client ID and scope, and which of the two tokens to send.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  OIDC client discovery and bearer-token authentication are available in
+  QuestDB Enterprise.
+</EnterpriseNote>
+
 A client needs two things from QuestDB before it can authenticate a user
 against your Identity Provider: where the provider's endpoints are, and which
 of the two tokens the provider issues QuestDB expects in the

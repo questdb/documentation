@@ -46,6 +46,14 @@ to the new QuestDB group. It cannot be combined with `IF NOT EXISTS`. Use
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/) to add or remove mappings on
 an existing group.
 
+External aliases are globally unique. If the alias is already reserved,
+`CREATE GROUP` fails instead of reusing the mapping.
+
+## Permissions
+
+Creating a group requires the `CREATE GROUP` permission. The `WITH EXTERNAL
+ALIAS` form also requires `ADD EXTERNAL ALIAS`.
+
 ## Examples
 
 ```questdb-sql
@@ -64,6 +72,7 @@ SHOW GROUPS;
 
 that yields:
 
-| name   |
-| ------ |
-| admins |
+| name     |
+| -------- |
+| admins   |
+| analysts |

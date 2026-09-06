@@ -153,31 +153,31 @@ location it was loaded from, without the query string or fragment
 - **Default**: `openid`
 - **Reloadable**: no
 
-The OIDC server asks consent for the scopes listed in this property. The
-scope `openid` is mandatory and must always be included. That is an OIDC
-protocol requirement enforced by the provider, not a QuestDB startup check:
-QuestDB passes the value on without inspecting it, so leaving `openid` out
-fails at the provider rather than at startup.
+The OIDC server asks consent for the scopes listed in this property. Keep
+`openid` in the value for QuestDB's OIDC flows. It requests OIDC authentication
+semantics and an ID token from the provider. QuestDB passes the value on without
+inspecting it. Without `openid`, a provider may process the request as OAuth2
+and issue only an access token, or reject it according to provider policy.
 
 QuestDB uses the scopes in the requests it makes itself, in the
 [ROPC flow](#acloidcropcflowenabled), and publishes them on the
 [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) for clients which
 run the flow themselves.
 
-For the [OIDC device flow](/docs/security/oidc/device-flow/), add
-`offline_access` alongside `openid`:
+For the [OIDC device flow](/docs/security/oidc/device-flow/), request the
+provider's refresh-token scope, commonly `offline_access`, alongside `openid`:
 
 ```ini title="server.conf"
 acl.oidc.scope=openid offline_access
 ```
 
-Most providers, Microsoft Entra ID among them, issue a refresh token only when
-that scope was requested, and without one the client has to make the user sign
-in again as soon as the current token expires.
-Providers which issue refresh tokens regardless ignore the extra scope, so
-adding it is the safe default. A client can also request it through its own
-`scope` override, which leaves this server-wide value, and every other flow
-using it, untouched.
+Requesting the scope does not guarantee a refresh token. The client
+registration, user or administrator consent, and provider policy determine
+whether one is issued. Some providers use a different scope, issue refresh
+tokens without one, or reject an unsupported scope. Without a refresh token,
+the client must ask the user to sign in again after the current token expires.
+A client can request the scope through its own `scope` override, which leaves
+this server-wide value, and every other flow using it, untouched.
 
 ## Authentication flows
 

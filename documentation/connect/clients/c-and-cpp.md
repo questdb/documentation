@@ -352,8 +352,10 @@ pool so sender and reader connections share its rotating token:
 </Tabs>
 
 The pool retains the auth state and gets a cached or silently refreshed token
-for every connection and reconnect. Silent refresh needs a refresh token, which
-the provider issues only when `offline_access` was requested; see
+for every connection and reconnect. Silent refresh needs a refresh token.
+Request the provider's refresh-token scope, commonly `offline_access`; the
+client registration, consent, and provider policy still determine whether one
+is issued. See
 [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Those transport
 operations never prompt; they fail with
 `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` in C, or

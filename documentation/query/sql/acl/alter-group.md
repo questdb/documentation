@@ -36,8 +36,16 @@ ALTER GROUP groupName DROP EXTERNAL ALIAS externalAlias;
 to `groupName`. An external user receives the QuestDB group's permissions when
 their claim contains that exact alias.
 
+External aliases are globally unique. If the alias is already reserved, adding
+it fails instead of replacing the existing mapping.
+
 `DROP EXTERNAL ALIAS` removes the named mapping. It does not drop the QuestDB
 group or change permissions granted to it.
+
+## Permissions
+
+- `WITH EXTERNAL ALIAS` requires `ADD EXTERNAL ALIAS`.
+- `DROP EXTERNAL ALIAS` requires `REMOVE EXTERNAL ALIAS`.
 
 ## Examples
 

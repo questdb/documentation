@@ -27,11 +27,21 @@ GRANT SELECT ON ALL TABLES TO analyst;
 
 A service account for an application that ingests data into specific tables:
 
-```questdb-sql
-CREATE SERVICE ACCOUNT ingest_app WITH PASSWORD 'pwd';
+```questdb-sql title="Create an ILP/TCP service account"
+CREATE SERVICE ACCOUNT ingest_app;
+ALTER SERVICE ACCOUNT ingest_app CREATE TOKEN TYPE JWK;
 GRANT ILP TO ingest_app;               -- InfluxDB Line Protocol access
 GRANT INSERT ON trades TO ingest_app;  -- Can only insert into trades
 ```
+
+:::warning
+
+Save the private key returned by `ALTER SERVICE ACCOUNT` when the token is
+created. QuestDB does not store the private key, so it cannot be recovered
+later. Configure the ILP/TCP client with the `ingest_app` account name and that
+private key. See [RBAC authentication](/docs/security/rbac/authentication/).
+
+:::
 
 ## Team-based access with groups
 
@@ -73,17 +83,21 @@ Different users see different subsets of data:
 
 ```questdb-sql
 -- Create views over different subsets of the trades table
-CREATE VIEW eth_usd_trades AS (SELECT * FROM trades WHERE symbol = 'ETH-USD');
-CREATE VIEW btc_usd_trades AS (SELECT * FROM trades WHERE symbol = 'BTC-USD');
+CREATE VIEW eth_usdt_trades AS (
+    SELECT * FROM trades WHERE symbol = 'ETH-USDT'
+);
+CREATE VIEW btc_usdt_trades AS (
+    SELECT * FROM trades WHERE symbol = 'BTC-USDT'
+);
 
 -- Grant users access to their subset only
 CREATE USER eth_analyst WITH PASSWORD 'pwd';
 GRANT HTTP, PGWIRE TO eth_analyst;
-GRANT SELECT ON eth_usd_trades TO eth_analyst;
+GRANT SELECT ON eth_usdt_trades TO eth_analyst;
 
 CREATE USER btc_analyst WITH PASSWORD 'pwd';
 GRANT HTTP, PGWIRE TO btc_analyst;
-GRANT SELECT ON btc_usd_trades TO btc_analyst;
+GRANT SELECT ON btc_usdt_trades TO btc_analyst;
 ```
 
 ## Database administrator

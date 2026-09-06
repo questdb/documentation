@@ -1,6 +1,7 @@
 ```c
 #include <questdb/client.h>
-#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
+/* questdb_db_borrow_sender and line_sender_buffer */
+#include <questdb/ingress/qwp_sender.h>
 #include <questdb/oidc.h>
 #include <stdio.h>
 #include <string.h>
@@ -45,15 +46,27 @@ int main(void) {
     if (!sender) goto done;
     buffer = questdb_db_new_buffer(db, &error);
     if (!buffer) goto done;
-    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto done;
+    if (!line_sender_buffer_table(
+            buffer, QDB_TABLE_NAME_LITERAL("trades"), &error))
+        goto done;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USDT"), &error)) goto done;
+                                   QDB_UTF8_LITERAL("ETH-USDT"), &error))
+        goto done;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"),
-                                   QDB_UTF8_LITERAL("sell"), &error)) goto done;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto done;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto done;
-    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &error)) goto done;
-    if (!qwp_sender_flush_buffer_and_wait(sender, buffer, qwpws_ack_level_ok, &error)) goto done;
+                                   QDB_UTF8_LITERAL("sell"), &error))
+        goto done;
+    if (!line_sender_buffer_column_f64(
+            buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error))
+        goto done;
+    if (!line_sender_buffer_column_f64(
+            buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error))
+        goto done;
+    if (!line_sender_buffer_at_nanos(
+            buffer, line_sender_now_nanos(), &error))
+        goto done;
+    if (!qwp_sender_flush_buffer_and_wait(
+            sender, buffer, qwpws_ack_level_ok, &error))
+        goto done;
     status = 0;
 
 done:
