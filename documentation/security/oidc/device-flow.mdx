@@ -103,6 +103,41 @@ walkthroughs for
 [Microsoft Entra ID](/docs/security/oidc/entra-id/) and
 [PingFederate](/docs/security/oidc/pingfederate/).
 
+## Prepare permissions and the example schema
+
+Every client example below writes one row to `trades` over QWP/WebSocket. Before
+running an example, create the table with the schema from the
+[Create a sample database guide](/docs/getting-started/create-database/#creating-a-table):
+
+```questdb-sql title="Create the example table"
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    side SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, symbol);
+```
+
+Next, run the following as the built-in admin. Replace the external alias with
+the exact group name or identifier that the Identity Provider places in the
+user's groups claim:
+
+```questdb-sql title="Map the external group and grant example permissions"
+CREATE GROUP oidc_ingest
+WITH EXTERNAL ALIAS 'identity-provider-ingest-group';
+
+GRANT HTTP TO oidc_ingest;
+GRANT INSERT ON trades TO oidc_ingest;
+```
+
+The `HTTP` permission allows the QWP/WebSocket connection, while `INSERT` allows
+the client to write to the existing table. The external alias gives those
+permissions to users whose groups claim contains that value. See
+[Mapping OIDC groups and permissions](/docs/security/oidc/group-mapping/#mapping-user-permissions)
+for provider-specific group mapping details.
+
 ## Official client examples
 
 Each example discovers the OIDC client ID, scope, token-selection mode, and
