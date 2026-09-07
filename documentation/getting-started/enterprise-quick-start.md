@@ -333,8 +333,8 @@ topics=your_kafka_topic
 
 # --- QuestDB Connection ---
 # Use ws:: if your QuestDB server does not have TLS enabled.
-# Replace the placeholder with the token you generated.
-client.conf.string=wss::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;
+# Replace YOUR_TOKEN with the token you generated.
+client.conf.string=wss::addr=localhost:9000;token=YOUR_TOKEN;
 
 # --- Optional: Data Mapping ---
 # Use a field from the Kafka message key or value as a QuestDB symbol.
