@@ -6,9 +6,11 @@ description: Apache Kafka and QuestDB Kafka Connector overview and guide. Thorou
 ---
 
 QuestDB provides a first-party Kafka Connect connector for streaming data from
-Apache Kafka into QuestDB tables. The connector handles serialization, fault
-tolerance, and batching automatically, making it the recommended approach for
-most use cases.
+Apache Kafka into QuestDB tables. The connector speaks the
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/overview/) over
+WebSocket, commits Kafka offsets only after QuestDB has acknowledged the rows,
+and handles serialization, batching, and reconnects automatically. It is the
+recommended approach for most use cases.
 
 ## Choosing an integration strategy
 
@@ -28,9 +30,12 @@ automatically, and requires minimal configuration.
 ## QuestDB Kafka connector {#questdb-kafka-connect-connector}
 
 The [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
-is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
-and uses InfluxDB Line Protocol for high-performance data transfer. It works
-with Kafka-compatible systems like [Redpanda](/docs/connect/message-brokers/redpanda/).
+is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html).
+It streams rows to QuestDB over QWP, selected with a `ws::` or `wss::`
+[client configuration string](#client-configuration-string), and works with
+Kafka-compatible systems like [Redpanda](/docs/connect/message-brokers/redpanda/).
+The older InfluxDB Line Protocol (ILP) transport over HTTP remains available,
+see [Legacy ILP transports](#legacy-ilp-transports).
 
 ### Quick start
 
@@ -39,8 +44,9 @@ and write it to QuestDB.
 
 #### Prerequisites
 
-- Apache Kafka (or compatible system)
-- QuestDB instance with HTTP endpoint accessible
+- Apache Kafka 3.6 or newer (or a compatible system)
+- QuestDB 10.0 or newer, with port 9000 reachable from the Kafka Connect worker
+- QuestDB Kafka connector 0.24 or newer
 - Java 17+ (JDK)
 
 #### Step 1: Install the connector
@@ -78,8 +84,8 @@ Create a configuration file at `/path/to/kafka/config/questdb-connector.properti
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
 
-# QuestDB connection
-client.conf.string=http::addr=localhost:9000;
+# QuestDB connection (QWP over WebSocket)
+client.conf.string=ws::addr=localhost:9000;
 
 # Kafka source
 topics=example-topic
@@ -151,11 +157,12 @@ The connector configuration has two parts:
 
 | Name | Type | Example | Default | Description |
 |------|------|---------|---------|-------------|
-| client.conf.string | `string` | http::addr=localhost:9000; | N/A | Client configuration string |
+| client.conf.string | `string` | ws::addr=localhost:9000; | N/A | Client configuration string |
 | topics | `string` | orders,audit | N/A | Kafka topics to read from |
 | table | `string` | my_table | Topic name | Target table in QuestDB |
 | key.converter | `string` | <sub>org.apache.kafka.connect.storage.StringConverter</sub> | N/A | Converter for Kafka keys |
 | value.converter | `string` | <sub>org.apache.kafka.connect.json.JsonConverter</sub> | N/A | Converter for Kafka values |
+| value.format | `string` | json | connect | Payload format: `connect`, `json`, or `json_envelope`. See [Raw JSON fast path](#raw-json-fast-path) |
 | include.key | `boolean` | false | true | Include message key in target table |
 | key.prefix | `string` | from_key | key | Prefix for key fields |
 | value.prefix | `string` | from_value | N/A | Prefix for value fields |
@@ -167,12 +174,36 @@ The connector configuration has two parts:
 | timestamp.string.fields | `string` | creation_time | N/A | String fields containing textual timestamps |
 | timestamp.string.format | `string` | yyyy-MM-dd HH:mm:ss.SSSUUU z | <sub>yyyy-MM-ddTHH:mm:ss.SSSUUUZ</sub> | Format for parsing string timestamps |
 | skip.unsupported.types | `boolean` | false | false | Skip unsupported types instead of failing |
-| allowed.lag | `int` | 250 | 1000 | Milliseconds to wait before flushing when no new events |
+| allowed.lag | `int` | 250 | 1000 | Milliseconds the task waits for new records before publishing what it has buffered |
+| retry.backoff.ms | `long` | 5000 | 3000 | Milliseconds to wait before reconnecting when QuestDB is unreachable. Not used by the HTTP transport |
+| dlq.send.batch.on.error | `boolean` | true | false | Send the whole rejected chunk to the dead letter queue instead of isolating the bad record. See [Dead letter queue](#dead-letter-queue) |
 
 The connector uses Kafka Connect converters for deserialization and works with
 any format they support, including JSON, Avro, and Protobuf. When using Schema
 Registry, configure the appropriate converter (e.g.,
 `io.confluent.connect.avro.AvroConverter`).
+
+#### QWP delivery options
+
+These options apply only to the `ws` and `wss` transports and are ignored by
+the legacy HTTP transport. See [Delivery guarantees](#fault-tolerance) and
+[Performance tuning](#performance-tuning) for when to change them.
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| qwp.commit.ack.timeout.ms | `long` | 500 | Milliseconds an offset commit waits for QuestDB to acknowledge just-published rows. Offsets that are still unacknowledged when the wait expires are withheld and their records redelivered |
+| qwp.dlq.terminal.categories | `list` | SCHEMA_MISMATCH | Server rejection categories that are isolated and sent to the dead letter queue instead of failing the task |
+| qwp.max.inflight.rows | `int` | 150000 | Soft limit on rows published but not yet acknowledged. Above it the task pauses consumption until acknowledgements catch up. The current poll batch can overshoot it |
+| qwp.progress.timeout.ms | `long` | 300000 | Milliseconds rows may stay unacknowledged before the task fails. This is the only bound on a QuestDB outage |
+| qwp.quarantine.ack.timeout.ms | `long` | 1000 | Milliseconds to wait for each synchronous chunk while isolating a rejected record |
+
+:::note
+
+Pre-release builds of the QWP transport used the names `max.inflight.rows` and
+`progress.timeout.ms`. Both are rejected at startup; rename them to
+`qwp.max.inflight.rows` and `qwp.progress.timeout.ms`.
+
+:::
 
 #### Client configuration string
 
@@ -187,7 +218,14 @@ Format:
 
 Note the trailing semicolon.
 
-**Supported protocols:** `http`, `https`
+**Supported protocols:**
+
+| Protocol | Transport | Notes |
+|----------|-----------|-------|
+| `ws` | QWP over WebSocket | Recommended. Acknowledged delivery, automatic reconnects |
+| `wss` | QWP over WebSocket with TLS | Requires QuestDB Enterprise, or a TLS-terminating proxy in front of QuestDB open source |
+| `http`, `https` | ILP over HTTP | Legacy. See [Legacy ILP transports](#legacy-ilp-transports) |
+| `tcp`, `tcps` | ILP over TCP | Not recommended. Offers no delivery guarantees |
 
 **Required keys:**
 - `addr` - QuestDB hostname and port (port defaults to 9000)
@@ -196,24 +234,42 @@ Examples:
 
 ```properties
 # Minimal configuration
-client.conf.string=http::addr=localhost:9000;
+client.conf.string=ws::addr=localhost:9000;
 
-# With HTTPS and retry timeout
-client.conf.string=https::addr=questdb.example.com:9000;retry_timeout=60000;
+# Basic authentication with the password from an environment variable
+client.conf.string=ws::addr=questdb.example.com:9000;username=admin;password=${QUESTDB_PASSWORD};
 
-# With authentication token from environment variable
-client.conf.string=http::addr=localhost:9000;token=${QUESTDB_TOKEN};
+# TLS with a bearer token (QuestDB Enterprise)
+client.conf.string=wss::addr=questdb.example.com:9000;token=${QUESTDB_TOKEN};
+
+# Multi-host failover (QuestDB Enterprise)
+client.conf.string=wss::addr=node-a:9000,node-b:9000;token=${QUESTDB_TOKEN};
+
+# Larger in-memory buffer for unacknowledged rows
+client.conf.string=ws::addr=localhost:9000;sf_max_total_bytes=256m;
 ```
 
-See the [Java Client configuration guide](/docs/connect/clients/java) for all
-available client options.
+See the [connect string reference](/docs/connect/clients/connect-string/) for
+all available client keys.
 
-:::danger
+##### Keys the connector manages
 
-The QuestDB client also supports TCP transport, but it is not recommended for
-Kafka Connect because the TCP transport offers no delivery guarantees.
+The connector owns batching and delivery, so it adjusts or restricts some
+client keys on the `ws` and `wss` transports:
 
-:::
+| Key | Behaviour in the connector |
+|-----|----------------------------|
+| `auto_flush_rows` | Rows per checkpoint. Default: `75000`. Cannot be `off` |
+| `auto_flush_interval` | Milliseconds between checkpoints. Default: `1000`. Cannot be `off` |
+| `auto_flush_bytes` | Kept enabled and clamped by the client to the server's batch cap, so a multi-row batch never exceeds one frame |
+| `sf_dir`, `sf_durability` | Rejected. Kafka is the durable log, so the client buffer is memory-only |
+| `sf_max_total_bytes` | Cap on the memory buffer of encoded, unacknowledged rows. Default: `128m` |
+| `sf_append_deadline_millis` | How long a checkpoint waits for buffer space. Default: `30000`. Must be lower than the consumer's `max.poll.interval.ms` |
+| `initial_connect_retry` | Forced to `off`; any other value is rejected. Kafka Connect owns startup retries, see [Outages and reconnects](#outages-and-reconnects) |
+| `close_flush_timeout_millis` | Default: `0`. Offsets are decided before the sender closes, so a close-time wait cannot commit more. An explicit value is preserved |
+
+The `reconnect_*` keys pass through unchanged and control the client's
+reconnect backoff during an outage.
 
 ##### Environment variable expansion
 
@@ -339,34 +395,70 @@ not appear as columns in the output.
 
 All listed fields must be present in each message.
 
-### Fault tolerance
+<!-- Legacy anchor kept for inbound links from other docs pages -->
+### Delivery guarantees {#fault-tolerance}
 
-The connector automatically retries recoverable errors (network issues, server
-unavailability, timeouts). Non-recoverable errors (invalid data, authentication
-failures) are not retried.
+The connector delivers every Kafka record to QuestDB at least once. It writes
+rows into checkpoints of up to `auto_flush_rows` rows, publishes each
+checkpoint over QWP, and commits a Kafka offset only after QuestDB has
+acknowledged every checkpoint up to that offset. Records QuestDB never
+acknowledged stay uncommitted in Kafka and are redelivered.
 
-Configure retry behavior via the client configuration:
-
-```properties
-# Retry for up to 60 seconds
-client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
-```
-
-Default retry timeout is 10,000 ms.
+Duplicates arise when QuestDB committed rows but the acknowledgement did not
+reach the connector before it had to give the records back to Kafka: a
+reconnect, a rebalance, a shutdown, or a server rejection that rewinds a
+checkpoint whose acknowledged prefix is then replayed. Enable deduplication on
+the target table whenever duplicate rows are not acceptable.
 
 #### Exactly-once delivery
 
-Retries may cause duplicate rows. To ensure exactly-once delivery, enable
-[deduplication](/docs/concepts/deduplication/) on your target table.
-Deduplication requires a designated timestamp from the message payload or Kafka
-metadata.
+For exactly-once results, enable
+[deduplication](/docs/concepts/deduplication/) on the target table with keys
+that identify a unique event:
+
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE,
+    volume LONG
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, symbol);
+```
+
+Deduplication requires a designated timestamp that is stable across
+redelivery, so take it from the [message payload](#using-a-message-field) or
+from [Kafka metadata](#using-kafka-timestamps). A server-assigned timestamp
+changes on every replay and cannot match. See
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the full model.
+
+#### Outages and reconnects
+
+The client reconnects on its own when the connection drops and re-sends
+unacknowledged rows from its memory buffer, so a short QuestDB outage only
+adds latency. When QuestDB is unreachable at task start, or after the
+connector has given up on a connection, the task retries every
+`retry.backoff.ms` (default 3 seconds) while Kafka Connect holds the current
+batch. Authentication and configuration failures are not retried and fail the
+task immediately.
+
+The task fails only when rows stay unacknowledged for
+`qwp.progress.timeout.ms` (default 5 minutes). Raise it to tolerate longer
+outages. Kafka retains the records until the task resumes, and a restarted
+task continues from the last committed offset.
+
+During an outage the client buffer keeps filling because nothing is
+acknowledged. Once it is full, a checkpoint waits up to
+`sf_append_deadline_millis` (default 30 seconds) for space. If that expires,
+the connector retires the connection, rewinds the affected partitions to their
+oldest unacknowledged checkpoint, and re-fetches those records from Kafka once
+QuestDB is back.
 
 #### Dead letter queue
 
-For messages that fail due to non-recoverable errors (invalid data, schema
-mismatches), configure a Dead Letter Queue to prevent the connector from
-stopping. These settings must be configured in the **Kafka Connect worker
-configuration** (e.g., `connect-standalone.properties` or
+For records that fail for data reasons, configure a dead letter queue (DLQ) so
+the connector skips them instead of stopping. These settings go in the **Kafka
+Connect worker configuration** (e.g., `connect-standalone.properties` or
 `connect-distributed.properties`), not in the connector configuration:
 
 ```properties
@@ -375,36 +467,163 @@ errors.deadletterqueue.topic.name=dlq-questdb
 errors.deadletterqueue.topic.replication.factor=1
 ```
 
-Failed messages are sent to the DLQ topic for later inspection.
+The DLQ is used only when both a DLQ topic is set and `errors.tolerance=all`.
+Two kinds of failure reach it:
+
+- **Records the connector cannot turn into a row**: an unsupported type, an
+  illegal column name, or a row larger than the server's batch cap. The record
+  goes to the DLQ and delivery continues.
+- **Records QuestDB rejects with a schema mismatch**: for example a string
+  value for a `DOUBLE` column. QWP rejects the whole frame, so the connector
+  rewinds the affected partitions, re-fetches the unacknowledged window from
+  Kafka, and delivers it synchronously in checkpoint-sized chunks, bisecting
+  each rejected chunk until the offending record is isolated and sent to the
+  DLQ. Each chunk waits up to `qwp.quarantine.ack.timeout.ms` for an
+  acknowledgement, so recovery on a high-latency link is slower than normal
+  delivery. Set `dlq.send.batch.on.error=true` to send the whole rejected
+  chunk to the DLQ instead of bisecting it, which avoids the extra round trips
+  when many records are expected to be bad.
+
+Any other server rejection, such as an authentication failure or a table that
+is not writable, fails the task. Without a usable DLQ, a schema mismatch also
+fails the task, and the error names the rejection category and the affected
+frame range. `qwp.dlq.terminal.categories` can extend the DLQ-eligible
+categories, but doing so can blame valid records for server or client faults,
+so leave it at the default.
+
+A common cause of schema mismatches is a JSON field that switches between
+integer and float. Pin such fields with the `doubles` option or pre-create the table, see
+[Numeric type inference](#numeric-type-inference).
 
 See the [Confluent DLQ documentation](https://developer.confluent.io/courses/kafka-connect/error-handling-and-dead-letter-queues/)
 for details.
 
+#### Shutdown and rebalances
+
+When Kafka Connect stops a task, the connector publishes its buffered rows and
+waits up to `qwp.commit.ack.timeout.ms` (default 500 ms) for acknowledgements
+before it commits offsets. Offsets still unacknowledged at that point are
+withheld, and Kafka redelivers those records to the next task, so a shutdown
+can produce duplicates unless deduplication is enabled. The wait is short
+because Kafka Connect gives all tasks on a worker one shared
+`task.shutdown.graceful.timeout.ms` budget (5 seconds by default).
+
+Partition revocation during a rebalance does not wait at all: the offsets of
+the revoked partitions were decided by the preceding commit, and waiting would
+stall the rebalance for the whole consumer group.
+
 ### Performance tuning
 
-#### Batch size
+#### Checkpoint size
 
-The connector batches messages before sending. Default batch size is 75,000 rows.
-For low-throughput scenarios, reduce this to lower latency:
+The connector publishes a checkpoint when it has buffered `auto_flush_rows`
+rows (default 75,000) or when `auto_flush_interval` milliseconds have elapsed
+since the previous checkpoint (default 1,000). For low-throughput topics,
+reduce the row count to lower latency:
 
 ```properties
-client.conf.string=http::addr=localhost:9000;auto_flush_rows=1000;
+client.conf.string=ws::addr=localhost:9000;auto_flush_rows=1000;
 ```
 
-#### Flush interval
+#### Flush triggers
 
-The connector flushes data when:
-- Batch size is reached
-- No new events for `allowed.lag` milliseconds (default: 1000)
+A checkpoint is published when any of these happens:
+- Buffered rows reach `auto_flush_rows`
+- `auto_flush_interval` milliseconds have elapsed since the previous checkpoint
+- A poll returns no records. The task wakes up at least every `allowed.lag`
+  milliseconds (default 1000) while rows are pending, so lowering
+  `allowed.lag` shortens the time to publish a trailing partial batch
 - Kafka Connect commits offsets
 
 ```properties
-# Flush after 250ms of no new events
+# Wake up every 250ms when idle
 allowed.lag=250
 ```
 
 Configure offset commit frequency in Kafka Connect via `offset.flush.interval.ms`.
 See [Kafka Connect configuration](https://docs.confluent.io/platform/current/connect/references/allconfigs.html).
+
+#### Backpressure
+
+Two limits bound how far the connector runs ahead of QuestDB's
+acknowledgements:
+
+- `qwp.max.inflight.rows` (default 150,000) pauses consumption from Kafka
+  when more rows than this are published but unacknowledged, and resumes it
+  when acknowledgements catch up. It is a soft limit: the current poll batch
+  can overshoot it.
+- `sf_max_total_bytes` (default 128 MiB) caps the client's memory buffer of
+  encoded, unacknowledged rows. When it fills, a checkpoint waits up to
+  `sf_append_deadline_millis` for space before the connector gives up on the
+  connection, see [Outages and reconnects](#outages-and-reconnects).
+
+Raise both on high-latency links so the pipeline stays full while
+acknowledgements are in flight:
+
+```properties
+qwp.max.inflight.rows=500000
+client.conf.string=ws::addr=questdb.example.com:9000;sf_max_total_bytes=512m;
+```
+
+#### Raw JSON fast path
+
+:::caution Experimental
+
+This option is covered by a differential test suite against the standard path
+but has not been used in production yet.
+
+:::
+
+Kafka Connect converts every record before the connector sees it. For JSON
+this builds two throwaway object graphs per record, which accounted for more
+than half of the sink task's CPU in profiling. With `value.format=json` the
+connector receives the raw bytes and parses them once, straight into rows:
+
+```properties
+value.converter=org.apache.kafka.connect.converters.ByteArrayConverter
+value.format=json
+```
+
+Measured on a single task with 5M records, throughput rose by 48% compared to
+the same pipeline using `JsonConverter`.
+
+If the producer writes the envelope that `JsonConverter` emits with
+`schemas.enable=true` (`{"schema": {...}, "payload": {...}}`), use
+`value.format=json_envelope` instead. The schema is ignored and the payload
+becomes the row. The mode is never guessed from the data: sending enveloped
+records with plain `value.format=json` flattens the envelope into `schema_*`
+and `payload_*` columns.
+
+The fast path honours `table`, `symbols`, `doubles`, `timestamp.field.name`,
+`timestamp.units`, `timestamp.string.fields`, `include.key`, `key.prefix`,
+`value.prefix` and `skip.unsupported.types`, flattens nested objects with `_`,
+and supports 1D, 2D and 3D numeric arrays with the same rules as the standard
+path.
+
+Limitations and differences from the standard path:
+
+- Transformations that inspect or modify the value cannot be used, because an
+  SMT sees opaque bytes. Topic-level SMTs such as `RegexRouter` are unaffected
+- Only the value is parsed by the connector. The key still goes through
+  `key.converter`
+- [Composed timestamps](#composed-timestamps) are not supported and are
+  rejected at startup
+- Column types come from the JSON values, even with `json_envelope`. A schema
+  declaring `INT8` or `FLOAT32` still yields `LONG` or `DOUBLE`. Use `doubles`
+  when an integer-looking field must be a double
+- Top-level values that are not JSON objects (`123`, `"text"`, `[1,2,3]`) are
+  rejected. The standard path writes them into a `value` column
+- JSON nested deeper than 64 levels is rejected as invalid data
+- Integers larger than `Long.MAX_VALUE` are written as doubles. The standard
+  path silently overflows them
+- When a JSON object repeats a field name, QuestDB keeps the first value. The
+  standard path keeps the last
+- Objects nested inside arrays are not valid array elements. They fail, or are
+  skipped with `skip.unsupported.types=true`
+- Column order follows the JSON document rather than the converter's map
+  order, which changes the column order of auto-created tables
+- Dead letter queue support for malformed payloads requires the `ws` or `http`
+  transport
 
 ### Type handling
 
@@ -528,7 +747,7 @@ entries.
 #### StructArrayExplode
 
 The `StructArrayExplode` SMT converts arrays of structs into **separate 1D
-`double[]` columns** — one per struct field. Unlike `OrderBookToArray` which
+`double[]` columns**, one per struct field. Unlike `OrderBookToArray` which
 produces a single 2D array column, this transform "explodes" each struct field
 into its own column.
 
@@ -589,6 +808,38 @@ transforms.explode.mappings=bids:bid_prices,bid_amounts:price,amount;asks:ask_pr
 | Output | One 2D `double[][]` column | Separate 1D `double[]` columns |
 | Mapping format | `source:target:field1,field2` | `source:target1,target2:field1,field2` |
 | Use case | All fields in one array column | Each field as its own column |
+
+### Legacy ILP transports
+
+The `http` and `https` protocols send rows as
+[InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over HTTP.
+They remain supported for QuestDB versions before 10.0 and for existing
+deployments, but new pipelines should use `ws` or `wss`.
+
+```properties
+client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
+```
+
+Differences from QWP:
+
+- Each batch is a synchronous HTTP request. The connector retries recoverable
+  errors (network issues, server unavailability, timeouts) for up to
+  `retry_timeout` milliseconds (default 10,000) and then fails the task.
+  Non-recoverable errors are not retried
+- A batch is sent when `auto_flush_rows` is reached (default 75,000), when no
+  new records arrive for `allowed.lag` milliseconds, or when Kafka Connect
+  commits offsets
+- The `qwp.*` options and the QWP backpressure limits have no effect
+- A server-side parsing error is isolated by re-sending the batch record by
+  record, and the bad record goes to the DLQ (the whole batch with
+  `dlq.send.batch.on.error=true`). Without a DLQ the task fails. Retries can
+  duplicate a whole batch, so deduplication is still recommended
+
+To migrate, change the protocol from `http::` to `ws::` (or `https::` to
+`wss::`), remove `retry_timeout` and any other HTTP-only key (the QWP client
+rejects them at startup), and enable
+[deduplication](#exactly-once-delivery) on the target tables. Authentication
+keys, `auto_flush_rows`, and all connector options keep working unchanged.
 
 ### Sample projects
 
@@ -691,7 +942,20 @@ key.converter.schemas.enable=false
 
 </details>
 
+<details>
+  <summary>The task fails with "QWP acknowledgements did not advance"</summary>
+
+QuestDB did not acknowledge pending rows within `qwp.progress.timeout.ms`
+(default 5 minutes). This usually means QuestDB was down or unreachable for
+longer than that. Restart the task once QuestDB is back; it resumes from the
+last committed offset. Raise `qwp.progress.timeout.ms` if outages of this
+length are expected.
+
+</details>
+
 ## See also
 
+- [Delivery semantics](/docs/concepts/delivery-semantics/)
+- [Connect string reference](/docs/connect/clients/connect-string/)
 - [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium/)
 - [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector/)

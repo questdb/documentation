@@ -20,6 +20,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Kafka connector](/docs/connect/message-brokers/kafka/) - Rewritten around the QWP transport (`ws::` / `wss::`): acknowledged delivery with offsets committed only after QuestDB confirms the rows, the `qwp.*` delivery options, the client keys the connector manages, outage and rebalance behaviour, schema-mismatch isolation to the dead letter queue, backpressure tuning, the experimental raw JSON fast path, and a legacy ILP section with migration steps
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order
 

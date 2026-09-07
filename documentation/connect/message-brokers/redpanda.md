@@ -173,7 +173,7 @@ lines:
 ```text title="questdb-connector.properties"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
-client.conf.string=http::addr=localhost:9000;
+client.conf.string=ws::addr=localhost:9000;
 timestamp.kafka.native=true
 topics=example-topic
 table=example_table
