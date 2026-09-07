@@ -563,6 +563,93 @@ This happens asynchronously, minimizing write performance impact.
 
 ## Enterprise features
 
+### Restricted access with row expiry
+
+An `EXPIRE ROWS` policy on a passthrough materialized view filters expired rows
+from queries before background cleanup removes them. In Enterprise, readers
+with column-level SELECT grants also need permission on columns used to enforce
+the policy, even when those columns are absent from the query's output.
+
+#### Direct materialized-view access
+
+Grant the requested columns and the policy's predicate, partition, and order
+columns. For example, on a materialized view `mv` with columns `sym`, `k`, `v`,
+`secret`, and designated timestamp `ts`:
+
+| Expiry policy | Grants needed for `SELECT sym FROM mv` |
+| --- | --- |
+| `WHEN v < 2.0` | `SELECT ON mv(sym, v)` |
+| `WHEN ts < '2025-01-01T00:00:01.000000Z'` | `SELECT ON mv(sym)` |
+| `KEEP LATEST PARTITION BY k` | `SELECT ON mv(sym, k)` |
+| `KEEP HIGHEST v PARTITION BY k` | `SELECT ON mv(sym, v, k)` |
+
+Column-level grants implicitly include the designated timestamp. A table-level
+SELECT grant covers all columns, including those needed by the policy.
+
+Review direct grants whenever you enable or change expiry. Granting a policy
+column lets the reader query that column explicitly. If it must remain hidden,
+use an ordinary SQL view as described below. Different readers can use either
+access pattern.
+
+**COUNT limitation:** `SELECT count() FROM mv` can require SELECT on unrelated
+columns as well as policy columns. With sufficient policy-column grants, use an
+explicit timestamp projection to count retained rows:
+
+```questdb-sql
+SELECT count() FROM (SELECT ts FROM mv);
+```
+
+This still requires the policy-column permissions. Direct COUNT also works with
+a table-level SELECT grant.
+
+#### Hide policy columns with an ordinary view
+
+After configuring expiry and waiting for it to apply, an authorized administrator
+can create an ordinary SQL view with only the intended output columns:
+
+```questdb-sql
+CREATE VIEW mv_public AS (SELECT sym FROM mv);
+GRANT SELECT ON mv_public TO reader;
+```
+
+The reader needs the appropriate connection permission, such as `PGWIRE` or
+`HTTP`, and SELECT on `mv_public`. They do not need any grant on `mv` or its
+policy columns. Both SELECT and COUNT through `mv_public` operate on retained
+rows, and its schema exposes only `sym`. Different output column sets can use
+separate ordinary views.
+
+#### Change expiry beneath an existing ordinary view
+
+Adding expiry, or replacing a policy with one that uses a new hidden column, can
+make reads through an existing ordinary view fail with access denied. The view's
+saved dependencies must be refreshed by reissuing its complete, unchanged
+original definition:
+
+```questdb-sql
+ALTER MATERIALIZED VIEW mv SET EXPIRE ROWS WHEN secret < 20;
+SELECT wait_wal_table('mv');
+ALTER VIEW mv_public AS (SELECT sym FROM mv);
+```
+
+Run these statements in order as an authorized administrator, waiting for each
+to complete successfully. The WAL wait ensures that the policy has been applied
+before `ALTER VIEW` collects its dependencies; an ALTER acknowledgement alone,
+including over the PostgreSQL protocol, does not establish application.
+
+The `ALTER VIEW` statement preserves existing grants on `mv_public`. Use the
+original definition for your view, including any filters and output restrictions.
+Readers can receive access-denied errors between policy application and the
+view-definition update. Reissuing the definition before policy application does
+not pick up the new dependencies.
+
+Background view compilation and `COMPILE VIEW` do not refresh these dependency
+permissions. This procedure also applies to timestamp-only expiry when the
+ordinary view predates the policy: implicit timestamp permission on a direct
+materialized-view grant does not extend to an ordinary-view-only reader.
+
+`ALTER MATERIALIZED VIEW mv DROP EXPIRE` requires no ordinary-view repair after
+it applies. Rows that have already been physically cleaned up are not restored.
+
 ### Replicated views
 
 Replication of the base table is independent of materialized view maintenance.
