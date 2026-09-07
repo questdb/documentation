@@ -194,7 +194,7 @@ the legacy HTTP transport. See [Delivery guarantees](#fault-tolerance) and
 | qwp.commit.ack.timeout.ms | `long` | 500 | Milliseconds an offset commit waits for QuestDB to acknowledge just-published rows. Offsets that are still unacknowledged when the wait expires are withheld and their records redelivered |
 | qwp.dlq.terminal.categories | `list` | SCHEMA_MISMATCH | Server rejection categories that are isolated and sent to the dead letter queue instead of failing the task |
 | qwp.max.inflight.rows | `int` | 150000 | Soft limit on rows published but not yet acknowledged. Above it the task pauses consumption until acknowledgements catch up. The current poll batch can overshoot it |
-| qwp.progress.timeout.ms | `long` | 300000 | Milliseconds rows may stay unacknowledged before the task fails. This is the only bound on a QuestDB outage |
+| qwp.progress.timeout.ms | `long` | 300000 | Milliseconds without any acknowledgement advancing, while rows are pending, before the task fails. Each acknowledgement resets the clock, so a backlog that keeps draining never trips it. This bounds how long a QuestDB outage can last |
 | qwp.quarantine.ack.timeout.ms | `long` | 1000 | Milliseconds to wait for each synchronous chunk while isolating a rejected record |
 
 :::note
@@ -442,9 +442,11 @@ connector has given up on a connection, the task retries every
 batch. Authentication and configuration failures are not retried and fail the
 task immediately.
 
-The task fails only when rows stay unacknowledged for
-`qwp.progress.timeout.ms` (default 5 minutes). Raise it to tolerate longer
-outages. A restarted task continues from the last committed offset, but only
+During an outage the task fails once no acknowledgement has advanced for
+`qwp.progress.timeout.ms` (default 5 minutes) while rows are pending. The
+timer measures inactivity, not record age: every acknowledgement resets it,
+so a backlog that keeps draining can hold older records without failing.
+Raise it to tolerate longer outages. A restarted task continues from the last committed offset, but only
 while the uncommitted records still exist in Kafka. Topic retention is
 independent of consumer offsets, so the retention period of the source topics
 must cover the outage plus the time needed to catch up afterwards. Records
@@ -949,8 +951,8 @@ key.converter.schemas.enable=false
 <details>
   <summary>The task fails with "QWP acknowledgements did not advance"</summary>
 
-QuestDB did not acknowledge pending rows within `qwp.progress.timeout.ms`
-(default 5 minutes). This usually means QuestDB was down or unreachable for
+No acknowledgement advanced for `qwp.progress.timeout.ms` (default 5 minutes)
+while rows were pending. This usually means QuestDB was down or unreachable for
 longer than that. Restart the task once QuestDB is back; it resumes from the
 last committed offset. Raise `qwp.progress.timeout.ms` if outages of this
 length are expected.
