@@ -71,6 +71,28 @@ Where:
 | PERIOD requires SAMPLE BY | The `PERIOD` clause only works with `SAMPLE BY` queries |
 | EVERY minimum | Minimum timer interval is `1m` |
 
+### LIMIT restrictions and existing definitions
+
+`LIMIT` is not supported in query branches that read the base table, including
+nested queries, for both aggregating and passthrough materialized views. An
+incremental refresh evaluates the defining query over changed timestamp ranges;
+a `LIMIT 100` would cap each refreshed range rather than the view as a whole.
+Limited subqueries over other tables remain allowed.
+
+:::note Upgrading existing definitions
+
+Existing materialized views whose definitions contain such a `LIMIT` continue
+refreshing. However, recreating them after an upgrade from a version that accepted
+those definitions requires removing or restructuring the limit. This also applies
+when replaying `SHOW CREATE MATERIALIZED VIEW` output during a migration or restore.
+
+If the limit only controls how many results an application receives, remove it
+from the view definition and apply `ORDER BY ... LIMIT ...` when querying the view.
+This changes which rows the view stores and does not preserve every original
+definition's behavior.
+
+:::
+
 ## Valid clause combinations
 
 | Refresh | DEFERRED | PERIOD | Valid |

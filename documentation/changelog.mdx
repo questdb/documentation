@@ -8,6 +8,19 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## Unreleased
+
+### Compatibility
+
+- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-restrictions-and-existing-definitions) -
+  The release introducing `EXPIRE ROWS` also rejects `LIMIT` in query branches that
+  read the base table, including nested queries. Existing views continue
+  refreshing, but recreating affected definitions, including replaying
+  `SHOW CREATE MATERIALIZED VIEW` output, requires removing or restructuring the
+  limit. To cap query results, apply `ORDER BY ... LIMIT ...` when reading the view;
+  moving the limit changes which rows the view stores. Limited subqueries over
+  other tables remain allowed.
+
 ## August 2026
 
 ### Releases
