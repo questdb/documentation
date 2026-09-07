@@ -444,8 +444,11 @@ task immediately.
 
 The task fails only when rows stay unacknowledged for
 `qwp.progress.timeout.ms` (default 5 minutes). Raise it to tolerate longer
-outages. Kafka retains the records until the task resumes, and a restarted
-task continues from the last committed offset.
+outages. A restarted task continues from the last committed offset, but only
+while the uncommitted records still exist in Kafka. Topic retention is
+independent of consumer offsets, so the retention period of the source topics
+must cover the outage plus the time needed to catch up afterwards. Records
+that expire before the task resumes are lost.
 
 During an outage the client buffer keeps filling because nothing is
 acknowledged. Once it is full, a checkpoint waits up to
