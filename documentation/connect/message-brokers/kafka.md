@@ -457,11 +457,12 @@ QuestDB is back.
 #### Dead letter queue
 
 For records that fail for data reasons, configure a dead letter queue (DLQ) so
-the connector skips them instead of stopping. These settings go in the **Kafka
-Connect worker configuration** (e.g., `connect-standalone.properties` or
-`connect-distributed.properties`), not in the connector configuration:
+the connector skips them instead of stopping. These are connector settings:
+add them to `questdb-connector.properties` in standalone mode, or to the
+connector JSON submitted to the REST API in distributed mode. They have no
+effect in the worker configuration.
 
-```properties
+```properties title="questdb-connector.properties"
 errors.tolerance=all
 errors.deadletterqueue.topic.name=dlq-questdb
 errors.deadletterqueue.topic.replication.factor=1
