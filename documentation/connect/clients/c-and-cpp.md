@@ -696,7 +696,9 @@ on_error:;
   the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
   string, binary, or array values — the flush fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code.** Check
-  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). False means the queue
+  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). This describes the
+  failed operation's input, not earlier independent flushes or replay from an
+  application checkpoint. False means the queue
   never took the frame and the chunk is intact: re-flush it. True means
   delivery is uncertain, so `wait` for what the queue already holds, and resend
   the chunk only where the table's dedup keys make duplicate rows harmless. A

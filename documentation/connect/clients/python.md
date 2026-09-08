@@ -466,7 +466,11 @@ commit. If a transient failure occurs before any batch is successfully
 published, the client can replay a materialized source in full. Once any batch
 may have committed, it raises instead of replaying from row zero and reports
 `in_doubt=True` for the whole DataFrame call, even if the final native write
-alone was provably not delivered. An application-level retry can then duplicate
+alone was provably not delivered. This also covers local validation and Arrow
+stream errors after earlier batches were published. Internal checkpoints do
+not reset the call's delivery status. This aggregation is specific to
+`dataframe()`; a sender flush's flag does not summarize earlier independent
+flushes. An application-level retry can then duplicate
 an already committed prefix unless the table uses suitable `DEDUP UPSERT KEYS`.
 A consumed one-shot Arrow stream can also be impossible to replay; when no
 batch could have landed, that separate error has `in_doubt=False` and asks for
@@ -1057,7 +1061,7 @@ All failures raise `QuestDBError` (or a subclass). Inspect:
 | Property | Meaning |
 | --- | --- |
 | `code` | A `QuestDBErrorCode` member; compare by identity, e.g. `err.code is QuestDBErrorCode.Cancelled`. |
-| `in_doubt` | `True` when the failed operation may already have delivered its input; retrying can duplicate rows without deduplication. |
+| `in_doubt` | `True` when the failed ingestion operation may already have delivered its input. For QWP `dataframe()`, this includes earlier batches from the same call, even on a later validation error. Retrying can duplicate rows without deduplication. |
 | `sender_error` | Structured server diagnostic for QWP sender failures, or `None`. |
 
 Codes you will most often dispatch on:
