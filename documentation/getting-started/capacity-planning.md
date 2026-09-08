@@ -188,7 +188,10 @@ for other database processes to use.
 
 ### CPU cores
 
-By default, QuestDB tries to use all available CPU cores.
+By default, QuestDB tries to use all available CPU cores. Work is spread across
+three pools, sized independently: network I/O, query execution, and writes. Each
+one defaults to roughly the core count, so the total thread count is the sum of
+the three rather than a single pool of that size.
 [The guide on shared worker configuration](/docs/configuration/shared-workers/)
 explains how to change the default settings. Assuming that the disk is not
 bottlenecked on IOPS, the throughput of read-only queries scales proportionally
