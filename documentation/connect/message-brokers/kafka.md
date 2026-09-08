@@ -254,8 +254,11 @@ all available client keys.
 
 ##### Keys the connector manages
 
-The connector owns batching and delivery, so it adjusts or restricts some
-client keys on the `ws` and `wss` transports:
+On the `ws` and `wss` transports some client keys behave differently, because
+the connector decides when rows are sent and when Kafka offsets are committed.
+Control batching with `auto_flush_rows` and `auto_flush_interval` only; the
+client's own flush timing is overridden. `auto_flush_bytes` stays active so
+that batches of wide rows still fit the server's frame limit.
 
 | Key | Behaviour in the connector |
 |-----|----------------------------|
@@ -612,8 +615,8 @@ Limitations and differences from the standard path:
   SMT sees opaque bytes. Topic-level SMTs such as `RegexRouter` are unaffected
 - Only the value is parsed by the connector. The key still goes through
   `key.converter`
-- [Composed timestamps](#composed-timestamps) are not supported and are
-  rejected at startup
+- [Composed timestamps](#composed-timestamps), a comma-separated
+  `timestamp.field.name`, are not supported and are rejected at startup
 - Column types come from the JSON values, even with `json_envelope`. A schema
   declaring `INT8` or `FLOAT32` still yields `LONG` or `DOUBLE`. Use `doubles`
   when an integer-looking field must be a double
@@ -626,10 +629,15 @@ Limitations and differences from the standard path:
   standard path keeps the last
 - Objects nested inside arrays are not valid array elements. They fail, or are
   skipped with `skip.unsupported.types=true`
+- A record with an empty field name (`{"": 1}`) goes to the DLQ, or fails the
+  task without one. The standard path writes it to a column named `value`
+- Listing an object or array field in `symbols` does not make it a symbol
+  column: it is still flattened or written as an array, unlike the standard
+  path
 - Column order follows the JSON document rather than the converter's map
   order, which changes the column order of auto-created tables
-- Dead letter queue support for malformed payloads requires the `ws` or `http`
-  transport
+- On `tcp`, a malformed payload fails the task on every restart even with a
+  DLQ, because TCP cannot discard a partial row. Use `ws` or `http`
 
 ### Type handling
 
