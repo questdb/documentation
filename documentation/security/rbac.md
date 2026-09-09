@@ -2,8 +2,8 @@
 title: Role-based Access Control (RBAC)
 description:
   Granular access control from database level down to individual columns and
-  rows. Learn how to secure your QuestDB instance with users, groups, and
-  fine-grained permissions.
+  rows, plus per-user, per-group, and per-service-account query memory limits.
+  Secure your QuestDB instance with users, groups, and fine-grained permissions.
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -578,6 +578,196 @@ information without these permissions.
 
 :::
 
+## Memory limits {#memory-limits}
+
+QuestDB Enterprise can limit the native memory tracked for a single query,
+overriding the server-wide query memory limit for a specific user, group, or
+service account. Use it to help prevent one tenant's runaway query from
+exhausting shared memory, or to grant a trusted principal more headroom than the
+default.
+
+Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
+[`ALTER GROUP`](/docs/query/sql/acl/alter-group/), or
+[`ALTER SERVICE ACCOUNT`](/docs/query/sql/acl/alter-service-account/):
+
+```questdb-sql
+ALTER USER john SET MEMORY LIMIT 512M;
+ALTER GROUP analysts SET MEMORY LIMIT 2G;
+ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT 1G;
+ALTER USER john SET MEMORY LIMIT UNLIMITED;  -- clear the user's own limit
+```
+
+The value is a byte count or a size with a `K`, `M`, or `G` suffix. Each suffix
+multiplies by 1024, so `512M` is 536870912 bytes. Setting a limit requires the
+`SET MEMORY LIMIT` permission, which is included in `GRANT ALL` and held
+implicitly by database admins.
+
+:::warning
+
+Treat `SET MEMORY LIMIT` as an administrative permission, not a self-service
+one. It takes no entity name, so its holder can set the limit of any principal,
+including its own. Because a per-principal limit overrides the workload limit
+rather than tightening it (see [How limits resolve](#how-limits-resolve)), a
+non-admin who holds it can raise its own ceiling above
+`cairo.query.memory.limit.bytes`. The built-in admin is exempt only as a
+target: its limit cannot be set at all.
+
+`GRANT ALL` expands to individual permissions at the moment it is granted. A
+principal granted `ALL` before upgrading to a version with this feature does
+not acquire `SET MEMORY LIMIT`; only grants issued after the upgrade include it,
+and no migration backfills it.
+
+:::
+
+### How limits resolve
+
+QuestDB resolves the limit for a query by strict precedence. It takes the first
+level that is set, not the smallest across levels:
+
+1. **The principal's own limit.** For a user this is the user's own limit; for a
+   query that assumes a service account it is the service account's limit.
+2. **A group limit** (users only). When a user has no limit of its own, it
+   inherits the
+   most restrictive (smallest positive) limit among the groups it belongs to.
+   Service accounts never inherit group limits.
+3. **The workload limit.** Otherwise the server-wide
+   [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
+   applies.
+
+A value of `0` (or `UNLIMITED`) means "not set" at that level, so resolution
+falls through to the next one. A more specific level, when set, fully overrides
+the broader one and binds even when it is larger, so a per-user or per-group
+override can raise a principal's ceiling above the workload limit, not only lower
+it. Use a smaller override to tighten the cap for a noisy tenant, or a larger one
+to lift it for a trusted principal. A user who assumes a service account takes on
+the service account's limit. The built-in admin cannot be given a limit and runs
+under the workload limit.
+
+The cap applies to the principal's queries on both the primary and replicas. The
+statement itself runs on the primary only: a replica rejects it and receives the
+new value through the replicated ACL tables. A changed limit applies to the
+principal's next query, including on connections that are already open, while a
+query already running keeps the limit it started with.
+
+A query that crosses its limit fails with the same
+`query memory limit exceeded [workload=QUERY, ...]` error as a breach of the
+workload limit. See
+[memory limits](/docs/configuration/cairo-engine/#memory-limits) for the message
+format.
+
+:::note
+
+A limit bounds a single query. Two concurrent queries by the same principal each
+run under the full limit, so the principal's aggregate usage can exceed it. The
+cap guards against one runaway workload, not total concurrent usage.
+
+:::
+
+### What a per-principal limit covers
+
+Per-principal limits have the same
+[coverage](/docs/configuration/cairo-engine/#memory-limits) as workload limits.
+They apply to tracked native allocations for:
+
+- The principal's queries, on both the primary and replicas.
+- Its background [`COPY ... TO`](/docs/query/sql/copy/) exports, which use the
+  issuing principal's limit. Some memory used to produce the export file is not
+  yet covered, and exports do not appear in `query_activity`, so their usage
+  cannot be observed while they run.
+- `UPDATE` on a non-WAL table, which is applied on the caller's own thread and
+  acquires its own query-workload tracker.
+
+It does not reach work that runs under an internal context rather than a
+principal. That work stays bounded only by its own
+[workload limit](/docs/configuration/cairo-engine/#memory-limits):
+
+- `UPDATE` on a WAL table, the default table type, because the statement
+  is applied by the WAL apply job and draws on that job's
+  `cairo.wal.apply.memory.limit.bytes` budget instead. Whether a large `UPDATE`
+  is capped by a `SET MEMORY LIMIT` override therefore depends on the table
+  type.
+- Materialized view refresh, live view refresh, and WAL apply itself. A WAL
+  apply batches many principals' transactions into one tracker, so it could not
+  attribute usage to a single principal in any case.
+- `COPY ... FROM` imports, which acquire no memory tracker at all and are
+  unaffected by either kind of limit.
+
+:::note
+
+An external (SSO/OIDC) user can only receive a limit by inheriting one from a
+group: `ALTER USER ... SET MEMORY LIMIT` on an external user is rejected with
+`Cannot set memory limit for external user`.
+
+:::
+
+### Inspecting limits
+
+- `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS` report per-principal
+  limits in a `memory_limit` column, in bytes. For users, it is the user's own
+  limit or, when it has none, the most restrictive of its groups'. For groups
+  and service accounts, it is the entity's own limit. The column excludes the
+  server-wide workload limit. For a user or service account, `null` means no
+  principal override, so the workload limit applies to its queries.
+- The filtered forms `SHOW GROUPS <user>` and
+  `SHOW SERVICE ACCOUNTS <user | group>` carry the column too, reporting each
+  listed group's or service account's own limit. This shows which inherited
+  limit binds for a user with no limit of its own.
+- [`query_activity`](/docs/query/functions/meta/#query_activity) exposes the
+  effective limit and live usage of each running query through its `memory_limit`
+  and `memory_used` columns.
+- `SHOW USER` does not carry the column, and `SHOW USERS` requires `LIST USERS`.
+  A user without that permission can still read its own effective cap from the
+  `memory_limit` column of `query_activity`, which always lists the caller's
+  own queries.
+- The stored value is persisted on the `sys.acl_entities` system table. That
+  table is protected: only the built-in admin can read it, and an ACL principal
+  holding `DATABASE ADMIN` is still denied.
+
+:::warning Breaking change on upgrade
+
+The `memory_limit` column is added unconditionally, whether or not any limit is
+ever set, so upgrading changes the shape of five results: `SHOW USERS`,
+`SHOW GROUPS` and `SHOW GROUPS <user>`, and `SHOW SERVICE ACCOUNTS` and
+`SHOW SERVICE ACCOUNTS <user | group>`. A `SELECT *` on `sys.acl_entities`
+returns one more column as well, though only the built-in admin can see it.
+
+Clients that read any of those results positionally will see one more column
+than before and must be updated. Clients that read by column name are
+unaffected.
+
+The column is added by an automatic migration when an upgraded node first starts
+as a primary or is promoted from replica to primary. Persisted principal limits
+are not enforced until the migration has been applied. The migration passes
+through two windows, and each refuses a different set of statements:
+
+- Before the column exists, a `SET MEMORY LIMIT` with a non-zero size is refused
+  with:
+
+  ```
+  Cannot modify ACL entities: the memory_limit column has not been migrated in yet; retry shortly, or restart the node if it persists
+  ```
+
+  `SET MEMORY LIMIT UNLIMITED` and `ALTER ... ENABLE` or `DISABLE` still
+  succeed.
+
+- Once the column has been added but WAL apply has not yet reached it,
+  `SET MEMORY LIMIT UNLIMITED` and `ALTER ... ENABLE` or `DISABLE` are refused
+  as well, so that a stale in-memory value cannot overwrite a stored limit. A
+  non-zero `SET MEMORY LIMIT` keeps the first message; the others read:
+
+  ```
+  Cannot set memory limit while the ACL memory_limit column migration is still being applied, retry [name=john]
+  ```
+
+  or `Cannot enable while ...` and `Cannot disable while ...` for a status
+  change.
+
+The window normally closes on its own once WAL apply catches up, so retry the
+statement first. If the error persists, restart the node: the migration runs
+again at startup.
+
+:::
+
 ## Permissions reference {#permissions}
 
 Use `all_permissions()` to see all available permissions:
@@ -657,6 +847,7 @@ SELECT * FROM all_permissions();
 | REMOVE EXTERNAL ALIAS  | Remove external group mappings          |
 | REMOVE PASSWORD        | Remove passwords                        |
 | REMOVE USER            | Remove users from groups                |
+| SET MEMORY LIMIT       | Set memory limits on users, groups, and service accounts |
 | USER DETAILS           | View user/group/service account details |
 
 ### Special permissions
@@ -681,8 +872,9 @@ replication role, is an ordinary grantable permission.
 ## SQL commands reference
 
 - [ADD USER](/docs/query/sql/acl/add-user/)
-- [ALTER USER](/docs/query/sql/acl/alter-user/)
+- [ALTER GROUP](/docs/query/sql/acl/alter-group/)
 - [ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/)
+- [ALTER USER](/docs/query/sql/acl/alter-user/)
 - [ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/assume-service-account/)
 - [CREATE GROUP](/docs/query/sql/acl/create-group/)
 - [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/)

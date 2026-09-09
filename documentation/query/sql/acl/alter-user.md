@@ -2,8 +2,8 @@
 title: ALTER USER reference
 sidebar_label: ALTER USER
 description:
-  "ALTER USER SQL keywords reference documentation. Applies to RBAC in QuestDB
-  Enterprise."
+  "ALTER USER enables or disables a user, manages passwords and tokens, and sets
+  a per-user query memory limit. Applies to RBAC in QuestDB Enterprise."
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -16,6 +16,8 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
+
+---
 
 ## Syntax
 
@@ -37,6 +39,10 @@ ALTER USER userName DROP TOKEN TYPE
     { JWK | REST [token] };
 ```
 
+```questdb-sql title="Set or clear memory limit"
+ALTER USER userName SET MEMORY LIMIT { size | UNLIMITED };
+```
+
 ## Description
 
 - `ALTER USER username ENABLE` - enables user account.
@@ -54,6 +60,21 @@ ALTER USER userName DROP TOKEN TYPE
   REST token to user account.
 - `ALTER USER username DROP TOKEN TYPE REST token` - removes REST token from
   user account.
+- `ALTER USER username SET MEMORY LIMIT size` - caps the native memory the
+  user's queries may allocate. `size` is a byte count or a size with a `K`, `M`,
+  or `G` suffix, such as `512M` or `2G`.
+- `ALTER USER username SET MEMORY LIMIT UNLIMITED` - clears the user's own
+  limit. A group limit or the workload limit then applies. `SET MEMORY LIMIT 0`
+  does the same.
+
+The limit applies to the user's queries on both the primary and replicas.
+Setting it requires the `SET MEMORY LIMIT` permission. The built-in admin and
+external (SSO/OIDC) users cannot be given a limit; the statement is rejected for
+both. An external user inherits a limit from its groups instead. A set limit
+takes priority over the user's groups and over the
+[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
+workload limit; see [memory limits](/docs/security/rbac/#memory-limits) for how
+limits resolve.
 
 ## Examples
 
@@ -160,3 +181,15 @@ SHOW USER john;
 | Password   | true    |
 | JWK Token  | false   |
 | REST Token | false   |
+
+### Set memory limit
+
+```questdb-sql
+-- cap the user's queries at 512 MiB of native memory
+ALTER USER john SET MEMORY LIMIT 512M;
+-- remove the limit
+ALTER USER john SET MEMORY LIMIT UNLIMITED;
+```
+
+Use `SHOW USERS` to inspect the user's own or inherited group limit in the
+`memory_limit` column.
