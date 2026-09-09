@@ -16,7 +16,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
-- [Memory limits](/docs/configuration/cairo-engine/#memory-limits) - New section covering the per-query, materialized view refresh, WAL apply, and live view refresh memory limits, what counts toward them, and what happens on a breach, plus the previously undocumented `cairo.mat.view.refresh.busy.retry.limit`, `cairo.mat.view.refresh.busy.retry.timeout`, `ram.usage.limit.bytes`, and `ram.usage.limit.percent` keys
+- [Memory limits](/docs/configuration/cairo-engine/#memory-limits) - New section covering the per-query, materialized view refresh, WAL apply, and live view refresh memory limits, what counts toward them, and what happens on a breach, plus the previously undocumented `cairo.mat.view.max.refresh.retries`, `cairo.mat.view.refresh.busy.retry.limit`, `cairo.mat.view.refresh.busy.retry.timeout`, `ram.usage.limit.bytes`, and `ram.usage.limit.percent` keys
 - [RBAC memory limits](/docs/security/rbac/#memory-limits) - Per-user, per-group, and per-service-account query memory limits in QuestDB Enterprise: `SET MEMORY LIMIT` on `ALTER USER`, `ALTER GROUP`, and `ALTER SERVICE ACCOUNT`, how limits resolve, the `SET MEMORY LIMIT` permission, and the upgrade migration
 - [ALTER GROUP](/docs/query/sql/acl/alter-group/) - New reference page covering `SET MEMORY LIMIT` and external alias mapping
 - [Migrate QuestDB onto the Kubernetes Operator](/docs/enterprise-kubernetes-operator/getting-started/migrate/) - Move an existing Enterprise deployment onto the Operator with a replica-first cutover: restore the source backup, consume replication WAL, then promote after a controlled source drain

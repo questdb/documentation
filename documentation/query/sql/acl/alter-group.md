@@ -45,15 +45,13 @@ ALTER GROUP groupName { WITH | DROP } EXTERNAL ALIAS externalAlias;
 Adding an alias requires the `ADD EXTERNAL ALIAS` permission and removing one
 requires `REMOVE EXTERNAL ALIAS`.
 
-A group limit applies to a member only when that member has no limit of its own;
-a user's own limit always takes priority. When several of a user's groups set a
-limit, the most restrictive (smallest positive) one applies. A set limit
-overrides the configured
-[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-workload limit and binds even when larger. Setting a group limit requires the
-`SET MEMORY LIMIT` permission. See
-[memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
-workload limits resolve.
+A group limit applies to a member only when that member has no limit of its own.
+When several of a user's groups set a limit, the most restrictive one applies.
+Setting a group limit requires the `SET MEMORY LIMIT` permission. See
+[memory limits](/docs/security/rbac/#memory-limits) for how a group limit
+interacts with the
+[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
+workload limit.
 
 For external group mapping with OIDC or LDAP, see the
 [OpenID Connect (OIDC) integration](/docs/security/oidc/) guide.

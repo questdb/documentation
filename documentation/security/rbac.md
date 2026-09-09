@@ -591,15 +591,16 @@ Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
 [`ALTER SERVICE ACCOUNT`](/docs/query/sql/acl/alter-service-account/):
 
 ```questdb-sql
-ALTER USER johndoe SET MEMORY LIMIT 512M;
+ALTER USER john SET MEMORY LIMIT 512M;
 ALTER GROUP analysts SET MEMORY LIMIT 2G;
 ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT 1G;
-ALTER USER johndoe SET MEMORY LIMIT UNLIMITED;  -- clear the override
+ALTER USER john SET MEMORY LIMIT UNLIMITED;  -- clear the user's own limit
 ```
 
-The value is a byte count or a size with a `K`, `M`, or `G` suffix. Setting a
-limit requires the `SET MEMORY LIMIT` permission, which is included in
-`GRANT ALL` and held implicitly by database admins.
+The value is a byte count or a size with a `K`, `M`, or `G` suffix. Each suffix
+multiplies by 1024, so `512M` is 536870912 bytes. Setting a limit requires the
+`SET MEMORY LIMIT` permission, which is included in `GRANT ALL` and held
+implicitly by database admins.
 
 :::warning
 
@@ -625,11 +626,12 @@ level that is set, not the smallest across levels:
 
 1. **The principal's own limit.** For a user this is the user's own limit; for a
    query that assumes a service account it is the service account's limit.
-2. **A group limit** (users only). When a user has no own limit, it inherits the
+2. **A group limit** (users only). When a user has no limit of its own, it
+   inherits the
    most restrictive (smallest positive) limit among the groups it belongs to.
    Service accounts never inherit group limits.
 3. **The workload limit.** Otherwise the server-wide
-   [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+   [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
    applies.
 
 A value of `0` (or `UNLIMITED`) means "not set" at that level, so resolution
@@ -664,7 +666,8 @@ They apply to tracked native allocations for:
 - The principal's queries, on both the primary and replicas.
 - Its background [`COPY ... TO`](/docs/query/sql/copy/) exports, which use the
   issuing principal's limit. Some memory used to produce the export file is not
-  yet covered.
+  yet covered, and exports do not appear in `query_activity`, so their usage
+  cannot be observed while they run.
 - `UPDATE` on a non-WAL table, which is applied on the caller's own thread and
   acquires its own query-workload tracker.
 
@@ -706,6 +709,9 @@ group: `ALTER USER ... SET MEMORY LIMIT` on an external user is rejected with
 - [`query_activity`](/docs/query/functions/meta/#query_activity) exposes the
   effective limit and live usage of each running query through its `memory_limit`
   and `memory_used` columns.
+- `SHOW USER` does not carry the column, and `SHOW USERS` requires `LIST USERS`,
+  so a user without that permission cannot see its own cap before a query
+  breaches it.
 - The stored value is persisted on the `sys.acl_entities` system table. That
   table is protected: only the built-in admin can read it, and an ACL principal
   holding `DATABASE ADMIN` is still denied.

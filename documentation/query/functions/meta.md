@@ -413,9 +413,9 @@ Returns metadata on running SQL queries, including columns such as:
   tracked by the
   [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits)
 - memory_limit - effective native memory limit for the query, in bytes, or
-  `null` when the query runs unlimited. On QuestDB Enterprise a set principal
-  [memory limit](/docs/security/rbac/#memory-limits) overrides the configured
-  workload limit; the workload limit applies only when the principal has none.
+  `null` when the query runs unlimited. On QuestDB Enterprise this is the
+  principal's [memory limit](/docs/security/rbac/#memory-limits) when one is
+  set, otherwise the workload limit.
   Both memory columns are `null` for SQL that runs under a background
   workload's tracker, such as the `SELECT` a materialized view refresh runs or
   an `UPDATE` applied by the WAL apply job, because that SQL charges the

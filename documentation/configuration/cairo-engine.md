@@ -913,7 +913,8 @@ lives with the other live view settings.
 
 All four default to `0`, which means unlimited, so behavior matches a server
 without limits until you opt in. Set each limit as a byte count or a size with a
-`K`, `M`, or `G` suffix, for example `512M` or `2G`. The limits are reloadable:
+`K`, `M`, or `G` suffix, for example `512M` or `2G`. Each suffix multiplies by
+1024, so `512M` is 536870912 bytes. The limits are reloadable:
 edit `server.conf` and call
 [`reload_config()`](/docs/query/functions/meta/#reload_config). New queries,
 materialized view refreshes, and WAL apply batches use the updated limits; work
@@ -928,7 +929,10 @@ workloads keep running. What happens next depends on the workload:
 
 - A user query fails with the error.
 - A materialized view refresh first retries with smaller refresh intervals where
-  possible. If the error persists, incremental and scheduled period refreshes
+  possible, up to
+  [`cairo.mat.view.max.refresh.retries`](/docs/configuration/materialized-views/#cairomatviewmaxrefreshretries)
+  times. If the error persists,
+  [incremental and scheduled period refreshes](/docs/concepts/materialized-views/#refresh-strategies)
   are deferred for
   [`cairo.mat.view.refresh.busy.retry.timeout`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrytimeout),
   with up to

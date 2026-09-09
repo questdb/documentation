@@ -68,14 +68,13 @@ ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT { size | UNLIMITED };
   the service account's limit. The workload limit then applies. `SET MEMORY
   LIMIT 0` does the same.
 
-A user who assumes the service account runs under its memory limit. A set limit
-overrides the configured
-[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-workload limit and binds even when larger. The workload limit applies only when
-the service account has none. Group limits are never merged into a service
-account. Setting it requires the `SET MEMORY LIMIT` permission. See
-[memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
-workload limits resolve.
+A user who assumes the service account runs under its memory limit. Group limits
+are never merged into a service account. Setting it requires the
+`SET MEMORY LIMIT` permission. See
+[memory limits](/docs/security/rbac/#memory-limits) for how the limit interacts
+with the
+[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
+workload limit.
 
 ## Examples
 

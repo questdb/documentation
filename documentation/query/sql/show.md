@@ -358,8 +358,7 @@ SHOW GROUPS;
 | management |                | 2147483648   |
 
 Filtering by a user lists the groups that user belongs to, with the same
-columns. Each row's `memory_limit` is that group's own limit, which is how you
-see which inherited limit binds for a user with no limit of its own:
+columns. Each row's `memory_limit` is that group's own limit:
 
 ```questdb-sql
 SHOW GROUPS john;
@@ -535,7 +534,7 @@ SHOW SERVICE ACCOUNTS;
 
 | name       | enabled | memory_limit |
 | ---------- | ------- | ------------ |
-| management | true    | null         |
+| client_app | true    | null         |
 | svc1_admin | true    | 268435456    |
 
 Filtering by a user or group instead lists the service accounts that principal

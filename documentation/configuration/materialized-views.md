@@ -17,6 +17,20 @@ To cap the native memory a single refresh may allocate, see
 
 Enables or disables SQL support and the refresh job for materialized views.
 
+## cairo.mat.view.max.refresh.retries
+
+- **Default**: `10`
+- **Reloadable**: yes
+
+Maximum number of immediate retries within a single refresh attempt. A retry
+happens when the base table changes structurally during the refresh, when a
+refresh step produces an oversized transaction, or when a step fails with an
+out-of-memory error, including a breach of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits). Each
+retry shrinks the refresh interval step. Once the retries are exhausted or the
+step cannot shrink further, the error propagates and the deferred retries
+governed by `cairo.mat.view.refresh.busy.retry.limit` take over.
+
 ## cairo.mat.view.parallel.sql.enabled
 
 - **Default**: `true`
