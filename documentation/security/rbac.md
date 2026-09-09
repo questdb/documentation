@@ -749,18 +749,17 @@ the limit it logged in with until it reconnects.
   table is protected: only the built-in admin can read it, and an ACL principal
   holding `DATABASE ADMIN` is still denied.
 
-:::warning Breaking change on upgrade
+### Upgrading {#memory-limit-upgrade}
 
-The `memory_limit` column is appended as the last column unconditionally,
-whether or not any limit is ever set, so upgrading changes the shape of five
-results: `SHOW USERS`, `SHOW GROUPS` and `SHOW GROUPS userName`, and
-`SHOW SERVICE ACCOUNTS` and `SHOW SERVICE ACCOUNTS { userName | groupName }`. A
-`SELECT *` on `sys.acl_entities`
-returns one more column as well, though only the built-in admin can see it.
+:::warning Breaking change
 
-Clients that read any of those results positionally will see one more column
-than before and must be updated. Clients that read by column name are
-unaffected.
+`memory_limit` is appended as the last column of `SHOW USERS`, `SHOW GROUPS`,
+and `SHOW SERVICE ACCOUNTS`, including their filtered forms, whether or not any
+limit is set. `SELECT *` on `sys.acl_entities` returns one more column as well.
+Clients that read these results by position must be updated; clients that read
+by column name are unaffected.
+
+:::
 
 The column is added by an automatic migration when an upgraded node first starts
 as a primary or is promoted from replica to primary. Persisted principal limits
@@ -792,8 +791,6 @@ through two windows, and each refuses a different set of statements:
 The window normally closes on its own once WAL apply catches up, so retry the
 statement first. If the error persists, restart the node: the migration runs
 again at startup.
-
-:::
 
 ## Permissions reference {#permissions}
 

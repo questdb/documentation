@@ -469,7 +469,10 @@ WHERE view_status = 'invalid';
 
 ### Refreshing an invalid view
 
-To restore an invalid view with a full refresh:
+Restore an invalid view with a full refresh. If `invalidation_reason` reports
+a memory limit breach, raise
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+first, because the full refresh runs under the same limit:
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW view_name FULL;

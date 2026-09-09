@@ -25,7 +25,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [query_activity()](/docs/query/functions/meta/#query_activity) - Documented the `is_wal`, `memory_used`, and `memory_limit` columns
 - [wal_tables()](/docs/query/functions/meta/#wal_tables) - Documented the `errorTag`, `errorMessage`, and `memoryPressure` columns; `errorTag` reads `OUT OF MEMORY` after a WAL apply memory limit breach
-- [SHOW](/docs/query/sql/show/) - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms and the new `SHOW SERVICE ACCOUNTS groupName` filter, gain a trailing `memory_limit` column. Clients that read these results by position need updating
+- [SHOW](/docs/query/sql/show/) - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, gain a trailing `memory_limit` column. Clients that read these results by position need [updating](/docs/security/rbac/#memory-limit-upgrade)
 - [CREATE GROUP](/docs/query/sql/acl/create-group/) - Documented the `WITH EXTERNAL ALIAS` form that creates a group and its OIDC or LDAP mapping in one statement
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order

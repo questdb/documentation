@@ -145,7 +145,10 @@ WHERE view_status = 'invalid';
 
 **Resolution:**
 
-Perform a full refresh to rebuild the view:
+Perform a full refresh to rebuild the view. If `invalidation_reason` reports a
+memory limit breach, raise the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits) first,
+because the full refresh runs under the same limit:
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW my_view FULL;

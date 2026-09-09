@@ -613,10 +613,21 @@ SHOW USERS;
 The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
 the user's own limit or, when it has none, the most restrictive of its groups'.
 `null` means no principal override; the workload limit
-(`cairo.query.memory.limit.bytes`) still applies. In `SHOW GROUPS` and
+(`cairo.query.memory.limit.bytes`) still applies, unlike the `memory_limit`
+column of [`query_activity`](/docs/query/functions/meta/#query_activity), which
+reports the effective limit and includes it. In `SHOW GROUPS` and
 `SHOW SERVICE ACCOUNTS` above it is instead the
 listed entity's own limit, since neither inherits one. See
 [memory limits](/docs/security/rbac/#memory-limits).
+
+:::note
+
+`memory_limit` is appended as the last column of `SHOW USERS`, `SHOW GROUPS`,
+and `SHOW SERVICE ACCOUNTS`, including their filtered forms. Tools that bind
+these columns by position rather than by name must account for it. See
+[upgrading](/docs/security/rbac/#memory-limit-upgrade).
+
+:::
 
 ## See also
 

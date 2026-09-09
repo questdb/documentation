@@ -10,6 +10,9 @@ control how data is written, read, indexed, and queried. Most defaults work well
 for typical workloads, but tuning may be needed for high-throughput ingestion,
 large analytical queries, or specific storage configurations.
 
+To cap the native memory a single query, view refresh, or WAL apply batch may
+allocate, see [Memory limits](#memory-limits).
+
 ## General
 
 ### cairo.date.locale
@@ -953,7 +956,8 @@ When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
 workloads keep running. What happens next depends on the workload:
 
-- A user query fails with the error.
+- A user query fails with the error. The client connection stays open, and its
+  next statement runs under the same limit.
 - A materialized view refresh first retries with smaller refresh intervals where
   possible, up to
   [`cairo.mat.view.max.refresh.retries`](/docs/configuration/materialized-views/#cairomatviewmaxrefreshretries)
@@ -1034,9 +1038,11 @@ disables the limit.
 - **Reloadable**: yes
 
 Maximum native memory a single user SQL query may allocate. `0` disables the
-limit. It applies to every statement registered as a query: `SELECT`,
-`INSERT ... SELECT`, `CREATE TABLE AS SELECT`, `CREATE MATERIALIZED VIEW`, and
-`UPDATE` on a non-WAL table. Subqueries and other nested work share the
+limit. It applies to every statement that appears in
+[`query_activity`](/docs/query/functions/meta/#query_activity), including
+`SELECT`, `INSERT ... SELECT`, `CREATE TABLE AS SELECT`,
+`CREATE MATERIALIZED VIEW`, `COPY ... TO` exports, and `UPDATE` on a non-WAL
+table. Subqueries and other nested work share the
 top-level query's budget rather than each acquiring their own. On QuestDB
 Enterprise the built-in admin cannot be given a per-principal override and runs
 under this limit, so size it with the admin's diagnostic queries in mind.

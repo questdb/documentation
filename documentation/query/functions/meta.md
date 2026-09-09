@@ -426,7 +426,8 @@ Returns metadata on running SQL queries, with the following columns:
 - memory_limit - effective native memory limit for the query, in bytes, or
   `null` when the query runs unlimited. On QuestDB Enterprise this is the
   principal's [memory limit](/docs/security/rbac/#memory-limits) when one is
-  set, otherwise the workload limit
+  set, otherwise the workload limit. Unlike the `memory_limit` column of
+  `SHOW USERS`, it includes the workload limit
 
 `memory_used` is a live gauge with no peak value, and it is reported even when
 `memory_limit` is `null`. Both memory columns are `null` for SQL that runs
