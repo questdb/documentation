@@ -151,11 +151,6 @@ alphabetically within each group, not in dependency order. Tables always precede
 materialized views, but a materialized view built on another materialized view
 can be emitted before its own base.
 
-Copying the [demo](https://demo.questdb.io) schema this way produces 5 of 13
-materialized views ahead of the view they read from, so `bbo_1d` arrives before
-`bbo_1h`, and a top-to-bottom paste fails on those statements. Reorder them by
-hand, or use `SHOW CREATE DATABASE`, which emits dependency order.
-
 :::
 
 :::info Related documentation
