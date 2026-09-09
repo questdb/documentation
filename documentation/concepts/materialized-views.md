@@ -639,6 +639,18 @@ modified in incompatible ways:
 - Renaming the base table
 - `TRUNCATE` or `UPDATE` operations
 
+An active [`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
+on a referenced materialized view also causes invalidation when refresh detects
+it. `SET EXPIRE` is allowed with existing dependents; invalidation is not
+synchronous with ALTER. An idle dependent may retain its status, and an
+already-running refresh may finish against its earlier snapshot. The policy does
+not retroactively filter rows already stored in the dependent.
+
+Removing the source policy does not automatically restore an invalidated view.
+Resolve the source conflict, then request a
+[FULL refresh](/docs/query/sql/refresh-mat-view/#full). FULL refresh deletes the
+existing contents before rebuilding; failure does not restore those contents.
+
 Check for invalid views:
 
 ```questdb-sql title="Find invalid views"

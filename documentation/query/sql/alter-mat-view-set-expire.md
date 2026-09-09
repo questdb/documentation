@@ -56,6 +56,15 @@ an unknown column is rejected immediately rather than breaking later reads. Once
 set, the policy takes effect without rebuilding the view. See
 [How it works](/docs/concepts/expire-rows/#how-it-works).
 
+`SET EXPIRE` is allowed when materialized or live views already depend on this
+view. Those dependents detect an applied policy when they next refresh and
+become invalid; ALTER completion and dependent invalidation are separate events.
+An idle dependent may remain active, and an already-running refresh may finish
+against its earlier snapshot. Existing dependent rows are not retroactively
+filtered. Removing the policy does not automatically reverse invalidation. See
+[Dependent materialized and live views](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
+for consequences and recovery.
+
 ## Examples
 
 These examples use `trades_mirror`, a passthrough materialized view over a
@@ -101,7 +110,7 @@ ALTER MATERIALIZED VIEW trades_mirror DROP EXPIRE;
 | Aspect                  | Description                                                                  |
 | ----------------------- | ---------------------------------------------------------------------------- |
 | Passthrough recommended | An aggregating view is accepted with a logged advisory: a later refresh can regenerate reclaimed rows, so align base-table retention with the expiry horizon |
-| No dependent views      | Rejected when other materialized views derive from this view (they would copy expired rows on refresh) |
+| Dependent views         | SET is allowed; existing materialized and live views detect the conflict and invalidate on refresh, not synchronously with ALTER |
 | Validation              | The policy is checked against the view's columns before it is applied        |
 | Replication             | The policy and the reclamation it drives replicate as normal WAL traffic     |
 
@@ -118,7 +127,6 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 | Error | Cause |
 | ----- | ----- |
 | `materialized view does not exist` | View with the specified name doesn't exist |
-| `cannot set an EXPIRE ROWS policy on '...': it is the base of N view(s), including '<name>', which would copy expired rows on refresh` | Other views derive from this view; the message names the first dependent |
 | `EXPIRE ROWS KEEP LATEST ON must name the designated timestamp ...` | `ON` names a column other than the designated timestamp |
 | `invalid EXPIRE ROWS KEEP LATEST PARTITION BY column: ...` | A `PARTITION BY` key column does not exist |
 | `EXPIRE ROWS KEEP HIGHEST/LOWEST requires a BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, DATE, TIMESTAMP or DECIMAL column, but '<col>' is <type>; use KEEP <N> HIGHEST/LOWEST to rank an orderable column of any type` | The bare `KEEP HIGHEST/LOWEST` form was given an unsupported column type; use a supported numeric/date type or the top-N form |

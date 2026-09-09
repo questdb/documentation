@@ -4,8 +4,8 @@ sidebar_label: EXPIRE ROWS
 description:
   EXPIRE ROWS is a row-level retention policy for passthrough materialized
   views. Keep the latest row per key, the top-N per group, or rows matching a
-  predicate. Policies are recomputed continuously, with expired rows hidden
-  immediately and reclaimed in the background under the modes that allow it.
+  predicate. Once a policy takes effect, reads hide expired rows without waiting
+  for background reclamation under the modes that allow it.
 ---
 
 `EXPIRE ROWS` is a row-level retention policy for
@@ -15,8 +15,10 @@ ROWS` decides retention **row by row**. It can keep the latest row per key, the
 top-N per group, rows matching a predicate, and so on. It recomputes the result
 continuously as the view refreshes.
 
-Expired rows disappear from query results **immediately** in every mode. Their
-on-disk storage is reclaimed afterwards by a background job under a monotonic
+Once the policy takes effect, ordinary queries hide expired rows in every mode
+**without waiting for physical cleanup**. This does not mean synchronous ALTER
+completion or immediate invalidation of dependent views. A background job
+reclaims their on-disk storage afterwards under a monotonic
 `WHEN` predicate; the relative modes (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`,
 `KEEP N`) and window predicates hide rows without freeing disk. See
 [The modes](#the-modes) and
@@ -131,10 +133,40 @@ rather than rejected: physical reclamation only sticks when base-table retention
 is aligned with the expiry horizon because a later incremental or full refresh
 can regenerate a reclaimed row from base rows that still exist.
 
-A policied view must also stand alone: `CREATE MATERIALIZED VIEW` rejects a
-defining query that reads a policied view (as its base or in a join), and
-`ALTER ... SET EXPIRE` is rejected on a view that other materialized views
-derive from because those views would copy expired rows on refresh.
+## Dependent materialized and live views
+
+`CREATE MATERIALIZED VIEW` and `CREATE LIVE VIEW` reject a defining query that
+reads a materialized view with an active `EXPIRE ROWS` policy, including references
+through joins and subqueries.
+
+`SET EXPIRE` is allowed when dependent views already exist:
+
+```questdb-sql
+-- Both views already exist.
+ALTER MATERIALIZED VIEW source
+SET EXPIRE ROWS WHEN v < 2;
+
+-- The dependent may remain active until it next refreshes.
+```
+
+Dependent views detect the conflict when they next refresh and become invalid.
+ALTER completion and dependent invalidation are separate events: an idle
+dependent may continue reporting active, and a refresh already underway may
+finish against its earlier snapshot. A policy on a joined source may remain
+undetected until the dependent's declared base triggers work or an operator
+requests a refresh.
+
+Ordinary queries against the source apply its expiry filter once the policy
+takes effect. The policy does not retroactively filter rows already stored in
+dependent views, and invalidated views keep serving their existing contents.
+
+`DROP EXPIRE` does not automatically restore an invalidated dependent. After
+resolving the source conflict, materialized views require
+[FULL refresh](/docs/query/sql/refresh-mat-view/#full); live views require saving
+the definition and [recreation](/docs/concepts/live-views/#base-table-lifecycle).
+FULL refresh retains its general truncate-first failure behavior; see the linked
+reference for visibility during rebuilding and failure recovery. Rebuilding can
+only recover source rows that still exist.
 
 ## Worked examples
 
@@ -329,11 +361,12 @@ at every stage. A row the `WHERE` clause excludes is never copied into the view:
 | Read cost | None | The keep-set filter is applied on every read of the view |
 | Write cost | None | Cleanup can rewrite partitions for `FILTER_AND_RECLAIM` policies |
 | After a full refresh | Still excluded | Re-materialized from the base, then hidden; eligible policies sweep it again |
-| Can be another view's base | Yes | No (a policied view is rejected as a base) |
+| Can remain a usable source for other views | Yes | No: CREATE rejects an active policy; existing dependents detect SET on refresh |
 
-That last row is a hard constraint rather than a preference. If any other view
-will read this one, the policy is not available and the predicate has to go in
-the `WHERE` clause.
+If this view must remain a usable source for other views, put the predicate in
+the defining query's `WHERE` clause. Existing dependents do not prevent setting
+an expiry policy, but they become invalid when a refresh detects it. See
+[Dependent materialized and live views](#dependent-materialized-and-live-views).
 
 The two forms are not exact negations of each other on `NULL`s: `WHERE` keeps a
 row only when the predicate is `TRUE`, while `EXPIRE ROWS WHEN` expires a row
@@ -384,9 +417,10 @@ best-effort background cleanup.
 
 ### Read-time filter (authoritative)
 
-Every query against a policied view is transparently rewritten so that only the
-kept rows are visible **immediately, regardless of whether cleanup has run**.
-This is what makes results correct at all times:
+Once a policy takes effect, ordinary queries against its source view apply a
+read filter so that only the kept rows are visible, **regardless of whether
+cleanup has run**. Dependent-view refreshes reject an active policy instead of
+materializing this time-varying keep-set:
 
 - **Per-row `WHEN`** keeps rows where the predicate is not `TRUE`. QuestDB
   comparisons use two-valued boolean semantics, so a comparison against `NULL`

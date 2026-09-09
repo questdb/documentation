@@ -239,14 +239,23 @@ base columns its query references:
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 
+When a materialized-view source gains an
+[`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views),
+the live view detects the conflict on its next refresh and becomes invalid.
+An idle view may continue reporting active, and a refresh already underway may
+finish against its earlier snapshot. Detection stops further refreshes but does
+not retroactively remove previously emitted rows.
+
 An invalidated view keeps serving its existing data and reports the reason in
 [`live_views()`](/docs/query/functions/meta/#live_views). It stops refreshing.
-Invalidation is permanent: reversing the schema change does not automatically
+Invalidation is permanent: reversing the schema change or removing the source's
+expiry policy does not automatically
 revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
 suspended WAL writer.
 
-To recover, inspect `invalidation_reason`, repair the base-table schema, and
-save the definition before dropping the view:
+To recover, inspect `invalidation_reason`, resolve the source conflict (repair
+the base-table schema or remove its expiry policy), and save the definition
+before dropping the view:
 
 ```questdb-sql
 SHOW CREATE LIVE VIEW trades_ma;
