@@ -188,12 +188,36 @@ for other database processes to use.
 
 ### CPU cores
 
-By default, QuestDB tries to use all available CPU cores.
+By default, QuestDB tries to use all available CPU cores. Assuming that the disk
+is not bottlenecked on IOPS, the throughput of read-only queries scales
+proportionally with the number of available cores, so a machine with more cores
+will provide better query performance.
+
+Work is divided across three independently sized thread pools, which is what you
+tune when one class of work needs more CPU than another:
+
+| Pool | Handles | Setting |
+| ---- | ------- | ------- |
+| Network | HTTP, PostgreSQL and ILP server I/O | `shared.network.worker.count` |
+| Query | Parallel query execution — filters, `GROUP BY` | `shared.query.worker.count` |
+| Write | WAL apply, table writes, materialized view refresh, housekeeping | `shared.write.worker.count` |
+
+Each pool defaults to roughly the CPU count, so the pools oversubscribe the
+machine by design and the OS scheduler arbitrates between them. That is a
+reasonable starting point. Move capacity deliberately when a workload is
+lopsided:
+
+- **Read-heavy** — raise `shared.query.worker.count` and lower
+  `shared.network.worker.count`, provided connection counts are modest.
+- **Ingestion-heavy** — raise `shared.write.worker.count` so WAL apply keeps up
+  with incoming data. A growing WAL apply backlog is the signal to watch.
+- **Many concurrent clients** — raise `shared.network.worker.count`, since I/O
+  rather than query execution is the constraint.
+
+On small machines, cutting a pool too far can leave a subsystem unable to make
+progress; keep at least two threads in each.
 [The guide on shared worker configuration](/docs/configuration/shared-workers/)
-explains how to change the default settings. Assuming that the disk is not
-bottlenecked on IOPS, the throughput of read-only queries scales proportionally
-with the number of available cores. As a result, a machine with more cores will
-provide better query performance.
+covers the defaults and the per-pool affinity settings.
 
 ### Writer page size
 
