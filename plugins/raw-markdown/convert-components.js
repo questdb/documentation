@@ -77,12 +77,54 @@ function replaceComponent(content, componentName, replacer) {
 }
 
 /**
- * Removes <Screenshot /> components
+ * Public base URL for static assets. Screenshot and LazyVideo resolve their
+ * src through useBaseUrl(), so assets are served under the docs baseUrl
+ * ("/docs/"), not at the site root.
+ */
+const ASSET_BASE_URL = "https://questdb.com/docs"
+
+/**
+ * Converts <Screenshot /> components to a markdown link so the alt text and
+ * image URL survive in the raw markdown output
  */
 function convertScreenshot(content) {
-  return replaceComponent(content, 'Screenshot', (_) => {
-    return ""
+  return replaceComponent(content, 'Screenshot', (match) => {
+    const alt = (match.props.alt || "").trim()
+    const src = (match.props.src || "").trim()
+    if (!src) {
+      return ""
+    }
+    const urlPath = src.startsWith("/") ? src : `/${src}`
+    const label = alt ? `Screenshot: ${alt}` : "Screenshot"
+    return `\n\n[${label}](${ASSET_BASE_URL}${urlPath})\n\n`
   })
+}
+
+/**
+ * Converts native <video /> and <LazyVideo /> embeds to a markdown link.
+ * Without this, the JSX tag and its src leak verbatim into the raw output.
+ */
+function convertVideo(content) {
+  const replacer = (match) => {
+    const src = match.props.src || ""
+    const requireMatch = src.match(/require\(["']([^"']+)["']\)/)
+    let urlPath = (requireMatch ? requireMatch[1] : src).trim()
+    if (!urlPath) {
+      return ""
+    }
+    urlPath = urlPath.replace(/^\/static\//, "/")
+    if (!urlPath.startsWith("/")) {
+      urlPath = `/${urlPath}`
+    }
+    const name = path
+      .basename(urlPath, path.extname(urlPath))
+      .replace(/[-_]+/g, " ")
+    const label = (match.props.label || match.props.title || name).trim()
+    return `\n\n[Video: ${label}](${ASSET_BASE_URL}${urlPath})\n\n`
+  }
+
+  const withNativeVideos = replaceComponent(content, 'video', replacer)
+  return replaceComponent(withNativeVideos, 'LazyVideo', replacer)
 }
 
 function convertImages(content) {
@@ -499,6 +541,7 @@ async function convertAllComponents(content, currentFileDir, docsRoot, repoExamp
   processed = convertILPClientsTable(processed)
   processed = convertClients(processed)
   processed = convertScreenshot(processed)
+  processed = convertVideo(processed)
   processed = convertDocButton(processed)
   processed = convertCodeBlock(processed)
   processed = convertTabs(processed)

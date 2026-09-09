@@ -14,7 +14,7 @@ Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 SELECT columns, aggregate_functions
 FROM table
 [WHERE conditions]
-SAMPLE BY <n><unit>
+SAMPLE BY [count]unit
     [FROM timestamp TO timestamp]
     [FILL(fill_option)]
     [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset] | ALIGN TO FIRST OBSERVATION]
@@ -22,7 +22,7 @@ SAMPLE BY <n><unit>
 
 ### Key clauses
 
-- **`SAMPLE BY <n><unit>`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`)
+- **`SAMPLE BY [count]unit`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`). The count is optional and defaults to `1`, so `h` means the same as `1h`
 - **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
 - **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
 - **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`
@@ -30,11 +30,15 @@ SAMPLE BY <n><unit>
 
 ## Sample units
 
-The size of sampled groups are specified with the following syntax:
+The size of sampled groups is specified as a count and a unit:
 
 ```questdb-sql
-SAMPLE BY n{units}
+SAMPLE BY [count]unit
 ```
+
+The count is optional and defaults to `1`, so `SAMPLE BY h` and `SAMPLE BY 1h`
+return identical results. When supplied it must be a positive integer written
+immediately before the unit, with no space between the two.
 
 Where the unit for sampled groups may be one of the following:
 
@@ -58,6 +62,14 @@ trades per hour:
 SELECT ts, count()
 FROM trades
 SAMPLE BY 1h;
+```
+
+Written without the count, this is the same query:
+
+```questdb-sql
+SELECT ts, count()
+FROM trades
+SAMPLE BY h;
 ```
 
 ## Fill options
@@ -285,7 +297,7 @@ Consider a table `trades` with the following data spanning three calendar days:
 CREATE TABLE trades (
   ts TIMESTAMP,
   price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 
 INSERT INTO trades (ts, price) VALUES
   ('2021-05-31T23:10:00.000000Z', 100.5),

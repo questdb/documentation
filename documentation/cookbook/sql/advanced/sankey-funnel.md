@@ -20,7 +20,7 @@ CREATE TABLE events (
     pathname SYMBOL,
     timestamp TIMESTAMP,
     metric_name SYMBOL
-) TIMESTAMP(timestamp) PARTITION BY MONTH WAL;
+) TIMESTAMP(timestamp) PARTITION BY MONTH;
 ```
 
 ## Solution: Session window functions

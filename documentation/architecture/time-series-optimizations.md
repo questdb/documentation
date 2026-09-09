@@ -79,7 +79,7 @@ QuestDB supports [Time To Live (TTL)](/docs/concepts/ttl/) configuration for bot
 materialized views. With TTL enabled, partitions older than the configured horizon will automatically
 be removed.
 
-An alternative is to use QuestDB Enterprise to automatically move older partitions to [cold storage](/docs/architecture/storage-engine/#tier-three-parquet-locally-or-in-an-object-store), with
+An alternative is to use QuestDB Enterprise to automatically move older partitions to [cold storage](/docs/architecture/storage-engine/#tier-three-remote-object-storage), with
 old partitions converted to Parquet and stored in object storage, while still being available for
 querying by the query engine.
 

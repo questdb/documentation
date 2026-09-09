@@ -386,6 +386,18 @@ WHERE t.timestamp < t2.timestamp
 
 :::
 
+:::tip Sampling points across a time horizon
+
+A `CROSS JOIN` against a small table of time offsets, ordered by the shifted
+timestamp, is the shape used to build a markout curve. That form materializes
+and sorts the whole join output by default. The
+[`markout_horizon` hint](/docs/concepts/deep-dive/sql-optimizer-hints/#markout_horizon)
+emits the rows already ordered instead, and
+[HORIZON JOIN](/docs/query/sql/horizon-join/) expresses the same idea as a
+dedicated join.
+
+:::
+
 ### LATERAL JOIN
 
 `LATERAL JOIN` allows a subquery on the right-hand side of a join to reference

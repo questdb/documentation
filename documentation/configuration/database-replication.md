@@ -25,6 +25,18 @@ For a tuning guide, see the
 
 ## General
 
+### replication.disabled.tables
+
+- **Default**: none
+- **Reloadable**: yes
+
+Comma-separated list of table names to exclude from replication. Listed tables
+stay local to the node: the primary does not upload their WAL, and replicas do
+not download it. Everything else replicates as usual.
+
+Because the setting is reloadable, a table can be taken out of replication, or
+put back, without restarting the instance.
+
 ### replication.object.store
 
 - **Default**: none
@@ -33,13 +45,38 @@ For a tuning guide, see the
 A configuration string for connecting to an object store. The format is
 `scheme::key1=value;key2=value2;…`. Ignored if replication is disabled.
 
+For a store fronted by a private, internal, or self-signed CA, the string also
+accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See
+[TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
+
 ### replication.role
 
 - **Default**: `none`
 - **Reloadable**: no
 
 Defaults to `none` for stand-alone instances. To enable replication, set to
-one of: `primary`, `replica`.
+one of: `primary`, `replica`. Values are case-insensitive.
+
+This is the role the instance boots into. Since QuestDB Enterprise 3.3.3 the
+role can also be switched at runtime with
+[`SWITCH ROLE`](/docs/query/sql/switch-role/), which does not update this
+setting.
+
+:::danger
+
+After a runtime switch, set `replication.role` to the new role on both nodes
+before either of them restarts. A demoted node that restarts with
+`replication.role=primary` can come back as a second primary on the same object
+store, and a promoted node that restarts with `replication.role=replica`
+silently demotes itself. See
+[Restarts](/docs/high-availability/failover/#restarts).
+
+:::
+
+`primary-catchup-uploads` is a one-shot maintenance value: the instance starts
+as a primary, uploads every pending transaction, and exits. It is used by the
+restart-based
+[planned primary migration](/docs/high-availability/setup/#planned-primary-migration).
 
 ### replication.summary.interval
 

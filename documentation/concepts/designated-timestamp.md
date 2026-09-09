@@ -556,6 +556,14 @@ EXPLAIN SELECT * FROM trades WHERE timestamp IN '2024-01-15';
 Look for `Interval forward scan`—if you see `Async Filter` instead, the
 designated timestamp optimization isn't being used.
 
+**Check if a table without a designated timestamp is ordered:**
+
+A table with no designated timestamp carries no ordering guarantee. Since one
+cannot be added after the fact, test whether the timestamp column already
+ascends before migrating the data into a table that has one. See the
+[Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
+cookbook recipe.
+
 ## FAQ
 
 **Can I add a designated timestamp to an existing table?**

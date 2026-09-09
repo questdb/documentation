@@ -8,6 +8,166 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## September 2026
+
+### QuestDB Enterprise Releases
+
+- [4.0.1](https://questdb.com/release-notes/) - Released September 1, 2026
+
+### New
+
+- [Migrate QuestDB onto the Kubernetes Operator](/docs/enterprise-kubernetes-operator/getting-started/migrate/) - Move an existing Enterprise deployment onto the Operator with a replica-first cutover: restore the source backup, consume replication WAL, then promote after a controlled source drain
+
+### Updated
+
+- [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
+- [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order
+
+## August 2026
+
+### Releases
+
+- [10.0.1](https://questdb.com/release-notes/) - Released August 24, 2026
+- [10.0.0](https://questdb.com/release-notes/) - Released August 6, 2026
+
+### QuestDB Enterprise Releases
+
+- [4.0.0](https://questdb.com/release-notes/) - Released August 25, 2026
+
+### New
+
+- [SWITCH ROLE](/docs/query/sql/switch-role/) - New reference page for switching a QuestDB Enterprise node between the primary and replica roles in place, with `SWITCH STATUS`, the timeout semantics, the statement errors, and the `SWITCH ROLE` permission
+- [Failover and role switch](/docs/high-availability/failover/) - Operator guide for planned switchovers and promotions without a restart: prerequisites, the timeout budget, refusals and the `UNKNOWN` state, what each client protocol sees during a demote, the restart hazard, and the `GET /lifecycle` and `POST /lifecycle/switch` endpoints
+- [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
+- [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
+- [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts
+- [SWITCH COLD STORAGE ROLE](/docs/query/sql/switch-cold-storage-role/) - New reference page for moving the cold storage manager role between instances at runtime, with `SWITCH COLD STORAGE STATUS`, the `FORCE` break-glass path, and the timeout semantics
+- [Connect](/docs/connect/overview/) - New top-level Connect section that gathers the native client libraries, the compatibility protocols (ILP, PGWire, REST), and the wire-protocol specifications under one home, with a decision table for picking a path and a per-language QWP support matrix
+- [Connect string reference](/docs/connect/clients/connect-string/) - Every configuration key for the native clients, with worked connect strings for common setups, a goal-to-keys recipe table, sender restart and replay semantics, and an alphabetical key index
+- [Wire protocols](/docs/connect/wire-protocols/overview/) - QWP specifications for client implementers, covering [ingress over WebSocket](/docs/connect/wire-protocols/qwp-ingress-websocket/), [egress over WebSocket](/docs/connect/wire-protocols/qwp-egress-websocket/), and [expected client behavior](/docs/connect/wire-protocols/qwp-client-behavior/)
+- [Store-and-forward](/docs/high-availability/store-and-forward/when-to-use/) - New section on client-side disk buffering: choosing between memory mode and disk-backed offload, [concepts](/docs/high-availability/store-and-forward/concepts/), [configuration](/docs/high-availability/store-and-forward/configuration/), and [operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/)
+- [Client failover](/docs/high-availability/client-failover/concepts/) - How clients detect a failed primary and switch to a healthy peer using multi-host address lists, host-health classification, role filtering, and zone-aware selection, plus its [configuration](/docs/high-availability/client-failover/configuration/)
+- [Delivery semantics](/docs/concepts/delivery-semantics/) - At-least-once delivery, where duplicate rows arise, and how designated timestamps combine with deduplication for exactly-once outcomes
+- [Agents](/docs/connect/agents/) - Which protocols AI agents use to drive QuestDB, the tooling available to them, and how to grant scoped access
+- [Live views](/docs/concepts/live-views/) - Incrementally maintained window-function queries over a WAL table, queried like a regular table, with [CREATE LIVE VIEW](/docs/query/sql/create-live-view/), [DROP LIVE VIEW](/docs/query/sql/drop-live-view/), and the [`cairo.live.view.*` settings](/docs/configuration/live-views/)
+- [Notebooks](/docs/getting-started/web-console/notebooks/overview/) - Web Console notebooks that combine SQL, markdown, and charts in one tab, covering [cells](/docs/getting-started/web-console/notebooks/cells/), [charts](/docs/getting-started/web-console/notebooks/charts/), [variables](/docs/getting-started/web-console/notebooks/variables/), [live dashboards](/docs/getting-started/web-console/notebooks/live-dashboards/), and [sharing](/docs/getting-started/web-console/notebooks/manage-share/)
+- [MCP connection](/docs/getting-started/web-console/mcp-server/) - Connect AI coding agents to the Web Console through the `@questdb/mcp-bridge` local MCP server, with the pairing flow, the four permission levels, and the available agent tools
+- [Register QuestDB Parquet as Apache Iceberg tables](/docs/tutorials/questdb-to-iceberg/) - Expose Parquet partitions as Iceberg tables and query them in place from Spark, Trino, DuckDB, or PyIceberg
+- [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - New reference page for rebuilding a suspended WAL table under a fresh sequencer, with its requirements and permission
+- [ALTER TABLE SET FORMAT](/docs/query/sql/alter-table-set-format/) - New reference page for switching a table's partition storage format between `NATIVE` and `PARQUET`
+- [QWP configuration](/docs/configuration/qwp/) - Server-side settings for the QWP ingestion (`/write/v4`) and query (`/read/v1`) endpoints
+- [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/) and [Check column sort order](/docs/cookbook/sql/advanced/check-column-sort-order/) - Two cookbook recipes that detect unsorted data with `lag()`: whether a table, CSV import or external Parquet file is ordered by its timestamp, and whether one column is sorted with respect to another
+- [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - New manual for running QuestDB Enterprise clusters on Kubernetes, covering [installation](/docs/enterprise-kubernetes-operator/installation/), getting started on [AWS](/docs/enterprise-kubernetes-operator/getting-started/aws/) and [Azure](/docs/enterprise-kubernetes-operator/getting-started/azure/), [configuration](/docs/enterprise-kubernetes-operator/configuration/), [day-to-day operations](/docs/enterprise-kubernetes-operator/operations/operator/), [high availability](/docs/enterprise-kubernetes-operator/high-availability/), [known limitations](/docs/enterprise-kubernetes-operator/known-limitations/), and the full [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
+- [ALTER TABLE SUSPEND WAL](/docs/query/sql/alter-table-suspend-wal/) - New reference page for deliberately stopping the WAL apply job, covering the quiescent-table use case that `REBASE WAL` requires, and the trap that writes to a suspended table succeed while staying invisible to queries until `RESUME WAL`
+
+### Reference
+
+- Added the [`node_role()`](/docs/query/functions/meta/#node_role) function, which reports the replication role of the instance to any authenticated session
+- [RBAC](/docs/security/rbac/#failover-operator) - Added the `SWITCH ROLE` permission to the permissions table, a failover operator scenario, and the built-in admin's break-glass role in a replicated cluster
+- [Minimal HTTP server](/docs/operations/logging-metrics/#lifecycle-endpoint) - Documented the `GET /lifecycle` component snapshot and the [`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired) setting
+- [Replication metrics](/docs/operations/logging-metrics/#replication-metrics) - Added `questdb_replication_pending_upload_txn` and `questdb_backup_active_at_last_demote`
+- [Replication configuration](/docs/configuration/database-replication/#replicationrole) - Documented that `replication.role` is the boot role, the `primary-catchup-uploads` value, and the restart hazard after an in-place switch
+- [Storage Policy](/docs/concepts/storage-policy/) - The `TO REMOTE` and `DROP REMOTE` stages are now enforced. Documented what each does, the requirement for a WAL table with cold storage enabled, and the warning that `DROP LOCAL` makes a partition read-only for good
+- Added the [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) function, which returns the remote state of every partition in a table's manifest as it walks `pending`, `live`, `sealed`, and `deleting`
+- [SHOW PARTITIONS](/docs/query/sql/show/#show-partitions) - Two trailing columns, `seqTxn` and `isRemotelyServed`, are appended to the result set. Tools binding columns by position must be updated
+- [Backup and restore](/docs/operations/backup/#cold-storage-partitions) - Documented that a backup of a database using cold storage does not contain the `data.parquet` bytes, so the backup and the object store prefix are one recovery set
+- [Replication overview](/docs/high-availability/overview/#cold-storage-in-a-replicated-cluster) - Documented that the cold storage manager role is independent of the primary and replica roles, that partition bytes never traverse replication, and that replicas must be upgraded first
+- [Cold storage read metrics](/docs/operations/logging-metrics/#cold-storage-read-metrics) - Added the fifteen `questdb_cold_chunk_*` Prometheus metrics
+- Added the [`storage.policy.recheck.drain.interval`](/docs/configuration/storage-policy/) configuration property
+- [CREATE TABLE](/docs/query/sql/create-table/#partition-format) - Added the `FORMAT { NATIVE | PARQUET }` clause to store partitions as Parquet by default on partitioned WAL tables
+- [REST API](/docs/connect/compatibility/rest-api/#authentication) - Merged the overlapping authentication sections into one, with basic auth (including building the `Authorization` header by hand) and Enterprise token auth
+- [SHOW CREATE LIVE VIEW](/docs/query/sql/show/#show-create-live-view) - Documented retrieving a live view's `CREATE` statement, alongside the `CREATE LIVE VIEW` and `DROP LIVE VIEW` [permissions](/docs/security/rbac/)
+- Added the [`live_views()`](/docs/query/functions/meta/#live_views) catalogue function and the `L` `table_type` discriminator to the meta functions page
+- Added the [`is_end_of_month()`](/docs/query/functions/date-time/#is_end_of_month) date-time function, which is leap-year aware and returns `false` for `null`
+- Documented the [`query.timeout`](/docs/configuration/cairo-engine/) duration key (`120s`, `1m`, `500ms`) alongside the now-deprecated `query.timeout.sec`, and how the two relate
+- Added the [`cairo.wal.apply.suspended.tables`](/docs/configuration/wal/) and `cairo.wal.apply.suspended.write.denied` configuration properties
+- [SHOW CREATE MATERIALIZED VIEW](/docs/query/sql/show/#show-create-materialized-view) - Documented retrieving a materialized view's `CREATE` statement, and alphabetized the SHOW reference page
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented dumping the whole database schema as round-trippable DDL, with `INCLUDE`/`EXCLUDE` category filtering
+- [EXPLAIN](/docs/query/sql/explain/) - Added the `Encode sort` / `Encode sort light` plan node to the plan-node reference
+- [LIMIT](/docs/query/sql/limit/#null-bounds) - Documented null `LIMIT` bounds (supplied via bind variables) and their two-bound semantics
+- Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
+- Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
+- [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
+- [SAMPLE BY](/docs/query/sql/sample-by/#sample-units) - Documented that the count is optional and defaults to `1`, so `SAMPLE BY h` is the same as `SAMPLE BY 1h`, and that it must be a positive integer written with no space before the unit
+- [REST API](/docs/connect/compatibility/rest-api/#execute) - Documented `/execute` and `/validate`, which compiles a query and returns its column metadata without running it. `/exec` is now marked deprecated in favour of `/execute`
+- [HTTP server configuration](/docs/configuration/http-server/#circuitbreakerbuffersize) - Flagged `circuit.breaker.buffer.size` as unsupported since QuestDB 10.0.0; a config that still sets it logs an advisory, or fails to start under `config.validation.strict`
+- [Meta functions](/docs/query/functions/meta/#wait_wal_table) - Documented [`wait_wal_table()`](/docs/query/functions/meta/#wait_wal_table), which blocks until a WAL table's pending writes have been applied so a following read sees them, plus [`sleep()`](/docs/query/functions/meta/#sleep), [`current_data_id()`](/docs/query/functions/meta/#current_data_id) and `session_user()`
+- [UNION, EXCEPT, INTERSECT](/docs/query/sql/union-except-intersect/#result-column-types) - Documented result column types: a column that is `SYMBOL` on every branch stays `SYMBOL` instead of widening, which also changes the type materialized by `CREATE TABLE AS` and reported in REST response metadata
+- [HTTP server configuration](/docs/configuration/http-server/#httpuser) - Documented that QuestDB Enterprise fails to start when `http.user`, `http.password` or `http.password.file` is set, since those Open Source settings were never enforced by Enterprise
+- [markout_horizon hint](/docs/concepts/deep-dive/sql-optimizer-hints/#markout_horizon) - Documented the optimizer hint that stops a markout-curve `CROSS JOIN` from materializing and sorting its whole output
+- [Column alias configuration](/docs/configuration/cairo-engine/#column-aliases) - Documented `cairo.sql.column.alias.expression.enabled`, the opt-out restoring pre-9.0.0 column naming, and `cairo.sql.column.alias.generated.max.size`
+- [Replication configuration](/docs/configuration/database-replication/#replicationdisabledtables) - Documented `replication.disabled.tables`, a reloadable list excluding tables from replication
+- [IAM configuration](/docs/configuration/iam/#aclpermissionscompactionrowthreshold) - Documented the two `acl.permissions.compaction.*` settings that keep `sys.acl_permissions` from growing until replica logins slow down
+- [SQL extensions](/docs/concepts/deep-dive/sql-extensions/) - Recorded that `pg_class.relkind` and `information_schema.tables.table_type` distinguish tables, views and materialized views, so PostgreSQL client tools can categorise objects
+
+### Updated
+
+- [Replication setup guide](/docs/high-availability/setup/#migration-procedures) - Planned primary migration now points at the in-place switch; the restart-based flow is kept for older versions and the emergency migration is marked as the lossy path
+- [Error codes](/docs/troubleshooting/error-codes/#er005) - ER005 now covers the refusal of an in-place promotion, and ER006 the restart of a demoted node with a stale `replication.role`
+- Client libraries rewritten for the QWP binary protocol, unifying ingestion and streaming SQL queries under one handle: [Java](/docs/connect/clients/java/), [Python](/docs/connect/clients/python/), [Go](/docs/connect/clients/go/), [C & C++](/docs/connect/clients/c-and-cpp/), [Rust](/docs/connect/clients/rust/), and [.NET](/docs/connect/clients/dotnet/)
+- [Web Console](/docs/getting-started/web-console/overview/) - Documented query sharing by link and tab import/export in the [code editor](/docs/getting-started/web-console/code-editor/), custom AI providers and per-provider permission levels in [QuestDB AI](/docs/getting-started/web-console/questdb-ai/), automatic column sizing in the [result grid](/docs/getting-started/web-console/result-grid/), and the storage policy section in [table details](/docs/getting-started/web-console/table-details/)
+- [AI coding agents](/docs/getting-started/ai-coding-agents/) - Repositioned around the agent skill and the Web Console MCP bridge together
+- [Telegraf](/docs/connect/message-brokers/telegraf/#authentication) - Documented authenticating from Telegraf with the Enterprise `token` setting or the Open Source `http_headers` basic-auth equivalent
+- [Integrations overview](/docs/integrations/overview/) - Synced with the sidebar: added the six missing pages, moved MindsDB into Other Tools, and added a Data Ingestion cross-reference
+- [Parquet](/docs/concepts/parquet/) - Moved the Parquet page to Concepts and revamped it around creating tables as Parquet, in-place conversion (storage policies and `ALTER TABLE`), and export; also documented `ALTER COLUMN TYPE` on Parquet partitions and relaxed the in-place conversion constraints
+- [Storage engine](/docs/architecture/storage-engine/) - Reworked the three-tier storage model: local native or Parquet storage, then remote object storage
+- [systemd deployment](/docs/deployment/systemd/) - Reworked the systemd service guide to cover both QuestDB Open Source and Enterprise
+- [Time to live (TTL)](/docs/concepts/ttl/) - Documented TTL on materialized views, set with `CREATE MATERIALIZED VIEW ... TTL` or `ALTER MATERIALIZED VIEW ... SET TTL` and managed independently of the base table's TTL
+- [Result grid](/docs/getting-started/web-console/result-grid/) - Documented the Parquet and CSV download options in the web console result grid
+- [Docker Compose configuration](/docs/cookbook/operations/docker-compose-config/) - Reworked the volume-permission guidance and explained why `QDB_CAIRO_ROOT` should not be set in Docker
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Renamed from "MCP connection" and reworked around when an agent actually needs an MCP server, with [AI coding agents](/docs/getting-started/ai-coding-agents/) gaining a four-option matrix covering the MCP server, the REST API, the agent skill, and the [QuestDB AI Assistant](/docs/getting-started/web-console/questdb-ai/)
+- [pandas](/docs/integrations/data-processing/pandas/) and [Polars](/docs/integrations/data-processing/polars/) - Rewritten around the native QWP clients, keeping the previous ILP and ConnectorX approaches as legacy; Polars now also covers the Rust `polars-ingress` and `polars-egress` crate features
+- [Python client](/docs/connect/clients/python/) - Documented N-dimensional `float64` numpy arrays landing in matching N-dimensional column types (other dtypes are rejected), and clarified Polars consumption: prefer `to_polars()`, with `polars.DataFrame(result)` reserved for pyarrow-free installs
+- [Query overview](/docs/query/overview/) - Added a client libraries section ahead of PostgreSQL, and removed the stale notice describing Parquet support as beta
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Updated for the renamed MCP server: the npm package is now `@questdb/mcp-server-questdb` (previously `@questdb/mcp-bridge`) and the repository is now `questdb/mcp-server-questdb`, also reflected in [AI coding agents](/docs/getting-started/ai-coding-agents/)
+- [.NET client](/docs/connect/clients/dotnet/) - Documented the optional `net-questdb-client-zstd` package for `QueryClient` egress compression: the fail-fast `ConfigError` raised when `compression=zstd` is requested without it, `compression=auto` degrading silently to raw, and the trimmed and Native AOT reflection caveat. The beta notice now refers to 4.0.0
+- [systemd deployment](/docs/deployment/systemd/) - `ExecStart` now depends on which archive you extracted rather than on CPU architecture, because only the `rt-` archive bundles Java while the no-JRE archive runs on system Java and needs `-p /opt/questdb/questdb.jar`. A new Startup failures section maps both common boot errors to their cause and fix
+- [CREATE TABLE](/docs/query/sql/create-table/#write-ahead-log-wal-settings) - Dropped the redundant `WAL` keyword from `CREATE TABLE` examples across the documentation. Partitioned tables have been WAL-enabled by default for a long time, and [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) no longer emits the keyword either, so the documented output now matches what the server returns
+
+## July 2026
+
+### QuestDB Enterprise Releases
+
+- [3.3.4](https://questdb.com/release-notes/) - Released July 31, 2026
+- [3.3.3](https://questdb.com/release-notes/) - Released July 1, 2026
+
+### Updated
+
+- [Storage policy](/docs/concepts/storage-policy/) - Clarified stage enforcement: `TO REMOTE` is now accepted and stored but not yet enforced, `DROP REMOTE` is rejected at parse time, and the policy check interval is 5 minutes
+- [systemd deployment](/docs/deployment/systemd/) - Added the `jdk.internal.vm` module export to the service example
+
+## June 2026
+
+### Releases
+
+- [9.4.3](https://questdb.com/release-notes/) - Released June 15, 2026
+- [9.4.2](https://questdb.com/release-notes/) - Released June 9, 2026
+- [9.4.1](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.3.2](https://questdb.com/release-notes/) - Released June 23, 2026
+- [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
+- [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### New
+
+- [Row-level security](/docs/cookbook/sql/advanced/row-level-security/) - New cookbook recipe for restricting row visibility per user
+
+### Reference
+
+- Documented the column wildcard with optional `EXCLUDE` list for column-level [`GRANT`](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table) and [`REVOKE`](/docs/query/sql/acl/revoke/#revoke-from-all-columns-of-a-table) — `GRANT SELECT ON trades(*) TO user` grants every current column, and `EXCLUDE` omits specific ones
+- Documented custom root CA support for the replication object store: the `ca_cert_file` and `ca_builtin_roots` [connection-string parameters](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca) trust a private, internal, or self-signed CA for S3, Azure Blob, and GCS stores
+- Added [`array_agg()`](/docs/query/functions/aggregation/#array_agg) aggregate function, covering scalar and array input forms, `SAMPLE BY` with FILL, and NULL handling
+- Documented the [`twap()`](/docs/query/functions/aggregation/#twap) designated-timestamp limitation: the timestamp argument must be the table's designated timestamp
+- Added [`kurtosis()`](/docs/query/functions/aggregation/#kurtosis--kurtosis_samp), [`kurtosis_pop()`](/docs/query/functions/aggregation/#kurtosis_pop), [`skewness()`](/docs/query/functions/aggregation/#skewness--skewness_samp), and [`skewness_pop()`](/docs/query/functions/aggregation/#skewness_pop) aggregate functions for distribution shape
+
+### Updated
+
+- [systemd service example](/docs/deployment/systemd/) - Updated the Java requirement from 17 to 25 across deployment and quick-start prerequisites
+- [GCP deployment](/docs/deployment/gcp/) - Reworked for VM install and aligned with the AWS and Azure guides
+- [Capacity planning](/docs/getting-started/capacity-planning/) - Reworked the OS configuration guidance for open file limits and `vm.max_map_count`
+
 ## May 2026
 
 ### Releases
@@ -25,7 +185,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
-- Documented [gzip request compression](/docs/ingestion/ilp/overview/) for ILP/HTTP and updated [Telegraf](/docs/ingestion/message-brokers/telegraf/) guidance for QuestDB 9.1.0+
+- Documented [gzip request compression](/docs/connect/compatibility/ilp/overview/) for ILP/HTTP and updated [Telegraf](/docs/connect/message-brokers/telegraf/) guidance for QuestDB 9.1.0+
 - Added [`ntile()`](/docs/query/functions/window-functions/reference/#ntile), [`cume_dist()`](/docs/query/functions/window-functions/reference/#cume_dist), and [`nth_value()`](/docs/query/functions/window-functions/reference/#nth_value) window functions
 - Added [`regr_r2()`](/docs/query/functions/finance/#regr_r2) coefficient of determination aggregate
 - Fixed `timestamp_ns` valid range documentation
@@ -35,6 +195,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Go client](/docs/connect/clients/go/) - Rewrote for the QWP binary protocol: ingestion, the QwpQueryClient query API, store-and-forward, and failover
 - [Storage policy](/docs/concepts/storage-policy/) - Removed the `DROP NATIVE` stage; `TO PARQUET` now removes native files and serves reads from the Parquet file
 - [SQL extensions and compatibility](/docs/concepts/deep-dive/sql-extensions/) - Rewritten as the canonical SQL dialect reference covering time-series clauses and joins, query syntax conveniences, storage extensions, PIVOT vs SQL Server/PostgreSQL, JSON and UNNEST, and a full inventory of standard SQL features not supported with QuestDB equivalents. Sidebar entry moved to the top of Query & SQL Reference
 - [systemd service example](/docs/deployment/systemd/) - Corrected JVM argument ordering, switched to `UseParallelGC`, set `-Dcontainerized=false`, and added required setup paths
@@ -58,13 +219,17 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.3.5](https://questdb.com/release-notes/) - Released April 13, 2026
 
+### QuestDB Enterprise Releases
+
+- [3.2.5](https://questdb.com/release-notes/) - Released April 13, 2026
+
 ### New
 
 - [Storage policy](/docs/concepts/storage-policy/) - Documentation for configuring storage policies
 - [UNNEST](/docs/query/sql/unnest/) - SQL reference for unnesting arrays into rows
 - [LATERAL JOIN](/docs/query/sql/lateral-join/) - SQL reference for lateral subqueries
 - [Sparkline and bar visualization functions](/docs/query/functions/visualization/) - Text-based chart functions for terminal and console output
-- [StructArrayExplode transform](/docs/ingestion/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
+- [StructArrayExplode transform](/docs/connect/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
 
 ### Reference
 
@@ -78,19 +243,24 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [SQL reference pages](/docs/query/sql/select/) - Replaced railroad diagrams with code-based syntax blocks across 65 SQL pages, with updated examples
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Updated timezone bucket alignment behavior
-- [Parquet export](/docs/query/export-parquet/) - Added partitioning options for exports
+- [Parquet export](/docs/concepts/parquet/) - Added partitioning options for exports
 - [WINDOW JOIN](/docs/query/sql/window-join/) - Documented dynamic window boundaries
 - [HORIZON JOIN](/docs/query/sql/horizon-join/) - Documented multi-RHS table support
 - [JOIN](/docs/query/sql/join/) - Improved join documentation and reorganized page
 - [Web Console](/docs/getting-started/web-console/overview/) - Added table details, updated screenshots
 - [TTL](/docs/concepts/ttl/) - Fixed removal syntax and general improvements
-- [REST API `/exp` endpoint](/docs/query/rest-api/) - Documented timeout parameter, removed outdated warning
+- [REST API `/exp` endpoint](/docs/connect/compatibility/rest-api/) - Documented timeout parameter, removed outdated warning
 
 ## March 2026
 
 ### Releases
 
 - [9.3.4](https://questdb.com/release-notes/) - Released March 26, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.4](https://questdb.com/release-notes/) - Released March 26, 2026
+- [3.2.3](https://questdb.com/release-notes/) - Released March 3, 2026
 
 ### New
 
@@ -110,13 +280,17 @@ This page tracks significant updates to the QuestDB documentation.
 - [Cookbook](/docs/cookbook/) - Refreshed recipes with lookback patterns, named windows, and updated schema references
 - [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-set-parquet/) - Comprehensive documentation for column-level settings
 - [Database replication](/docs/configuration/database-replication/) - GCP NFS transport and tuning updates
-- [Ingestion benchmarks](/docs/ingestion/overview/) - Updated benchmark image to Q1 2026
+- [Ingestion benchmarks](/docs/connect/overview/) - Updated benchmark image to Q1 2026
 
 ## February 2026
 
 ### Releases
 
 - [9.3.3](https://questdb.com/release-notes/) - Released February 25, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.2](https://questdb.com/release-notes/) - Released February 4, 2026
 
 ### New
 
@@ -137,7 +311,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Named windows](/docs/query/functions/window-functions/overview/) - Support for reusable `WINDOW` clause definitions
-- [Parquet export](/docs/query/export-parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
+- [Parquet export](/docs/concepts/parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
 - [Backup](/docs/operations/backup/) - Documented `backup.schedule.cron` format, improved scheduler visibility
 - [Date/time functions](/docs/query/functions/date-time/) - Page updates and corrections
 - [Window functions](/docs/query/functions/window-functions/overview/) - Added limitation documentation
@@ -151,6 +325,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.3.2](https://questdb.com/release-notes/) - Released January 28, 2026
 - [9.3.1](https://questdb.com/release-notes/) - Released January 14, 2026
 - [9.3.0](https://questdb.com/release-notes/) - Released January 9, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.1](https://questdb.com/release-notes/) - Released January 29, 2026
+- [3.2.0](https://questdb.com/release-notes/) - Released January 19, 2026
 
 ### New
 
@@ -183,6 +362,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.2.3](https://questdb.com/release-notes/) - Released December 18, 2025
 - [9.2.2](https://questdb.com/release-notes/) - Released December 1, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.1.2](https://questdb.com/release-notes/) - Released December 18, 2025
+- [3.1.1](https://questdb.com/release-notes/) - Released December 1, 2025
+
 ### New
 
 - [Builtin profiler](/docs/troubleshooting/profiling/) - Documentation for QuestDB's built-in query profiler
@@ -206,6 +390,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.2.0](https://questdb.com/release-notes/) - Released November 13, 2025
 - [9.1.1](https://questdb.com/release-notes/) - Released November 3, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.1.0](https://questdb.com/release-notes/) - Released November 25, 2025
+- [3.0.5](https://questdb.com/release-notes/) - Released November 7, 2025
+
 ### New
 
 - [Hetzner deployment](/docs/deployment/hetzner/) - Step-by-step guide for deploying QuestDB on Hetzner Cloud
@@ -219,7 +408,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
+- [Parquet export](/docs/concepts/parquet/) - Complete documentation for exporting data to Parquet format
 - [Shared pool configuration](/docs/configuration/shared-workers/) - Updated with network, query, and write shared pool options
 - [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
 
@@ -229,9 +418,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.1.0](https://questdb.com/release-notes/) - Released October 3, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.0.4](https://questdb.com/release-notes/) - Released October 27, 2025
+
 ### New
 
-- [PGWire for C/C++](/docs/query/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
+- [PGWire for C/C++](/docs/connect/compatibility/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
 - [Table and column naming rules](/docs/query/sql/create-table/#table-name) - Guidelines for valid identifiers
 
 ### Reference
@@ -246,10 +439,14 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## September 2025
 
+### QuestDB Enterprise Releases
+
+- [3.0.3](https://questdb.com/release-notes/) - Released September 15, 2025
+
 ### Updated
 
 - [Partitioning](/docs/concepts/partitions/) - Improved formatting and explanations
-- [Go client examples](/docs/ingestion/clients/go/) - Updated to v4 API
+- [Go client examples](/docs/connect/clients/go/) - Updated to v4 API
 
 ## August 2025
 
@@ -257,6 +454,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.0.3](https://questdb.com/release-notes/) - Released August 29, 2025
 - [9.0.2](https://questdb.com/release-notes/) - Released August 15, 2025
+
+### QuestDB Enterprise Releases
+
+- [3.0.2](https://questdb.com/release-notes/) - Released August 29, 2025
+- [3.0.1](https://questdb.com/release-notes/) - Released August 15, 2025
 
 ### New
 
@@ -274,6 +476,10 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.0.1](https://questdb.com/release-notes/) - Released July 23, 2025
 - [9.0.0](https://questdb.com/release-notes/) - Released July 11, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.0.0](https://questdb.com/release-notes/) - Released July 23, 2025
+
 ### New
 
 - [N-dimensional arrays](/docs/query/datatypes/array/) - Comprehensive guide to multi-dimensional arrays
@@ -283,7 +489,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [ILP clients](/docs/ingestion/overview/) - Array support added to Python, C++, Rust, Java, and .NET clients
+- [ILP clients](/docs/connect/overview/) - Array support added to Python, C++, Rust, Java, and .NET clients
 - [WAL metrics](/docs/operations/monitoring-alerting/) - Added metrics for detecting WAL apply lag
 
 ## Earlier updates

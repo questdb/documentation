@@ -19,7 +19,6 @@ same regardless of how the repo is checked out.
 ├── documentation/             # Main content (markdown/MDX)
 │   ├── concepts/              # Conceptual docs
 │   ├── configuration/         # Config reference
-│   │   └── configuration-utils/  # Config JSON files
 │   ├── cookbook/              # Recipes and how-tos
 │   ├── guides/                # User guides and tutorials
 │   ├── ingestion/             # Ingestion methods
@@ -325,6 +324,39 @@ WHERE timestamp IN today()
 WHERE timestamp > dateadd('h', -1, now())
 ```
 
+### Omit the WAL keyword
+
+`WAL` has long been the default for partitioned tables, so `CREATE TABLE`
+examples must not pass it explicitly. Spelling it out adds noise and implies
+the keyword is required.
+
+```sql
+-- Preferred
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+-- Avoid
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+This holds for every clause combination. `FORMAT PARQUET`, `STORAGE POLICY`,
+`DEDUP UPSERT KEYS`, `TTL`, and posting indexes all produce a WAL table
+without the keyword.
+
+Keep `WAL` only where it is the subject of the example:
+
+- The [write-ahead log](/docs/concepts/write-ahead-log/) page, which teaches
+  the keyword and shows the plain form first
+- Syntax blocks presenting the grammar, such as `[BYPASS WAL | WAL]`
+- Examples that deliberately contrast a WAL table against a `BYPASS WAL` one
+- `BYPASS WAL` itself, which is never redundant
+
+`SHOW CREATE TABLE` no longer emits `WAL` either, so any documented output
+sample must match what the server actually returns.
+
 ### Finance-friendly examples
 
 - Use realistic table and column names from the finance domain
@@ -407,21 +439,108 @@ actually does.
 Structure: Intro (what it does in one sentence) - Syntax - How it works
 (precise mechanics) - Examples (demoable) - Limitations.
 
-## Configuration property sync
+## Overview page sync
 
-When documenting a feature that introduces a new server configuration property
-(e.g., `cairo.sql.subsample.max.rows`), add it to the configuration reference
-JSON at `documentation/configuration/configuration-utils/_cairo.config.json`.
-Properties are grouped by prefix and sorted alphabetically within each group.
+Several sections have an overview or index page that lists every page in that
+section (e.g. `integrations/overview.md`, `cookbook/sql/finance/index.md`).
+These lists go stale silently: nothing in the build checks that the overview
+matches `sidebars.js`, so a missing entry is invisible until a reader can't
+find a page.
 
-Each entry follows this format:
+**Whenever you add or remove a page in a section that has an overview page,
+update that overview in the same change. Do it automatically, without
+asking.**
 
-```json
-"cairo.sql.example.property": {
-  "default": "value",
-  "description": "What this property controls."
+- **Adding a page**: add a bullet to the overview, in the section that
+  corresponds to its `sidebars.js` category.
+- **Removing a page**: delete its bullet from the overview.
+- **Renaming a page**: update the label and the link.
+
+Never leave an overview listing a page that no longer exists, or omitting one
+that does.
+
+### Match the sidebar, not your own judgement
+
+The overview must mirror `sidebars.js`, not what seems logically tidy:
+
+- **Section order** follows the sidebar's category order.
+- **Item order within a section** follows the sidebar's item order. That order
+  is curated, not alphabetical. Do not re-sort it alphabetically, and do not
+  "fix" it, even when it looks arbitrary.
+- **Section headings** should correspond to the sidebar's category labels.
+
+Where a page lives in the sidebar decides which overview section it belongs
+to. A page under the `Other Tools` sidebar category goes in the overview's
+"other tools" section even if its subject matter sounds like ingestion or
+analytics.
+
+### Do not rename existing headings
+
+Overview headings are anchor targets. Renaming `## Tooling and Interfaces` to
+`## Other Tools` changes `#tooling-and-interfaces` to `#other-tools` and
+breaks every inbound link.
+
+Only rename a heading when the user explicitly asks. When you do, first grep
+both repos for the old anchor and report what you find:
+
+```
+grep -rn --exclude-dir=node_modules --exclude-dir=.git \
+  --exclude-dir=build --exclude-dir=.docusaurus "old-anchor-slug" .
+```
+
+Adding, removing, and reordering bullets is safe. Renaming headings is not.
+
+### Moving a page between sections
+
+Moving a page across sidebar categories is not a mechanical edit. **Stop and
+ask the user** which outcome they want:
+
+1. **Point to the new location**: move the entry to the new section, leaving
+   one canonical home. Usually correct.
+2. **Duplicate it**: list it in both sections. Warn the user first, see below.
+3. **Remove it**: drop it from the overview entirely.
+
+Never pick one silently.
+
+### Why duplicate sidebar entries misbehave
+
+If the user wants the same page reachable from two sidebar categories, tell
+them what actually happens: **both categories highlight and auto-expand at
+once** whenever that page is open.
+
+This is not a bug and there is no config to disable it. In
+`@docusaurus/plugin-content-docs/src/client/docsUtils.tsx`:
+
+```js
+if (item.type === 'link') {
+  return isActive(item.href, activePath);
 }
 ```
+
+Activeness is decided purely by URL. Authored `type: "doc"` entries are
+compiled to `type: 'link'` props carrying an href, so a `type: "link"` entry
+behaves identically to a duplicated doc id. There is no way to duplicate an
+entry without duplicating the highlight. Then in
+`@docusaurus/theme-classic/src/theme/DocSidebarItem/Category/index.tsx`:
+
+```js
+initialState: () => (isActive ? false : item.collapsed)
+```
+
+An active category always initializes expanded, reinforced by
+`useAutoExpandActiveCategory`.
+
+The one escape hatch: `isSamePath` compares normalized path strings and does
+**not** strip fragments, so an href containing `#` can never equal
+`activePath`. A cross-reference link with an anchor never highlights and never
+auto-expands:
+
+```js
+{ type: "link", label: "Message Brokers",
+  href: "/docs/integrations/overview/#data-ingestion-and-streaming" },
+```
+
+Prefer this, or a plain link in the overview body, over duplicating an entry.
 
 ## Configuration page format
 
@@ -460,8 +579,19 @@ notes, examples, or warnings as needed.
 
 ### Adding a new property
 
-1. Add the property to the appropriate JSON file in
-   `configuration/configuration-utils/`.
+Configuration pages are plain markdown. There is no JSON file to keep in
+sync, so the page is the only place a property is defined.
+
+1. Get the real default and reloadability from a running server rather than
+   from the PR description, which is often out of date:
+
+   ```
+   SHOW PARAMETERS
+   ```
+
+   The result has `property_path`, `env_var_name`, `value`, `value_source`,
+   `sensitive` and `reloadable`. A property missing from `SHOW PARAMETERS` no
+   longer exists on that build, which is worth knowing before documenting it.
 2. Add the property as an H3 entry on the appropriate configuration page,
    in alphabetical order within its section.
 3. If no existing section fits, create a new H2 section in the logical
@@ -469,6 +599,11 @@ notes, examples, or warnings as needed.
 4. If the property belongs to a new subsystem, create a new page, add it
    to `sidebars.js` in alphabetical order, and add a row to the index
    table in `overview.md`.
+
+Only document a property you can describe. A default without an explanation of
+when to change it and what the trade-off is adds noise. If the PR gives no
+semantics, ask the author rather than paraphrasing the property name back at
+the reader.
 
 ### Property metadata
 
@@ -656,6 +791,8 @@ When reviewing a documentation page, check:
 - [ ] Examples use demo datasets where possible (`fx_trades`, `core_price`, etc.)
 - [ ] Demoable queries marked with `demo` tag
 - [ ] TICK syntax used for date filtering (`'$today'`, `'$now-1h..$now'`)
+- [ ] No redundant `WAL` keyword in `CREATE TABLE` examples, and any
+      `SHOW CREATE TABLE` output sample matches what the server emits
 - [ ] Both `!=` and `<>` shown where inequality is documented
 - [ ] No horizontal scrolling in code blocks
 - [ ] Links use correct paths (`/docs/query/...` not `/docs/reference/...`)
@@ -665,7 +802,11 @@ When reviewing a documentation page, check:
 - [ ] Result tables only where output is predictable
 - [ ] `yarn build` passes (no broken links)
 - [ ] Sidebar updated if new pages were added (`sidebars.js`)
-- [ ] New config properties added to `configuration/configuration-utils/_cairo.config.json`
+- [ ] Section overview page updated for any added, removed, or renamed page,
+      with section and item order matching `sidebars.js`
+- [ ] No overview heading renamed without checking inbound anchors first
+- [ ] New config properties carry a real **Default** and **Reloadable** value,
+      confirmed against `SHOW PARAMETERS` on a running server
 - [ ] New keywords/functions/types checked against `questdb/sql-parser` repo
       (default branch and open PRs)
 

@@ -527,16 +527,19 @@ http.net.connection.sndbuf=2m
 | Section | Description &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Enterprise only |
 |---------|-------------|:----------:|
 | [Cairo engine](/docs/configuration/cairo-engine/) | SQL engine settings | |
+| [Cold storage](/docs/configuration/cold-storage/) | Historical partitions on object storage | ✓ |
 | [COPY settings](/docs/configuration/copy-settings/) | CSV import and Parquet export | |
 | [HTTP server](/docs/configuration/http-server/) | Web Console and REST API | |
 | [IAM](/docs/configuration/iam/) | Identity and Access Management | ✓ |
 | [Ingestion (ILP/HTTP)](/docs/configuration/ingestion/) | InfluxDB Line Protocol settings | |
+| [Live views](/docs/configuration/live-views/) | Live view refresh settings | |
 | [Logging & Metrics](/docs/configuration/logging-metrics/) | Log levels and metrics | |
 | [Materialized views](/docs/configuration/materialized-views/) | Materialized view refresh settings | |
 | [Minimal HTTP server](/docs/configuration/http-min-server/) | Health check and metrics endpoint | |
 | [OpenID Connect (OIDC)](/docs/configuration/oidc/) | OIDC integration | ✓ |
 | [Parallel SQL execution](/docs/configuration/parallel-sql-execution/) | Query parallelism settings | |
 | [Postgres wire protocol](/docs/configuration/postgres-wire-protocol/) | PostgreSQL wire protocol connections | |
+| [QuestDB Wire Protocol (QWP)](/docs/configuration/qwp/) | QWP protocol limits and UDP receiver | |
 | [Replication](/docs/configuration/database-replication/) | High availability cluster replication | ✓ |
 | [Shared workers](/docs/configuration/shared-workers/) | Worker thread pools | |
 | [Storage policy](/docs/configuration/storage-policy/) | Partition lifecycle management | ✓ |

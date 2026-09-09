@@ -101,7 +101,11 @@ cat <key>.json | base64
 replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;credential=${BASE64_ENCODED_KEY};
 ```
 
-Alternatively, use `credential_path` to reference the key file directly.
+Alternatively, use `credential_path` to reference the key file directly, or
+supply a pre-obtained static OAuth `token` to skip the token exchange
+altogether. A static `token` is required when the store sits behind a private
+or intercepting CA; see
+[TLS with a private or self-signed CA](#tls-with-a-private-or-self-signed-ca).
 
 :::tip[Using Workload Identity]
 If your instance uses Workload Identity (GKE) or runs on a GCE VM with a service
@@ -128,15 +132,64 @@ mount to prevent write corruption.
 replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;
 ```
 
+### TLS with a private or self-signed CA
+
+By default, QuestDB trusts only the built-in Mozilla root certificates
+when connecting to an object store over HTTPS. Public AWS S3, Azure Blob, and
+GCS endpoints work out of the box, but a private or on-prem
+S3/Azure/GCS-compatible store fronted by an internal CA, a self-signed
+certificate, or a TLS-intercepting proxy fails the TLS handshake. Two optional
+connection-string parameters add the trusted CA:
+
+- `ca_cert_file`: path to a PEM file holding one or more CA root certificates to
+  trust, in addition to the built-in roots. The file may hold a single
+  certificate or a bundle.
+- `ca_builtin_roots` (optional): `true` (default) or `false`. Set to `false` to
+  trust only the certificates from `ca_cert_file` and drop the built-in roots.
+  Valid only together with `ca_cert_file`.
+
+```ini
+replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};region=${AWS_REGION};endpoint=https://minio.internal;ca_cert_file=/etc/ssl/private-ca.pem;
+```
+
+Both parameters are valid only for the HTTP-based backends (`s3`, `azblob`,
+`gcs`) and are rejected for `fs` (NFS). They belong to the object store
+connection string, so they work the same way in `backup.object.store` and
+`cold.storage.object.store`. The file
+is read and parsed at startup, so a missing or malformed PEM fails fast with an
+`InvalidObjectStoreConfigurationException`.
+
+:::caution
+
+- **Point it at the CA, not the server certificate.** `ca_cert_file` must hold
+  the CA certificate(s) that issued the store's certificate (the root plus any
+  intermediates), not the store's own server certificate. Startup validation
+  only checks that the PEM parses, so a server certificate passes validation but
+  then fails every request with a certificate-trust error.
+- **No `;` in the path.** The connection string is split on `;` with no escape,
+  so a certificate path must not contain a `;`. A parameter with no `=` (for
+  example, a path truncated at a `;`) is rejected at startup.
+- **Data requests only.** The custom CA applies to object store data requests
+  (read, write, list, delete). Dynamic credential and token fetches (S3
+  IMDS/STS/assume-role and the GCS OAuth token endpoint) go through a separate
+  client that always trusts the built-in roots. Stores that authenticate with
+  static credentials (S3 `access_key_id` and `secret_access_key`, or Azure
+  `account_key`) make no such fetch and are unaffected. A `gcs` store reached
+  through a private or intercepting CA must therefore also be given a static
+  OAuth `token`, otherwise its token fetch fails the handshake at runtime even
+  though the configuration validates.
+
+:::
+
 ## 2. Configure the primary node
 
 Add to `server.conf`:
 
-| Setting | Value |
-|---------|-------|
-| `replication.role` | `primary` |
-| `replication.object.store` | Your connection string from step 1 |
-| `cairo.snapshot.instance.id` | Unique UUID for this node |
+| Setting                      | Value                              |
+| ---------------------------- | ---------------------------------- |
+| `replication.role`           | `primary`                          |
+| `replication.object.store`   | Your connection string from step 1 |
+| `cairo.snapshot.instance.id` | Unique UUID for this node          |
 
 Restart QuestDB.
 
@@ -156,11 +209,11 @@ Set up regular snapshots (daily or weekly).
 
 Create a new QuestDB instance. Add to `server.conf`:
 
-| Setting | Value |
-|---------|-------|
-| `replication.role` | `replica` |
-| `replication.object.store` | Same connection string as primary |
-| `cairo.snapshot.instance.id` | Unique UUID for this replica |
+| Setting                      | Value                             |
+| ---------------------------- | --------------------------------- |
+| `replication.role`           | `replica`                         |
+| `replication.object.store`   | Same connection string as primary |
+| `cairo.snapshot.instance.id` | Unique UUID for this replica      |
 
 :::warning
 Do not copy `server.conf` from the primary. Two nodes configured as primary
@@ -204,10 +257,10 @@ configuration options, tuning, and troubleshooting.
 
 ### Failure scenarios
 
-| Node | Recoverable | Unrecoverable |
-|------|-------------|---------------|
-| Primary | Restart | Promote replica, create new replica |
-| Replica | Restart | Destroy and recreate |
+| Node    | Recoverable | Unrecoverable                       |
+| ------- | ----------- | ----------------------------------- |
+| Primary | Restart     | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
+| Replica | Restart     | Destroy and recreate                |
 
 ### Network partitions
 
@@ -229,9 +282,22 @@ migration flow to move to new storage.
 
 ## Migration procedures
 
+:::note
+
+If the cluster uses [cold storage](/docs/concepts/cold-storage/), the manager role does not move with the primary role. Migrating the primary leaves the cold storage manager where it was. Move it separately with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) if the instance holding it is being retired.
+
+:::
+
 ### Planned primary migration
 
-Use when the current primary is healthy but you want to switch to a new one.
+Since QuestDB Enterprise 3.3.3, the primary role moves without stopping either
+node: demote the primary with `SWITCH ROLE TO REPLICA`, then promote the
+replica with `SWITCH ROLE TO PRIMARY`. Clients stay connected and no data is
+lost. The procedure, its timeout, and what to do when a switch is refused are in
+[Failover and role switch](/docs/high-availability/failover/).
+
+On older versions, or when the object store changes at the same time, use the
+restart-based flow:
 
 1. Stop the primary
 2. Restart with `replication.role=primary-catchup-uploads`
@@ -240,7 +306,11 @@ Use when the current primary is healthy but you want to switch to a new one.
 
 ### Emergency primary migration
 
-Use when the primary has failed.
+Use when the primary has failed and a replica cannot be promoted in place: the
+surviving replica is behind the object store and you accept losing the
+transactions that never reached it. If a caught-up replica exists,
+[promote it in place](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss)
+instead; that path refuses rather than losing data.
 
 1. Stop the failed primary (ensure it cannot restart)
 2. Stop the replica
@@ -252,6 +322,13 @@ Use when the primary has failed.
 :::warning
 Data committed to the primary but not yet replicated will be lost. Use planned
 migration if the primary is still functional.
+:::
+
+:::tip Keep clients connected across the switch
+Promoting a replica only helps if your applications can find the new primary.
+Configure clients with a multi-host address list so they fail over
+automatically — see
+[Client failover](/docs/high-availability/client-failover/concepts/).
 :::
 
 ### Point-in-time recovery
@@ -273,3 +350,7 @@ Restore the database to a specific historical timestamp.
 
 - [Tuning guide](/docs/high-availability/tuning/) - Optimize replication
   performance
+- [Client failover](/docs/high-availability/client-failover/concepts/) -
+  Configure your applications with a multi-host address list so they follow a
+  primary promotion automatically. Replication moves the data; client failover
+  keeps your clients connected to it.

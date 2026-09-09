@@ -90,6 +90,10 @@ The following list contains some plan node types:
   in a specified direction.
 - `Sort` - sorts data. If low or hi property is specified, then the sort buffer
   size is limited and a number of rows are skipped after sorting.
+- `Encode sort` / `Encode sort light` - sorts data by packing the `ORDER BY`
+  keys into a byte-comparable key for radix/quicksort, instead of a red-black
+  tree. The 'light' variant stores only row ids when the child supports random
+  access.
 - `SampleBy` - `SAMPLE BY` keyword implementation. If the `fill` is not shown,
   it means `fill(none)`.
 - `Selected Record` - used to reorder or rename columns. It does not do any

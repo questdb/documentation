@@ -38,7 +38,6 @@
       "@theme/Button": ["src/theme/Button"],
       "@theme/Chevron": ["src/theme/Chevron"],
       "@theme/CareerEmailUs": ["src/theme/CareerEmailUs"],
-      "@theme/Input": ["src/theme/Input"],
       "@theme/Screenshot": ["src/theme/Screenshot"],
       "@theme/useResizeObserver": ["src/theme/useResizeObserver"],
       "@theme/useWindowWidth": ["src/theme/useWindowWidth"],

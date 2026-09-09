@@ -57,6 +57,38 @@ Rules:
 - Place "Releases" FIRST in each month (before New, Updated, etc.)
 - Omit if no releases that month
 
+#### Enterprise releases
+
+QuestDB Enterprise ships on its own version track (`3.x`) from a separate,
+private repository. Fetch its releases the same way:
+
+```bash
+gh api repos/questdb/questdb-enterprise/releases --jq '.[] | "\(.tag_name)|\(.published_at)"'
+```
+
+This repo is private. If the contributor's GitHub token has access the command
+returns releases; if not, it fails with a 404 or permission error. Treat any
+failure as "no Enterprise releases available" and skip the section silently. Do
+NOT fail the changelog over it.
+
+When the command succeeds, filter to releases within the period and render them
+under their own header, immediately after the OSS `Releases` section:
+
+```markdown
+### QuestDB Enterprise Releases
+
+- [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
+- [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+```
+
+Rules:
+- Same format and link target as OSS releases (`https://questdb.com/release-notes/`);
+  both editions are listed on that page
+- One line per release, descending order (newest first)
+- Include the section ONLY when there is at least one Enterprise release in the
+  period (and the repo was accessible)
+- Place it directly after the `Releases` section, before `New`
+
 ### Step 4: Analyze each commit
 
 For each commit hash, check the diff:
@@ -90,16 +122,36 @@ git diff <hash>^..<hash> -- '*.md' '*.mdx'
 - Tutorial additions/updates
 - Corrected technical instructions
 
+#### Reconcile against the existing changelog
+
+Before including a change, check whether it is ALREADY covered anywhere in
+`changelog.mdx`, not just under the month you are currently writing. A commit's
+date and the month its entry was filed under do not always match (a commit
+dated June 4 may already be listed under May), so a check scoped to a single
+month produces false duplicates. Search the whole file for the function name,
+page path, or feature before deciding.
+
+- If the same change is already described, SKIP it. Do not restate it.
+- If the commit makes a genuinely NEW, changelog-worthy change to content that
+  was documented (and changelogged) earlier, DO report it. A follow-up that
+  adds a parameter, a new syntax form, a corrected behavior, or a new section
+  to an already-listed page is a legitimate new entry, not a duplicate.
+  Describe what changed this time, not the original addition.
+
+The same reconciliation applies to releases: do not re-list a release (OSS or
+Enterprise) that already appears in the changelog for its period.
+
 ### Step 5: Categorize changes
 
 Group into these categories, always in this exact order. Skip a category if
 there are no entries for it, but never reorder:
 
-1. **Releases** - QuestDB releases in the period (from Step 3)
-2. **New** - Brand new pages or major new sections (content that did not exist before)
-3. **Reference** - Individual functions, parameters, config properties, or syntax additions to existing reference pages
-4. **Guides** - Tutorials, how-tos, walkthroughs
-5. **Updated** - Significant updates to existing content (restructured pages, rewritten sections, new examples)
+1. **Releases** - QuestDB (OSS) releases in the period (from Step 3)
+2. **QuestDB Enterprise Releases** - Enterprise releases in the period (from Step 3), only when accessible and non-empty
+3. **New** - Brand new pages or major new sections (content that did not exist before)
+4. **Reference** - Individual functions, parameters, config properties, or syntax additions to existing reference pages
+5. **Guides** - Tutorials, how-tos, walkthroughs
+6. **Updated** - Significant updates to existing content (restructured pages, rewritten sections, new examples)
 
 ### Step 6: Generate the entry
 
@@ -111,6 +163,10 @@ Format as Docusaurus-compatible MDX, one `## Month YYYY` header per month:
 ### Releases
 
 - [9.4.0](https://questdb.com/release-notes/) - Released February 15, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.2](https://questdb.com/release-notes/) - Released February 4, 2026
 
 ### New
 

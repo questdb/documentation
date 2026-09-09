@@ -98,7 +98,7 @@ CREATE TABLE trades (
     ts TIMESTAMP,
     symbol SYMBOL INDEX,
     price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 
 -- Posting index with covering columns — best for read-heavy, selective queries
 CREATE TABLE trades (
@@ -106,7 +106,7 @@ CREATE TABLE trades (
     symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
     price DOUBLE,
     raw_data VARCHAR  -- not in INCLUDE, read from column files
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 -- The designated timestamp (ts) is automatically included in the covering index.
 ```
 
@@ -412,7 +412,7 @@ permissions for access control.
 
 ## PostgreSQL compatibility
 
-QuestDB supports the [PostgreSQL wire protocol](/docs/query/pgwire/overview/),
+QuestDB supports the [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/),
 so most PostgreSQL client libraries work. However, QuestDB is not PostgreSQL:
 
 - No `PRIMARY KEY`, `FOREIGN KEY`, or `NOT NULL` constraints
@@ -514,11 +514,11 @@ CREATE TABLE metrics (
 For schema migrations, QuestDB supports [Flyway](https://documentation.red-gate.com/fd/questdb-305791448.html).
 
 You can also use ILP auto-creation for dynamic schemas, though this applies
-default settings. See [ILP Overview](/docs/ingestion/ilp/overview/) for details.
+default settings. See [ILP Overview](/docs/connect/compatibility/ilp/overview/) for details.
 
 ## Next steps
 
 - [Quick Start](/docs/getting-started/quick-start/) — Create your first table and run queries
 - [Capacity Planning](/docs/getting-started/capacity-planning/) — Size your deployment for production
-- [Connect & Ingest](/docs/ingestion/overview/) — Load data into QuestDB
+- [Connect & Ingest](/docs/connect/overview/) — Load data into QuestDB
 - [Materialized Views](/docs/concepts/materialized-views/) — Pre-compute aggregations for fast dashboards

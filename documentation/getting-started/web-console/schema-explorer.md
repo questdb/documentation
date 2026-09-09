@@ -12,12 +12,12 @@ You can toggle the Schema Explorer by using the database icon on the left.
 <Screenshot
   alt="Schema Explorer in the Web Console"
   src="images/docs/console/schema-explorer.webp"
-  height={551}
-  width={319}
+  height={675}
+  width={350}
 
 />
 
-## Tree View
+## Tree view
 
 The Schema Explorer displays database objects in an expandable tree structure. When you expand a table, a view, or a materialized view, the following information is available:
 
@@ -31,7 +31,7 @@ All table columns are displayed with their names and data types, each represente
   - **Symbol Capacity**: The maximum number of distinct symbols that can be stored (e.g., 256)
   - **Cached**: Shows whether symbol values are cached in memory for improved performance
 
-#### Storage Details
+#### Storage details
 - **Partitioning**: Displays the table's partitioning approach (e.g., "By day", "By week", "None")
 - **WAL**: Indicates whether Write-Ahead Log is enabled or disabled for the table
 
@@ -39,20 +39,23 @@ All table columns are displayed with their names and data types, each represente
 Icons of the data sources visually indicate key storage details such as partitioning and WAL status. Hover over these icons to see detailed information including partitioning strategy, ordering configuration, and WAL status, allowing you to quickly assess critical storage details without expanding the full table structure.
 ::: 
 
-#### Base Tables
-For materialized views, shows the underlying source tables
+#### Base tables
 
-### Context Menu
+For materialized views, shows the underlying source tables.
+
+### Context menu
+
 Right-clicking on any data source opens a context menu with the following actions:
 <Screenshot
   alt="Table context menu for quick actions"
   src="images/docs/console/table-context-menu.webp"
-  height={150}
-  width={488}
+  height={240}
+  width={545}
 
 />
 - **View details**: Opens [Table details panel](/docs/getting-started/web-console/table-details) for viewing detailed information about the data source
 - **Copy schema**: Copies the schema of the table to the clipboard
+- **Create materialized view**: Generates a `CREATE MATERIALIZED VIEW` statement for the selected table or materialized view and adds it to the editor. For tables, this requires WAL to be enabled and a designated timestamp to be set.
 - **Explain schema with AI**: If [AI Assistant](/docs/getting-started/web-console/questdb-ai) is enabled, this action starts a conversation about the schema of the data source
 - **Resume WAL**: If WAL is suspended for a table, a warning icon is shown to the right of the table name. You can resume WAL from a specific transaction number by clicking on the context menu item.
   
@@ -60,28 +63,32 @@ Right-clicking on any data source opens a context menu with the following action
 When a materialized view is invalid, a warning icon is shown to the right of the materialized view name. You can see the invalidation reason by hovering over the icon.
 :::
 
+### Keyboard navigation
 
-### Keyboard Navigation
 You can navigate in the tree view using arrow keys, Home, End, Page Up, and Page Down.
 
-
 ## Toolbar
+
 The toolbar provides essential actions for filtering, managing, and interacting with your database objects.
 
 <Screenshot
   alt="Schema Explorer Toolbar"
   src="images/docs/console/schema-toolbar.webp"
-  height={50}
-  width={800}
+  height={46}
+  width={350}
 />
 
 ### Filter
-Type to filter tables and materialized views by name.
 
-### Suspended Tables
+Type to filter data sources by table or column name. Tables with a matching
+column appear expanded so you can see the match.
+
+### Suspended tables
+
 When tables have suspended WAL operations, an error icon with a count of suspended tables appears. Click to filter and show only suspended tables.
 
-### Table Management Actions
-- **Add Metrics**: Chart icon button to add metrics for monitoring database performance. See [Metrics View ](/docs/getting-started/web-console/metrics-view) for details.
+### Table management actions
+
+- **Add Metrics**: Chart icon button to add metrics for monitoring database performance. See [Metrics View](/docs/getting-started/web-console/metrics-view) for details.
 - **Select Mode**: Checkbox circle icon to enter table selection mode for copying multiple schemas to the clipboard.
 - **Auto Refresh**: Refresh icon to toggle automatic updates of the schema explorer when database structure changes. Disabling auto refresh is recommended only for development purposes.

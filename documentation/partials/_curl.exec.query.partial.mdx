@@ -1,7 +1,7 @@
 ```shell
 curl -G \
   --data-urlencode "query=SELECT x FROM long_sequence(5);" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 ```
 
 The JSON response contains the original query, a `"columns"` key with the schema

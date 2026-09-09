@@ -31,5 +31,5 @@ Another viable approach is to run `SELECT count(*) FROM my_table` and verify the
 :::info Related Documentation
 - [Write-Ahead Log concept](/docs/concepts/write-ahead-log/)
 - [Meta functions reference](/docs/query/functions/meta/)
-- [InfluxDB Line Protocol overview](/docs/ingestion/ilp/overview/)
+- [InfluxDB Line Protocol overview](/docs/connect/compatibility/ilp/overview/)
 :::
