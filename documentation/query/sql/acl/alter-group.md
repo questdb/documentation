@@ -2,8 +2,8 @@
 title: ALTER GROUP reference
 sidebar_label: ALTER GROUP
 description:
-  "ALTER GROUP SQL keywords reference documentation. Applies to RBAC in QuestDB
-  Enterprise."
+  "ALTER GROUP sets a per-group query memory limit or maps an external OIDC or
+  LDAP group alias. Applies to RBAC in QuestDB Enterprise."
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -32,14 +32,18 @@ ALTER GROUP groupName { WITH | DROP } EXTERNAL ALIAS externalAlias;
 ## Description
 
 - `ALTER GROUP groupName SET MEMORY LIMIT size` - caps the native memory that
-  queries of the group's members may allocate. `size` is a byte count or a size
-  with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
-- `ALTER GROUP groupName SET MEMORY LIMIT UNLIMITED` - removes the limit. `SET
-  MEMORY LIMIT 0` does the same.
+  each query run by a member of the group may allocate. `size` is a byte count
+  or a size with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
+- `ALTER GROUP groupName SET MEMORY LIMIT UNLIMITED` - clears the group's limit.
+  Members then fall back to their own limit, another group's limit, or the
+  workload limit. `SET MEMORY LIMIT 0` does the same.
 - `ALTER GROUP groupName WITH EXTERNAL ALIAS externalAlias` - maps an external
   OIDC or LDAP group to this group.
 - `ALTER GROUP groupName DROP EXTERNAL ALIAS externalAlias` - removes an external
   group mapping.
+
+Adding an alias requires the `ADD EXTERNAL ALIAS` permission and removing one
+requires `REMOVE EXTERNAL ALIAS`.
 
 A group limit applies to a member only when that member has no limit of its own;
 a user's own limit always takes priority. When several of a user's groups set a

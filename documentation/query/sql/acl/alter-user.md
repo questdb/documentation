@@ -2,8 +2,8 @@
 title: ALTER USER reference
 sidebar_label: ALTER USER
 description:
-  "ALTER USER SQL keywords reference documentation. Applies to RBAC in QuestDB
-  Enterprise."
+  "ALTER USER enables or disables a user, manages passwords and tokens, and sets
+  a per-user query memory limit. Applies to RBAC in QuestDB Enterprise."
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -63,8 +63,9 @@ ALTER USER userName SET MEMORY LIMIT { size | UNLIMITED };
 - `ALTER USER username SET MEMORY LIMIT size` - caps the native memory the
   user's queries may allocate. `size` is a byte count or a size with a `K`, `M`,
   or `G` suffix, such as `512M` or `2G`.
-- `ALTER USER username SET MEMORY LIMIT UNLIMITED` - removes the limit. `SET
-  MEMORY LIMIT 0` does the same.
+- `ALTER USER username SET MEMORY LIMIT UNLIMITED` - clears the user's own
+  limit. A group limit or the workload limit then applies. `SET MEMORY LIMIT 0`
+  does the same.
 
 The limit applies to the user's queries on both the primary and replicas. A set
 limit takes priority over the user's groups and overrides the configured
@@ -191,5 +192,5 @@ ALTER USER john SET MEMORY LIMIT 512M;
 ALTER USER john SET MEMORY LIMIT UNLIMITED;
 ```
 
-The configured value can be verified with `SHOW USERS`, which reports the
-effective limit in the `memory_limit` column.
+Use `SHOW USERS` to inspect the user's own or inherited group limit in the
+`memory_limit` column.

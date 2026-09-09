@@ -526,7 +526,7 @@ http.net.connection.sndbuf=2m
 
 | Section | Description &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Enterprise only |
 |---------|-------------|:----------:|
-| [Cairo engine](/docs/configuration/cairo-engine/) | SQL engine settings | |
+| [Cairo engine](/docs/configuration/cairo-engine/) | SQL engine settings, including query and refresh memory limits | |
 | [Cold storage](/docs/configuration/cold-storage/) | Historical partitions on object storage | ✓ |
 | [COPY settings](/docs/configuration/copy-settings/) | CSV import and Parquet export | |
 | [HTTP server](/docs/configuration/http-server/) | Web Console and REST API | |

@@ -53,6 +53,6 @@ SHOW GROUPS;
 
 that yields:
 
-| name   |
-| ------ |
-| admins |
+| name   | external_alias | memory_limit |
+| ------ | -------------- | ------------ |
+| admins |                | null         |

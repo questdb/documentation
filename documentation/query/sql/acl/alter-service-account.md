@@ -2,8 +2,9 @@
 title: ALTER SERVICE ACCOUNT reference
 sidebar_label: ALTER SERVICE ACCOUNT
 description:
-  "ALTER SERVICE ACCOUNT SQL keywords reference documentation.  Applies to RBAC
-  in QuestDB Enterprise."
+  "ALTER SERVICE ACCOUNT enables or disables a service account, manages its
+  passwords and tokens, and sets its query memory limit. Applies to RBAC in
+  QuestDB Enterprise."
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -63,14 +64,15 @@ ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT { size | UNLIMITED };
 - `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT size` - caps the
   native memory the service account's queries may allocate. `size` is a byte
   count or a size with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
-- `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT UNLIMITED` - removes
-  the limit. `SET MEMORY LIMIT 0` does the same.
+- `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT UNLIMITED` - clears
+  the service account's limit. The workload limit then applies. `SET MEMORY
+  LIMIT 0` does the same.
 
 A user who assumes the service account runs under its memory limit. A set limit
 overrides the configured
 [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-workload limit — binding even when larger — and the workload limit applies only
-when the service account has none. Group limits are never merged into a service
+workload limit and binds even when larger. The workload limit applies only when
+the service account has none. Group limits are never merged into a service
 account. Setting it requires the `SET MEMORY LIMIT` permission. See
 [memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
 workload limits resolve.

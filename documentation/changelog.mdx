@@ -16,10 +16,15 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Memory limits](/docs/configuration/cairo-engine/#memory-limits) - New section covering the per-query, materialized view refresh, WAL apply, and live view refresh memory limits, what counts toward them, and what happens on a breach, plus the previously undocumented `cairo.mat.view.refresh.busy.retry.limit`, `cairo.mat.view.refresh.busy.retry.timeout`, `ram.usage.limit.bytes`, and `ram.usage.limit.percent` keys
+- [RBAC memory limits](/docs/security/rbac/#memory-limits) - Per-user, per-group, and per-service-account query memory limits in QuestDB Enterprise: `SET MEMORY LIMIT` on `ALTER USER`, `ALTER GROUP`, and `ALTER SERVICE ACCOUNT`, how limits resolve, the `SET MEMORY LIMIT` permission, and the upgrade migration
+- [ALTER GROUP](/docs/query/sql/acl/alter-group/) - New reference page covering `SET MEMORY LIMIT` and external alias mapping
 - [Migrate QuestDB onto the Kubernetes Operator](/docs/enterprise-kubernetes-operator/getting-started/migrate/) - Move an existing Enterprise deployment onto the Operator with a replica-first cutover: restore the source backup, consume replication WAL, then promote after a controlled source drain
 
 ### Updated
 
+- [query_activity()](/docs/query/functions/meta/#query_activity) - Documented the `memory_used` and `memory_limit` columns
+- [SHOW](/docs/query/sql/show/) - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, gain a trailing `memory_limit` column. Clients that read these results by position need updating
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order
 

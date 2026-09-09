@@ -416,8 +416,10 @@ Returns metadata on running SQL queries, including columns such as:
   `null` when the query runs unlimited. On QuestDB Enterprise a set principal
   [memory limit](/docs/security/rbac/#memory-limits) overrides the configured
   workload limit; the workload limit applies only when the principal has none.
-  Both memory columns are `null` for nested registrations such as subquery
-  recompiles, which share the outer query's budget
+  Both memory columns are `null` for SQL that runs under a background
+  workload's tracker, such as the `SELECT` a materialized view refresh runs or
+  an `UPDATE` applied by the WAL apply job, because that SQL charges the
+  workload's budget instead of acquiring its own
 - query - text of sql query
 
 **Examples:**
@@ -429,8 +431,8 @@ FROM query_activity();
 
 | query_id | username | state  | memory_used | memory_limit | query                                                      |
 | -------- | -------- | ------ | ----------- | ------------ | ---------------------------------------------------------- |
-| 62179    | bob      | active | 262144      | null         | SELECT \* FROM query_activity()                            |
-| 57777    | bob      | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades |
+| 62179    | john     | active | 262144      | 536870912    | SELECT \* FROM query_activity()                            |
+| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades |
 
 ## reader_pool
 

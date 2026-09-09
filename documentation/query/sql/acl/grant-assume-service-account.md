@@ -65,9 +65,9 @@ GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john WITH GRANT OPTION;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | true         |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | true         | null         |
 
 ### Removing grant option
 
@@ -94,6 +94,6 @@ CREATE SERVICE ACCOUNT ingestion;
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | true         |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | true         | null         |

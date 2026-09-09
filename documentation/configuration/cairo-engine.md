@@ -1,6 +1,8 @@
 ---
 title: Cairo engine
-description: Configuration settings for the Cairo SQL engine in QuestDB.
+description:
+  Configuration settings for the Cairo SQL engine in QuestDB, including the
+  query, materialized view refresh, and WAL apply memory limits.
 ---
 
 The Cairo engine is the core storage and query engine in QuestDB. These settings
@@ -86,6 +88,27 @@ deprecation advisory during config validation at startup.
 A global timeout in seconds for long-running queries. When `query.timeout` is
 also set, it takes precedence and this key is ignored. Per-query overrides work
 the same as for `query.timeout`.
+
+### ram.usage.limit.bytes
+
+- **Default**: `0`
+- **Reloadable**: no
+
+Process-wide limit on the resident memory QuestDB may allocate, as a byte count
+or a size with a `K`, `M`, or `G` suffix. `0` means no byte limit. When both this
+key and `ram.usage.limit.percent` resolve to a limit, the smaller one applies. An
+allocation that would cross the resolved limit fails with a
+`global RSS memory limit exceeded` error. Memory-mapped files do not count. The
+per-workload [memory limits](#memory-limits) sit underneath this one.
+
+### ram.usage.limit.percent
+
+- **Default**: `90`
+- **Reloadable**: no
+
+Process-wide resident memory limit as a percentage of the physical memory on the
+host. `0` disables the percentage limit. When both this key and
+`ram.usage.limit.bytes` resolve to a limit, the smaller one applies.
 
 ## Commit and write behavior
 
@@ -878,10 +901,11 @@ is the approximate number of nested SELECT clauses allowed.
 These limits cap the native memory tracked for a single query, materialized view
 refresh, live view refresh, or WAL apply batch. They help prevent runaway
 workloads from exhausting server memory. Each workload has its own limit, in
-addition to the process-wide RSS limit (`ram.usage.limit.bytes` /
-`ram.usage.limit.percent`). Allocations still count toward global RSS, so
-concurrent workloads can reach that limit even when each stays within its own
-budget.
+addition to the process-wide RSS limit set by
+[`ram.usage.limit.bytes`](#ramusagelimitbytes) and
+[`ram.usage.limit.percent`](#ramusagelimitpercent). Allocations still count
+toward global RSS, so concurrent workloads can reach that limit even when each
+stays within its own budget.
 
 Three of the four limits are documented on this page. The fourth,
 [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes),
@@ -891,9 +915,12 @@ All four default to `0`, which means unlimited, so behavior matches a server
 without limits until you opt in. Set each limit as a byte count or a size with a
 `K`, `M`, or `G` suffix, for example `512M` or `2G`. The limits are reloadable:
 edit `server.conf` and call
-[`reload_config()`](/docs/query/functions/meta/#reload_config), and the new value
-applies to every workload that starts afterward, with no restart. A workload
-already running keeps the limit it started with.
+[`reload_config()`](/docs/query/functions/meta/#reload_config). New queries,
+materialized view refreshes, and WAL apply batches use the updated limits; work
+already running keeps its original limit. A live view acquires its limit when it
+is first compiled and keeps it across refreshes, so a reloaded value reaches an
+existing view only after a full teardown: invalidation, recreation, or a server
+restart.
 
 When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
@@ -908,8 +935,14 @@ workloads keep running. What happens next depends on the workload:
   [`cairo.mat.view.refresh.busy.retry.limit`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrylimit)
   retries before invalidation. Full refreshes and user-requested
   `REFRESH ... RANGE FROM ... TO ...` invalidate without deferred retries.
-- A live view refresh invalidates the view immediately.
-- A WAL apply suspends the affected table.
+- A live view refresh invalidates the view immediately. The live view limit
+  also counts the state a view retains between refreshes, so size it for the
+  view's retained state plus the transient buffers of one refresh.
+- A WAL apply first retries under the writer's memory-pressure control, which
+  shrinks the transaction block, reduces parallelism, and backs off between
+  attempts. If the breach persists after the back-off budget is exhausted, the
+  table is suspended with the `OUT_OF_MEMORY` error tag. Resume it with
+  [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/).
 
 The message names the workload so you can tell it apart from a process-wide
 breach:
@@ -917,6 +950,11 @@ breach:
 ```
 query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., size=..., memoryTag=...]
 ```
+
+`workload` is one of `QUERY`, `MAT_VIEW_REFRESH`, `LIVE_VIEW_REFRESH`, or
+`WAL_APPLY`. The prefix reads `query memory limit exceeded` for every workload.
+`queryId` is the query id for a query, the copy id for a `COPY ... TO` export,
+and the table id for a WAL apply batch or a live view refresh.
 
 :::note
 
@@ -927,7 +965,7 @@ covered.
 :::
 
 Live usage and the effective limit for each running query are exposed by the
-[`query_activity`](/docs/query/functions/meta/#query_activity) view through its
+[`query_activity`](/docs/query/functions/meta/#query_activity) function through its
 `memory_used` and `memory_limit` columns. QuestDB Enterprise can additionally set
 a memory limit per user, group, or service account, which overrides this workload
 limit for a principal's queries. See
@@ -958,9 +996,11 @@ rather than each acquiring their own.
 Maximum native memory a single WAL apply batch may allocate. `0` disables the
 limit.
 
-WAL apply runs only simple `UPDATE` statements, metadata changes, and data
-commits, so in practice this limit rarely fires. Its main effect is to keep WAL
-apply on its own budget, separate from the query limit.
+The limit covers only the SQL that WAL apply runs inside a batch: `UPDATE`
+statements and non-structural `ALTER TABLE` changes. Memory used to commit data,
+including out-of-order merges, is not tracked and is bounded only by the
+process-wide RSS limit. In practice this limit rarely fires. Its main effect is
+to keep WAL apply SQL on its own budget, separate from the query limit.
 
 ## Batch operations
 
