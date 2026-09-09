@@ -657,6 +657,11 @@ ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=qu
 See [`CREATE GROUP`](/docs/query/sql/acl/create-group/) and
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/) for the full syntax.
 
+External users cannot be given a query memory limit directly;
+`ALTER USER ... SET MEMORY LIMIT` is rejected for them. Set the limit on the
+mapped QuestDB group instead; see
+[memory limits](/docs/security/rbac/#memory-limits).
+
 QuestDB works the list of external groups out from the User Info response
 message.
 

@@ -1,6 +1,8 @@
 ---
 title: Materialized views
-description: Configuration settings for materialized views in QuestDB.
+description:
+  Materialized view configuration in QuestDB, covering refresh workers, parallel
+  SQL, and the retry limits that govern out-of-memory and busy refresh failures.
 ---
 
 These settings control materialized view SQL support and the background refresh
@@ -26,10 +28,13 @@ Maximum number of immediate retries within a single refresh attempt. A retry
 happens when the base table changes structurally during the refresh, when a
 refresh step produces an oversized transaction, or when a step fails with an
 out-of-memory error, including a breach of the
-[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits). Each
-retry shrinks the refresh interval step. Once the retries are exhausted or the
-step cannot shrink further, the error propagates and the deferred retries
-governed by `cairo.mat.view.refresh.busy.retry.limit` take over.
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits).
+Retries after an oversized transaction or an out-of-memory error shrink the
+refresh interval step; a retry after a structural change recompiles the view
+with the same step, and if it keeps failing the refresh is queued again. Once
+the out-of-memory retries are exhausted or the step cannot shrink further, the
+error propagates and the deferred retries governed by
+`cairo.mat.view.refresh.busy.retry.limit` take over.
 
 ## cairo.mat.view.parallel.sql.enabled
 

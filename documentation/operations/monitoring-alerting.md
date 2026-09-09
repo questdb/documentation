@@ -215,9 +215,9 @@ Other options:
 - Add more RAM to the server
 - Reduce concurrent ingestion load
 - Reduce the number of tables with active O3 writes
-- Cap the memory a single query, view refresh, or WAL apply batch may allocate
-  with the per-workload
-  [memory limits](/docs/configuration/cairo-engine/#memory-limits)
+- Cap the memory a single query or view refresh may allocate with the
+  per-workload [memory limits](/docs/configuration/cairo-engine/#memory-limits),
+  which leaves more headroom for O3 merges
 
 See [Capacity planning](/docs/getting-started/capacity-planning/#memory-page-size-configuration)
 and [Optimize for many tables](/docs/cookbook/operations/optimize-many-tables/)

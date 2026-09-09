@@ -60,12 +60,12 @@ ALTER USER userName SET MEMORY LIMIT { size | UNLIMITED };
   REST token to user account.
 - `ALTER USER username DROP TOKEN TYPE REST token` - removes REST token from
   user account.
-- `ALTER USER username SET MEMORY LIMIT size` - caps the native memory the
-  user's queries may allocate. `size` is a byte count or a size with a `K`, `M`,
-  or `G` suffix, such as `512M` or `2G`.
+- `ALTER USER username SET MEMORY LIMIT size` - caps the native memory each of
+  the user's queries may allocate. `size` is a byte count or a size with a `K`,
+  `M`, or `G` suffix, such as `512M` or `2G`.
 - `ALTER USER username SET MEMORY LIMIT UNLIMITED` - clears the user's own
-  limit. A group limit or the workload limit then applies. `SET MEMORY LIMIT 0`
-  does the same.
+  limit. A group limit or the workload limit (`cairo.query.memory.limit.bytes`)
+  then applies. `SET MEMORY LIMIT 0` does the same.
 
 The limit applies to the user's queries on both the primary and replicas.
 Setting it requires the `SET MEMORY LIMIT` permission. The built-in admin and
@@ -191,5 +191,5 @@ ALTER USER john SET MEMORY LIMIT 512M;
 ALTER USER john SET MEMORY LIMIT UNLIMITED;
 ```
 
-Use `SHOW USERS` to inspect the user's own or inherited group limit in the
-`memory_limit` column.
+Use [`SHOW USERS`](/docs/query/sql/show/#show-users) to inspect the user's own
+or inherited group limit in the `memory_limit` column.

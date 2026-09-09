@@ -1,7 +1,9 @@
 ---
 title: Meta functions
 sidebar_label: Meta
-description: Database and table metadata function reference documentation.
+description:
+  Meta functions for inspecting tables, WAL status, running queries with their
+  memory usage and limits, configuration, and server metadata.
 ---
 
 These functions provide instance-level information and table, column and
@@ -323,7 +325,13 @@ materialized_views();
 
 **Return value:**
 
-Returns granular memory metrics.
+Returns granular memory metrics. `RSS` is the process resident set size and
+`TOTAL_USED` the sum of all tracked allocations. The `NATIVE_*` rows are the
+tracked allocations that count toward
+[`ram.usage.limit.bytes`](/docs/configuration/cairo-engine/#ramusagelimitbytes)
+and the per-workload
+[memory limits](/docs/configuration/cairo-engine/#memory-limits); the `MMAP_*`
+rows do not.
 
 **Examples:**
 
@@ -418,11 +426,13 @@ Returns metadata on running SQL queries, with the following columns:
 - memory_limit - effective native memory limit for the query, in bytes, or
   `null` when the query runs unlimited. On QuestDB Enterprise this is the
   principal's [memory limit](/docs/security/rbac/#memory-limits) when one is
-  set, otherwise the workload limit.
-  Both memory columns are `null` for SQL that runs under a background
-  workload's tracker, such as the `SELECT` a materialized view refresh runs or
-  an `UPDATE` applied by the WAL apply job, because that SQL charges the
-  workload's budget instead of acquiring its own
+  set, otherwise the workload limit
+
+`memory_used` is a live gauge with no peak value, and it is reported even when
+`memory_limit` is `null`. Both memory columns are `null` for SQL that runs
+under a background workload's tracker, such as the `SELECT` a materialized view
+refresh runs or an `UPDATE` applied by the WAL apply job, because that SQL
+charges the workload's budget instead of acquiring its own.
 
 **Examples:**
 
@@ -1281,7 +1291,7 @@ Returns a `table` including the following information:
 - `name` - table or materialized view name
 - `suspended` - suspended status flag
 - `writerTxn` - the last committed transaction in TableWriter (equivalent to `table_txn` in `tables()`)
-- `writerLagTxnCount` - the number of transactions that are kept invisible when
+- `bufferedTxnSize` - the number of transactions that are kept invisible when
   writing to the table; these transactions will be eventually moved to the table
   data and become visible for readers (equivalent to `wal_txn - table_txn`)
 - `sequencerTxn` - the last committed transaction in the sequencer (equivalent to `wal_txn` in `tables()`)
@@ -1301,11 +1311,11 @@ Returns a `table` including the following information:
 wal_tables();
 ```
 
-| name        | suspended | writerTxn | writerLagTxnCount | sequencerTxn | errorTag      | errorMessage                                                                                                          | memoryPressure |
-| ----------- | --------- | --------- | ----------------- | ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
-| sensor_wal  | false     | 2         | 1                 | 4            |               |                                                                                                                       | 0              |
-| weather_wal | false     | 3         | 0                 | 3            |               |                                                                                                                       | 0              |
-| test_wal    | true      | 7         | 1                 | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 0              |
+| name        | suspended | writerTxn | bufferedTxnSize | sequencerTxn | errorTag      | errorMessage                                                                                                                | memoryPressure |
+| ----------- | --------- | --------- | --------------- | ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| sensor_wal  | false     | 2         | 1               | 4            |               |                                                                                                                             | 0              |
+| weather_wal | false     | 3         | 0               | 3            |               |                                                                                                                             | 0              |
+| test_wal    | true      | 7         | 1               | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 2              |
 
 ## writer_pool
 

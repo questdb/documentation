@@ -2,7 +2,7 @@
 title: ALTER SERVICE ACCOUNT reference
 sidebar_label: ALTER SERVICE ACCOUNT
 description:
-  "ALTER SERVICE ACCOUNT enables or disables a service account, manages its
+  "ALTER SERVICE ACCOUNT enables or disables a service account, manages
   passwords and tokens, and sets its query memory limit. Applies to RBAC in
   QuestDB Enterprise."
 ---
@@ -62,11 +62,12 @@ ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT { size | UNLIMITED };
 - `ALTER USER serviceAccountName DROP TOKEN TYPE REST token` - removes REST
   token from the service account.
 - `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT size` - caps the
-  native memory the service account's queries may allocate. `size` is a byte
-  count or a size with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
+  native memory each of the service account's queries may allocate. `size` is a
+  byte count or a size with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
 - `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT UNLIMITED` - clears
-  the service account's limit. The workload limit then applies. `SET MEMORY
-  LIMIT 0` does the same.
+  the service account's limit. The workload limit
+  (`cairo.query.memory.limit.bytes`) then applies. `SET MEMORY LIMIT 0` does the
+  same.
 
 A user who assumes the service account runs under its memory limit. Group limits
 are never merged into a service account. Setting it requires the
@@ -189,10 +190,11 @@ SHOW SERVICE ACCOUNT client_app;
 
 ```questdb-sql
 -- cap the service account's queries at 1 GiB of native memory
-ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT 1G;
+ALTER SERVICE ACCOUNT client_app SET MEMORY LIMIT 1G;
 -- remove the limit
-ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT UNLIMITED;
+ALTER SERVICE ACCOUNT client_app SET MEMORY LIMIT UNLIMITED;
 ```
 
-The configured value can be verified with `SHOW SERVICE ACCOUNTS`, which reports
-it in the `memory_limit` column.
+The configured value can be verified with
+[`SHOW SERVICE ACCOUNTS`](/docs/query/sql/show/#show-service-accounts), which
+reports it in the `memory_limit` column.

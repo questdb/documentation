@@ -25,6 +25,10 @@ SET columnName = expression [, columnName = expression ...]
   [attached by a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
   the partition is read-only. `UPDATE` operation on a read-only partition will
   fail and generate an error.
+- On a WAL table, `UPDATE` is applied by the WAL apply job and counts against
+  [`cairo.wal.apply.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairowalapplymemorylimitbytes)
+  rather than the query memory limit; on a non-WAL table it runs under the
+  caller's [query memory limit](/docs/configuration/cairo-engine/#memory-limits).
 
 :::
 

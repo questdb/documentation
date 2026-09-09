@@ -50,7 +50,7 @@ SELECT * FROM query_activity();
 
 | query_id | worker_id | worker_pool | username | query_start                 | state_change                | state  | is_wal | query                                                                | memory_used | memory_limit |
 | -------- | --------- | ----------- | -------- | --------------------------- | --------------------------- | ------ | ------ | -------------------------------------------------------------------- | ----------- | ------------ |
-| 29       | 1         | shared      | joe      | 2024-01-09T10:51:05.878627Z | 2024-01-09T10:51:05.878627Z | active | false  | CREATE TABLE test_tab AS (SELECT x FROM long_sequence(10000000000)); | 1073741824  | null         |
+| 29       | 1         | shared      | joe      | 2024-01-09T10:51:05.878627Z | 2024-01-09T10:51:05.878627Z | active | false  | CREATE TABLE test_tab AS (SELECT x FROM long_sequence(10000000000)); | 913571840   | null         |
 | 30       | 21        | shared      | joe      | 2024-01-09T10:51:10.661032Z | 2024-01-09T10:51:10.661032Z | active | false  | SELECT \* FROM query_activity();                                     | 262144      | null         |
 
 We see that the two latest queries have `query_id`'s of 29 and 30, respectively.

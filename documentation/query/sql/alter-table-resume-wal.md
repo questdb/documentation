@@ -33,18 +33,24 @@ the Sequencer. Once the error is resolved, `ALTER TABLE RESUME WAL` restarts the
 suspended WAL transactions from the failed transaction. Alternatively, an
 optional `sequencerTxn` value can be provided to skip the failed transaction.
 
+`wal_tables()` also reports the `errorTag` and `errorMessage` of a suspended
+table; `OUT OF MEMORY` means a WAL apply batch breached its
+[memory limit](/docs/configuration/cairo-engine/#memory-limits).
+
 ## Examples
 
 Using the [`wal_tables()`](/docs/query/functions/meta/#wal_tables) function
 to investigate the table status:
 
-```questdb-sql title="List all tables"
-wal_tables();
+```questdb-sql title="List suspended tables"
+SELECT name, suspended, writerTxn, sequencerTxn, errorTag
+FROM wal_tables()
+WHERE suspended;
 ```
 
-| name   | suspended | writerTxn | sequencerTxn |
-| ------ | --------- | --------- | ------------ |
-| trades | true      | 3         | 5            |
+| name   | suspended | writerTxn | sequencerTxn | errorTag  |
+| ------ | --------- | --------- | ------------ | --------- |
+| trades | true      | 3         | 5            | DISK FULL |
 
 The table `trades` is suspended. The last successful commit in the table is
 `3`.

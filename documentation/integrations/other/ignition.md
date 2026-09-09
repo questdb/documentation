@@ -69,8 +69,8 @@ Ignition can be configured to expose QuestDB's Postgres wire server, allowing fo
 Ignition also exposes settings to control the amount of memory allocated to the underlying database.
 
 - `historian.questdb.ramUsageLimitBytes`
-  - Corresponds to `ram.usage.limit.bytes` in QuestDB's `server.conf`.
-  - Controls the amount of RAM allocated to the database in bytes.
+  - Corresponds to [`ram.usage.limit.bytes`](/docs/configuration/cairo-engine/#ramusagelimitbytes) in QuestDB's `server.conf`.
+  - Caps the tracked native memory the database may allocate, in bytes.
 - `historian.questdb.ramUsageLimitPercent`
-  - Corresponds to `ram.usage.limit.percent` in QuestDB's `server.conf`.
-  - Control the amount of RAM allocated to the database as a percentage of system memory.
+  - Corresponds to [`ram.usage.limit.percent`](/docs/configuration/cairo-engine/#ramusagelimitpercent) in QuestDB's `server.conf`.
+  - Caps the tracked native memory the database may allocate as a percentage of system memory.

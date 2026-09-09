@@ -46,5 +46,5 @@ that yields:
 
 | name       | external_alias | memory_limit |
 | ---------- | -------------- | ------------ |
-| management |                | null         |
+| management |                | 2147483648   |
 | audit      |                | null         |

@@ -1,11 +1,14 @@
 ---
 title: SHOW keyword
 sidebar_label: SHOW
-description: SHOW SQL keyword reference documentation.
+description:
+  SHOW statements for columns, partitions, parameters, and CREATE DDL, plus
+  Enterprise users, groups, and service accounts with their memory limits.
 ---
 
-This keyword provides table, column, and partition information including
-metadata. The `SHOW` keyword is useful for checking the
+`SHOW` returns metadata about tables, columns, partitions, and configuration
+parameters and, in QuestDB Enterprise, about users, groups, service accounts,
+and permissions. It is useful for checking the
 [designated timestamp setting](/docs/concepts/designated-timestamp/) column, the
 [partition attachment settings](/docs/query/sql/alter-table-attach-partition/),
 and partition storage size on disk.
@@ -347,7 +350,8 @@ including any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW GROUPS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user requires
+`USER DETAILS`.
 
 ```questdb-sql
 SHOW GROUPS;
@@ -526,7 +530,8 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 
 ### SHOW SERVICE ACCOUNTS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user or group
+requires `USER DETAILS`.
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS;
@@ -538,9 +543,9 @@ SHOW SERVICE ACCOUNTS;
 | svc1_admin | true    | 268435456    |
 
 Filtering by a user or group instead lists the service accounts that principal
-can assume. The `enabled` column is replaced by `grant_option`, showing whether
-they may grant the assumption to others, and `memory_limit` reports each listed
-service account's own limit:
+can assume. The result has a `grant_option` column in place of `enabled`,
+showing whether the user or group may grant the assumption to others, and
+`memory_limit` reports each listed service account's own limit:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
@@ -594,7 +599,7 @@ SHOW USER john;
 
 ### SHOW USERS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`.
 
 ```questdb-sql
 SHOW USERS;
@@ -607,8 +612,9 @@ SHOW USERS;
 
 The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
 the user's own limit or, when it has none, the most restrictive of its groups'.
-`null` means no principal override; the server-wide query memory limit still
-applies. In `SHOW GROUPS` and `SHOW SERVICE ACCOUNTS` above it is instead the
+`null` means no principal override; the workload limit
+(`cairo.query.memory.limit.bytes`) still applies. In `SHOW GROUPS` and
+`SHOW SERVICE ACCOUNTS` above it is instead the
 listed entity's own limit, since neither inherits one. See
 [memory limits](/docs/security/rbac/#memory-limits).
 
