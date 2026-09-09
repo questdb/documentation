@@ -580,11 +580,11 @@ information without these permissions.
 
 ## Memory limits {#memory-limits}
 
-QuestDB Enterprise can set the native memory a single principal's queries may
-allocate, overriding the server-wide query memory limit for a specific user,
-group, or service account. Use it to stop one tenant's runaway query from
-exhausting memory shared with everyone else, or to grant a trusted principal more
-headroom than the default.
+QuestDB Enterprise can limit the native memory tracked for a single query,
+overriding the server-wide query memory limit for a specific user, group, or
+service account. Use it to help prevent one tenant's runaway query from
+exhausting shared memory, or to grant a trusted principal more headroom than the
+default.
 
 Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/), or
@@ -651,15 +651,14 @@ cap guards against one runaway workload, not total concurrent usage.
 
 ### What a per-principal limit covers
 
-A per-principal limit binds whatever runs under that principal's own context on
-the query workload, which is more than its interactive queries:
+Per-principal limits have the same
+[coverage](/docs/configuration/cairo-engine/#memory-limits) as workload limits.
+They apply to tracked native allocations for:
 
 - The principal's queries, on both the primary and replicas.
-- Its background [`COPY ... TO`](/docs/query/sql/copy/) exports. An export runs
-  under the issuing principal's context and is capped by the same value as an
-  interactive query, so `ALTER USER u SET MEMORY LIMIT 64M` aborts `u`'s exports
-  at 64 MiB. Size a principal's limit for the largest single thing it runs,
-  exports included — not only for its interactive queries.
+- Its background [`COPY ... TO`](/docs/query/sql/copy/) exports, which use the
+  issuing principal's limit. Some memory used to produce the export file is not
+  yet covered.
 - `UPDATE` on a non-WAL table, which is applied on the caller's own thread and
   acquires its own query-workload tracker.
 

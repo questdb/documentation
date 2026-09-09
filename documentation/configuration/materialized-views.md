@@ -30,21 +30,26 @@ single-threaded.
 - **Default**: `10`
 - **Reloadable**: no
 
-Maximum number of consecutive refresh attempts that fail with a transient error
-before the materialized view is invalidated. A transient error is a busy base
-table or view, or a breach of the
-[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits). The
-counter resets on any successful refresh.
+Maximum number of deferred retries after an incremental or scheduled period
+refresh fails with a transient error. If all retries fail, the view is
+invalidated. A successful refresh resets the counter; `0` disables deferred
+retries.
+
+Transient errors include a busy base table or view and out-of-memory errors,
+including breaches of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits). Full
+refreshes and user-requested `REFRESH ... RANGE FROM ... TO ...` do not use these
+deferred retries.
 
 ## cairo.mat.view.refresh.busy.retry.timeout
 
 - **Default**: `1000`
 - **Reloadable**: no
 
-Backoff before a materialized view refresh is retried after a transient error,
-in milliseconds. The retry is timer-driven and does not block a refresh worker.
+Delay in milliseconds before a deferred retry for an incremental or scheduled
+period refresh. The retry is timer-driven and does not block a refresh worker.
 The deprecated `cairo.mat.view.refresh.oom.retry.timeout` key is accepted but
-has no effect; out-of-memory retries use this backoff.
+has no effect; deferred out-of-memory retries use this backoff.
 
 ## mat.view.refresh.worker.affinity
 

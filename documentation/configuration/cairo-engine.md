@@ -875,12 +875,13 @@ is the approximate number of nested SELECT clauses allowed.
 
 ## Memory limits
 
-These limits cap how much native memory a single workload may allocate, so a
-runaway query, materialized view refresh, live view refresh, or WAL apply batch
-is stopped at its source before it can drive the whole server toward
-out-of-memory. Each workload has its own independent limit: a runaway in one
-does not draw against another's budget, nor against the process-wide RSS limit
-(`ram.usage.limit.bytes` / `ram.usage.limit.percent`).
+These limits cap the native memory tracked for a single query, materialized view
+refresh, live view refresh, or WAL apply batch. They help prevent runaway
+workloads from exhausting server memory. Each workload has its own limit, in
+addition to the process-wide RSS limit (`ram.usage.limit.bytes` /
+`ram.usage.limit.percent`). Allocations still count toward global RSS, so
+concurrent workloads can reach that limit even when each stays within its own
+budget.
 
 Three of the four limits are documented on this page. The fourth,
 [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes),
@@ -899,14 +900,14 @@ allocation that crossed the line and aborts that workload, while unrelated
 workloads keep running. What happens next depends on the workload:
 
 - A user query fails with the error.
-- A materialized view refresh is treated as a transient failure: the refresh is
-  deferred and retried after
+- A materialized view refresh first retries with smaller refresh intervals where
+  possible. If the error persists, incremental and scheduled period refreshes
+  are deferred for
   [`cairo.mat.view.refresh.busy.retry.timeout`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrytimeout),
-  and the view is invalidated only after
+  with up to
   [`cairo.mat.view.refresh.busy.retry.limit`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrylimit)
-  consecutive failed attempts. A view whose working set does not fit the limit
-  therefore invalidates after the retry budget is spent, not on the first
-  breach.
+  retries before invalidation. Full refreshes and user-requested
+  `REFRESH ... RANGE FROM ... TO ...` invalidate without deferred retries.
 - A live view refresh invalidates the view immediately.
 - A WAL apply suspends the affected table.
 
@@ -919,8 +920,9 @@ query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., s
 
 :::note
 
-Memory-mapped memory, such as the table column files a query reads, does not
-count toward a limit. A limit covers the native memory the workload allocates.
+Only tracked native allocations count toward a limit. Memory-mapped files, such
+as table column files, are excluded, and some native allocations are not yet
+covered.
 
 :::
 

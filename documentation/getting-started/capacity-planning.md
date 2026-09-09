@@ -175,9 +175,8 @@ For relatively small datasets i.e 4-40GB, and a read-heavy workload, performance
 can be improved by maximising use of the OS page cache. Users should consider
 increasing available RAM to improve the speed of read operations.
 
-To bound how much native memory a single query, materialized view refresh,
-live view refresh, or WAL apply may allocate, so one runaway workload cannot
-exhaust the server's RAM, see
+To help protect against runaway queries, materialized view refreshes, live view
+refreshes, or WAL apply workloads, see
 [memory limits](/docs/configuration/cairo-engine/#memory-limits).
 
 ### Memory page size configuration
