@@ -17,7 +17,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### New
 
 - [Migrate QuestDB onto the Kubernetes Operator](/docs/enterprise-kubernetes-operator/getting-started/migrate/) - Move an existing Enterprise deployment onto the Operator with a replica-first cutover: restore the source backup, consume replication WAL, then promote after a controlled source drain
-- [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/) - Recreate one instance's tables, views, and materialized views on another from `SHOW CREATE DATABASE`, either by replaying the statements over the REST API or by dumping them to a `.sql` file, with `INCLUDE (SCHEMA)` and `INCLUDE (ACL)` for separating structure from permissions on Enterprise
+- [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/) - Recreate one instance's tables, views, and materialized views on another from `SHOW CREATE DATABASE`, either by replaying the statements over the REST API or by dumping them to a `.sql` file, with `INCLUDE (SCHEMA)` and `INCLUDE (ACL)` for separating structure from permissions on Enterprise, plus the Web Console schema explorer as a manual alternative and the ordering caveat that comes with it
 
 ### Updated
 
