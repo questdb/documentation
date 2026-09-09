@@ -7,8 +7,9 @@ description: Stream data from Kafka to QuestDB. Set up the connector, map fields
 
 Use the QuestDB Kafka connector to stream data from Apache Kafka into QuestDB
 tables. It handles data conversion, batching, and reconnects automatically.
-Follow the [quick start](#quick-start) to send your first message, or see
-[migration from HTTP](#legacy-ilp-transports) for an existing pipeline.
+Follow the [quick start](#quick-start) to send your first message. If you have
+an existing pipeline that uses the InfluxDB Line Protocol (ILP) over HTTP, see
+[migrating from ILP](#legacy-ilp-transports).
 
 ## Choosing an integration strategy
 
@@ -350,6 +351,33 @@ outages. A backlog that continues to drain resets the timer.
 task resumes from its last committed offset only if those records still
 exist. Kafka can expire uncommitted records; expired records cannot be
 recovered by the connector.
+
+#### Failover between QuestDB nodes
+
+With QuestDB Enterprise, list every node of the cluster in `addr` and the
+connector follows whichever node holds the primary role:
+
+```properties
+client.conf.string=wss::addr=node-a:9000,node-b:9000;token=${QUESTDB_TOKEN};
+```
+
+Failover itself is a manual operation, see
+[Failover and role switch](/docs/high-availability/failover/). Once you promote
+a replica, the connector switches to it on its own:
+
+1. The demoted node closes the connection on the first write it refuses.
+2. The client reconnects and tries each address in turn. Replicas reject the
+   connection immediately, so it lands on the new primary without a backoff
+   delay.
+3. Rows that were not acknowledged before the switch are re-sent to the new
+   primary.
+
+Step 3 can produce duplicates, so enable
+[deduplication](#exactly-once-delivery) on the affected tables.
+
+While no node accepts writes, the client keeps retrying in the background. The
+task fails only if `qwp.progress.timeout.ms` elapses without progress, and a
+task that starts during the switch retries every `retry.backoff.ms`.
 
 #### Dead letter queue
 
