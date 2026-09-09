@@ -83,13 +83,22 @@ ORDER BY
 ### Detect suspended tables
 
 A WAL table becomes suspended when an error occurs during WAL apply, such as
-disk full, corrupted WAL segment, or kernel limits reached. While suspended,
-new data continues to be written to WAL but is not applied to the table.
+disk full, corrupted WAL segment, kernel limits reached, or a WAL apply batch
+breaching its [memory limit](/docs/configuration/cairo-engine/#memory-limits).
+While suspended, new data continues to be written to WAL but is not applied to
+the table.
 
 **Detection:**
 
 ```questdb-sql
 SELECT table_name FROM tables() WHERE table_suspended;
+```
+
+To see why a table was suspended, query `wal_tables()`. Its `errorTag` column
+reads `OUT OF MEMORY` when the cause was a memory limit breach:
+
+```questdb-sql
+SELECT name, errorTag, errorMessage FROM wal_tables() WHERE suspended;
 ```
 
 **Resolution:**
@@ -121,7 +130,10 @@ detailed recovery procedures including corrupted segment handling.
 
 Materialized views become invalid when their base table is modified in
 incompatible ways: dropping referenced columns, dropping partitions, renaming
-the table, or running TRUNCATE/UPDATE operations.
+the table, or running TRUNCATE/UPDATE operations. A view is also invalidated
+when its refresh keeps failing with an out-of-memory error, including a breach
+of the [refresh memory limit](/docs/configuration/cairo-engine/#memory-limits),
+after the deferred retries are exhausted.
 
 **Detection:**
 
@@ -203,6 +215,9 @@ Other options:
 - Add more RAM to the server
 - Reduce concurrent ingestion load
 - Reduce the number of tables with active O3 writes
+- Cap the memory a single query, view refresh, or WAL apply batch may allocate
+  with the per-workload
+  [memory limits](/docs/configuration/cairo-engine/#memory-limits)
 
 See [Capacity planning](/docs/getting-started/capacity-planning/#memory-page-size-configuration)
 and [Optimize for many tables](/docs/cookbook/operations/optimize-many-tables/)

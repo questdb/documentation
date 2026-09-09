@@ -94,21 +94,33 @@ the same as for `query.timeout`.
 - **Default**: `0`
 - **Reloadable**: no
 
-Process-wide limit on the resident memory QuestDB may allocate, as a byte count
-or a size with a `K`, `M`, or `G` suffix. `0` means no byte limit. When both this
-key and `ram.usage.limit.percent` resolve to a limit, the smaller one applies. An
-allocation that would cross the resolved limit fails with a
-`global RSS memory limit exceeded` error. Memory-mapped files do not count. The
-per-workload [memory limits](#memory-limits) sit underneath this one.
+Process-wide limit on the native memory QuestDB may allocate, as a byte count or
+a size with a `K`, `M`, or `G` suffix. `0` means no byte limit. When both this
+key and `ram.usage.limit.percent` resolve to a limit, the smaller one applies.
+
+Despite the name, the limit counts tracked native allocations, not the process
+RSS. The JVM heap, thread stacks, and memory-mapped files such as table column
+files do not count, so a limit equal to a container's memory limit does not stop
+the kernel from killing the process. Compare the `RSS` and `NATIVE_*` rows of
+[`memory_metrics()`](/docs/query/functions/meta/#memory_metrics) to see the gap.
+
+An allocation that would cross the resolved limit fails with a
+`global RSS memory limit exceeded` error. The error lands on whichever workload
+allocates last, so a query, a view refresh, or a WAL apply batch can fail
+because of another workload's usage. A WAL apply that hits it goes through the
+same retries and suspension as a breach of its own limit. The per-workload
+[memory limits](#memory-limits) sit underneath this one and isolate workloads
+from each other.
 
 ### ram.usage.limit.percent
 
 - **Default**: `90`
 - **Reloadable**: no
 
-Process-wide resident memory limit as a percentage of the physical memory on the
-host. `0` disables the percentage limit. When both this key and
-`ram.usage.limit.bytes` resolve to a limit, the smaller one applies.
+Process-wide native memory limit as a percentage of the physical memory on the
+host. It counts the same tracked allocations as `ram.usage.limit.bytes`. `0`
+disables the percentage limit. When both this key and `ram.usage.limit.bytes`
+resolve to a limit, the smaller one applies.
 
 ## Commit and write behavior
 

@@ -1258,10 +1258,11 @@ SELECT wait_wal_table('trades', 42);
 :::note
 
 For monitoring and observability, use [`tables()`](#tables) instead.
-`tables()` provides all the same information plus additional metrics
+`tables()` provides the same status information plus additional metrics
 (pending rows, memory pressure, deduplication stats, throughput histograms),
 and is fully in-memory. `wal_tables()` reads from disk and is less suitable
-for frequent polling.
+for frequent polling, but it is the only function that reports the `errorTag`
+and `errorMessage` of a suspended table.
 
 :::
 
@@ -1288,7 +1289,11 @@ Returns a `table` including the following information:
   as `OUT OF MEMORY` when a WAL apply batch breached its
   [memory limit](/docs/configuration/cairo-engine/#memory-limits), or empty
   when the table is not suspended
-- `errorMessage` - full text of the error that suspended the table
+- `errorMessage` - full text of the error that suspended the table, or empty
+  when the table is not suspended
+- `memoryPressure` - memory pressure level of the table writer: `0` for none,
+  `1` when parallelism is reduced, `2` when the writer backs off between
+  attempts (equivalent to `table_memory_pressure_level` in `tables()`)
 
 **Examples:**
 
@@ -1296,11 +1301,11 @@ Returns a `table` including the following information:
 wal_tables();
 ```
 
-| name        | suspended | writerTxn | writerLagTxnCount | sequencerTxn |
-| ----------- | --------- | --------- | ----------------- | ------------ |
-| sensor_wal  | false     | 2         | 1                 | 4            |
-| weather_wal | false     | 3         | 0                 | 3            |
-| test_wal    | true      | 7         | 1                 | 9            |
+| name        | suspended | writerTxn | writerLagTxnCount | sequencerTxn | errorTag      | errorMessage                                                                                                          | memoryPressure |
+| ----------- | --------- | --------- | ----------------- | ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
+| sensor_wal  | false     | 2         | 1                 | 4            |               |                                                                                                                       | 0              |
+| weather_wal | false     | 3         | 0                 | 3            |               |                                                                                                                       | 0              |
+| test_wal    | true      | 7         | 1                 | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 0              |
 
 ## writer_pool
 

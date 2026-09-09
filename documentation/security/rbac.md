@@ -649,6 +649,12 @@ new value through the replicated ACL tables. A changed limit applies to the
 principal's next query, including on connections that are already open, while a
 query already running keeps the limit it started with.
 
+A query that crosses its limit fails with the same
+`query memory limit exceeded [workload=QUERY, ...]` error as a breach of the
+workload limit. See
+[memory limits](/docs/configuration/cairo-engine/#memory-limits) for the message
+format.
+
 :::note
 
 A limit bounds a single query. Two concurrent queries by the same principal each
@@ -709,9 +715,10 @@ group: `ALTER USER ... SET MEMORY LIMIT` on an external user is rejected with
 - [`query_activity`](/docs/query/functions/meta/#query_activity) exposes the
   effective limit and live usage of each running query through its `memory_limit`
   and `memory_used` columns.
-- `SHOW USER` does not carry the column, and `SHOW USERS` requires `LIST USERS`,
-  so a user without that permission cannot see its own cap before a query
-  breaches it.
+- `SHOW USER` does not carry the column, and `SHOW USERS` requires `LIST USERS`.
+  A user without that permission can still read its own effective cap from the
+  `memory_limit` column of `query_activity`, which always lists the caller's
+  own queries.
 - The stored value is persisted on the `sys.acl_entities` system table. That
   table is protected: only the built-in admin can read it, and an ACL principal
   holding `DATABASE ADMIN` is still denied.
@@ -729,20 +736,31 @@ than before and must be updated. Clients that read by column name are
 unaffected.
 
 The column is added by an automatic migration when an upgraded node first starts
-as a primary or is promoted from replica to primary. Until that migration has
-been applied, `SET MEMORY LIMIT` and `ALTER ... ENABLE` or `DISABLE` statements
-are refused, and persisted principal limits are not enforced. The refusal reads
-either:
+as a primary or is promoted from replica to primary. Persisted principal limits
+are not enforced until the migration has been applied. The migration passes
+through two windows, and each refuses a different set of statements:
 
-```
-Cannot modify ACL entities: the memory_limit column has not been migrated in yet; retry shortly, or restart the node if it persists
-```
+- Before the column exists, a `SET MEMORY LIMIT` with a non-zero size is refused
+  with:
 
-or, once the column has been added but WAL apply has not yet reached it:
+  ```
+  Cannot modify ACL entities: the memory_limit column has not been migrated in yet; retry shortly, or restart the node if it persists
+  ```
 
-```
-Cannot set memory limit while the ACL memory_limit column migration is still being applied, retry [name=john]
-```
+  `SET MEMORY LIMIT UNLIMITED` and `ALTER ... ENABLE` or `DISABLE` still
+  succeed.
+
+- Once the column has been added but WAL apply has not yet reached it,
+  `SET MEMORY LIMIT UNLIMITED` and `ALTER ... ENABLE` or `DISABLE` are refused
+  as well, so that a stale in-memory value cannot overwrite a stored limit. A
+  non-zero `SET MEMORY LIMIT` keeps the first message; the others read:
+
+  ```
+  Cannot set memory limit while the ACL memory_limit column migration is still being applied, retry [name=john]
+  ```
+
+  or `Cannot enable while ...` and `Cannot disable while ...` for a status
+  change.
 
 The window normally closes on its own once WAL apply catches up, so retry the
 statement first. If the error persists, restart the node: the migration runs
