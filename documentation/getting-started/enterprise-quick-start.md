@@ -186,13 +186,13 @@ GRANT ALL ON table2 TO user2 WITH GRANT OPTION;
 
 Permission grants can be specific and fine-tuned.
 
-List the full list of applied permissions with `all_permissions()`.
+List every permission the database supports with `all_permissions()`.
 
 - For the full role-based access control docs, including group management, see
   the [RBAC operations guide](/docs/security/rbac/).
 
 - For a full list of available permissions, see the
-  [permissions sub-section in the RBAC operations guide](/docs/security/rbac/#permissions).
+  [permissions sub-section in the RBAC operations guide](/docs/security/rbac/permissions-reference/).
 
 ## 4. Ingest data, InfluxDB Line Protocol
 

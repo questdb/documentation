@@ -66,10 +66,12 @@ an error:
 
 ## Permissions
 
-`REBASE WAL` requires database administrator (system admin) privileges rather
-than a table-level grant. This reflects that the operation is destructive: it
-discards un-applied transactions, changes the table's internal id, and replaces
-its on-disk directory. A user who can run the non-destructive
+`REBASE WAL` requires the `SYSTEM ADMIN`
+[permission](/docs/security/rbac/permissions-reference/#special-permissions)
+rather than a table-level grant.
+This reflects that the operation is destructive: it discards un-applied
+transactions, changes the table's internal id, and replaces its on-disk
+directory. A user who can run the non-destructive
 [`RESUME WAL`](/docs/query/sql/alter-table-resume-wal/) on a table cannot
 necessarily run `REBASE WAL` on it.
 

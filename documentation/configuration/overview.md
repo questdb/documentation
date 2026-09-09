@@ -536,7 +536,7 @@ http.net.connection.sndbuf=2m
 | [Logging & Metrics](/docs/configuration/logging-metrics/) | Log levels and metrics | |
 | [Materialized views](/docs/configuration/materialized-views/) | Materialized view refresh settings | |
 | [Minimal HTTP server](/docs/configuration/http-min-server/) | Health check and metrics endpoint | |
-| [OpenID Connect (OIDC)](/docs/configuration/oidc/) | OIDC integration | ✓ |
+| [OIDC settings](/docs/configuration/oidc/) | `acl.oidc.*` reference for OIDC authentication | ✓ |
 | [Parallel SQL execution](/docs/configuration/parallel-sql-execution/) | Query parallelism settings | |
 | [Postgres wire protocol](/docs/configuration/postgres-wire-protocol/) | PostgreSQL wire protocol connections | |
 | [QuestDB Wire Protocol (QWP)](/docs/configuration/qwp/) | QWP protocol limits and UDP receiver | |
