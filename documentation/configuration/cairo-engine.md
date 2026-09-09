@@ -917,17 +917,8 @@ query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., s
 
 :::note
 
-Coverage is best-effort. A limit constrains the allocation sites that grow with
-data volume: hash and GROUP BY tables, sorts, joins, window partition buffers,
-set operations, `LATEST BY`, SAMPLE BY fill, Parquet decode buffers, and
-posting-index covered-column decode buffers. Memory that is structurally
-bounded, or that lives for the life of a process or session (page-frame buffers,
-JIT buffers, table readers and writers, symbol tables, connection buffers,
-memory-mapped pages), is accounted only against the global RSS limit. One
-notable gap is the vectorized hash table used by the default plan for a keyed
-`GROUP BY` on a single `INT` or `SYMBOL` key, which grows in native code and is
-accounted only against the global RSS limit. Treat a workload limit as a guard
-against common runaway patterns, not a hard ceiling on every allocation.
+Memory-mapped memory, such as the table column files a query reads, does not
+count toward a limit. A limit covers the native memory the workload allocates.
 
 :::
 
@@ -964,9 +955,8 @@ Maximum native memory a single WAL apply batch may allocate. `0` disables the
 limit.
 
 WAL apply runs only simple `UPDATE` statements, metadata changes, and data
-commits, and table writer memory is outside the coverage described above, so in
-practice this limit rarely fires. Its main effect is to keep WAL apply on its
-own budget, separate from the query limit.
+commits, so in practice this limit rarely fires. Its main effect is to keep WAL
+apply on its own budget, separate from the query limit.
 
 ## Batch operations
 
