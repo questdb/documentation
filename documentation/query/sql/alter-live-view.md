@@ -314,9 +314,10 @@ These statements are relayed to replicas over a replicated control table and
 applied by each node to its own copy of the view, so retention and storage format
 converge without shipping rows.
 
-A replica holds a relayed change until its own refresh has reached the base-table
-progress the primary had when it took the change, so both nodes remove or convert
-the same rows. A `WHERE` selector is resolved to a concrete partition list on the
+A replica holds a relayed partition change until its own refresh has reached the
+base-table progress the primary had when it took the change, so both nodes remove
+or convert the same rows. `SET TTL` carries no such fence, since the view applies
+the rule to whatever it holds. A `WHERE` selector is resolved to a concrete partition list on the
 primary and travels as that list, which keeps the two nodes from resolving the
 same predicate against different data. A node with live views or refresh disabled
 applies the change through the ordinary WAL apply job.

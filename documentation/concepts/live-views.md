@@ -426,8 +426,9 @@ depends on base-table replication and apply lag.
 
 [`ALTER LIVE VIEW`](/docs/query/sql/alter-live-view/) statements that manage the
 disk tier do replicate. They travel over a replicated control table and each node
-applies them to its own copy of the view, holding a change until its own refresh
-has reached the base-table progress the primary had when the change was taken. A
+applies them to its own copy of the view, holding a partition change until its own
+refresh has reached the base-table progress the primary had when the change was
+taken. A
 node with live views or refresh disabled applies them through the ordinary WAL
 apply job.
 
