@@ -90,6 +90,33 @@ A view's TTL is independent of its base table's TTL. For full syntax, see
 and
 [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/).
 
+### On live views
+
+[Live views](/docs/concepts/live-views/) take TTL the same way, bounding the
+disk tier that holds their computed rows:
+
+```questdb-sql
+-- At view creation
+CREATE LIVE VIEW trades_ma
+FLUSH EVERY 1s
+PARTITION BY DAY
+TTL 4 WEEKS
+START FROM NOW
+AS
+SELECT timestamp, symbol,
+  avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
+    AS moving_avg
+FROM trades;
+
+-- On an existing view
+ALTER LIVE VIEW trades_ma SET TTL 4 WEEKS;
+```
+
+A live view evaluates its TTL when its own table commits, which happens on the
+`FLUSH EVERY` cadence while the view is producing rows. For full syntax, see
+[CREATE LIVE VIEW](/docs/query/sql/create-live-view/#ttl) and
+[ALTER LIVE VIEW SET TTL](/docs/query/sql/alter-live-view/#set-ttl).
+
 ## How TTL works
 
 TTL drops partitions based on the **partition's time range**, not individual row

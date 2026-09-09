@@ -329,6 +329,7 @@ module.exports = {
                     "query/sql/alter-table-change-symbol-capacity", // SYMBOL CAPACITY
                   ],
                 },
+                "query/sql/alter-live-view",
                 {
                   type: "category",
                   label: "ALTER MATERIALIZED VIEW",

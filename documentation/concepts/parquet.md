@@ -131,14 +131,15 @@ optionally set the false positive probability (FPP) using `WITH`:
 ```questdb-sql title="Convert with explicit bloom filter columns"
 ALTER TABLE trades CONVERT PARTITION TO PARQUET
 WHERE timestamp < '2025-08-31'
-WITH (bloom_filter_columns = 'symbol,side', bloom_filter_fpp = 0.01);
+WITH (bloom_filter_columns = 'symbol,side', fpp = '0.01');
 ```
 
 :::note
 
 When an explicit `bloom_filter_columns` list is provided, it overrides any
 per-column `PARQUET(BLOOM_FILTER)` metadata on the table. If the option is
-omitted, per-column metadata is used.
+omitted, per-column metadata is used. The option is named `fpp` here, and its
+value must be quoted. `COPY ... TO` spells the same setting `bloom_filter_fpp`.
 
 :::
 
