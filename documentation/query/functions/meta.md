@@ -445,7 +445,7 @@ FROM query_activity();
 | query_id | username | state  | memory_used | memory_limit | query                                                                                 |
 | -------- | -------- | ------ | ----------- | ------------ | ------------------------------------------------------------------------------------- |
 | 62179    | john     | active | 262144      | 536870912    | SELECT query_id, username, state, memory_used, memory_limit, query FROM query_activity() |
-| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades                            |
+| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 0.5, 2) FROM trades                           |
 
 ## reader_pool
 

@@ -1038,12 +1038,16 @@ disables the limit.
 - **Reloadable**: yes
 
 Maximum native memory a single user SQL query may allocate. `0` disables the
-limit. It applies to every statement that appears in
-[`query_activity`](/docs/query/functions/meta/#query_activity), including
-`SELECT`, `INSERT ... SELECT`, `CREATE TABLE AS SELECT`,
-`CREATE MATERIALIZED VIEW`, `COPY ... TO` exports, and `UPDATE` on a non-WAL
-table. Subqueries and other nested work share the
-top-level query's budget rather than each acquiring their own. On QuestDB
+limit. It covers `SELECT`, `INSERT ... SELECT`, `CREATE TABLE AS SELECT`,
+`UPDATE` on a non-WAL table, and every other statement that runs on the
+caller's connection and appears in
+[`query_activity`](/docs/query/functions/meta/#query_activity). It also covers
+`COPY ... TO` exports, which run in the background under the issuing query's
+budget but do not appear in `query_activity`. `CREATE MATERIALIZED VIEW`
+charges only its DDL to this limit: the initial population runs as a refresh
+under `cairo.mat.view.refresh.memory.limit.bytes`. Subqueries and other nested
+work share the top-level query's budget rather than each acquiring their own.
+On QuestDB
 Enterprise the built-in admin cannot be given a per-principal override and runs
 under this limit, so size it with the admin's diagnostic queries in mind.
 

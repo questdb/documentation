@@ -761,9 +761,11 @@ by column name are unaffected.
 
 :::
 
-The column is added by an automatic migration when an upgraded node first starts
-as a primary or is promoted from replica to primary. Persisted principal limits
-are not enforced until the migration has been applied. The migration passes
+The `SHOW` results carry the column from the first start of the upgraded
+binary, reading `null` until limits are set. The `sys.acl_entities` column that
+stores the value is added by an automatic migration when an upgraded node first
+starts as a primary or is promoted from replica to primary. Persisted principal
+limits are not enforced until the migration has been applied. The migration passes
 through two windows, and each refuses a different set of statements:
 
 - Before the column exists, a `SET MEMORY LIMIT` with a non-zero size is refused
