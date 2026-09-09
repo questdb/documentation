@@ -276,8 +276,9 @@ For more on ILP ingestion, see:
 
 _If you're not using Kafka, you can skip to section 6._
 
-The official **QuestDB Kafka Connect sink** forwards messages from Kafka topics directly to your database over the QuestDB Wire Protocol (QWP).
-The setup process is straightforward:
+Use the **QuestDB Kafka connector** to stream messages from Kafka topics into
+QuestDB. The configuration below requires QuestDB 10.0 or newer and connector
+0.24 or newer.
 
 1. Create a dedicated service account in QuestDB.
 2. Generate an authentication token for the account.

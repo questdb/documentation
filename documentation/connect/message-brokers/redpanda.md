@@ -19,8 +19,9 @@ tool that can be used to build data pipelines.
 ### Prerequisites
 
 - Docker
-- A local JDK installation
-- A running QuestDB instance
+- Java 17 or newer (JDK)
+- A running QuestDB 10.0 or newer instance
+- QuestDB Kafka connector 0.24 or newer (installed below)
 
 ### Configure and start Redpanda
 
