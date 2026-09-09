@@ -900,8 +900,10 @@ workloads keep running. What happens next depends on the workload:
 
 - A user query fails with the error.
 - A materialized view refresh is treated as a transient failure: the refresh is
-  deferred and retried after `cairo.mat.view.refresh.busy.retry.timeout`, and
-  the view is invalidated only after `cairo.mat.view.refresh.busy.retry.limit`
+  deferred and retried after
+  [`cairo.mat.view.refresh.busy.retry.timeout`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrytimeout),
+  and the view is invalidated only after
+  [`cairo.mat.view.refresh.busy.retry.limit`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrylimit)
   consecutive failed attempts. A view whose working set does not fit the limit
   therefore invalidates after the retry budget is spent, not on the first
   breach.
