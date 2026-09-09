@@ -262,6 +262,37 @@ supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
 in the view. A view over a deduplicated base is one `FLUSH EVERY` cycle behind
 rather than sub-cycle fresh, because its refresh is coupled to base apply.
 
+## Retention and storage format
+
+A live view's disk tier is a WAL-backed table, and
+[`ALTER LIVE VIEW`](/docs/query/sql/alter-live-view/) manages it with the same
+verbs a table has:
+
+- [`SET TTL`](/docs/query/sql/alter-live-view/#set-ttl), or the `TTL` clause of
+  [`CREATE LIVE VIEW`](/docs/query/sql/create-live-view/#ttl), drops partitions
+  older than a retention window. The view enforces it on its own commits, so the
+  window holds without operator action.
+- [`DROP PARTITION`](/docs/query/sql/alter-live-view/#drop-partition) removes
+  partitions on demand.
+- [`CONVERT PARTITION`](/docs/query/sql/alter-live-view/#convert-partition)
+  moves partitions between the native and Parquet storage formats.
+
+A view's retention is independent of its base table's. The view stores computed
+rows, so a wide projection can outgrow the base table even when both keep the
+same window.
+
+A live view is derived rather than ingested, which gives its retention two
+properties a table's does not have. The
+[`ALTER LIVE VIEW`](/docs/query/sql/alter-live-view/) page covers both in detail:
+
+- **A manual `DROP PARTITION` is not permanent.** An out-of-order base commit, or
+  a rebuild from the view's `START FROM` boundary, recomputes output over the
+  dropped period and writes those rows back. TTL survives recovery, because the
+  rule is re-applied to the recomputed rows.
+- **The two tiers evict independently.** Rows removed from disk can still be
+  served from the in-memory tier until it is rebuilt, so neither statement makes
+  data unreadable at a known point in time.
+
 ## Monitoring
 
 The [`live_views()`](/docs/query/functions/meta/#live_views) function exposes
@@ -343,14 +374,16 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **Deterministic queries only.** Non-deterministic functions such as `now()`,
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.
-- **No TTL on the view.** Live-view disk growth is unbounded in this version.
-  Size retention on the base table instead.
+- **Retention is partition-granular.** A live view drops whole partitions, as a
+  table does. Choose the view's `PARTITION BY` with the retention window in
+  mind, and see [Retention and storage format](#retention-and-storage-format).
 
 ## Tradeoffs
 
 - **Storage grows with output.** The computed rows are stored on the live view's
   disk tier in addition to the base table's rows. For wide projections or long
-  retention the view's footprint can exceed the base table.
+  retention the view's footprint can exceed the base table. Bound it with a
+  [TTL](#retention-and-storage-format) on the view.
 - **No admission control.** A view that cannot keep up with ingestion stays
   correct but stale, with no automatic throttle or drop.
 - **Per-partition state for partitioned windows grows with distinct partition
@@ -391,6 +424,13 @@ A role switch continues the local refresh state; it does not reconstruct or
 transfer the former primary's live-view rows. Replica freshness therefore also
 depends on base-table replication and apply lag.
 
+[`ALTER LIVE VIEW`](/docs/query/sql/alter-live-view/) statements that manage the
+disk tier do replicate. They travel over a replicated control table and each node
+applies them to its own copy of the view, holding a change until its own refresh
+has reached the base-table progress the primary had when the change was taken. A
+node with live views or refresh disabled applies them through the ordinary WAL
+apply job.
+
 ### Backup and restore
 
 A live view is captured by the object-store backup like a materialized view: its
@@ -402,6 +442,8 @@ base table.
 
 - **SQL commands**
   - [`CREATE LIVE VIEW`](/docs/query/sql/create-live-view/): Create a live view
+  - [`ALTER LIVE VIEW`](/docs/query/sql/alter-live-view/): Manage a live view's
+    retention, storage format and WAL
   - [`DROP LIVE VIEW`](/docs/query/sql/drop-live-view/): Remove a live view
 
 - **Related concepts**

@@ -25,6 +25,7 @@ CREATE LIVE VIEW [ IF NOT EXISTS ] viewName
 FLUSH EVERY duration
 [ IN MEMORY duration ]
 [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) ]
+[ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] } ]
 START FROM ( NOW | BEGINNING | 'timestamp' )
 AS [ ( ] query [ ) ]
 [ OWNED BY ownerName ]
@@ -38,9 +39,9 @@ Where:
   [window functions](/docs/query/functions/window-functions/overview/).
 
 `FLUSH EVERY` is required and must come first. `START FROM` is also required and
-may appear in any order with the optional `IN MEMORY` and `PARTITION BY`
-clauses. These clauses all precede `AS`; the optional `OWNED BY` clause follows
-the query.
+may appear in any order with the optional `IN MEMORY`, `PARTITION BY` and `TTL`
+clauses. Each may appear at most once. These clauses all precede `AS`; the
+optional `OWNED BY` clause follows the query.
 
 ## Parameters
 
@@ -51,6 +52,7 @@ the query.
 | `FLUSH EVERY` | How often computed rows are persisted to disk. Required |
 | `IN MEMORY` | Window of recent rows kept in RAM for fresh reads. Defaults to `FLUSH EVERY` |
 | `PARTITION BY` | Partitioning unit for the view's disk tier. Defaults to the base table's scheme |
+| `TTL` | Retention period for the view's disk tier. No retention by default |
 | `START FROM` | Inclusive event-time boundary: `NOW`, `BEGINNING`, or a timestamp literal. Required |
 | `query` | A window-function `SELECT` over a single WAL-backed base table |
 | `OWNED BY` | Assign ownership (Enterprise) |
@@ -121,6 +123,37 @@ SELECT timestamp, symbol,
     AS moving_avg
 FROM trades;
 ```
+
+### TTL
+
+`TTL` sets a [time-to-live](/docs/concepts/ttl/) period on the view's disk tier.
+QuestDB drops partitions of the view whose entire time range falls outside the
+window, which bounds the view's footprint without touching the base table. A
+view's TTL is independent of its base table's TTL.
+
+The period must be a whole number multiple of the view's partition size, whether
+that comes from `PARTITION BY` or from the base table. Accepted units are
+`HOUR[S]`, `DAY[S]`, `WEEK[S]`, `MONTH[S]` and `YEAR[S]`, with the `h`, `d`, `w`,
+`M` and `y` shorthands.
+
+```questdb-sql
+CREATE LIVE VIEW trades_ma
+FLUSH EVERY 1s
+PARTITION BY DAY
+TTL 4 WEEKS
+START FROM NOW
+AS
+SELECT timestamp, symbol,
+  avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
+    AS moving_avg
+FROM trades;
+```
+
+The window is enforced against the view's own rows as the refresh worker writes
+them, so a view created with `START FROM BEGINNING` and a short `TTL` still
+recomputes the whole history during its initial seed, evicting as it goes. Change
+or clear the period afterwards with
+[`ALTER LIVE VIEW SET TTL`](/docs/query/sql/alter-live-view/#set-ttl).
 
 ### START FROM
 
@@ -336,11 +369,14 @@ OWNED BY analysts;
 | `wildcard column select is not allowed in live view queries`                                                                               | The top-level projection contains `*`                                            |
 | `live view unbounded window must have an ANCHOR clause`                                                                                    | A stateful partitioned window uses the default unbounded frame without an anchor |
 | `non-deterministic function cannot be used in live view`                                                                                   | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function       |
+| `TTL value must be an integer multiple of the partition size`                                                                              | The `TTL` period is not a whole multiple of the view's partition size            |
+| `live view TTL clause specified more than once`                                                                                            | The `TTL` clause appears twice                                                   |
 | `permission denied`                                                                                                                        | Missing required permission (Enterprise)                                         |
 
 ## See also
 
 - [Live views concept](/docs/concepts/live-views/)
+- [ALTER LIVE VIEW](/docs/query/sql/alter-live-view/)
 - [DROP LIVE VIEW](/docs/query/sql/drop-live-view/)
 - [Window functions](/docs/query/functions/window-functions/overview/)
 - [live_views()](/docs/query/functions/meta/#live_views)
