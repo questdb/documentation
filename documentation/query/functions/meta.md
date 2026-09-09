@@ -397,7 +397,7 @@ because inserted rows replicate as data.
 
 **Return value:**
 
-Returns metadata on running SQL queries, including columns such as:
+Returns metadata on running SQL queries, with the following columns:
 
 - query_id - identifier of the query that can be used with
   [cancel query](/docs/query/sql/cancel-query) command or
@@ -409,6 +409,9 @@ Returns metadata on running SQL queries, including columns such as:
 - query_start - timestamp of when query started
 - state_change - timestamp of latest query state change, such as a cancellation
 - state - state of running query, can be `active` or `cancelled`
+- is_wal - `true` when the SQL is being applied by the WAL apply job, such as
+  an `UPDATE` on a WAL table. Such queries cannot be cancelled
+- query - text of sql query
 - memory_used - native memory currently allocated by the query, in bytes, as
   tracked by the
   [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits)
@@ -420,7 +423,6 @@ Returns metadata on running SQL queries, including columns such as:
   workload's tracker, such as the `SELECT` a materialized view refresh runs or
   an `UPDATE` applied by the WAL apply job, because that SQL charges the
   workload's budget instead of acquiring its own
-- query - text of sql query
 
 **Examples:**
 
@@ -429,10 +431,10 @@ SELECT query_id, username, state, memory_used, memory_limit, query
 FROM query_activity();
 ```
 
-| query_id | username | state  | memory_used | memory_limit | query                                                      |
-| -------- | -------- | ------ | ----------- | ------------ | ---------------------------------------------------------- |
-| 62179    | john     | active | 262144      | 536870912    | SELECT \* FROM query_activity()                            |
-| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades |
+| query_id | username | state  | memory_used | memory_limit | query                                                                                 |
+| -------- | -------- | ------ | ----------- | ------------ | ------------------------------------------------------------------------------------- |
+| 62179    | john     | active | 262144      | 536870912    | SELECT query_id, username, state, memory_used, memory_limit, query FROM query_activity() |
+| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades                            |
 
 ## reader_pool
 
@@ -1282,6 +1284,11 @@ Returns a `table` including the following information:
   writing to the table; these transactions will be eventually moved to the table
   data and become visible for readers (equivalent to `wal_txn - table_txn`)
 - `sequencerTxn` - the last committed transaction in the sequencer (equivalent to `wal_txn` in `tables()`)
+- `errorTag` - short classification of the error that suspended the table, such
+  as `OUT OF MEMORY` when a WAL apply batch breached its
+  [memory limit](/docs/configuration/cairo-engine/#memory-limits), or empty
+  when the table is not suspended
+- `errorMessage` - full text of the error that suspended the table
 
 **Examples:**
 

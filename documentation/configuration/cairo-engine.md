@@ -945,7 +945,9 @@ workloads keep running. What happens next depends on the workload:
 - A WAL apply first retries under the writer's memory-pressure control, which
   shrinks the transaction block, reduces parallelism, and backs off between
   attempts. If the breach persists after the back-off budget is exhausted, the
-  table is suspended with the `OUT_OF_MEMORY` error tag. Resume it with
+  table is suspended and
+  [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reports
+  `OUT OF MEMORY` in its `errorTag` column. Resume it with
   [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/).
 
 The message names the workload so you can tell it apart from a process-wide
@@ -957,8 +959,11 @@ query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., s
 
 `workload` is one of `QUERY`, `MAT_VIEW_REFRESH`, `LIVE_VIEW_REFRESH`, or
 `WAL_APPLY`. The prefix reads `query memory limit exceeded` for every workload.
-`queryId` is the query id for a query, the copy id for a `COPY ... TO` export,
-and the table id for a WAL apply batch or a live view refresh.
+`queryId` is the `query_id` reported by
+[`query_activity`](/docs/query/functions/meta/#query_activity) for a query, the
+copy id for a `COPY ... TO` export, and the table id, as reported by
+[`tables()`](/docs/query/functions/meta/#tables), for a WAL apply batch, a
+materialized view refresh, or a live view refresh.
 
 :::note
 

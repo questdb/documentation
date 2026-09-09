@@ -55,9 +55,9 @@ the effects of running SQL commands that follow are shown with
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | false        |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | false        | null         |
 
 ### Assign a service account to a user with grant option
 
@@ -76,9 +76,9 @@ GRANT ASSUME SERVICE ACCOUNT ingestion TO john WITH GRANT OPTION;
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | false        |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | false        | null         |
 
 ### Owner grants
 

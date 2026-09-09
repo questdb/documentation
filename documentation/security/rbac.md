@@ -2,8 +2,8 @@
 title: Role-based Access Control (RBAC)
 description:
   Granular access control from database level down to individual columns and
-  rows. Learn how to secure your QuestDB instance with users, groups, and
-  fine-grained permissions.
+  rows, plus per-user, per-group, and per-service-account query memory limits.
+  Secure your QuestDB instance with users, groups, and fine-grained permissions.
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -731,9 +731,22 @@ unaffected.
 The column is added by an automatic migration when an upgraded node first starts
 as a primary or is promoted from replica to primary. Until that migration has
 been applied, `SET MEMORY LIMIT` and `ALTER ... ENABLE` or `DISABLE` statements
-are refused with an error naming the `memory_limit` column migration, and
-persisted principal limits are not enforced. The window closes on its own once
-WAL apply catches up: retry the statement, no restart is needed.
+are refused, and persisted principal limits are not enforced. The refusal reads
+either:
+
+```
+Cannot modify ACL entities: the memory_limit column has not been migrated in yet; retry shortly, or restart the node if it persists
+```
+
+or, once the column has been added but WAL apply has not yet reached it:
+
+```
+Cannot set memory limit while the ACL memory_limit column migration is still being applied, retry [name=john]
+```
+
+The window normally closes on its own once WAL apply catches up, so retry the
+statement first. If the error persists, restart the node: the migration runs
+again at startup.
 
 :::
 
