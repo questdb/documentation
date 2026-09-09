@@ -9,7 +9,7 @@ This page provides detailed documentation for each window function. For an intro
 
 ## Aggregate window functions
 
-These functions respect the frame clause and calculate values over the specified window frame.
+These functions respect the frame clause and calculate values over the specified window frame. They are the only window functions that accept a [`FILTER`](/docs/query/sql/filter/) clause.
 
 ### avg() / EMA / VWEMA {#avg}
 
@@ -323,55 +323,6 @@ FROM telemetry;
 
 ---
 
-### first_value()
-
-Returns the first value in the window frame. Supports `IGNORE NULLS` clause.
-
-**Syntax:**
-```questdb-sql
-first_value(value) [(IGNORE|RESPECT) NULLS]
-OVER ([PARTITION BY partition_expression]
-      [ORDER BY sort_expression]
-      [frame_clause])
-```
-
-**Arguments:**
-- `value`: Column or expression to get value from
-- `IGNORE NULLS` (optional): Skip null values
-- `RESPECT NULLS` (default): Include null values
-
-**Return value:**
-- Same type as input. The first value in the window frame (or first non-null with `IGNORE NULLS`)
-
-**Description:**
-
-Use `first_value()` when you need to reference the starting point of a sequence. Common use cases include:
-
-- **Opening price**: Get the first price of each trading session to calculate daily returns
-- **Baseline comparison**: Compare each row to the first value in its partition
-- **Session start**: Reference the initial state at the beginning of each user session
-- **Gap filling**: Use `IGNORE NULLS` to carry forward the last known value when data is sparse
-
-**Example:**
-```questdb-sql title="First price in partition" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    first_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS first_price,
-    first_value(price) IGNORE NULLS OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS first_non_null_price
-FROM trades
-WHERE timestamp IN '$today';
-```
-
----
-
 ### ksum()
 
 Calculates the sum of values over the window frame using the Kahan summation algorithm for improved floating-point precision. This is particularly useful when summing many floating-point values where standard summation might accumulate rounding errors.
@@ -425,64 +376,6 @@ SELECT
 FROM trades
 WHERE timestamp IN '$today';
 ```
-
----
-
-### last_value()
-
-Returns the last value in the window frame. Supports `IGNORE NULLS` clause.
-
-**Syntax:**
-```questdb-sql
-last_value(value) [(IGNORE|RESPECT) NULLS]
-OVER ([PARTITION BY partition_expression]
-      [ORDER BY sort_expression]
-      [frame_clause])
-```
-
-**Arguments:**
-- `value`: Column or expression to get value from
-- `IGNORE NULLS` (optional): Skip null values
-- `RESPECT NULLS` (default): Include null values
-
-**Return value:**
-- Same type as input. The last value in the window frame (or last non-null with `IGNORE NULLS`)
-
-**Description:**
-
-Use `last_value()` when you need to reference the most recent or ending value in a sequence. Common use cases include:
-
-- **Closing price**: Get the last price in each time bucket for OHLC calculations
-- **Current state**: Access the most recent value in a rolling window
-- **Forward filling**: Use `IGNORE NULLS` to get the most recent non-null value for sparse data
-- **End-of-period values**: Capture the final state at partition boundaries
-
-**Frame behavior:**
-- Without `ORDER BY` or frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
-- With `ORDER BY` but no frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
-
-**Example:**
-```questdb-sql title="Last value with IGNORE NULLS" demo
-SELECT
-    timestamp,
-    price,
-    last_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
-    ) AS last_price,
-    last_value(price) IGNORE NULLS OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS last_non_null_price
-FROM trades
-WHERE timestamp IN '$today';
-```
-
-This example:
-- Gets the last price within a 3-row window for each symbol (`last_price`)
-- Gets the last non-null price for each symbol (`last_non_null_price`)
-- Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
 
 ---
 
@@ -565,72 +458,6 @@ SELECT
 FROM trades
 WHERE timestamp IN '$today';
 ```
-
----
-
-### nth_value() {#nth_value}
-
-Returns the `n`-th value (1-based) within the current window frame.
-
-**Syntax:**
-```questdb-sql
-nth_value(value, n) OVER (window_definition)
-```
-
-**Arguments:**
-- `value`: Column or expression to retrieve (`double`, `long`, or `timestamp`)
-- `n`: Positive integer constant, the 1-based position within the frame
-
-**Return value:**
-- Same type as input. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
-
-**Description:**
-
-`nth_value()` is similar to `lag()`, but while `lag()` counts the offset relative to the current row, `nth_value()` counts from the start of the frame. For each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
-
-Common use cases include:
-
-- **Reference value within a window**: Compare the current row to a fixed slot in the window (e.g. the third price in the last 10 trades)
-- **Anchor points**: Pick out a specific row from each partition, such as the second observation in a session
-- **Quantile-style spot checks**: Combine with frame clauses to read a specific position in a sliding range
-
-**Behavior:**
-- `n` must be a compile-time constant. A non-constant expression for `n` is rejected at parse time
-- `n = 1` returns the same value as `first_value(value)` for the same frame
-- `IGNORE NULLS` / `RESPECT NULLS` are not supported
-- Supports both `ROWS` and `RANGE` frames, bounded and unbounded
-- For `RANGE` frames, the query must be ordered by the designated timestamp
-
-**Example:**
-```questdb-sql title="3rd most recent price in 5-row window" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    nth_value(price, 3) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS 4 PRECEDING
-    ) AS third_price
-FROM trades
-WHERE timestamp IN '$today';
-```
-
-```questdb-sql title="Compare nth_value with first_value" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    first_value(price) OVER w AS first_price,
-    nth_value(price, 1) OVER w AS nth_1,
-    nth_value(price, 2) OVER w AS nth_2,
-    nth_value(price, 3) OVER w AS nth_3
-FROM trades
-WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
-WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
-```
-
-With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
 
 ---
 
@@ -778,9 +605,186 @@ WHERE timestamp IN '$today';
 
 ---
 
+## Frame value functions
+
+These functions return a value from a specific position within the window frame. They respect the frame clause, and unlike aggregate window functions they do not accept a `FILTER` clause.
+
+### first_value()
+
+Returns the first value in the window frame. Supports `IGNORE NULLS` clause.
+
+**Syntax:**
+```questdb-sql
+first_value(value) [(IGNORE|RESPECT) NULLS]
+OVER ([PARTITION BY partition_expression]
+      [ORDER BY sort_expression]
+      [frame_clause])
+```
+
+**Arguments:**
+- `value`: Column or expression to get value from
+- `IGNORE NULLS` (optional): Skip null values
+- `RESPECT NULLS` (default): Include null values
+
+**Return value:**
+- Same type as input. The first value in the window frame (or first non-null with `IGNORE NULLS`)
+
+**Description:**
+
+Use `first_value()` when you need to reference the starting point of a sequence. Common use cases include:
+
+- **Opening price**: Get the first price of each trading session to calculate daily returns
+- **Baseline comparison**: Compare each row to the first value in its partition
+- **Session start**: Reference the initial state at the beginning of each user session
+- **Gap filling**: Use `IGNORE NULLS` to carry forward the last known value when data is sparse
+
+**Example:**
+```questdb-sql title="First price in partition" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_value(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS first_price,
+    first_value(price) IGNORE NULLS OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS first_non_null_price
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+---
+
+### last_value()
+
+Returns the last value in the window frame. Supports `IGNORE NULLS` clause.
+
+**Syntax:**
+```questdb-sql
+last_value(value) [(IGNORE|RESPECT) NULLS]
+OVER ([PARTITION BY partition_expression]
+      [ORDER BY sort_expression]
+      [frame_clause])
+```
+
+**Arguments:**
+- `value`: Column or expression to get value from
+- `IGNORE NULLS` (optional): Skip null values
+- `RESPECT NULLS` (default): Include null values
+
+**Return value:**
+- Same type as input. The last value in the window frame (or last non-null with `IGNORE NULLS`)
+
+**Description:**
+
+Use `last_value()` when you need to reference the most recent or ending value in a sequence. Common use cases include:
+
+- **Closing price**: Get the last price in each time bucket for OHLC calculations
+- **Current state**: Access the most recent value in a rolling window
+- **Forward filling**: Use `IGNORE NULLS` to get the most recent non-null value for sparse data
+- **End-of-period values**: Capture the final state at partition boundaries
+
+**Frame behavior:**
+- Without `ORDER BY` or frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
+- With `ORDER BY` but no frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+
+**Example:**
+```questdb-sql title="Last value with IGNORE NULLS" demo
+SELECT
+    timestamp,
+    price,
+    last_value(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS last_price,
+    last_value(price) IGNORE NULLS OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS last_non_null_price
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+This example:
+- Gets the last price within a 3-row window for each symbol (`last_price`)
+- Gets the last non-null price for each symbol (`last_non_null_price`)
+- Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
+
+---
+
+### nth_value() {#nth_value}
+
+Returns the `n`-th value (1-based) within the current window frame.
+
+**Syntax:**
+```questdb-sql
+nth_value(value, n) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Column or expression to retrieve (`double`, `long`, or `timestamp`)
+- `n`: Positive integer constant, the 1-based position within the frame
+
+**Return value:**
+- Same type as input. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
+
+**Description:**
+
+`nth_value()` is similar to `lag()`, but while `lag()` counts the offset relative to the current row, `nth_value()` counts from the start of the frame. For each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
+
+Common use cases include:
+
+- **Reference value within a window**: Compare the current row to a fixed slot in the window (e.g. the third price in the last 10 trades)
+- **Anchor points**: Pick out a specific row from each partition, such as the second observation in a session
+- **Quantile-style spot checks**: Combine with frame clauses to read a specific position in a sliding range
+
+**Behavior:**
+- `n` must be a compile-time constant. A non-constant expression for `n` is rejected at parse time
+- `n = 1` returns the same value as `first_value(value)` for the same frame
+- `IGNORE NULLS` / `RESPECT NULLS` are not supported
+- Supports both `ROWS` and `RANGE` frames, bounded and unbounded
+- For `RANGE` frames, the query must be ordered by the designated timestamp
+
+**Example:**
+```questdb-sql title="3rd most recent price in 5-row window" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    nth_value(price, 3) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS 4 PRECEDING
+    ) AS third_price
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+```questdb-sql title="Compare nth_value with first_value" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_value(price) OVER w AS first_price,
+    nth_value(price, 1) OVER w AS nth_1,
+    nth_value(price, 2) OVER w AS nth_2,
+    nth_value(price, 3) OVER w AS nth_3
+FROM trades
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
+```
+
+With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
+
+---
+
 ## Ranking functions
 
-These functions assign ranks, row numbers, or partition-scoped distribution values. They ignore the frame clause and operate on the entire partition.
+These functions assign ranks, row numbers, or partition-scoped distribution values, and always operate on the entire partition. They divide on how they treat a frame clause: `row_number()`, `rank()` and `dense_rank()` accept one and ignore it, while `cume_dist()`, `percent_rank()` and `ntile()` reject one with an error such as `ntile() does not support framing; remove the frame clause`.
 
 ### cume_dist() {#cume_dist}
 
@@ -1325,6 +1329,7 @@ WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
 ## Notes
 
 - The order of rows in the result set is not guaranteed to be consistent across query executions. Use an `ORDER BY` clause outside the `OVER` clause to ensure consistent ordering.
-- Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`) and offset functions (`lag`, `lead`) ignore frame specifications.
+- Offset functions (`lag`, `lead`) and the ranking functions `row_number`, `rank` and `dense_rank` accept a frame specification and ignore it. `cume_dist`, `percent_rank` and `ntile` reject one with an error.
+- Only aggregate window functions accept a [`FILTER`](/docs/query/sql/filter/) clause. Frame value, ranking and offset functions reject it.
 - For time-based calculations, consider using `RANGE` frames with timestamp columns.
 - Aggregate window functions (`avg`, `sum`, `ksum`, `count`, `min`, `max`) support numeric types: `short`, `int`, `long`, `float`, `double`. The `decimal` type is not supported.

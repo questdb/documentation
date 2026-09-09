@@ -127,6 +127,32 @@ in this documentation often omit `GROUP BY` for brevity.
 
 ---
 
+## Conditional aggregation with FILTER
+
+Most aggregates on this page accept a
+[`FILTER (WHERE ...)`](/docs/query/sql/filter/) clause, which restricts the rows
+that aggregate sees without affecting the others in the same query:
+
+```questdb-sql demo title="Two aggregates, two conditions, one scan"
+SELECT
+    symbol,
+    count(*)   FILTER (WHERE quantity >= 250_000) AS large_trades,
+    avg(price) FILTER (WHERE side = 'buy')        AS avg_buy_price
+FROM fx_trades
+WHERE timestamp IN '$today'
+ORDER BY symbol;
+```
+
+When the condition matches no row, each aggregate returns what it returns over
+an empty set: [count](#count) gives `0`, while [sum](#sum), [avg](#avg),
+[min](#min), [max](#max) and the rest give `NULL`. A few aggregates, including
+[first](#first), [last](#last), [array_agg](#array_agg),
+[bool_and](#bool_and), [bool_or](#bool_or), [mode](#mode) and [twap](#twap), do
+not accept `FILTER`. See the [FILTER](/docs/query/sql/filter/) page for those
+exclusions, the argument-type restrictions, and the workarounds.
+
+---
+
 ## approx_count_distinct
 
 `approx_count_distinct(column_name, precision)` - estimates the number of
@@ -2205,6 +2231,7 @@ LIMIT 5;
 
 ## See also
 
+- [FILTER](/docs/query/sql/filter/) - Restrict the rows a single aggregate sees
 - [GROUP BY](/docs/query/sql/group-by/) - Group rows for aggregation
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [PIVOT](/docs/query/sql/pivot/) - Transform aggregation results from rows to columns
