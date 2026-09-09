@@ -88,8 +88,9 @@ Use these if you have existing tooling that speaks them, or if a native client
 library isn't a fit for your environment.
 
 - **[InfluxDB Line Protocol (ILP)](/docs/connect/compatibility/ilp/overview/)** — the
-  text-based ingest protocol used by InfluxDB. Works with Telegraf, Kafka,
-  Redpanda, Flink, and any collector that already emits ILP.
+  text-based ingest protocol used by InfluxDB. Works with Telegraf, Flink,
+  and any collector that already emits ILP. The
+  [Kafka connector](/docs/connect/message-brokers/kafka/) speaks QWP natively.
 - **[PostgreSQL Wire Protocol (PGWire)](/docs/connect/compatibility/pgwire/overview/)** — query
   QuestDB from any Postgres-compatible driver (psycopg, JDBC, pgx, …), BI
   tools (Tableau, Grafana, Metabase), and ORMs.
