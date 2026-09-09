@@ -672,20 +672,21 @@ principal. That work stays bounded only by its own
   `cairo.wal.apply.memory.limit.bytes` budget instead. Whether a large `UPDATE`
   is capped by a `SET MEMORY LIMIT` override therefore depends on the table
   type.
-- Materialized view refresh, and WAL apply itself. A WAL apply batches many
-  principals' transactions into one tracker, so it could not attribute usage to
-  a single principal in any case.
+- Materialized view refresh, live view refresh, and WAL apply itself. A WAL
+  apply batches many principals' transactions into one tracker, so it could not
+  attribute usage to a single principal in any case.
 - `COPY ... FROM` imports, which acquire no memory tracker at all and are
   unaffected by either kind of limit.
 
 :::note
 
 An external (SSO/OIDC) user can only receive a limit by inheriting one from a
-group, and that inherited limit refreshes at the user's next login rather than
-on its current session — the same refresh-on-login model that already governs
-group-granted permissions for external users. Changing a group's limit takes
-effect immediately for locally defined users, and at next login for external
-ones.
+group: `ALTER USER ... SET MEMORY LIMIT` on an external user is rejected with
+`Cannot set memory limit for external user`. The inherited limit refreshes at
+the user's next login rather than on its current session — the same
+refresh-on-login model that already governs group-granted permissions for
+external users. Changing a group's limit takes effect immediately for locally
+defined users, and at next login for external ones.
 
 :::
 
@@ -720,6 +721,12 @@ returns one more column as well, though only the built-in admin can see it.
 Clients that read any of those results **positionally** will see one more column
 than before and must be updated. Clients that read by column name are
 unaffected.
+
+The column is added to `sys.acl_entities` by an automatic migration when an
+upgraded node first starts as a primary, or is promoted from replica to
+primary. Existing principals come up with no limit. If an ACL statement is
+refused with an error naming the `memory_limit` column migration, the node has
+not completed that migration yet: restart it, then retry the statement.
 
 :::
 

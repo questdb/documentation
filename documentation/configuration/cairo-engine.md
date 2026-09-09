@@ -876,13 +876,17 @@ is the approximate number of nested SELECT clauses allowed.
 ## Memory limits
 
 These limits cap how much native memory a single workload may allocate, so a
-runaway query, materialized view refresh, or WAL apply batch is stopped at its
-source before it can drive the whole server toward out-of-memory. Each workload
-has its own independent limit: a runaway in one does not draw against another's
-budget, nor against the process-wide RSS limit (`ram.usage.limit.bytes` /
-`ram.usage.limit.percent`).
+runaway query, materialized view refresh, live view refresh, or WAL apply batch
+is stopped at its source before it can drive the whole server toward
+out-of-memory. Each workload has its own independent limit: a runaway in one
+does not draw against another's budget, nor against the process-wide RSS limit
+(`ram.usage.limit.bytes` / `ram.usage.limit.percent`).
 
-All three default to `0`, which means unlimited, so behavior matches a server
+Three of the four limits are documented on this page. The fourth,
+[`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes),
+lives with the other live view settings.
+
+All four default to `0`, which means unlimited, so behavior matches a server
 without limits until you opt in. Set each limit as a byte count or a size with a
 `K`, `M`, or `G` suffix, for example `512M` or `2G`. The limits are reloadable:
 edit `server.conf` and call
@@ -892,9 +896,20 @@ already running keeps the limit it started with.
 
 When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
-workloads keep running. A user query fails with the error, a materialized view
-refresh is invalidated, and a WAL apply suspends the affected table. The message
-names the workload so you can tell it apart from a process-wide breach:
+workloads keep running. What happens next depends on the workload:
+
+- A user query fails with the error.
+- A materialized view refresh is treated as a transient failure: the refresh is
+  deferred and retried after `cairo.mat.view.refresh.busy.retry.timeout`, and
+  the view is invalidated only after `cairo.mat.view.refresh.busy.retry.limit`
+  consecutive failed attempts. A view whose working set does not fit the limit
+  therefore invalidates after the retry budget is spent, not on the first
+  breach.
+- A live view refresh invalidates the view immediately.
+- A WAL apply suspends the affected table.
+
+The message names the workload so you can tell it apart from a process-wide
+breach:
 
 ```
 query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., size=..., memoryTag=...]
@@ -904,12 +919,15 @@ query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., s
 
 Coverage is best-effort. A limit constrains the allocation sites that grow with
 data volume: hash and GROUP BY tables, sorts, joins, window partition buffers,
-set operations, `LATEST BY`, SAMPLE BY fill, and Parquet decode buffers. Memory
-that is structurally bounded, or that lives for the life of a process or session
-(page-frame buffers, JIT buffers, table readers and writers, symbol tables,
-connection buffers, memory-mapped pages), is accounted only against the global
-RSS limit. Treat a workload limit as a guard against common runaway patterns,
-not a hard ceiling on every allocation.
+set operations, `LATEST BY`, SAMPLE BY fill, Parquet decode buffers, and
+posting-index covered-column decode buffers. Memory that is structurally
+bounded, or that lives for the life of a process or session (page-frame buffers,
+JIT buffers, table readers and writers, symbol tables, connection buffers,
+memory-mapped pages), is accounted only against the global RSS limit. One
+notable gap is the vectorized hash table used by the default plan for a keyed
+`GROUP BY` on a single `INT` or `SYMBOL` key, which grows in native code and is
+accounted only against the global RSS limit. Treat a workload limit as a guard
+against common runaway patterns, not a hard ceiling on every allocation.
 
 :::
 
@@ -944,6 +962,11 @@ rather than each acquiring their own.
 
 Maximum native memory a single WAL apply batch may allocate. `0` disables the
 limit.
+
+WAL apply runs only simple `UPDATE` statements, metadata changes, and data
+commits, and table writer memory is outside the coverage described above, so in
+practice this limit rarely fires. Its main effect is to keep WAL apply on its
+own budget, separate from the query limit.
 
 ## Batch operations
 

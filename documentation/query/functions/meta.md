@@ -416,7 +416,9 @@ Returns metadata on running SQL queries, including columns such as:
 - memory_limit - effective native memory limit for the query, in bytes, or
   `null` when the query runs unlimited. On QuestDB Enterprise a set principal
   [memory limit](/docs/security/rbac/#memory-limits) overrides the configured
-  workload limit; the workload limit applies only when the principal has none
+  workload limit; the workload limit applies only when the principal has none.
+  Both memory columns are `null` for nested registrations such as subquery
+  recompiles, which share the outer query's budget
 - query - text of sql query
 
 **Examples:**
