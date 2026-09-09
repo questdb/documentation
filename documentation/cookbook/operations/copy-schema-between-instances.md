@@ -131,10 +131,38 @@ Passwords and tokens are never dumped, so `CREATE USER` and
 `CREATE SERVICE ACCOUNT` statements replay without credentials. Set those on the
 target after the replay.
 
+## Manual alternative: copy from the Web Console
+
+For a one-off copy, or when you only want a few objects, the
+[schema explorer toolbar](/docs/getting-started/web-console/schema-explorer/#toolbar)
+puts the DDL on your clipboard with no scripting:
+
+1. Click **Select Mode**, the checkbox circle icon in the toolbar.
+2. Click **Select all**, the circle icon, or tick individual objects.
+3. Click **Copy schemas to clipboard**.
+
+Paste the result into an editor, or straight into the target's Web Console and
+run it. Selection mode exits once the copy succeeds.
+
+:::warning Reorder chained materialized views first
+
+The Web Console groups the copied statements by object type and sorts them
+alphabetically within each group, not in dependency order. Tables always precede
+materialized views, but a materialized view built on another materialized view
+can be emitted before its own base.
+
+Copying the [demo](https://demo.questdb.io) schema this way produces 5 of 13
+materialized views ahead of the view they read from, so `bbo_1d` arrives before
+`bbo_1h`, and a top-to-bottom paste fails on those statements. Reorder them by
+hand, or use `SHOW CREATE DATABASE`, which emits dependency order.
+
+:::
+
 :::info Related documentation
 
 - [`SHOW CREATE DATABASE`](/docs/query/sql/show/#show-create-database)
 - [REST API `/execute`](/docs/connect/compatibility/rest-api/#execute)
+- [Schema explorer](/docs/getting-started/web-console/schema-explorer/)
 - [Copy data between instances](/docs/cookbook/operations/copy-data-between-instances/)
 - [Backup and restore](/docs/operations/backup/)
 
