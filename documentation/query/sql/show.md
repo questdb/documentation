@@ -129,6 +129,10 @@ Each `ddl` value is stored with formatting characters, so pasting a row into a
 text editor expands it to the indented form shown by
 [`SHOW CREATE TABLE`](#show-create-table).
 
+For turning the result set into a `.sql` file or replaying it on another server,
+see
+[Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/).
+
 #### Output order
 
 Objects are emitted in dependency order: a materialized view or view is never
