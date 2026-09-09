@@ -1,10 +1,12 @@
 ---
 title: Logging and metrics
-description: Configure and understand QuestDB logging and metrics, including log levels, configuration options, and Prometheus integration.
+description:
+  Configure and understand QuestDB logging and metrics, including log levels,
+  configuration options, and Prometheus integration.
 ---
 
-
-This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus.
+This page outlines logging in QuestDB. It covers how to configure logs via
+`log.conf` and expose metrics via Prometheus.
 
 - [Logging](/docs/operations/logging-metrics/#logging)
 - [Metrics](/docs/operations/logging-metrics/#metrics)
@@ -206,19 +208,20 @@ For configuration options, see the
 :::warning
 
 On systems with
-[8 Cores and less](/docs/getting-started/capacity-planning/#cpu-cores), contention
-for threads might increase the latency of health check service responses. If you
-use a load balancer, and it thinks the QuestDB service is dead with nothing
-apparent in the QuestDB logs, you may need to configure a dedicated thread pool
-for the health check service. To do so, increase `http.min.worker.count` to `1`.
+[8 Cores and less](/docs/getting-started/capacity-planning/#cpu-cores),
+contention for threads might increase the latency of health check service
+responses. If you use a load balancer, and it thinks the QuestDB service is dead
+with nothing apparent in the QuestDB logs, you may need to configure a dedicated
+thread pool for the health check service. To do so, increase
+`http.min.worker.count` to `1`.
 
 :::
 
 #### Lifecycle endpoint
 
 `GET /lifecycle` on the same port returns the startup and shutdown state of
-every server component as JSON, for probes and coordinators that need more
-than the `200` of the health check:
+every server component as JSON, for probes and coordinators that need more than
+the `200` of the health check:
 
 ```shell
 curl http://127.0.0.1:9003/lifecycle
@@ -338,23 +341,23 @@ When [cold storage](/docs/concepts/cold-storage/) is enabled, the endpoint
 exposes fifteen additional metrics under the `questdb_cold_chunk_` prefix,
 covering the chunk cache and the range reads that serve remote partitions:
 
-| Metric | Type | Description |
-| ------ | ---- | ----------- |
-| `questdb_cold_chunk_acquire_full_hit_total` | counter | Reads that found every chunk already resident |
-| `questdb_cold_chunk_acquire_partial_hit_total` | counter | Reads that found some chunks and fetched the rest |
-| `questdb_cold_chunk_acquire_full_miss_total` | counter | Reads where every chunk had to be fetched |
-| `questdb_cold_chunk_acquire_hit_chunks_total` | counter | Chunk lookups served from the cache |
-| `questdb_cold_chunk_acquire_miss_chunks_total` | counter | Chunk lookups that had to be fetched |
-| `questdb_cold_chunk_download_started_total` | counter | Range requests dispatched, one per coalesced group |
-| `questdb_cold_chunk_download_finished_total` | counter | Range requests that returned data |
-| `questdb_cold_chunk_download_failed_total` | counter | Range requests that failed after retries |
-| `questdb_cold_chunk_download_coalesced_total` | counter | Readers that attached to an in-flight download instead of starting a new one |
-| `questdb_cold_chunk_release_evictions_total` | counter | Chunks evicted when their last lease was released |
-| `questdb_cold_chunk_in_flight_downloads` | gauge | Range requests dispatched but not yet complete |
-| `questdb_cold_chunk_pending_batches` | gauge | Batches the read coordinator is tracking |
-| `questdb_cold_chunk_busy_leases` | gauge | Currently allocated leases |
-| `questdb_cold_chunk_ready_chunks` | gauge | Chunks resident in the ready cache |
-| `questdb_cold_chunk_pinned_bytes` | gauge | Compressed bytes resident in the ready cache |
+| Metric                                         | Type    | Description                                                                  |
+| ---------------------------------------------- | ------- | ---------------------------------------------------------------------------- |
+| `questdb_cold_chunk_acquire_full_hit_total`    | counter | Reads that found every chunk already resident                                |
+| `questdb_cold_chunk_acquire_partial_hit_total` | counter | Reads that found some chunks and fetched the rest                            |
+| `questdb_cold_chunk_acquire_full_miss_total`   | counter | Reads where every chunk had to be fetched                                    |
+| `questdb_cold_chunk_acquire_hit_chunks_total`  | counter | Chunk lookups served from the cache                                          |
+| `questdb_cold_chunk_acquire_miss_chunks_total` | counter | Chunk lookups that had to be fetched                                         |
+| `questdb_cold_chunk_download_started_total`    | counter | Range requests dispatched, one per coalesced group                           |
+| `questdb_cold_chunk_download_finished_total`   | counter | Range requests that returned data                                            |
+| `questdb_cold_chunk_download_failed_total`     | counter | Range requests that failed after retries                                     |
+| `questdb_cold_chunk_download_coalesced_total`  | counter | Readers that attached to an in-flight download instead of starting a new one |
+| `questdb_cold_chunk_release_evictions_total`   | counter | Chunks evicted when their last lease was released                            |
+| `questdb_cold_chunk_in_flight_downloads`       | gauge   | Range requests dispatched but not yet complete                               |
+| `questdb_cold_chunk_pending_batches`           | gauge   | Batches the read coordinator is tracking                                     |
+| `questdb_cold_chunk_busy_leases`               | gauge   | Currently allocated leases                                                   |
+| `questdb_cold_chunk_ready_chunks`              | gauge   | Chunks resident in the ready cache                                           |
+| `questdb_cold_chunk_pinned_bytes`              | gauge   | Compressed bytes resident in the ready cache                                 |
 
 Watch rates and ratios rather than raw totals. Sustained
 `download_failed_total`, `pending_batches` sitting at its configured cap, or
@@ -369,10 +372,52 @@ _Enterprise only._
 Two gauges describe the state of an in-place
 [role switch](/docs/high-availability/failover/):
 
-| Metric | Type | Description |
-| ------ | ---- | ----------- |
+| Metric                                   | Type  | Description                                                                                                                                                                                                  |
+| ---------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `questdb_replication_pending_upload_txn` | gauge | Committed transactions not yet uploaded to the object store, summed over the replicated tables. Poll it before demoting a primary: a demote that cannot bring it to zero within its timeout is not completed |
-| `questdb_backup_active_at_last_demote` | gauge | `1` if a backup was still running when the node was last demoted, `0` otherwise. Cleared by the next promotion |
+| `questdb_backup_active_at_last_demote`   | gauge | `1` if a backup was still running when the node was last demoted, `0` otherwise. Cleared by the next promotion                                                                                               |
+
+### Resource group metrics
+
+_Enterprise only._
+
+When [resource groups](/docs/concepts/resource-groups/) are enabled, the
+endpoint exposes one series per group, labelled with `resource_group`:
+
+| Metric                                              | Type    | Description                                                  |
+| --------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| `questdb_resource_group_active_queries`             | gauge   | Queries holding an admission slot                            |
+| `questdb_resource_group_queued_queries`             | gauge   | Queries waiting for a slot                                   |
+| `questdb_resource_group_oldest_queue_wait_millis`   | gauge   | How long the longest waiting query has waited                |
+| `questdb_resource_group_memory_bytes`               | gauge   | Tracked query memory in use                                  |
+| `questdb_resource_group_memory_limit_bytes`         | gauge   | Effective group memory ceiling, `0` when the group sets none |
+| `questdb_resource_group_cpu_nanos_total`            | counter | CPU charged to the group                                     |
+| `questdb_resource_group_cpu_wait_nanos_total`       | counter | Time the group spent waiting for CPU                         |
+| `questdb_resource_group_cpu_max_percent`            | gauge   | Effective CPU cap, `-1` when uncapped                        |
+| `questdb_resource_group_admission_rejections_total` | counter | Queries rejected because the queue was full                  |
+| `questdb_resource_group_admission_timeouts_total`   | counter | Queries that timed out while queued                          |
+
+The single uncapped group dispatch path does not sample CPU. Consequently,
+`cpu_nanos_total` counts CPU measured by managed scheduling, not every query's
+CPU consumption. A flat counter does not imply that the group is idle; also
+check `questdb_resource_groups_cpu_managed_dispatch` and query activity. Memory
+gauges show published accounting and can lag worker-local deltas.
+
+Instance-wide series describe the feature itself:
+
+| Metric                                                  | Type    | Description                                                           |
+| ------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `questdb_resource_groups_enabled`                       | gauge   | `1` when the feature is on                                            |
+| `questdb_resource_groups_catalog_current`               | gauge   | `1` when the group catalog is current; `0` while a replica catches up |
+| `questdb_resource_groups_catalog_lag_unmanaged_queries` | counter | Queries that ran unmanaged because the catalog was not current yet    |
+| `questdb_resource_groups_cpu_capacity_microcores`       | gauge   | Capacity that `cpu_max_percent` applies to                            |
+| `questdb_resource_groups_cpu_capacity_fallback`         | gauge   | `1` when capacity detection failed and the processor count was used   |
+| `questdb_resource_groups_cpu_managed_dispatch`          | gauge   | `1` while managed CPU scheduling is engaged                           |
+| `questdb_resource_groups_cpu_scheduler_degraded`        | gauge   | `1` when CPU scheduling has degraded to unmanaged                     |
+
+A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU shares are
+no longer enforced until the instance restarts. Admission and memory limits stay
+enforced.
 
 ### Prometheus Alertmanager
 
