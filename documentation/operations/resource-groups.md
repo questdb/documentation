@@ -102,15 +102,12 @@ Resource groups are enabled by default. These are instance-wide settings; the
 per-group policy is set in SQL. Each setting is described in full in the
 [resource groups configuration reference](/docs/configuration/resource-groups/).
 
-| Property                                     | Default    | Meaning                                                                                                              |
-| -------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
-| `resource.groups.enabled`                    | `true`     | Set to `false` to disable resource group enforcement. Existing single-query memory limits still apply.               |
-| `resource.groups.cpu.capacity.cores`         | `auto`     | CPU capacity that `cpu_max_percent` is a percentage of. `auto` detects container quota, including fractional quotas. |
-| `resource.groups.process.memory.limit.bytes` | `0`        | Ceiling for tracked query memory across all groups, `0` for none. Every group limit is capped by it.                 |
-| `resource.groups.queue.timeout.millis`       | `30000`    | Default admission queue timeout for groups that do not set `queue_timeout`.                                          |
-| `resource.groups.catalog.max.snapshot.bytes` | `16777216` | Size ceiling for the serialized catalog.                                                                             |
-| `resource.groups.max.user.groups`            | `4096`     | Maximum number of user-created resource groups.                                                                      |
-| `resource.groups.max.principal.links`        | `65536`    | Maximum number of principal mappings.                                                                                |
+| Property                                     | Default | Meaning                                                                                                              |
+| -------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| `resource.groups.enabled`                    | `true`  | Set to `false` to disable resource group enforcement. Existing single-query memory limits still apply.               |
+| `resource.groups.cpu.capacity.cores`         | `auto`  | CPU capacity that `cpu_max_percent` is a percentage of. `auto` detects container quota, including fractional quotas. |
+| `resource.groups.process.memory.limit.bytes` | `0`     | Ceiling for tracked query memory across all groups, `0` for none. Every group limit is capped by it.                 |
+| `resource.groups.queue.timeout.millis`       | `30000` | Default admission queue timeout for groups that do not set `queue_timeout`.                                          |
 
 Turning the feature off is a restart with `resource.groups.enabled=false`.
 Definitions and mappings stay in the catalog, so nothing is lost and the

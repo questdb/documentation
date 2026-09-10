@@ -72,14 +72,18 @@ The default behaviour is:
 
 Resource groups govern the statements that read data:
 
-- `SELECT` and `EXPLAIN`
+- `SELECT`
 - the source query of `CREATE TABLE ... AS SELECT` and `INSERT ... SELECT`
 - query exports
 
 Everything else runs outside the feature and consumes no admission slot, CPU
-grant or group memory budget: value `INSERT`, `UPDATE`, ordinary DDL, `COPY`,
-transaction and session control, ILP ingestion, WAL apply, materialized and live
-view refresh, and QuestDB's own internal SQL.
+grant or group memory budget: `EXPLAIN`, value `INSERT`, `UPDATE`, ordinary DDL,
+`COPY`, transaction and session control, ILP ingestion, WAL apply, materialized
+and live view refresh, and QuestDB's own internal SQL.
+
+`EXPLAIN` is deliberately outside the feature. It walks a plan tree and opens no
+base cursor, so it reads no data, and holding an admission slot for it would
+block the one statement an operator reaches for while a group is saturated.
 
 For `CREATE TABLE ... AS SELECT` and `INSERT ... SELECT` the owner covers cursor
 open, the source scan, transforms, parallel query work and the row pump. Source

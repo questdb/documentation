@@ -3,8 +3,7 @@ title: Resource groups
 sidebar_label: Resource groups
 description:
   Configuration settings for QuestDB Enterprise resource groups, covering the
-  master switch, CPU capacity, memory ceiling, admission defaults and catalog
-  limits.
+  master switch, CPU capacity, memory ceiling and admission defaults.
 ---
 
 :::note
@@ -89,36 +88,6 @@ heap, memory-mapped table pages or long-lived engine caches.
 How long a queued query waits for an admission slot in a group that does not set
 its own `queue_timeout`. A query that waits longer fails with
 `Resource Group admission queue timeout`.
-
-## Catalog limits
-
-Group definitions and principal mappings live in a replicated system catalog.
-These bounds limit the catalog size. Increase them if the deployment requires
-more definitions or mappings.
-
-### resource.groups.catalog.max.snapshot.bytes
-
-- **Default**: `16777216`
-- **Reloadable**: no
-
-Size ceiling for one serialized catalog snapshot.
-
-### resource.groups.max.user.groups
-
-- **Default**: `4096`
-- **Reloadable**: no
-
-Maximum number of user-created resource groups, not counting `DEFAULT`. Dropped
-groups stop counting towards this limit immediately, even while their existing
-queries finish.
-
-### resource.groups.max.principal.links
-
-- **Default**: `65536`
-- **Reloadable**: no
-
-Maximum number of principal mappings, counting users, service accounts and ACL
-groups together.
 
 ## See also
 
