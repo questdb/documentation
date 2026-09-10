@@ -1190,6 +1190,7 @@ module.exports = {
                 "cookbook/operations/csv-import-milliseconds",
                 "cookbook/operations/tls-pgbouncer",
                 "cookbook/operations/copy-data-between-instances",
+                "cookbook/operations/copy-schema-between-instances",
                 "cookbook/operations/query-times-histogram",
                 "cookbook/operations/optimize-many-tables",
                 "cookbook/operations/check-transaction-applied",

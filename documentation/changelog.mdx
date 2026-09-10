@@ -17,9 +17,11 @@ This page tracks significant updates to the QuestDB documentation.
 ### New
 
 - [Migrate QuestDB onto the Kubernetes Operator](/docs/enterprise-kubernetes-operator/getting-started/migrate/) - Move an existing Enterprise deployment onto the Operator with a replica-first cutover: restore the source backup, consume replication WAL, then promote after a controlled source drain
+- [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/) - Recreate one instance's tables, views, and materialized views on another from `SHOW CREATE DATABASE`, either by replaying the statements over the REST API or by dumping them to a `.sql` file, with `INCLUDE (SCHEMA)` and `INCLUDE (ACL)` for separating structure from permissions on Enterprise, plus the Web Console schema explorer as a manual alternative and the ordering caveat that comes with it
 
 ### Updated
 
+- [Kafka connector](/docs/connect/message-brokers/kafka/) - Updated for QWP with a quick start, guidance on preventing duplicates and recovering from outages, and migration steps for existing HTTP pipelines
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order
 
