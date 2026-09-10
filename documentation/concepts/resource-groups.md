@@ -200,6 +200,18 @@ replica receives group definitions and mappings through normal replication.
   unmanaged, exactly as if the feature were disabled, and reports how many
   queries took that path. It does not reject queries or serve them under a
   policy it cannot see yet.
+- A **replica being promoted** validates the catalog after replication has
+  switched and before writes are admitted. If the old primary predated resource
+  groups and never created the catalog table, the promoted node creates it and
+  continues. With the feature enabled, a catalog that is unreadable or still
+  lagging refuses the promotion: the switch fails part-way, the node lands in
+  the `UNKNOWN` role and keeps serving reads as before, and the failure reason
+  starts with `RESOURCE_GROUP_CATALOG_UNAVAILABLE` or
+  `RESOURCE_GROUP_CATALOG_LAGGING`. Retrying the switch repeats the check. With
+  the feature disabled the condition is logged and the promotion proceeds.
+- At **startup** an unreadable catalog stops an instance with the feature
+  enabled from starting, in either role. A lagging catalog does not: the
+  instance starts and the refresh job catches up.
 - If **CPU scheduling** hits an internal fault, it degrades: queries continue to
   run without CPU grants, and the condition is visible in metrics until the
   instance restarts. Admission and memory limits do not depend on CPU scheduling

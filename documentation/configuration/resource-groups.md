@@ -40,6 +40,11 @@ memory accounting are disabled. Group definitions and principal mappings remain
 in the catalog, so turning the feature back on restores the policies that were
 already there.
 
+`true` also makes the catalog a hard dependency: an instance whose catalog
+cannot be read does not start, and a replica whose catalog is not current is not
+promoted. With `false`, both conditions are logged and ignored. See
+[Behaviour under failure and on replicas](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
+
 Existing principal-specific and instance-default single-query memory limits
 continue to apply when resource groups are disabled.
 
