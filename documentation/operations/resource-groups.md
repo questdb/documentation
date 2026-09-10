@@ -531,15 +531,14 @@ growing once `questdb_resource_groups_catalog_current` reaches 1.
 
 **Promotion fails naming the resource group catalog.** With the feature enabled,
 `SWITCH ROLE TO PRIMARY` does not admit writes over a catalog that is unreadable
-or lagging. The node lands in the `UNKNOWN` role and still serves reads;
-`GET /lifecycle` and the server log carry a reason that starts with
-`RESOURCE_GROUP_CATALOG_LAGGING` or `RESOURCE_GROUP_CATALOG_UNAVAILABLE`.
-Lagging means the replica has not finished applying the transactions the catalog
-depends on: wait for WAL apply to catch up and run `SWITCH ROLE TO PRIMARY`
-again. Unavailable means the catalog table is missing or its contents cannot be
-read, and retrying does not help: promote another replica, or restart this node
-as primary with `resource.groups.enabled=false`, which turns the check into a
-logged error. See
+or lagging. The node lands in the `UNKNOWN` role and still serves reads; the
+server log names `RESOURCE_GROUP_CATALOG_LAGGING` or
+`RESOURCE_GROUP_CATALOG_UNAVAILABLE`. Lagging means the replica has not finished
+applying the access control transactions the catalog depends on: wait for WAL
+apply to catch up and run `SWITCH ROLE TO PRIMARY` again. Unavailable means the
+catalog table is missing or its contents cannot be read, and retrying does not
+help: promote another replica, or restart this node as primary with
+`resource.groups.enabled=false`, which turns the check into a logged error. See
 [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
 
 **Startup fails naming the resource group catalog.** The catalog table cannot be

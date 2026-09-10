@@ -205,10 +205,10 @@ replica receives group definitions and mappings through normal replication.
   groups and never created the catalog table, the promoted node creates it and
   continues. With the feature enabled, a catalog that is unreadable or still
   lagging refuses the promotion: the switch fails part-way, the node lands in
-  the `UNKNOWN` role and keeps serving reads as before, and the failure reason
-  starts with `RESOURCE_GROUP_CATALOG_UNAVAILABLE` or
-  `RESOURCE_GROUP_CATALOG_LAGGING`. Retrying the switch repeats the check. With
-  the feature disabled the condition is logged and the promotion proceeds.
+  the `UNKNOWN` role and keeps serving reads as before, and the log names
+  `RESOURCE_GROUP_CATALOG_UNAVAILABLE` or `RESOURCE_GROUP_CATALOG_LAGGING`.
+  Retrying the switch repeats the check. With the feature disabled the condition
+  is logged and the promotion proceeds.
 - At **startup** an unreadable catalog stops an instance with the feature
   enabled from starting, in either role. A lagging catalog does not: the
   instance starts and the refresh job catches up.
