@@ -199,7 +199,8 @@ to 0 and is rejected on user and service account mappings, which are one-to-one.
 
 Resolution order for a query is: direct mapping on the principal, then the
 highest-priority mapping among the user's ACL groups, then `DEFAULT`. Service
-accounts do not inherit ACL group mappings.
+accounts do not inherit ACL group mappings. `ASSUME SERVICE ACCOUNT` does not
+change the group: the session keeps the group of the principal that logged in.
 
 ## Policy parameters
 
@@ -464,12 +465,13 @@ questdb_resource_group_admission_timeouts_total{resource_group="reporting"}
 
 Instance-wide series:
 
-| Metric                                           | Meaning                                                               |
-| ------------------------------------------------ | --------------------------------------------------------------------- |
-| `questdb_resource_groups_enabled`                | 1 when the feature is on                                              |
-| `questdb_resource_groups_catalog_current`        | 1 when the catalog is current; 0 while a replica is still catching up |
-| `questdb_resource_groups_cpu_managed_dispatch`   | 1 while managed CPU scheduling is engaged                             |
-| `questdb_resource_groups_cpu_scheduler_degraded` | 1 when CPU scheduling has degraded to unmanaged                       |
+| Metric                                                        | Meaning                                                               |
+| ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `questdb_resource_groups_enabled`                             | 1 when the feature is on                                              |
+| `questdb_resource_groups_catalog_current`                     | 1 when the catalog is current; 0 while a replica is still catching up |
+| `questdb_resource_groups_catalog_lag_unmanaged_queries_total` | Queries that ran unmanaged because the catalog was not current yet    |
+| `questdb_resource_groups_cpu_managed_dispatch`                | 1 while managed CPU scheduling is engaged                             |
+| `questdb_resource_groups_cpu_scheduler_degraded`              | 1 when CPU scheduling has degraded to unmanaged                       |
 
 Two signals are worth alerting on: a non-zero
 `questdb_resource_groups_cpu_scheduler_degraded`, which means CPU shares are no
@@ -501,9 +503,9 @@ query belongs to, which is the quickest way to tell whether the load you are
 watching is attributed where you expect.
 
 **Queries on a fresh replica are not limited.** Until the catalog has
-replicated, a replica runs queries unmanaged and
-`questdb_resource_groups_catalog_current` stays at 0. Queries are managed again
-once it reaches 1.
+replicated, a replica runs queries unmanaged and counts them in
+`questdb_resource_groups_catalog_lag_unmanaged_queries_total`. The counter stops
+growing once `questdb_resource_groups_catalog_current` reaches 1.
 
 **Promotion fails naming the resource group catalog.** With the feature enabled,
 `SWITCH ROLE TO PRIMARY` does not admit writes over a catalog that is unreadable

@@ -404,12 +404,13 @@ gauges show published accounting and can lag worker-local deltas.
 
 Instance-wide series describe the feature itself:
 
-| Metric                                           | Type  | Description                                                           |
-| ------------------------------------------------ | ----- | --------------------------------------------------------------------- |
-| `questdb_resource_groups_enabled`                | gauge | `1` when the feature is on                                            |
-| `questdb_resource_groups_catalog_current`        | gauge | `1` when the group catalog is current; `0` while a replica catches up |
-| `questdb_resource_groups_cpu_managed_dispatch`   | gauge | `1` while managed CPU scheduling is engaged                           |
-| `questdb_resource_groups_cpu_scheduler_degraded` | gauge | `1` when CPU scheduling has degraded to unmanaged                     |
+| Metric                                                        | Type    | Description                                                           |
+| ------------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `questdb_resource_groups_enabled`                             | gauge   | `1` when the feature is on                                            |
+| `questdb_resource_groups_catalog_current`                     | gauge   | `1` when the group catalog is current; `0` while a replica catches up |
+| `questdb_resource_groups_catalog_lag_unmanaged_queries_total` | counter | Queries that ran unmanaged because the catalog was not current yet    |
+| `questdb_resource_groups_cpu_managed_dispatch`                | gauge   | `1` while managed CPU scheduling is engaged                           |
+| `questdb_resource_groups_cpu_scheduler_degraded`              | gauge   | `1` when CPU scheduling has degraded to unmanaged                     |
 
 A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU shares are
 no longer enforced until the instance restarts. Admission and memory limits stay

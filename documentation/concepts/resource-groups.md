@@ -56,7 +56,9 @@ Assignment follows the authenticated principal, not the statement:
 3. Otherwise the query runs in **DEFAULT**.
 
 Service accounts inherit nothing from ACL groups; they are either mapped
-directly or they run in DEFAULT.
+directly or they run in DEFAULT. A session that assumes a service account keeps
+the group of the principal that logged in; the service account's own mapping
+applies to sessions that authenticate as that account.
 
 The group is resolved once, when the query starts, and stays fixed for the
 statement's lifetime. Changing a mapping affects statements that start after the
@@ -182,9 +184,9 @@ Resource groups are stored in a replicated system catalog, so a read-only
 replica receives group definitions and mappings through normal replication.
 
 - A **fresh replica** that has not yet received the catalog runs queries
-  unmanaged, exactly as if the feature were disabled, and reports the catalog as
-  not current. It does not reject queries or serve them under a policy it cannot
-  see yet.
+  unmanaged, exactly as if the feature were disabled, and counts them in
+  `questdb_resource_groups_catalog_lag_unmanaged_queries_total`. It does not
+  reject queries or serve them under a policy it cannot see yet.
 - A **replica being promoted** validates the catalog after replication has
   switched and before writes are admitted. If the old primary predated resource
   groups and never created the catalog table, the promoted node creates it and
