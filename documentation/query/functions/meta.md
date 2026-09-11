@@ -61,9 +61,9 @@ SELECT current_data_id();
 
 ## current database, schema, or user
 
-`current_database()`, `current_schema()`, `current_user()`, and
-`session_user()` are standard SQL functions that return information about the
-current database, schema, and user.
+`current_database()`, `current_schema()`, `current_user()`, and `session_user()`
+are standard SQL functions that return information about the current database,
+schema, and user.
 
 ```questdb-sql
 -- Get the current database
@@ -85,6 +85,28 @@ statement without any arguments.
 `current_user()` and `session_user()` both return the authenticated principal
 and are interchangeable in QuestDB. Both report the user that authenticated on
 the current connection, whichever protocol it arrived on.
+
+## current_resource_group
+
+_QuestDB Enterprise only._
+
+Returns the resource group assigned to the calling query. Ordinary users can use
+this function to check their own assignment; administrator rights are not
+required. See [resource groups](/docs/concepts/resource-groups/) for mapping
+precedence and the scope of managed execution.
+
+**Arguments:** none.
+
+**Return value:** `STRING`. Returns `NULL` when the execution is unmanaged,
+including when resource groups are disabled or a replica's catalog is not ready.
+A managed query without a principal mapping returns `DEFAULT`.
+
+```questdb-sql
+SELECT current_resource_group();
+```
+
+The result follows the query's acquired group, including across suspended cursor
+pages. A subsequent mapping change affects the next query.
 
 ## flush_query_cache()
 
@@ -314,7 +336,6 @@ materialized_views();
 | trades_OHLC_15m  | immediate    | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
 | trades_latest_1d | immediate    | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
 
-
 ## memory_metrics
 
 **Arguments:**
@@ -382,10 +403,10 @@ SELECT node_role();
 :::warning
 
 `node_role()` cannot be used in a materialized view or a live view. Avoid it in
-`UPDATE` on a WAL table as well: the statement is re-executed on every node of
-a replicated cluster and each node evaluates its own role, so the primary and
-its replicas would write different values. Tagging rows on `INSERT` is safe,
-because inserted rows replicate as data.
+`UPDATE` on a WAL table as well: the statement is re-executed on every node of a
+replicated cluster and each node evaluates its own role, so the primary and its
+replicas would write different values. Tagging rows on `INSERT` is safe, because
+inserted rows replicate as data.
 
 :::
 
@@ -410,17 +431,32 @@ Returns metadata on running SQL queries, including columns such as:
 - state_change - timestamp of latest query state change, such as a cancellation
 - state - state of running query, can be `active` or `cancelled`
 - query - text of sql query
+- is_wal - whether the query runs as part of WAL apply
+- memory_used, memory_limit - tracked native memory the query holds and its
+  ceiling, `NULL` when no tracker is bound; `memory_limit` is also `NULL` when
+  the query has no ceiling
+- resource_group - the [resource group](/docs/concepts/resource-groups/) the
+  query was admitted to in QuestDB Enterprise, `NULL` when resource groups do
+  not manage the execution
 
 **Examples:**
 
 ```questdb-sql
-SELECT * FROM query_activity();
+SELECT query_id, worker_id, worker_pool, username, query_start, state_change, state, query
+FROM query_activity();
 ```
 
 | query_id | worker_id | worker_pool | username | query_start                 | state_change                | state  | query                                                     |
 | -------- | --------- | ----------- | -------- | --------------------------- | --------------------------- | ------ | --------------------------------------------------------- |
-| 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397  | active | select \* from query_activity()                           |
+| 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397Z | active | SELECT count() FROM trades                                |
 | 57777    | 6         | shared      | bob      | 2024-01-09T08:58:55.988017Z | 2024-01-09T08:58:55.988017Z | active | SELECT symbol,approx_percentile(price, 50, 2) from trades |
+
+To inspect query memory and resource group assignment in QuestDB Enterprise:
+
+```questdb-sql
+SELECT query_id, username, resource_group, memory_used, memory_limit
+FROM query_activity();
+```
 
 ## reader_pool
 
@@ -470,15 +506,90 @@ Edit `server.conf` and run `reload_config`:
 SELECT reload_config();
 ```
 
+## resource_group_mappings
+
+_QuestDB Enterprise only. Requires administrator rights._
+
+Returns the principal mappings in the resource group catalog. Definitions remain
+available when resource group enforcement is disabled.
+
+**Arguments:** none.
+
+**Return value:** a table with these columns:
+
+| Column              | Type      | Description                                                                                                    |
+| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `principal_type`    | `VARCHAR` | `USER`, `GROUP` or `SERVICE_ACCOUNT`                                                                           |
+| `principal_name`    | `VARCHAR` | ACL principal name                                                                                             |
+| `resource_group_id` | `LONG`    | System-assigned identifier of the mapped resource group                                                        |
+| `resource_group`    | `VARCHAR` | Group name                                                                                                     |
+| `mapping_priority`  | `INT`     | Priority for ACL group mappings; defaults to `0`. Equal priorities resolve to the resource group created first |
+
+```questdb-sql
+SELECT principal_type, principal_name, resource_group, mapping_priority
+FROM resource_group_mappings()
+ORDER BY principal_type, principal_name;
+```
+
+This lists mappings rather than expanding inherited assignments into one row per
+user. Use `current_resource_group()` from a user's own session to confirm the
+resolved assignment.
+
+## resource_groups
+
+_QuestDB Enterprise only. Requires administrator rights._
+
+Returns one row per current catalog group, including `DEFAULT`, with resolved
+policies and live counters. Group definitions remain visible when enforcement is
+disabled; their runtime counters are zero.
+
+**Arguments:** none.
+
+**Return value:** a table with these columns:
+
+| Column                     | Type      | Description                                                                                             |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| `name`                     | `VARCHAR` | Group name                                                                                              |
+| `memory_limit_bytes`       | `LONG`    | Effective group ceiling in bytes, capped by the process budget when enabled; `0` means no group ceiling |
+| `max_active_queries`       | `INT`     | Concurrent admission limit; `2147483647` represents unlimited                                           |
+| `max_queued_queries`       | `INT`     | Queue capacity; `2147483647` represents unlimited, and `0` disables queueing                            |
+| `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds                                                             |
+| `cpu_weight`               | `INT`     | Relative scheduling weight                                                                              |
+| `active_queries`           | `LONG`    | Queries currently holding admission slots                                                               |
+| `queued_queries`           | `LONG`    | Queries waiting for admission                                                                           |
+| `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                                       |
+| `memory_used_bytes`        | `LONG`    | Published tracked native query memory in bytes                                                          |
+| `cpu_nanos_total`          | `LONG`    | CPU nanoseconds measured by managed scheduling                                                          |
+| `cpu_wait_nanos_total`     | `LONG`    | Cumulative query waiting time for CPU, in nanoseconds                                                   |
+| `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                                        |
+| `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                           |
+
+```questdb-sql
+SELECT name, memory_limit_bytes, memory_used_bytes, active_queries, queued_queries
+FROM resource_groups()
+ORDER BY name;
+```
+
+Counters describe the current runtime and reset on restart or group recreation.
+Worker-local memory deltas can be temporarily unpublished. The single-group
+dispatch path does not sample CPU, so `cpu_nanos_total` does not cover all query
+CPU use. Dropped groups disappear from this table while their existing queries
+finish using retained state.
+
+For the corresponding
+[Prometheus metrics](/docs/operations/logging-metrics/#resource-group-metrics),
+an unlimited group memory ceiling is `0` in both interfaces; it does not remove
+principal-specific, instance-default single-query or process memory limits.
+
 ## sleep()
 
-Pauses the query for the given number of seconds, then returns the timestamp
-at which it resumed. Intended for testing and demonstration, for example to
-hold a query open while inspecting
-[`query_activity()`](#query_activity) from another session.
+Pauses the query for the given number of seconds, then returns the timestamp at
+which it resumed. Intended for testing and demonstration, for example to hold a
+query open while inspecting [`query_activity()`](#query_activity) from another
+session.
 
-`sleep()` does not hold a worker thread while it waits, so many concurrent
-calls can be parked at once without exhausting the shared worker pool.
+`sleep()` does not hold a worker thread while it waits, so many concurrent calls
+can be parked at once without exhausting the shared worker pool.
 
 **Arguments:**
 
@@ -502,8 +613,8 @@ SELECT * FROM sleep(1);
 
 :::note
 
-Storage policies — and the `storage_policies` view — are available in
-**QuestDB Enterprise** only.
+Storage policies — and the `storage_policies` view — are available in **QuestDB
+Enterprise** only.
 
 :::
 
@@ -532,9 +643,9 @@ SELECT * FROM storage_policies;
 - TTL values are rendered in two units: `h` for hours and `m` for **months**.
   Hour-, day-, and week-based durations are stored as hours (e.g. `3 DAYS` →
   `72h`, `1 WEEK` → `168h`). Month- and year-based durations are stored as
-  months (e.g. `1 MONTH` → `1m`, `1 YEAR` → `12m`). Despite the visual
-  collision with "minute", `m` in this view is **months**; QuestDB's duration
-  shorthand has no unit for minutes.
+  months (e.g. `1 MONTH` → `1m`, `1 YEAR` → `12m`). Despite the visual collision
+  with "minute", `m` in this view is **months**; QuestDB's duration shorthand
+  has no unit for minutes.
 - An unset stage renders as `0h`, not blank.
 
 **Example:**
@@ -557,11 +668,15 @@ stage set and has been temporarily disabled. Every unset stage renders as `0h`.
 
 :::note
 
-[Cold storage](/docs/concepts/cold-storage/) and the `table_cold_partitions()` function are available in **QuestDB Enterprise** only.
+[Cold storage](/docs/concepts/cold-storage/) and the `table_cold_partitions()`
+function are available in **QuestDB Enterprise** only.
 
 :::
 
-`table_cold_partitions('tableName')` returns one row per partition in the table's remote manifest, with the state of its object in the store. Use it to follow a partition through upload and sealing, and to find partitions that are not progressing.
+`table_cold_partitions('tableName')` returns one row per partition in the
+table's remote manifest, with the state of its object in the store. Use it to
+follow a partition through upload and sealing, and to find partitions that are
+not progressing.
 
 **Arguments:**
 
@@ -609,9 +724,16 @@ WHERE state = 'pending';
 
 **Notes:**
 
-- The cold storage manager answers from its own in-memory view. A refresher answers from its mirrored copy, which it updates when the catalog generation changes, so the two can differ briefly.
-- While an instance is transitioning between the manager and refresher roles, the function returns zero rows rather than blocking. Check the live role with [`SWITCH COLD STORAGE STATUS`](/docs/query/sql/switch-cold-storage-role/).
-- The function reflects the remote manifest, not local partition state. Use [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) or [`table_partitions()`](#table_partitions) to see whether a partition is actually being served remotely.
+- The cold storage manager answers from its own in-memory view. A refresher
+  answers from its mirrored copy, which it updates when the catalog generation
+  changes, so the two can differ briefly.
+- While an instance is transitioning between the manager and refresher roles,
+  the function returns zero rows rather than blocking. Check the live role with
+  [`SWITCH COLD STORAGE STATUS`](/docs/query/sql/switch-cold-storage-role/).
+- The function reflects the remote manifest, not local partition state. Use
+  [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) or
+  [`table_partitions()`](#table_partitions) to see whether a partition is
+  actually being served remotely.
 
 ## table_columns
 
@@ -634,14 +756,14 @@ Returns a `table` with the following columns:
 - `symbolCached` - whether this `symbol` column is cached
 - `symbolCapacity` - how many distinct values this column of `symbol` type is
   expected to have
-- `symbolTableSize` - current number of distinct values stored in this
-  `symbol` column's table
+- `symbolTableSize` - current number of distinct values stored in this `symbol`
+  column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
 - `upsertKey` - if this column is a part of UPSERT KEYS list for table
   [deduplication](/docs/concepts/deduplication)
-- `indexType` - the [index type](/docs/concepts/deep-dive/indexes/)
-  (`POSTING`, `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
+- `indexType` - the [index type](/docs/concepts/deep-dive/indexes/) (`POSTING`,
+  `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
 - `indexInclude` - comma-separated names of columns included in a
   [posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar
 
@@ -719,16 +841,16 @@ Returns a table with the following columns:
   partition will contain the `.detached` extension)
 - `attachable` - _BOOLEAN_, true if the partition is detached and can be
   attached (`name` of the partition will contain the `.attachable` extension)
-- `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
-  has been generated. Set by either
+- `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition has
+  been generated. Set by either
   [manual Parquet conversion](/docs/concepts/parquet/#in-place-conversion)
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
   [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
   (Enterprise)
 - `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format:
-  the native files have been removed and reads are served from the Parquet
-  file. Set the same way as `hasParquetGenerated`: either manually or by a
-  storage policy's `TO PARQUET` stage
+  the native files have been removed and reads are served from the Parquet file.
+  Set the same way as `hasParquetGenerated`: either manually or by a storage
+  policy's `TO PARQUET` stage
 - `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
   file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
 - `seqTxn` - _LONG_, WAL transaction version the partition was last written at
@@ -889,7 +1011,7 @@ Returns a `table` with the following columns:
 
 :::
 
-### Table metrics (table_* prefix)
+### Table metrics (table\_\* prefix)
 
 | Column                        | Type      | Description                                                                               |
 | ----------------------------- | --------- | ----------------------------------------------------------------------------------------- |
@@ -912,16 +1034,18 @@ Returns a `table` with the following columns:
 | `table_merge_rate_p99`        | LONG      | Throughput that 99% of jobs **exceeded** (slowest 1%)                                     |
 | `table_merge_rate_max`        | LONG      | Maximum throughput in rows/second                                                         |
 
-Write amplification measures O3 (out-of-order) merge overhead as `physicalRowsWritten / logicalRows`.
-A ratio of `1.0` means no amplification. Higher values indicate O3 merge overhead.
+Write amplification measures O3 (out-of-order) merge overhead as
+`physicalRowsWritten / logicalRows`. A ratio of `1.0` means no amplification.
+Higher values indicate O3 merge overhead.
 
 :::note
 
-Merge rate P99 shows the *lowest* throughput (worst performance), not the highest.
+Merge rate P99 shows the _lowest_ throughput (worst performance), not the
+highest.
 
 :::
 
-### WAL metrics (wal_* prefix)
+### WAL metrics (wal\_\* prefix)
 
 | Column                            | Type      | Description                                                   |
 | --------------------------------- | --------- | ------------------------------------------------------------- |
@@ -935,9 +1059,10 @@ Merge rate P99 shows the *lowest* throughput (worst performance), not the highes
 | `wal_tx_size_p99`                 | LONG      | 99th percentile transaction size in rows                      |
 | `wal_tx_size_max`                 | LONG      | Maximum transaction size in rows                              |
 
-### Replica metrics (replica_* prefix)
+### Replica metrics (replica\_\* prefix)
 
-These columns are populated on **replicas only** via replication download tracking:
+These columns are populated on **replicas only** via replication download
+tracking:
 
 | Column                   | Type    | Description                                                              |
 | ------------------------ | ------- | ------------------------------------------------------------------------ |
@@ -954,17 +1079,31 @@ On primary instances, these columns will be `0` or `false`.
 
 These values are approximations, not precise real-time metrics:
 
-- **Null when not tracked**: Values are `null` for tables not written to since server start, or evicted from the tracker
-- **Writer stats updated on pool return**: `table_row_count`, `table_last_write_timestamp`, `table_txn` are captured when TableWriter returns to the pool, not on every commit. A writer held for a long time won't update these columns until released.
+- **Null when not tracked**: Values are `null` for tables not written to since
+  server start, or evicted from the tracker
+- **Writer stats updated on pool return**: `table_row_count`,
+  `table_last_write_timestamp`, `table_txn` are captured when TableWriter
+  returns to the pool, not on every commit. A writer held for a long time won't
+  update these columns until released.
 - **WAL stats updated in real-time**:
-  - On WAL commit: `wal_pending_row_count` (incremented), `wal_txn`, `wal_max_timestamp`, `wal_tx_size_*` histogram
-  - On WAL apply: `wal_pending_row_count` (decremented), `wal_dedup_row_count_since_start`, `table_min_timestamp`, `table_max_timestamp`, `table_write_amp_*`, `table_merge_rate_*`
-- **LRU eviction**: Tracker maintains bounded memory (default 1000 tables). Least recently written tables are evicted when capacity is exceeded
-- **Startup hydration**: Values are hydrated from table metadata (`TxReader`) on startup, but diverge as writes occur
+  - On WAL commit: `wal_pending_row_count` (incremented), `wal_txn`,
+    `wal_max_timestamp`, `wal_tx_size_*` histogram
+  - On WAL apply: `wal_pending_row_count` (decremented),
+    `wal_dedup_row_count_since_start`, `table_min_timestamp`,
+    `table_max_timestamp`, `table_write_amp_*`, `table_merge_rate_*`
+- **LRU eviction**: Tracker maintains bounded memory (default 1000 tables).
+  Least recently written tables are evicted when capacity is exceeded
+- **Startup hydration**: Values are hydrated from table metadata (`TxReader`) on
+  startup, but diverge as writes occur
 
-**Non-WAL tables**: `wal_txn`, `wal_max_timestamp`, `wal_pending_row_count`, `wal_dedup_row_count_since_start`, `table_min_timestamp`, `table_max_timestamp`, `table_memory_pressure_level`, and histogram columns are `null` or `0`.
+**Non-WAL tables**: `wal_txn`, `wal_max_timestamp`, `wal_pending_row_count`,
+`wal_dedup_row_count_since_start`, `table_min_timestamp`, `table_max_timestamp`,
+`table_memory_pressure_level`, and histogram columns are `null` or `0`.
 
-**WAL tables**: All columns populated when tracked. `wal_max_timestamp` reflects the max data timestamp from the WAL transaction, not wall-clock time. `table_min_timestamp` and `table_max_timestamp` reflect the actual data range in the table after WAL merge.
+**WAL tables**: All columns populated when tracked. `wal_max_timestamp` reflects
+the max data timestamp from the WAL transaction, not wall-clock time.
+`table_min_timestamp` and `table_max_timestamp` reflect the actual data range in
+the table after WAL merge.
 
 ### Configuration
 
@@ -1206,9 +1345,8 @@ concurrent waiters is not bounded by the shared worker pool.
 
 **Arguments:**
 
-- `tableName` (`string`): name of the table to wait for. Must be a constant,
-  not a column reference. On a non-WAL table the call returns `true`
-  immediately.
+- `tableName` (`string`): name of the table to wait for. Must be a constant, not
+  a column reference. On a non-WAL table the call returns `true` immediately.
 - `seqTxn` (optional, `long`): the sequencer transaction to wait for. When
   omitted, the call captures the table's current `seqTxn` when it starts and
   waits for that, which is what you want after your own write.
@@ -1218,8 +1356,8 @@ concurrent waiters is not bounded by the shared worker pool.
 Returns `boolean`. `true` once the writer has caught up.
 
 Throws if the table is dropped while the call is waiting, and if the table
-becomes [suspended](/docs/query/sql/alter-table-resume-wal/), since a
-suspended table would otherwise never catch up.
+becomes [suspended](/docs/query/sql/alter-table-resume-wal/), since a suspended
+table would otherwise never catch up.
 
 **Examples:**
 
@@ -1243,11 +1381,10 @@ SELECT wait_wal_table('trades', 42);
 
 :::note
 
-For monitoring and observability, use [`tables()`](#tables) instead.
-`tables()` provides all the same information plus additional metrics
-(pending rows, memory pressure, deduplication stats, throughput histograms),
-and is fully in-memory. `wal_tables()` reads from disk and is less suitable
-for frequent polling.
+For monitoring and observability, use [`tables()`](#tables) instead. `tables()`
+provides all the same information plus additional metrics (pending rows, memory
+pressure, deduplication stats, throughput histograms), and is fully in-memory.
+`wal_tables()` reads from disk and is less suitable for frequent polling.
 
 :::
 
@@ -1265,11 +1402,13 @@ Returns a `table` including the following information:
 
 - `name` - table or materialized view name
 - `suspended` - suspended status flag
-- `writerTxn` - the last committed transaction in TableWriter (equivalent to `table_txn` in `tables()`)
+- `writerTxn` - the last committed transaction in TableWriter (equivalent to
+  `table_txn` in `tables()`)
 - `writerLagTxnCount` - the number of transactions that are kept invisible when
   writing to the table; these transactions will be eventually moved to the table
   data and become visible for readers (equivalent to `wal_txn - table_txn`)
-- `sequencerTxn` - the last committed transaction in the sequencer (equivalent to `wal_txn` in `tables()`)
+- `sequencerTxn` - the last committed transaction in the sequencer (equivalent
+  to `wal_txn` in `tables()`)
 
 **Examples:**
 
