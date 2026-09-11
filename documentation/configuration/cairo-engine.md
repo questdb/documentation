@@ -926,6 +926,36 @@ Maximum number of decimal places for types cast as doubles.
 
 Maximum number of decimal places for types cast as floats.
 
+## Column aliases
+
+Controls the names QuestDB gives result columns when the query does not supply
+one with `AS`.
+
+### cairo.sql.column.alias.expression.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+When enabled, a column without an explicit alias is named after the expression
+that produced it. `SELECT floor(avg(price * amount)) FROM trades` returns a
+column named `floor(avg(price * amount))`.
+
+Before QuestDB 9.0.0, the name came from the outermost function instead, so
+that query returned a column named `floor`, repeated functions had a number
+appended, and a plain expression such as `5 + 2` was named `column`.
+
+Set to `false` to restore the pre-9.0.0 naming. This exists for compatibility
+with tools and scripts that select result columns by their generated name.
+
+### cairo.sql.column.alias.generated.max.size
+
+- **Default**: `64`
+- **Reloadable**: no
+
+Maximum length of a generated column alias. Expression-derived names can be
+long, so they are truncated at this limit. Has no effect when
+`cairo.sql.column.alias.expression.enabled` is `false`.
+
 ## JSON UNNEST
 
 ### cairo.json.unnest.max.value.size

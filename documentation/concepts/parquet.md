@@ -35,8 +35,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-FORMAT PARQUET
-WAL;
+FORMAT PARQUET;
 ```
 
 See [CREATE TABLE — Partition format](/docs/query/sql/create-table/#partition-format)
@@ -288,7 +287,7 @@ See also the [COPY-TO documentation](/docs/query/sql/copy).
 :::
 
 You can use the `COPY` command from the web console, from any pgwire-compliant client,
-or using the [`exec` endpoint](/docs/connect/compatibility/rest-api/#exec---execute-queries) of the REST API.
+or using the [`/execute` endpoint](/docs/connect/compatibility/rest-api/#execute) of the REST API.
 
 You can export a query:
 

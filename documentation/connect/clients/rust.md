@@ -251,6 +251,22 @@ an existing nullable column.
 | `DOUBLE[]` | `column_arr`, `column_arr_opt` |
 | `TIMESTAMP`, `TIMESTAMP_NS` | `column_ts`, `column_ts_opt` |
 
+`column_uuid` takes `(name, lo, hi)`, where `hi` is the most significant 64
+bits of the UUID and `lo` the least significant. That is the same split as
+`java.util.UUID`, but note the argument order puts `lo` first:
+
+```rust
+// `Uuid::as_u64_pair()` returns (high, low); the setter takes (lo, hi).
+let (hi, lo) = uuid.as_u64_pair();
+buffer.column_uuid("trace_id", lo, hi)?;
+```
+
+Starting from the canonical 16 bytes instead, `hi` is a big-endian read of
+bytes 0..8 and `lo` a big-endian read of bytes 8..16. `column_uuid_opt` takes
+an `Option<(u64, u64)>` holding the same two halves in the same order. Passing
+whole canonical bytes is simpler with `Chunk::column_uuid`, which takes them
+directly.
+
 QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value in
 one of those columns is received as `false` or `0`; use a wider nullable type
 when the distinction matters.
@@ -340,7 +356,7 @@ needs an entry in `data`, which the encoder ignores.
 | `BOOLEAN` | `column_bool(name, bits, row_count, validity)` | LSB-first bit-packed values |
 | `TIMESTAMP`, `TIMESTAMP_NS` | `column_ts(name, data, TimestampUnit, validity)` | Epoch `i64` values |
 | `DATE` | `column_date` | Epoch milliseconds |
-| `UUID` | `column_uuid` | `&[[u8; 16]]` in QuestDB wire order |
+| `UUID` | `column_uuid` | `&[[u8; 16]]` in canonical RFC-4122 order |
 | `LONG256` | `column_long256` | `&[[u8; 32]]` in little-endian limb order |
 | `IPv4` | `column_ipv4` | Host-order `u32` values |
 | `VARCHAR` | `column_str`, `column_str_large` | Arrow Utf8 offsets and bytes |

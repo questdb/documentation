@@ -44,7 +44,7 @@ CREATE TABLE trades (
     exchange SYMBOL,
     price DOUBLE,
     quantity DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Out-of-line syntax (index defined separately):
@@ -57,7 +57,7 @@ CREATE TABLE trades (
     price DOUBLE,
     quantity DOUBLE
 ), INDEX(symbol TYPE POSTING)
-TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 ### With covering columns (INCLUDE)
@@ -69,7 +69,7 @@ CREATE TABLE trades (
     exchange SYMBOL,
     price DOUBLE,
     quantity DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 The `INCLUDE` clause specifies which columns are stored in the index sidecar
@@ -150,15 +150,15 @@ benchmarking.
 ```questdb-sql
 -- Default adaptive encoding (recommended for most workloads)
 CREATE TABLE t1 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING)
-    TIMESTAMP(ts) PARTITION BY DAY WAL;
+    TIMESTAMP(ts) PARTITION BY DAY;
 
 -- Force Elias-Fano only (benchmarking)
 CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING EF)
-    TIMESTAMP(ts) PARTITION BY DAY WAL;
+    TIMESTAMP(ts) PARTITION BY DAY;
 
 -- Force delta + Frame-of-Reference only (benchmarking)
 CREATE TABLE t3 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
-    TIMESTAMP(ts) PARTITION BY DAY WAL;
+    TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
 ## Covering index
@@ -225,7 +225,7 @@ CREATE TABLE trades (
     -- other columns not needed in hot queries
     raw_data VARCHAR,
     metadata VARCHAR
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 :::tip

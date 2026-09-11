@@ -403,3 +403,61 @@ SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
 
 This is useful for benchmarking index effectiveness or forcing a table scan
 when you know the filter selectivity is low (many rows match).
+
+-----
+
+## Markout horizon hint
+
+### markout_horizon
+
+Speeds up the `CROSS JOIN` that builds the sampling points of a markout curve.
+
+Post-trade analysis evaluates each trade at a series of time offsets, which is
+expressed as a `CROSS JOIN` between the trades and a small table of offsets,
+ordered by the shifted timestamp:
+
+```questdb-sql title="Sampling points across a markout horizon"
+SELECT id, order_ts, sym, price, sec_offs, order_ts + usec_offs AS ts
+FROM orders CROSS JOIN offsets
+ORDER BY order_ts + usec_offs;
+```
+
+By default this materializes the whole join output and then sorts it, which
+scales badly with the number of trades. `markout_horizon` names the two tables
+and lets the optimizer emit the rows already in timestamp order, so only the
+small offsets table is materialized:
+
+```questdb-sql title="Hinting the markout horizon join"
+SELECT /*+ markout_horizon(orders offsets) */ sum(price)
+FROM (SELECT * FROM (
+    SELECT price, ts + usec_offs AS timestamp
+    FROM orders CROSS JOIN offsets
+    ORDER BY ts + usec_offs
+) TIMESTAMP(timestamp));
+```
+
+The first parameter is the table supplying the rows, the second the table
+supplying the offsets. The offsets table must be small, typically generated
+with [`long_sequence()`](/docs/query/functions/row-generator/#long_sequence) or
+[`generate_series()`](/docs/query/functions/row-generator/#generate_series),
+because the optimizer keeps it in memory for random access.
+
+Confirm the hint applied with [`EXPLAIN`](/docs/query/sql/explain/), which
+replaces the join and sort nodes with a single one:
+
+```text
+GroupBy vectorized: false
+  values: [sum(price)]
+    SelectedRecord
+        VirtualRecord
+          functions: [orders.ts+offsets.usec_offs,orders.price]
+            Markout Horizon Join timestampColumn: 0 offsetColumn: 0
+                PageFrame
+                    Row forward scan
+                    Frame forward scan on: orders
+```
+
+For the analysis this supports, see the
+[markout](/docs/cookbook/sql/finance/markout/) recipe and
+[HORIZON JOIN](/docs/query/sql/horizon-join/), which expresses the same shape
+as a dedicated join.

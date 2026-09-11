@@ -254,7 +254,7 @@ public class ArrayInsert {
                         bid DOUBLE PRECISION[][],
                         ask DOUBLE PRECISION[][],
                         timestamp TIMESTAMP
-                    ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+                    ) TIMESTAMP(timestamp) PARTITION BY DAY;
                     """;
                 stmt.execute(createTableSQL);
                 System.out.println("Table 'l3_order_book' is ready.");

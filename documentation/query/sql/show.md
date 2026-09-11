@@ -129,6 +129,10 @@ Each `ddl` value is stored with formatting characters, so pasting a row into a
 text editor expands it to the indented form shown by
 [`SHOW CREATE TABLE`](#show-create-table).
 
+For turning the result set into a `.sql` file or replaying it on another server,
+see
+[Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/).
+
 #### Output order
 
 Objects are emitted in dependency order: a materialized view or view is never
@@ -237,7 +241,7 @@ SHOW CREATE TABLE trades;
 
 | ddl                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WAL WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
+| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
 
 This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
 
@@ -248,7 +252,7 @@ CREATE TABLE trades (
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
+) timestamp(timestamp) PARTITION BY DAY
 WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 ```
 
@@ -267,7 +271,7 @@ CREATE TABLE trades (
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
+) timestamp(timestamp) PARTITION BY DAY
 WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 ```
 
@@ -301,7 +305,7 @@ CREATE TABLE 'sensor_data' (
     ts TIMESTAMP,
     value DOUBLE
 ) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH);
 ```
 
 Stages that are not configured on the policy are omitted from the clause. Only
@@ -322,7 +326,7 @@ CREATE TABLE trades (
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
+) timestamp(timestamp) PARTITION BY DAY
 WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```

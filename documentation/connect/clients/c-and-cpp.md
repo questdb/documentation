@@ -776,7 +776,7 @@ See `qwp_sender.h` for the exact signatures. Complete list:
 | `column_bool` | LSB-first packed bitmap | `BOOLEAN` |
 | `column_ts` + `qwp_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
 | `column_date` | int64 millis since epoch | `DATE` |
-| `column_uuid` | 16 bytes | `UUID` |
+| `column_uuid` | 16 bytes, canonical RFC-4122 order | `UUID` |
 | `column_long256` | 32 bytes (4 LE limbs) | `LONG256` |
 | `column_ipv4` | uint32 | `IPV4` |
 | `column_str` | Arrow Utf8 offsets + bytes | `VARCHAR` |

@@ -221,8 +221,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-FORMAT PARQUET
-WAL;
+FORMAT PARQUET;
 ```
 
 `FORMAT` accepts one of:
@@ -336,8 +335,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-WAL;
+STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
@@ -748,7 +746,7 @@ CREATE TABLE trades (
   symbol SYMBOL INDEX TYPE POSTING,
   price DOUBLE,
   amount DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 
 -- Out-of-line syntax
 CREATE TABLE trades (
@@ -757,7 +755,7 @@ CREATE TABLE trades (
   price DOUBLE,
   amount DOUBLE
 ), INDEX(symbol TYPE POSTING)
-TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 ### Posting index with covering columns (INCLUDE)
@@ -774,7 +772,7 @@ CREATE TABLE trades (
   exchange SYMBOL,
   price DOUBLE,
   amount DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 The designated timestamp column is automatically included — you do not need
@@ -796,8 +794,7 @@ table.
 :::tip
 
 Posting indexes (with or without `INCLUDE`) work on both WAL and `BYPASS WAL`
-tables. The examples above use `WAL` because it is the recommended default,
-but `BYPASS WAL` tables can declare posting indexes in exactly the same way.
+tables.
 
 :::
 

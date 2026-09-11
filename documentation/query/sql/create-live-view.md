@@ -249,7 +249,7 @@ CREATE TABLE trades (
   price DOUBLE,
   amount DOUBLE,
   timestamp TIMESTAMP
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 ```questdb-sql title="Fully specified live view"

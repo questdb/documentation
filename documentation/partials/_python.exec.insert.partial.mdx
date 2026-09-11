@@ -8,7 +8,7 @@ host = 'http://localhost:9000'
 def run_query(sql_query):
     query_params = {'query': sql_query, 'fmt' : 'json'}
     try:
-        response = requests.get(host + '/exec', params=query_params)
+        response = requests.get(host + '/api/v1/sql/execute', params=query_params)
         json_response = json.loads(response.text)
         print(json_response)
     except requests.exceptions.RequestException as e:

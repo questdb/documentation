@@ -1,6 +1,8 @@
 ---
 title: Install the Kubernetes Operator
-description: Install the QuestDB Enterprise Kubernetes Operator from its supported OCI Helm chart.
+description:
+  Install the QuestDB Enterprise Kubernetes Operator from its supported OCI Helm
+  chart.
 ---
 
 # Installation
@@ -8,14 +10,14 @@ description: Install the QuestDB Enterprise Kubernetes Operator from its support
 The QuestDB Enterprise Operator is available to named design partners on these
 tested combinations:
 
-| Platform | Kubernetes | QuestDB Enterprise |
-| --- | --- | --- |
-| Amazon EKS | 1.31–1.36 | 3.3.4 |
-| Azure AKS | 1.33–1.36 | 3.3.4 |
+| Platform   | Kubernetes | QuestDB Enterprise |
+| ---------- | ---------- | ------------------ |
+| Amazon EKS | 1.31–1.36  | 4.0.0              |
+| Azure AKS  | 1.33–1.36  | 4.0.0              |
 
 Other Kubernetes distributions and versions are untested. Only the latest
-release receives fixes; obtain its `<operator-version>` and private registry credentials
-or AWS account grant from your QuestDB design-partner contact.
+release receives fixes; obtain its `<operator-version>` and private registry
+credentials or AWS account grant from your QuestDB design-partner contact.
 
 ## Before you install
 
@@ -35,11 +37,11 @@ Check these prerequisites:
 - Enough schedulable CPU, memory, and zonal disk capacity for every database
   instance. QuestDB memory request and limit must be equal.
 - Cluster DNS and network paths for the Kubernetes API server to reach the
-  operator webhook on TCP 9443; the operator to reach tenant pods on TCP 9000,
-  8812, and 9003; and nodes/pods to reach the private image registry, object
-  store, and cloud identity endpoints over HTTPS.
-- Pull access for two private images. The **operator** pull credential belongs in
-  `questdb-operator-system`; each **database** pull credential belongs in its
+  operator webhook on TCP 9443; the operator to reach tenant pods on TCP 8812
+  and 9003; and nodes/pods to reach the private image registry, object store,
+  and cloud identity endpoints over HTTPS.
+- Pull access for two private images. The **operator** pull credential belongs
+  in `questdb-operator-system`; each **database** pull credential belongs in its
   tenant namespace and is named by `spec.imagePullSecrets`. Do not reuse a
   short-lived ECR login token as a long-lived Secret.
 
@@ -51,8 +53,8 @@ Follow the complete cloud checklist before installing:
 ## Canonical Helm install
 
 The OCI chart on GHCR is public; its operator image is private. Replace the
-placeholders first. Your QuestDB contact supplies the current operator version and,
-off AWS, static credentials for `registry.distribution.questdb.io`.
+placeholders first. Your QuestDB contact supplies the current operator version
+and, off AWS, static credentials for `registry.distribution.questdb.io`.
 
 ```bash
 export OPERATOR_VERSION='<operator-version>'
@@ -75,8 +77,8 @@ helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
 ```
 
 On EKS with QuestDB's cross-account ECR repository grant, kubelets pull through
-the worker-node IAM role. Omit the Secret and both `--set` flags; do not use IRSA
-for image pulls.
+the worker-node IAM role. Omit the Secret and both `--set` flags; do not use
+IRSA for image pulls.
 
 Verify the deployment and APIs:
 
@@ -92,18 +94,43 @@ CRDs are listed.
 
 ## Common safe values
 
-| Value | Default | Guidance |
-| --- | --- | --- |
-| `controllerManager.replicas` | `1` | Keep at `1` unless QuestDB advises otherwise. |
-| `crd.enable` / `crd.keep` | `true` / `true` | Install CRDs and retain them on Helm uninstall. |
-| `webhook.enable` | `true` | Keep admission validation enabled. Reconcile-time validation remains a backstop. |
-| `webhook.certMode` | `self-signed` | The operator creates and rotates its serving certificate; cert-manager is not required. |
-| `webhook.failurePolicy` | `Ignore` | Fail-open avoids blocking cluster writes during a webhook outage. Use `Fail` only after accepting that availability trade-off. |
-| `metrics.enable` | `true` | Exposes authenticated HTTPS metrics on 8443. |
-| `prometheus.enable` | `false` | Requires Prometheus Operator `ServiceMonitor` CRDs. Bind the scraper identity to `questdb-operator-metrics-reader`. |
-| `certmanager.enable` | `false` | Does not provide working verified controller metrics TLS. Leave disabled unless QuestDB has reviewed a separate integration; see [Known Limitations](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). |
-| `networkPolicy.enable` | `false` | Enable only after allowing the control-plane, operator, tenant, registry, identity, and object-store paths above. |
+| Value                        | Default         | Guidance                                                                                                                                                                                                |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `controllerManager.replicas` | `1`             | Keep at `1` unless QuestDB advises otherwise.                                                                                                                                                           |
+| `crd.enable` / `crd.keep`    | `true` / `true` | Install CRDs and retain them on Helm uninstall.                                                                                                                                                         |
+| `webhook.enable`             | `true`          | Keep admission validation enabled. Reconcile-time validation remains a backstop.                                                                                                                        |
+| `webhook.certMode`           | `self-signed`   | The operator creates and rotates its serving certificate; cert-manager is not required.                                                                                                                 |
+| `webhook.failurePolicy`      | `Ignore`        | Fail-open avoids blocking cluster writes during a webhook outage. Use `Fail` only after accepting that availability trade-off.                                                                          |
+| `metrics.enable`             | `true`          | Exposes authenticated HTTPS metrics on 8443.                                                                                                                                                            |
+| `prometheus.enable`          | `false`         | Requires Prometheus Operator `ServiceMonitor` CRDs. Bind the scraper identity to `questdb-operator-metrics-reader`.                                                                                     |
+| `certmanager.enable`         | `false`         | When combined with `prometheus.enable=true`, the chart issues and mounts a metrics serving certificate and renders a ServiceMonitor with certificate verification. Install cert-manager first.          |
+| `networkPolicy.enable`       | `false`         | Selects the manager only. It restricts metrics ingress to namespaces labeled `metrics=enabled` and leaves webhook 9443 open for managed API servers. It does not create database/tenant ingress policy. |
+
+## Operator scheduling and availability
+
+The chart can place and annotate the manager independently of database
+`spec.scheduling`. Use `controllerManager.nodeSelector`, `tolerations`,
+`affinity`, `topologySpreadConstraints`, and `priorityClassName` for the manager
+Pod. Use `controllerManager.pod.annotations`, `controllerManager.pod.labels`,
+`controllerManager.serviceAccount.annotations`, and
+`controllerManager.container.env` for integration metadata and environment.
+
+The default manager has one replica and leader election enabled, so only one
+reconciler is active. The manager PDB is disabled by default because
+`replicas=1`; enable it only after running multiple replicas across failure
+domains, for example:
+
+```yaml
+controllerManager:
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+```
+
+The manager PDB accepts integer and percentage `minAvailable` values. The
+database CRD PDB uses an integer only.
 
 Treat upgrades, rollback, and removal as separate lifecycle procedures; use the
-[operator operations runbook](/docs/enterprise-kubernetes-operator/operations/operator/) rather than inferring them
-from installation commands.
+[operator operations runbook](/docs/enterprise-kubernetes-operator/operations/operator/)
+rather than inferring them from installation commands.

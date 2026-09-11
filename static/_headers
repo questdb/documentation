@@ -19,13 +19,17 @@
   Access-Control-Allow-Methods: GET, OPTIONS
   Cache-Control: public, max-age=60
 
-# Cache JavaScript, CSS, SVG, TXT, and WebP files for a year
+# Cache fingerprinted assets for a year
 /*.js
-  Cache-Control: public, max-age=31536000
-/*.txt
   Cache-Control: public, max-age=31536000
 /*.webp
   Cache-Control: public, max-age=31536000
+
+# llms.txt and robots.txt are regenerated on every deploy, so they must
+# revalidate rather than be cached like immutable assets. A year-long TTL here
+# means agents keep reading a stale documentation index long after it changes.
+/*.txt
+  Cache-Control: public, max-age=60
 
 # Cache images in the /images/ folder for 2 days
 /images/*

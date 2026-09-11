@@ -1219,7 +1219,7 @@ metadata is then available on the reader as `RowsAffected` and `OpType`:
 await using var reader = await client.ExecuteReaderAsync(
     "CREATE TABLE trades ("
     + "ts TIMESTAMP, symbol SYMBOL, price DOUBLE, amount LONG"
-    + ") TIMESTAMP(ts) PARTITION BY DAY WAL");
+    + ") TIMESTAMP(ts) PARTITION BY DAY");
 
 while (await reader.ReadBatchAsync()) { /* no batches for DDL/DML */ }
 

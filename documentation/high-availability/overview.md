@@ -64,11 +64,15 @@ This decoupled architecture means:
 - Add or remove replicas without touching the primary
 - Replicas can be in different regions or availability zones
 - Object store provides durability and point-in-time recovery
+- The primary role moves between nodes at runtime, see
+  [Failover and role switch](/docs/high-availability/failover/)
 
 ## Availability strategies
 
 **Hot availability** - Run replicas continuously alongside the primary for
-instant failover. Faster recovery, higher cost.
+instant failover. Faster recovery, higher cost. A replica is promoted in place
+with [`SWITCH ROLE`](/docs/query/sql/switch-role/), without restarting either
+node.
 
 **Cold availability** - Reconstruct a new primary from the latest snapshot and
 WAL files when needed. Slower recovery, lower cost.
@@ -142,6 +146,8 @@ by you.
 
 - [Setup Guide](/docs/high-availability/setup/) — configure object storage, the
   primary, and replica nodes.
+- [Failover and role switch](/docs/high-availability/failover/) — switch roles
+  in place, promote a replica, and recover from a refused switch.
 - [Client failover](/docs/high-availability/client-failover/concepts/) —
   configure your applications to follow a primary promotion automatically.
 - [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —

@@ -1,12 +1,13 @@
 ---
 title: Get started on Azure AKS
-description: Prepare Azure AKS and deploy QuestDB Enterprise with the Kubernetes Operator.
+description:
+  Prepare Azure AKS and deploy QuestDB Enterprise with the Kubernetes Operator.
 ---
 
 # Get Started on Azure AKS
 
-By the end of this guide, you'll have QuestDB running on AKS and sending
-backups to Azure Blob Storage.
+By the end of this guide, you'll have QuestDB running on AKS and sending backups
+to Azure Blob Storage.
 
 You'll use an AKS cluster you already have. QuestDB will provide the credentials
 needed to pull the private operator and database images.
@@ -33,12 +34,14 @@ Azure Disk.
 
 Azure may bill the 20 GiB request as a 32 GiB disk SKU.
 
-For mitigation of a partial regional outage, place worker nodes in more than one Availability Zone. Cross-AZ connectivity is not required, since all database instances communicate over a shared Object Storage Bucket.
+For mitigation of a partial regional outage, place worker nodes in more than one
+Availability Zone. Cross-AZ connectivity is not required, since all database
+instances communicate over a shared Object Storage Bucket.
 
 QuestDB also needs these network paths:
 
 - the Kubernetes API server to reach the operator webhook on TCP 9443;
-- the operator to reach QuestDB pods on TCP 9000, 8812, and 9003;
+- the operator to reach QuestDB pods on TCP 8812 and 9003;
 - worker nodes to reach `registry.distribution.questdb.io`; and
 - QuestDB pods to reach Azure Blob Storage over HTTPS.
 
@@ -46,17 +49,22 @@ Those are the paths the operator itself needs. Your ingestion and query clients
 reach QuestDB on a different set of ports, which the operator publishes on the
 cluster Services: 9000 for HTTP, the Web Console, and
 [QWP](/docs/configuration/qwp/) over WebSocket; 8812 for PostgreSQL wire; and
-9009 for [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over
-TCP. Allow whichever your clients use. The
+9009 for [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/)
+over TCP. Allow whichever your clients use. The
 [QWP UDP receiver](/docs/configuration/qwp/#qwpudpbindto) on 9007/UDP is off
 unless you enable
-[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#wire-protocols),
+[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#qwp-udp),
 and it is unauthenticated when you do, so restrict it with a NetworkPolicy. See
 [Services and ports](/docs/enterprise-kubernetes-operator/operations/database/#services-and-ports)
-for the full table.
+for the full table, and
+[Configuration](/docs/enterprise-kubernetes-operator/configuration/#database-ingress-isolation)
+for optional network isolation. PGWire TLS must be chosen at cluster creation;
+see
+[PGWire TLS](/docs/enterprise-kubernetes-operator/configuration/#pgwire-tls).
 
 The computer running Helm also needs HTTPS access to `ghcr.io`. For a private
-cluster, provide working DNS plus egress or private endpoints for these services.
+cluster, provide working DNS plus egress or private endpoints for these
+services.
 
 ### Access and tools
 
@@ -70,13 +78,14 @@ Before you continue, make sure you have:
 - Helm 3.10 or later; and
 - the PostgreSQL `psql` client.
 
-Keep one Bash shell open and run the steps in order. Values you set early in
-the guide are reused later.
+Keep one Bash shell open and run the steps in order. Values you set early in the
+guide are reused later.
 
 ### Information from QuestDB
 
 QuestDB supplies access to the private images. In the shared design-partner
-channel described on the [Support](/docs/enterprise-kubernetes-operator/support/) page, ask for:
+channel described on the
+[Support](/docs/enterprise-kubernetes-operator/support/) page, ask for:
 
 - the current operator version;
 - a username for `registry.distribution.questdb.io`; and
@@ -318,8 +327,8 @@ You should see a successful rollout followed by all three CRDs.
 You're ready to create QuestDB. The manifest below connects it to your Blob
 container and starts one instance with a backup every five minutes.
 
-It uses the tested `3.3.4-enterprise` image. Change the tag only when QuestDB
-provides another one.
+It uses the tested v0.2.1 `4.0.0-enterprise` image. Change the tag only when
+QuestDB provides another one.
 
 ```sh
 cat <<EOF | kubectl apply -f -
@@ -342,7 +351,7 @@ metadata:
   name: questdb
   namespace: $QDB_NAMESPACE
 spec:
-  image: registry.distribution.questdb.io/questdb:3.3.4-enterprise
+  image: registry.distribution.questdb.io/questdb:4.0.0-enterprise
   imagePullSecrets:
     - name: questdb-registry
   instances: 1
@@ -371,6 +380,7 @@ QuestDB may take a few minutes to start. Wait until the operator has processed
 the configuration and the primary is ready with observed healthy WAL writes:
 
 ```sh
+(
 generation="$(kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
   -o jsonpath='{.metadata.generation}')"
@@ -407,11 +417,13 @@ while true; do
 done
 
 echo 'QuestDB is ready'
+)
 ```
 
 Once QuestDB is ready, wait for its first scheduled backup:
 
 ```sh
+(
 deadline=$(($(date +%s) + 1200))
 until [ "$(kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
@@ -428,14 +440,15 @@ done
 kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
   -o jsonpath='{.status.backup.lastBackup.endTime}{" completed\n"}'
+)
 ```
 
 A timestamp followed by `completed` confirms the backup worked.
 
 ## 8. Connect to QuestDB
 
-Your QuestDB instance is ready. In one terminal, forward its PostgreSQL wire
-and HTTP ports.
+Your QuestDB instance is ready. In one terminal, forward its PostgreSQL wire and
+HTTP ports.
 
 If you chose another namespace in step 3, use it here.
 

@@ -54,8 +54,9 @@ an error:
 - The table uses [WAL](/docs/concepts/write-ahead-log/). On a non-WAL table the
   operation returns `<tableName> is not a WAL table`.
 - The table is suspended. A table auto-suspends on an apply failure; you can also
-  suspend it explicitly with `ALTER TABLE tableName SUSPEND WAL`. On a table that
-  is not suspended the operation returns
+  suspend it explicitly with
+  [`ALTER TABLE tableName SUSPEND WAL`](/docs/query/sql/alter-table-suspend-wal/).
+  On a table that is not suspended the operation returns
   `REBASE WAL requires the table to be suspended first`.
 - The server sets `cairo.wal.apply.suspended.write.denied=true`, so that
   suspension blocks writes and the table is quiescent. Otherwise the operation
@@ -111,6 +112,7 @@ intended for manual use. Run outside a read-only replica, it returns
 
 ## See also
 
+- [`ALTER TABLE SUSPEND WAL`](/docs/query/sql/alter-table-suspend-wal/)
 - [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/)
 - [Write-ahead log (WAL)](/docs/concepts/write-ahead-log/)
 - [`wal_tables()`](/docs/query/functions/meta/#wal_tables)

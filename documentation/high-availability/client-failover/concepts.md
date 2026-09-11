@@ -16,7 +16,8 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 </EnterpriseNote>
 
 When a QuestDB cluster fails over from one primary to another — whether through
-a planned promotion, a rolling upgrade, or an unplanned outage — clients with a
+a planned [in-place promotion](/docs/high-availability/failover/), a rolling
+upgrade, or an unplanned outage — clients with a
 single hard-coded address must be reconfigured and restarted. A failover-aware
 client instead carries the full list of peers and walks that list automatically
 when the current connection breaks.

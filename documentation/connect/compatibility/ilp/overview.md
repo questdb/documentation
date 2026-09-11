@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS 'trades' (
   price DOUBLE,
   amount DOUBLE,
   my_ts TIMESTAMP
-) timestamp (my_ts) PARTITION BY DAY WAL;
+) timestamp (my_ts) PARTITION BY DAY;
 ```
 
 You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is

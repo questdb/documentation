@@ -28,6 +28,7 @@
     "framer-motion": "^10.18.0",
     "gray-matter": "4.0.3",
     "js-yaml": "^4.1.0",
+    "posthog-js": "1.420.0",
     "prism-react-renderer": "2.4.0",
     "react": "^19.0.0",
     "react-calendly": "4.3.1",

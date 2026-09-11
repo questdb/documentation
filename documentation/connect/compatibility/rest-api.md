@@ -26,7 +26,10 @@ The [Web Console](/docs/getting-started/web-console/overview/) is the official W
 **Available methods**
 
 - [`/imp`](#imp---import-data) for importing data from `.CSV` files
-- [`/exec`](#exec---execute-queries) to execute a SQL statement
+- [`/execute`](#execute) to execute a SQL
+  statement, previously named `/exec`
+- [`/validate`](#validate) to compile a
+  SQL statement without running it
 - [`/exp`](#exp---export-data) to export data
 
 ## Examples
@@ -38,7 +41,7 @@ insert-capable entrypoints:
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
-| [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
+| `/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/connect/compatibility/rest-api/) docs.
@@ -107,9 +110,10 @@ explicitly. See the second example in Python for these features.
 
 </Tabs>
 
-### `/exec`: SQL `INSERT` Query
+### `/execute`: SQL `INSERT` Query
 
-The `/exec` entrypoint takes a SQL query and returns results as JSON.
+The `/execute` entrypoint takes a SQL query and returns results as
+JSON.
 
 We can use this for quick SQL inserts too, but note that there's no support for
 parameterized queries that are necessary to avoid SQL injection issues. Prefer
@@ -139,6 +143,268 @@ need high-performance inserts.
  <GoExecPartial />
 </TabItem>
 </Tabs>
+
+## /exec - Execute queries
+
+:::caution Deprecated
+
+`/exec` is the older name for [`/execute`](#execute), documented immediately
+below. It is still supported and takes the same parameters and returns the same
+response, so an existing integration keeps working unchanged. Use `/execute` for
+new work.
+
+:::
+
+## /execute - Execute queries {#execute}
+
+`/execute` compiles and executes the SQL query supplied as a parameter and
+returns a JSON response. It was previously named
+[`/exec`](#exec---execute-queries).
+
+Its full path is `/api/v1/sql/execute`.
+
+:::note
+
+The query execution terminates automatically when the socket connection is
+closed.
+
+:::
+
+### Overview
+
+#### Parameters
+
+`/execute` expects an HTTP GET request with the following query
+parameters. `POST` is not supported and returns `405`.
+
+| Parameter       | Required | Default | Description                                                                                                                                                                            |
+| --------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `count`         | No       | `false` | `true` or `false`. Counts the number of rows and returns this value.                                                                                                                   |
+| `limit`         | No       |         | Allows limiting the number of rows to return. `limit=10` will return the first 10 rows (equivalent to `limit=1,10`), `limit=10,20` will return row numbers 10 through to 20 inclusive. |
+| `nm`            | No       | `false` | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                      |
+| `query`         | Yes      |         | URL encoded query text. It can be multi-line.                                                                                                                                          |
+| `timings`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include a `timings` property in the response which gives details about the execution times.                                   |
+| `explain`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include an `explain` property in the response which gives details about the execution plan.                                   |
+| `quoteLargeNum` | No       | `false` | `true` or `false`. When set to `true`, QuestDB will surround `LONG` type numbers with double quotation marks that will make them parsed as strings.                                    |
+
+The parameters must be URL encoded.
+
+#### Headers
+
+Supported HTTP headers:
+
+| Header              | Required | Description                                                               |
+| ------------------- | -------- | ------------------------------------------------------------------------- |
+| `Statement-Timeout` | No       | Query timeout in milliseconds, overrides default timeout from server.conf |
+
+### Examples
+
+#### SELECT query example:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT timestamp, price FROM trades LIMIT 2;" \
+  --data-urlencode "count=true" \
+  http://localhost:9000/api/v1/sql/execute
+```
+
+A HTTP status code of `200` is returned with the following response body:
+
+```json
+{
+  "query": "SELECT timestamp, price FROM trades LIMIT 2;",
+  "columns": [
+    {
+      "name": "timestamp",
+      "type": "TIMESTAMP"
+    },
+    {
+      "name": "price",
+      "type": "DOUBLE"
+    }
+  ],
+  "timestamp": 0
+  "dataset": [
+    ["2024-01-01T00:00:00.000000Z", 142.50],
+    ["2024-01-01T00:00:01.000000Z", 142.75]
+  ],
+  "count": 2
+}
+```
+
+SELECT query returns response in the following format:
+
+```json
+{
+  "query": string,
+  "columns": Array<{ "name": string, "type": string }>
+  "dataset": Array<Array<Value for Column1, Value for Column2>>,
+  "timestamp": number,
+  "count": Optional<number>,
+  "timings": Optional<{ compiler: number, count: number, execute: number }>,
+  "explain": Optional<{ jitCompiled: boolean }>
+}
+```
+
+You can find the exact list of column types in the
+[dedicated page](/docs/query/datatypes/overview/).
+
+The `timestamp` field indicates which of the columns in the result set is the
+designated timestamp, or -1 if there isn't one.
+
+`limit` bounds the rows returned in `dataset`, while `count` reports how many
+rows the query matched in total.
+
+#### UPDATE query example:
+
+This request executes an update of table `weather` setting 2 minutes query
+timeout
+
+```shell
+curl -G \
+  -H "Statement-Timeout: 120000" \
+  --data-urlencode "query=UPDATE weather SET tempF = tempF + 0.12 WHERE tempF > 60" \
+  http://localhost:9000/api/v1/sql/execute
+```
+
+A HTTP status code of `200` is returned with the following response body:
+
+```json
+{
+  "ddl": "OK",
+  "updated": 34
+}
+```
+
+#### CREATE TABLE query example:
+
+This request creates a basic table, with a designated timestamp.
+
+```shell
+curl -G \
+  -H "Statement-Timeout: 120000" \
+  --data-urlencode "query=CREATE TABLE foo ( a INT, ts TIMESTAMP) timestamp(ts)" \
+  http://localhost:9000/api/v1/sql/execute
+```
+
+A HTTP status code of `200` is returned with the following response body:
+
+```json
+{
+  "ddl": "OK"
+}
+```
+
+## /exp - Export data
+
+This endpoint allows you to pass url-encoded queries but the request body is
+returned in a tabular form to be saved and reused as opposed to JSON.
+
+### Overview
+
+`/exp` is expecting an HTTP GET request with following parameters:
+
+| Parameter | Required | Description                                                                                                                                                                                                                  |
+| :-------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `query`   | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
+| `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
+| `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
+| `fmt`     | No       | Export format. Valid values: `parquet`, `csv`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                         |
+| `timeout` | No       | Query timeout in seconds. Overrides the default timeout. For Parquet exports, the default is the server's export timeout. For CSV exports, the default is the general query timeout.                                         |
+
+#### Parquet Export Parameters
+
+When `fmt=parquet`, the following additional parameters are supported:
+
+| Parameter              | Required | Default   | Description                                                                                                        |
+| :--------------------- | :------- | :-------- | :----------------------------------------------------------------------------------------------------------------- |
+| `partition_by`         | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                                 |
+| `compression_codec`    | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`.                |
+| `compression_level`    | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                                 |
+| `row_group_size`       | No       | `100000`  | Number of rows per Parquet row group.                                                                              |
+| `data_page_size`       | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                                         |
+| `statistics_enabled`   | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
+| `parquet_version`      | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
+| `raw_array_encoding`   | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
+| `bloom_filter_columns` | No       | (none)    | Comma-separated column names for bloom filter generation.                                                          |
+| `bloom_filter_fpp`     | No       | `0.01`    | False positive probability for bloom filters (0.0 to 1.0). Lower values produce larger but more accurate filters.  |
+
+The parameters must be URL encoded.
+
+### Examples
+
+#### CSV Export (default)
+
+Considering the query:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT AccidentIndex2, Date, Time FROM 'Accidents0514.csv'" \
+  --data-urlencode "limit=5" \
+  http://localhost:9000/exp
+```
+
+A HTTP status code of `200` is returned with the following response body:
+
+```shell
+"AccidentIndex","Date","Time"
+200501BS00001,"2005-01-04T00:00:00.000Z",17:42
+200501BS00002,"2005-01-05T00:00:00.000Z",17:36
+200501BS00003,"2005-01-06T00:00:00.000Z",00:15
+200501BS00004,"2005-01-07T00:00:00.000Z",10:35
+200501BS00005,"2005-01-10T00:00:00.000Z",21:13
+```
+
+#### Parquet Export
+
+Export query results to Parquet format:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT * FROM trades WHERE timestamp IN today()" \
+  --data-urlencode "fmt=parquet" \
+  http://localhost:9000/exp > trades_today.parquet
+```
+
+#### Parquet Export with Custom Options
+
+Export with custom compression and partitioning:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT * FROM trades" \
+  --data-urlencode "fmt=parquet" \
+  --data-urlencode "partition_by=DAY" \
+  --data-urlencode "compression_codec=ZSTD" \
+  --data-urlencode "compression_level=9" \
+  --data-urlencode "row_group_size=1000000" \
+  http://localhost:9000/exp > trades.parquet
+```
+
+#### Parquet Export with LZ4 Compression
+
+Export with LZ4_RAW compression for faster export:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT symbol, price, amount FROM trades WHERE timestamp > dateadd('h', -1, now())" \
+  --data-urlencode "fmt=parquet" \
+  --data-urlencode "compression_codec=LZ4_RAW" \
+  http://localhost:9000/exp > recent_trades.parquet
+```
+
+#### Parquet Export with Bloom Filters
+
+Export with bloom filters for faster
+equality lookups on the exported file:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT * FROM trades" \
+  --data-urlencode "fmt=parquet" \
+  --data-urlencode "bloom_filter_columns=symbol,side" \
+  http://localhost:9000/exp > trades_bloom.parquet
+```
 
 ## /imp - Import data
 
@@ -453,256 +719,49 @@ Here is an example with column-level errors due to unsuccessful casts:
 }
 ```
 
-## /exec - Execute queries
+## /validate - Validate queries {#validate}
 
-`/exec` compiles and executes the SQL query supplied as a parameter and returns
-a JSON response.
+`/validate` compiles a SQL query and returns the metadata of the result set it
+would produce, without executing it. Use it to check that a statement parses and
+to discover its column names and types up front, without paying the cost of
+running the query.
 
-:::note
+Its full path is `/api/v1/sql/validate`.
 
-The query execution terminates automatically when the socket connection is
-closed.
-
-:::
-
-### Overview
-
-#### Parameters
-
-`/exec` is expecting an HTTP GET request with following query parameters:
-
-| Parameter       | Required | Default | Description                                                                                                                                                                            |
-| --------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `count`         | No       | `false` | `true` or `false`. Counts the number of rows and returns this value.                                                                                                                   |
-| `limit`         | No       |         | Allows limiting the number of rows to return. `limit=10` will return the first 10 rows (equivalent to `limit=1,10`), `limit=10,20` will return row numbers 10 through to 20 inclusive. |
-| `nm`            | No       | `false` | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                      |
-| `query`         | Yes      |         | URL encoded query text. It can be multi-line.                                                                                                                                          |
-| `timings`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include a `timings` property in the response which gives details about the execution times.                                   |
-| `explain`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include an `explain` property in the response which gives details about the execution plan.                                   |
-| `quoteLargeNum` | No       | `false` | `true` or `false`. When set to `true`, QuestDB will surround `LONG` type numbers with double quotation marks that will make them parsed as strings.                                    |
-
-The parameters must be URL encoded.
-
-#### Headers
-
-Supported HTTP headers:
-
-| Header              | Required | Description                                                               |
-| ------------------- | -------- | ------------------------------------------------------------------------- |
-| `Statement-Timeout` | No       | Query timeout in milliseconds, overrides default timeout from server.conf |
-
-### Examples
-
-#### SELECT query example:
+It takes the same `query` parameter as [`/execute`](#execute) and returns the
+same response, minus the `dataset` and `count` fields:
 
 ```shell
 curl -G \
-  --data-urlencode "query=SELECT timestamp, price FROM trades LIMIT 2;" \
-  --data-urlencode "count=true" \
-  http://localhost:9000/exec
+  --data-urlencode "query=SELECT 1 AS n" \
+  http://localhost:9000/api/v1/sql/validate
 ```
-
-A HTTP status code of `200` is returned with the following response body:
 
 ```json
 {
-  "query": "SELECT timestamp, price FROM trades LIMIT 2;",
-  "columns": [
-    {
-      "name": "timestamp",
-      "type": "TIMESTAMP"
-    },
-    {
-      "name": "price",
-      "type": "DOUBLE"
-    }
-  ],
-  "timestamp": 0
-  "dataset": [
-    ["2024-01-01T00:00:00.000000Z", 142.50],
-    ["2024-01-01T00:00:01.000000Z", 142.75]
-  ],
-  "count": 2
+  "query": "SELECT 1 AS n",
+  "columns": [{ "name": "n", "type": "INT" }],
+  "timestamp": -1
 }
 ```
 
-SELECT query returns response in the following format:
+A statement that fails to compile returns HTTP `400` with an `error` message
+and the character `position` at which compilation failed:
 
 ```json
 {
-  "query": string,
-  "columns": Array<{ "name": string, "type": string }>
-  "dataset": Array<Array<Value for Column1, Value for Column2>>,
-  "timestamp": number,
-  "count": Optional<number>,
-  "timings": Optional<{ compiler: number, count: number, execute: number }>,
-  "explain": Optional<{ jitCompiled: boolean }>
+  "query": "SELECT nonexistent_col FROM nothing_here",
+  "error": "table does not exist [table=nothing_here]",
+  "position": 28
 }
-```
-
-You can find the exact list of column types in the
-[dedicated page](/docs/query/datatypes/overview/).
-
-The `timestamp` field indicates which of the columns in the result set is the
-designated timestamp, or -1 if there isn't one.
-
-#### UPDATE query example:
-
-This request executes an update of table `weather` setting 2 minutes query
-timeout
-
-```shell
-curl -G \
-  -H "Statement-Timeout: 120000" \
-  --data-urlencode "query=UPDATE weather SET tempF = tempF + 0.12 WHERE tempF > 60" \
-  http://localhost:9000/exec
-```
-
-A HTTP status code of `200` is returned with the following response body:
-
-```json
-{
-  "ddl": "OK",
-  "updated": 34
-}
-```
-
-#### CREATE TABLE query example:
-
-This request creates a basic table, with a designated timestamp.
-
-```shell
-curl -G \
-  -H "Statement-Timeout: 120000" \
-  --data-urlencode "query=CREATE TABLE foo ( a INT, ts TIMESTAMP) timestamp(ts)" \
-  http://localhost:9000/exec
-```
-
-A HTTP status code of `200` is returned with the following response body:
-
-```json
-{
-  "ddl": "OK"
-}
-```
-
-## /exp - Export data
-
-This endpoint allows you to pass url-encoded queries but the request body is
-returned in a tabular form to be saved and reused as opposed to JSON.
-
-### Overview
-
-`/exp` is expecting an HTTP GET request with following parameters:
-
-| Parameter | Required | Description                                                                                                                                                                                                                  |
-| :-------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `query`   | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
-| `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
-| `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
-| `fmt`     | No       | Export format. Valid values: `parquet`, `csv`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                         |
-| `timeout` | No       | Query timeout in seconds. Overrides the default timeout. For Parquet exports, the default is the server's export timeout. For CSV exports, the default is the general query timeout.                                         |
-
-#### Parquet Export Parameters
-
-When `fmt=parquet`, the following additional parameters are supported:
-
-| Parameter              | Required | Default   | Description                                                                                                        |
-| :--------------------- | :------- | :-------- | :----------------------------------------------------------------------------------------------------------------- |
-| `partition_by`         | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                                 |
-| `compression_codec`    | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`.                |
-| `compression_level`    | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                                 |
-| `row_group_size`       | No       | `100000`  | Number of rows per Parquet row group.                                                                              |
-| `data_page_size`       | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                                         |
-| `statistics_enabled`   | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
-| `parquet_version`      | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
-| `raw_array_encoding`   | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
-| `bloom_filter_columns` | No       | (none)    | Comma-separated column names for bloom filter generation.                                                          |
-| `bloom_filter_fpp`     | No       | `0.01`    | False positive probability for bloom filters (0.0 to 1.0). Lower values produce larger but more accurate filters.  |
-
-The parameters must be URL encoded.
-
-### Examples
-
-#### CSV Export (default)
-
-Considering the query:
-
-```shell
-curl -G \
-  --data-urlencode "query=SELECT AccidentIndex2, Date, Time FROM 'Accidents0514.csv'" \
-  --data-urlencode "limit=5" \
-  http://localhost:9000/exp
-```
-
-A HTTP status code of `200` is returned with the following response body:
-
-```shell
-"AccidentIndex","Date","Time"
-200501BS00001,"2005-01-04T00:00:00.000Z",17:42
-200501BS00002,"2005-01-05T00:00:00.000Z",17:36
-200501BS00003,"2005-01-06T00:00:00.000Z",00:15
-200501BS00004,"2005-01-07T00:00:00.000Z",10:35
-200501BS00005,"2005-01-10T00:00:00.000Z",21:13
-```
-
-#### Parquet Export
-
-Export query results to Parquet format:
-
-```shell
-curl -G \
-  --data-urlencode "query=SELECT * FROM trades WHERE timestamp IN today()" \
-  --data-urlencode "fmt=parquet" \
-  http://localhost:9000/exp > trades_today.parquet
-```
-
-#### Parquet Export with Custom Options
-
-Export with custom compression and partitioning:
-
-```shell
-curl -G \
-  --data-urlencode "query=SELECT * FROM trades" \
-  --data-urlencode "fmt=parquet" \
-  --data-urlencode "partition_by=DAY" \
-  --data-urlencode "compression_codec=ZSTD" \
-  --data-urlencode "compression_level=9" \
-  --data-urlencode "row_group_size=1000000" \
-  http://localhost:9000/exp > trades.parquet
-```
-
-#### Parquet Export with LZ4 Compression
-
-Export with LZ4_RAW compression for faster export:
-
-```shell
-curl -G \
-  --data-urlencode "query=SELECT symbol, price, amount FROM trades WHERE timestamp > dateadd('h', -1, now())" \
-  --data-urlencode "fmt=parquet" \
-  --data-urlencode "compression_codec=LZ4_RAW" \
-  http://localhost:9000/exp > recent_trades.parquet
-```
-
-#### Parquet Export with Bloom Filters
-
-Export with bloom filters for faster
-equality lookups on the exported file:
-
-```shell
-curl -G \
-  --data-urlencode "query=SELECT * FROM trades" \
-  --data-urlencode "fmt=parquet" \
-  --data-urlencode "bloom_filter_columns=symbol,side" \
-  http://localhost:9000/exp > trades_bloom.parquet
 ```
 
 ## Error responses
 
 ### Malformed queries
 
-A successful call to `/exec` or `/exp` which also contains a malformed query
-will return response bodies with the following format:
+A successful call to `/execute` or `/exp` which also contains a
+malformed query will return response bodies with the following format:
 
 ```json
 {
@@ -774,7 +833,7 @@ header. The `curl` flag `-u` builds that header for you. This example executes a
 ```bash
 curl -G --data-urlencode "query=SELECT 1;" \
     -u "my_user:my_password" \
-    http://localhost:9000/exec
+    http://localhost:9000/api/v1/sql/execute
 ```
 
 #### Building the Authorization header manually
@@ -796,7 +855,7 @@ Send the encoded value using the `Basic` scheme:
 ```bash
 curl -G --data-urlencode "query=SELECT 1;" \
     -H "Authorization: Basic bXlfdXNlcjpteV9wYXNzd29yZA==" \
-    http://localhost:9000/exec
+    http://localhost:9000/api/v1/sql/execute
 ```
 
 The colon is the delimiter, so the username cannot contain one. Passwords can,
@@ -823,7 +882,7 @@ Specify the token in an `Authorization: Bearer` header:
 ```bash
 curl -G --data-urlencode "query=SELECT 1;" \
     -H "Authorization: Bearer qt1cNK6s2t79f76GmTBN9k7XTWm5wwOtF7C0UBxiHGPn44" \
-    http://localhost:9000/exec
+    http://localhost:9000/api/v1/sql/execute
 ```
 
 Refer to the [user management](/docs/security/rbac/#user-management) page to
