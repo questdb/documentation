@@ -170,7 +170,13 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
-| Cluster-wide ordering | Best-effort | Best-effort | FSN-driven, server-deduplicated |
+| Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
+
+QWP replay is at-least-once: FSNs track local progress but do not suppress
+duplicate writes after a reconnect. Use table-level `DEDUP UPSERT KEYS`
+with stable event timestamps and row identity to suppress replayed rows.
+See [Delivery semantics](/docs/concepts/delivery-semantics/) for the
+[deduplication](/docs/concepts/deduplication/) requirements.
 
 The transition is application-transparent — `Sender.fromConfig` accepts
 a `ws::` or `wss::` connect string and the public builder API is the

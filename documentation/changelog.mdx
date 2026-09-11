@@ -21,6 +21,9 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Python client](/docs/connect/clients/python/) - Documented 5.1.0 QWP-only row types, UUID/LONG256 binary column overrides and byte-order migration, and pandas type-preserving round trips including DATE and read-only type metadata
+- [Python](/docs/connect/clients/python/#dataframe-ingestion) and [Rust](/docs/connect/clients/rust/#arrow-and-polars-ingestion) clients - Clarified DataFrame-wide `in_doubt` status versus individual flushes and the risk of duplicating committed rows on retry
+- [Store-and-forward](/docs/high-availability/store-and-forward/concepts/#reconnect-and-replay) - Corrected replay guidance: connection-local sequence numbers do not deduplicate writes; table-level deduplication with stable row identity is required to suppress duplicates
 - [Kafka connector](/docs/connect/message-brokers/kafka/) - Updated for QWP with a quick start, guidance on preventing duplicates and recovering from outages, and migration steps for existing HTTP pipelines
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - Refreshed for Operator 0.2.1 across installation, configuration, high availability, backup and restore, known limitations, troubleshooting, and the generated [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Rust](/docs/connect/clients/rust/) and [C and C++](/docs/connect/clients/c-and-cpp/) clients - Documented the UUID byte order, which was previously unstated. `Buffer::column_uuid` takes `(lo, hi)` where `hi` is the most significant half, matching `java.util.UUID`, and the chunk setter takes the 16 bytes in canonical RFC-4122 order
