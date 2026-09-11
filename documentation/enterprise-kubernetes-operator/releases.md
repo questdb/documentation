@@ -45,9 +45,6 @@ helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
 
 ## [0.2.1] - 2026-09-02
 
-An earlier source-only `v0.2.1` tag was deleted before any image, chart, or GitHub
-Release was published. This is the official 0.2.1 release.
-
 ### Added
 
 - Verified Secret-backed PGWire TLS for new clusters.

@@ -1,14 +1,15 @@
 ---
 slug: /connect/message-brokers/kafka
-title: Ingestion from Kafka Overview
+title: Ingest data from Kafka
 sidebar_label: Kafka
-description: Apache Kafka and QuestDB Kafka Connector overview and guide. Thorough explanations and examples.
+description: Stream data from Kafka to QuestDB. Set up the connector, map fields and timestamps, handle failed records, and prevent duplicates.
 ---
 
-QuestDB provides a first-party Kafka Connect connector for streaming data from
-Apache Kafka into QuestDB tables. The connector handles serialization, fault
-tolerance, and batching automatically, making it the recommended approach for
-most use cases.
+Use the QuestDB Kafka connector to stream data from Apache Kafka into QuestDB
+tables. It handles data conversion, batching, and reconnects automatically.
+Follow the [quick start](#quick-start) to send your first message. If you have
+an existing pipeline that uses the InfluxDB Line Protocol (ILP) over HTTP, see
+[migrating from ILP](#legacy-ilp-transports).
 
 ## Choosing an integration strategy
 
@@ -20,17 +21,19 @@ There are three ways to get data from Kafka into QuestDB:
 | [Stream processing (Flink)](#stream-processing)             | Complex transformations | Medium     |
 | [Custom program](#custom-program)                           | Special requirements    | High       |
 
-**For most users, the QuestDB Kafka connector is the best choice.** It provides
-excellent performance (100,000+ rows/second), handles fault tolerance
-automatically, and requires minimal configuration.
-
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ## QuestDB Kafka connector {#questdb-kafka-connect-connector}
 
 The [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
-is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
-and uses InfluxDB Line Protocol for high-performance data transfer. It works
-with Kafka-compatible systems like [Redpanda](/docs/connect/message-brokers/redpanda/).
+is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html).
+It also works with Kafka-compatible systems such as
+[Redpanda](/docs/connect/message-brokers/redpanda/).
+
+For new pipelines, use the
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/overview/) with
+`ws::` or `wss::` (TLS). The connector records progress in Kafka only after
+QuestDB confirms delivery. Enable [deduplication](#exactly-once-delivery) if
+your table must not contain duplicate events.
 
 ### Quick start
 
@@ -39,19 +42,18 @@ and write it to QuestDB.
 
 #### Prerequisites
 
-- Apache Kafka (or compatible system)
-- QuestDB instance with HTTP endpoint accessible
+- A running Apache Kafka 3.6 or newer broker (or a compatible system)
+- A running QuestDB 10.0 or newer instance, reachable on port 9000
+- QuestDB Kafka connector 0.24 or newer
 - Java 17+ (JDK)
+
+The examples use Kafka at `localhost:9092` and QuestDB at `localhost:9000`.
+For Kafka setup, follow the [Apache Kafka quick start](https://kafka.apache.org/quickstart/).
 
 #### Step 1: Install the connector
 
-Download and install the connector JAR files:
-
-```shell
-curl -s https://api.github.com/repos/questdb/kafka-questdb-connector/releases/latest |
-jq -r '.assets[]|select(.content_type == "application/zip")|.browser_download_url'|
-wget -qi -
-```
+Download the `kafka-questdb-connector-<version>-bin.zip` archive from the
+[connector releases](https://github.com/questdb/kafka-questdb-connector/releases).
 
 Extract and copy to your Kafka installation:
 
@@ -74,12 +76,12 @@ For Confluent platform users, see the
 
 Create a configuration file at `/path/to/kafka/config/questdb-connector.properties`:
 
-```shell title="questdb-connector.properties"
+```properties title="questdb-connector.properties"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
 
-# QuestDB connection
-client.conf.string=http::addr=localhost:9000;
+# QuestDB connection (QWP over WebSocket)
+client.conf.string=ws::addr=localhost:9000;
 
 # Kafka source
 topics=example-topic
@@ -94,27 +96,20 @@ value.converter.schemas.enable=false
 include.key=false
 ```
 
-#### Step 3: Start the services
+#### Step 3: Start the connector
 
-Run these commands from your Kafka installation directory (single-node KRaft):
+In Kafka's `config/connect-standalone.properties`, set `bootstrap.servers` to
+your broker address (`localhost:9092` for this example). From your Kafka
+installation directory, create the topic and start the connector:
 
 ```shell
-# Generate a unique cluster ID
-KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
-
-# Format storage directories (run once)
-bin/kafka-storage.sh format --standalone -t $KAFKA_CLUSTER_ID -c config/server.properties
-
-# Start Kafka
-bin/kafka-server-start.sh config/server.properties
-
-# Start the connector (from another terminal)
+bin/kafka-topics.sh --create --if-not-exists --topic example-topic --bootstrap-server localhost:9092
 bin/connect-standalone.sh config/connect-standalone.properties config/questdb-connector.properties
 ```
 
 #### Step 4: Test the pipeline
 
-Publish a test message:
+From another terminal in your Kafka installation directory, publish a test message:
 
 ```shell
 bin/kafka-console-producer.sh --topic example-topic --bootstrap-server localhost:9092
@@ -139,106 +134,10 @@ Expected output:
 "AAPL",192.34,1200,"2026-02-03T15:10:00.000000Z"
 ```
 
-The timestamp is assigned by QuestDB on ingestion, so the value you see will match your local ingest time.
+QuestDB assigns the timestamp when the message arrives, so your value will differ.
 
-### Configuration reference
-
-The connector configuration has two parts:
-- **Client configuration string**: How the connector connects to QuestDB
-- **Connector options**: How the connector processes Kafka messages
-
-#### Connector options
-
-| Name | Type | Example | Default | Description |
-|------|------|---------|---------|-------------|
-| client.conf.string | `string` | http::addr=localhost:9000; | N/A | Client configuration string |
-| topics | `string` | orders,audit | N/A | Kafka topics to read from |
-| table | `string` | my_table | Topic name | Target table in QuestDB |
-| key.converter | `string` | <sub>org.apache.kafka.connect.storage.StringConverter</sub> | N/A | Converter for Kafka keys |
-| value.converter | `string` | <sub>org.apache.kafka.connect.json.JsonConverter</sub> | N/A | Converter for Kafka values |
-| include.key | `boolean` | false | true | Include message key in target table |
-| key.prefix | `string` | from_key | key | Prefix for key fields |
-| value.prefix | `string` | from_value | N/A | Prefix for value fields |
-| symbols | `string` | instrument,stock | N/A | Columns to create as [symbol](/docs/concepts/symbol/) type |
-| doubles | `string` | volume,price | N/A | Columns to always send as double type |
-| timestamp.field.name | `string` | pickup_time | N/A | Designated timestamp field. Use comma-separated names for [composed timestamps](#composed-timestamps) |
-| timestamp.units | `string` | micros | auto | Timestamp field units: `nanos`, `micros`, `millis`, `seconds`, `auto` |
-| timestamp.kafka.native | `boolean` | true | false | Use Kafka message timestamps as designated timestamps |
-| timestamp.string.fields | `string` | creation_time | N/A | String fields containing textual timestamps |
-| timestamp.string.format | `string` | yyyy-MM-dd HH:mm:ss.SSSUUU z | <sub>yyyy-MM-ddTHH:mm:ss.SSSUUUZ</sub> | Format for parsing string timestamps |
-| skip.unsupported.types | `boolean` | false | false | Skip unsupported types instead of failing |
-| allowed.lag | `int` | 250 | 1000 | Milliseconds to wait before flushing when no new events |
-
-The connector uses Kafka Connect converters for deserialization and works with
-any format they support, including JSON, Avro, and Protobuf. When using Schema
-Registry, configure the appropriate converter (e.g.,
-`io.confluent.connect.avro.AvroConverter`).
-
-#### Client configuration string
-
-The `client.conf.string` option configures how the connector communicates with
-QuestDB. You can also set this via the `QDB_CLIENT_CONF` environment variable.
-
-Format:
-
-```
-<protocol>::<key>=<value>;<key>=<value>;...;
-```
-
-Note the trailing semicolon.
-
-**Supported protocols:** `http`, `https`
-
-**Required keys:**
-- `addr` - QuestDB hostname and port (port defaults to 9000)
-
-Examples:
-
-```properties
-# Minimal configuration
-client.conf.string=http::addr=localhost:9000;
-
-# With HTTPS and retry timeout
-client.conf.string=https::addr=questdb.example.com:9000;retry_timeout=60000;
-
-# With authentication token from environment variable
-client.conf.string=http::addr=localhost:9000;token=${QUESTDB_TOKEN};
-```
-
-See the [Java Client configuration guide](/docs/connect/clients/java) for all
-available client options.
-
-:::danger
-
-The QuestDB client also supports TCP transport, but it is not recommended for
-Kafka Connect because the TCP transport offers no delivery guarantees.
-
-:::
-
-##### Environment variable expansion
-
-The `client.conf.string` supports `${VAR}` syntax for environment variable
-expansion, useful for injecting secrets in Kubernetes environments:
-
-| Pattern | Result |
-|---------|--------|
-| `${VAR}` | Replaced with environment variable value |
-| `$$` | Escaped to literal `$` |
-| `$${VAR}` | Escaped to literal `${VAR}` (not expanded) |
-| `$VAR` | Not expanded (braces required) |
-
-The connector fails to start if:
-- A referenced environment variable is not defined
-- A variable reference is malformed (e.g., unclosed braces `${VAR`)
-- A variable name is empty (`${}`) or invalid (must start with letter or
-  underscore, followed by letters, digits, or underscores)
-
-:::warning
-
-Environment variable values containing semicolons (`;`) will break the
-configuration string parsing.
-
-:::
+Next, choose a [timestamp source](#designated-timestamps) and review
+[delivery guarantees](#fault-tolerance) before using the connector in production.
 
 ### How data is mapped
 
@@ -285,10 +184,11 @@ If your message contains a timestamp field:
 
 ```properties
 timestamp.field.name=event_time
-timestamp.units=millis  # or: nanos, micros, seconds, auto
+timestamp.units=millis
 ```
 
-The connector auto-detects units for timestamps after April 26, 1970.
+Supported units are `nanos`, `micros`, `millis`, `seconds`, and `auto` (the
+default). Auto-detection supports timestamps after April 26, 1970.
 
 #### Using Kafka timestamps
 
@@ -338,73 +238,6 @@ to produce `2026-02-02T13:50:10.207000Z`. The source fields are consumed and do
 not appear as columns in the output.
 
 All listed fields must be present in each message.
-
-### Fault tolerance
-
-The connector automatically retries recoverable errors (network issues, server
-unavailability, timeouts). Non-recoverable errors (invalid data, authentication
-failures) are not retried.
-
-Configure retry behavior via the client configuration:
-
-```properties
-# Retry for up to 60 seconds
-client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
-```
-
-Default retry timeout is 10,000 ms.
-
-#### Exactly-once delivery
-
-Retries may cause duplicate rows. To ensure exactly-once delivery, enable
-[deduplication](/docs/concepts/deduplication/) on your target table.
-Deduplication requires a designated timestamp from the message payload or Kafka
-metadata.
-
-#### Dead letter queue
-
-For messages that fail due to non-recoverable errors (invalid data, schema
-mismatches), configure a Dead Letter Queue to prevent the connector from
-stopping. These settings must be configured in the **Kafka Connect worker
-configuration** (e.g., `connect-standalone.properties` or
-`connect-distributed.properties`), not in the connector configuration:
-
-```properties
-errors.tolerance=all
-errors.deadletterqueue.topic.name=dlq-questdb
-errors.deadletterqueue.topic.replication.factor=1
-```
-
-Failed messages are sent to the DLQ topic for later inspection.
-
-See the [Confluent DLQ documentation](https://developer.confluent.io/courses/kafka-connect/error-handling-and-dead-letter-queues/)
-for details.
-
-### Performance tuning
-
-#### Batch size
-
-The connector batches messages before sending. Default batch size is 75,000 rows.
-For low-throughput scenarios, reduce this to lower latency:
-
-```properties
-client.conf.string=http::addr=localhost:9000;auto_flush_rows=1000;
-```
-
-#### Flush interval
-
-The connector flushes data when:
-- Batch size is reached
-- No new events for `allowed.lag` milliseconds (default: 1000)
-- Kafka Connect commits offsets
-
-```properties
-# Flush after 250ms of no new events
-allowed.lag=250
-```
-
-Configure offset commit frequency in Kafka Connect via `offset.flush.interval.ms`.
-See [Kafka Connect configuration](https://docs.confluent.io/platform/current/connect/references/allconfigs.html).
 
 ### Type handling
 
@@ -462,6 +295,231 @@ Tables are created automatically when they don't exist. This is convenient for
 development but in production, pre-create tables using
 [CREATE TABLE](/docs/query/sql/create-table/) for control over partitioning,
 indexes, and column types.
+
+<!-- Legacy anchor kept for inbound links from other docs pages -->
+### Delivery guarantees {#fault-tolerance}
+
+With QWP, delivery is **at least once**: the connector commits Kafka offsets
+only after QuestDB acknowledges the corresponding rows. Records without
+confirmation remain uncommitted and can be retried. You can route invalid
+records to a [dead letter queue](#dead-letter-queue).
+
+Retries can produce duplicates. For example, QuestDB may save a row just
+before the connection drops, leaving the connector unsure whether it arrived.
+Use deduplication if each event must appear only once, and keep source records
+in Kafka long enough for [outage recovery](#outages-and-reconnects).
+
+#### Exactly-once delivery
+
+For exactly-once results, enable
+[deduplication](/docs/concepts/deduplication/) on the target table with keys
+that identify a unique event:
+
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    trade_id LONG,
+    symbol SYMBOL,
+    price DOUBLE,
+    volume LONG
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, trade_id);
+```
+
+Here, `trade_id` is an event identifier supplied by your producer. Choose keys
+that distinguish separate events, even when they share a timestamp.
+
+Use a timestamp from the [message payload](#using-a-message-field) or
+[Kafka metadata](#using-kafka-timestamps) so it stays the same on retry.
+The default server-assigned timestamp changes on retry and cannot deduplicate
+the event. See
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the full model.
+
+#### Outages and reconnects
+
+The connector reconnects and retries automatically after a connection drops.
+If QuestDB is unreachable when a task starts, it retries every
+`retry.backoff.ms` (default 3 seconds). Authentication and configuration errors
+fail the task immediately; fix the error before restarting it.
+
+If rows are pending and QuestDB confirms no further delivery for
+`qwp.progress.timeout.ms` (default 5 minutes), the task fails. Restart it once
+QuestDB is available. Increase this timeout if you need to tolerate longer
+outages. A backlog that continues to drain resets the timer.
+
+**Set Kafka retention to cover the outage and catch-up time.** A restarted
+task resumes from its last committed offset only if those records still
+exist. Kafka can expire uncommitted records; expired records cannot be
+recovered by the connector.
+
+#### Failover between QuestDB nodes
+
+With QuestDB Enterprise, list every node of the cluster in `addr` and the
+connector follows whichever node holds the primary role:
+
+```properties
+client.conf.string=wss::addr=node-a:9000,node-b:9000;token=${QUESTDB_TOKEN};
+```
+
+Failover itself is a manual operation, see
+[Failover and role switch](/docs/high-availability/failover/). Once you promote
+a replica, the connector switches to it on its own:
+
+1. The demoted node closes the connection on the first write it refuses.
+2. The client reconnects and tries each address in turn. Replicas reject the
+   connection immediately, so it lands on the new primary without a backoff
+   delay.
+3. Rows that were not acknowledged before the switch are re-sent to the new
+   primary.
+
+Step 3 can produce duplicates, so enable
+[deduplication](#exactly-once-delivery) on the affected tables.
+
+While no node accepts writes, the client keeps retrying in the background. The
+task fails only if `qwp.progress.timeout.ms` elapses without progress, and a
+task that starts during the switch retries every `retry.backoff.ms`.
+
+#### Dead letter queue
+
+Configure a dead letter queue (DLQ) to set aside invalid records for inspection
+while valid records continue to QuestDB. Add these settings to your connector
+configuration (`questdb-connector.properties`, or the connector JSON in
+distributed mode):
+
+```properties title="questdb-connector.properties"
+errors.tolerance=all
+errors.deadletterqueue.topic.name=dlq-questdb
+# Use 1 for a single-broker development cluster
+errors.deadletterqueue.topic.replication.factor=1
+```
+
+Both `errors.tolerance=all` and a DLQ topic are required. Choose a replication
+factor appropriate for your production Kafka cluster.
+
+By default, the connector sends records with conversion errors, oversized rows,
+or schema mismatches to the DLQ. For example, a string sent to a `DOUBLE`
+column is a schema mismatch. Without a usable DLQ, these errors stop the task.
+Authentication errors and other server failures still stop the task.
+
+The connector retries rejected batches to identify the invalid records. This
+can slow ingestion. Set `dlq.send.batch.on.error=true` only if you prefer to
+send the entire rejected batch to the DLQ, including any valid records in it.
+
+A common cause of schema mismatches is a JSON field that switches between
+integer and float. Pin such fields with the `doubles` option or pre-create the table, see
+[Numeric type inference](#numeric-type-inference).
+
+See the [Confluent DLQ documentation](https://developer.confluent.io/courses/kafka-connect/error-handling-and-dead-letter-queues/)
+for details.
+
+#### Shutdown and rebalances
+
+During a normal shutdown or rebalance, the connector sends pending rows and
+waits up to `qwp.commit.ack.timeout.ms` (default 500 ms) for confirmation before
+Kafka Connect commits offsets. Unconfirmed records remain uncommitted and may
+be delivered again by the next task. Deduplication prevents these retries
+from creating duplicate rows.
+
+### Performance tuning
+
+Start with the defaults. Adjust batching if messages take too long to appear,
+or buffer limits if network latency keeps the connector waiting for delivery
+confirmations.
+
+#### Batch size and latency
+
+| Setting | Default | Use it to |
+|---------|---------|-----------|
+| `auto_flush_rows` | 75000 rows | Send a batch when it reaches this size |
+| `auto_flush_interval` | 1000 ms | Send pending rows periodically, even while new records keep arriving |
+| `allowed.lag` | 1000 ms | Limit how long the connector waits for more records before sending a partial batch when idle |
+
+For smaller batches and more frequent sends:
+
+```properties
+client.conf.string=ws::addr=localhost:9000;auto_flush_rows=1000;auto_flush_interval=250;
+allowed.lag=250
+```
+
+Smaller batches increase request overhead. The connector also sends pending
+rows when Kafka Connect commits offsets.
+
+#### Backpressure
+
+The connector automatically pauses consumption when too many rows are waiting
+for QuestDB to confirm delivery. It resumes when QuestDB catches up.
+
+- `qwp.max.inflight.rows` (default 150,000) limits buffered and sent rows
+  awaiting confirmation. This is a soft limit: a Kafka poll batch can exceed it.
+- `sf_max_total_bytes` (default 128 MiB) limits memory used to buffer encoded
+  rows awaiting confirmation.
+
+On high-latency connections, larger limits allow more data to be sent while
+waiting for confirmations, at the cost of more memory. For example:
+
+```properties
+qwp.max.inflight.rows=500000
+client.conf.string=ws::addr=questdb.example.com:9000;sf_max_total_bytes=512m;
+```
+
+If the byte buffer stays full for `sf_append_deadline_millis` (default 30
+seconds), the connector reconnects and retries unconfirmed records from Kafka.
+
+#### Raw JSON fast path
+
+:::caution Experimental
+
+Test this mode with representative messages before using it in production.
+Keep the default converter-based mode if you need value transformations or
+schema-defined column types.
+
+:::
+
+For JSON object messages, you can let the connector parse the values directly
+to reduce conversion work:
+
+```properties
+value.converter=org.apache.kafka.connect.converters.ByteArrayConverter
+value.format=json
+```
+
+For messages wrapped as `{"schema": {...}, "payload": {...}}`, set
+`value.format=json_envelope`. Only `payload` becomes the row; the schema is
+ignored. Choose the mode explicitly: `json` would turn the envelope into
+`schema_*` and `payload_*` columns.
+
+Before switching, check that:
+
+- Your messages contain JSON objects. Top-level strings, numbers, and arrays
+  are not supported.
+- You do not use transformations that read or modify message values, such as
+  the [array transforms](#transformations). Topic routing transforms
+  such as `RegexRouter` still work.
+- You do not use [composed timestamps](#composed-timestamps).
+- Your table accepts types inferred from JSON values. Schema declarations
+  such as `INT8` or `FLOAT32` are ignored; numbers become `LONG` or `DOUBLE`.
+  Use `doubles` for fields that must always be sent as doubles.
+
+The key still uses `key.converter`. Field mapping, nested-object flattening,
+and numeric arrays remain available.
+
+<details>
+<summary>Additional JSON compatibility details</summary>
+
+| Input or setting | Behavior in raw JSON mode |
+|------------------|---------------------------|
+| Duplicate field names | The first value is kept; the standard converter keeps the last |
+| Integers outside the signed 64-bit range | Written as doubles, which can lose precision |
+| Empty field names | Sent to the DLQ, or fail the task without one; the standard converter uses a column named `value` |
+| Objects or arrays listed in `symbols` | Remain flattened objects or arrays, rather than becoming symbol columns |
+| Objects inside arrays | Fail, or are skipped with `skip.unsupported.types=true` |
+| Nesting deeper than 64 levels | Rejected as invalid data |
+| Auto-created tables | Column order follows the JSON document and may differ from converter-based ingestion |
+
+Use `ws` or `http` (or their TLS variants). With the legacy TCP transport,
+malformed JSON fails the task even if a DLQ is configured.
+
+</details>
 
 ### Transformations
 
@@ -528,7 +586,7 @@ entries.
 #### StructArrayExplode
 
 The `StructArrayExplode` SMT converts arrays of structs into **separate 1D
-`double[]` columns** — one per struct field. Unlike `OrderBookToArray` which
+`double[]` columns**, one per struct field. Unlike `OrderBookToArray` which
 produces a single 2D array column, this transform "explodes" each struct field
 into its own column.
 
@@ -589,6 +647,186 @@ transforms.explode.mappings=bids:bid_prices,bid_amounts:price,amount;asks:ask_pr
 | Output | One 2D `double[][]` column | Separate 1D `double[]` columns |
 | Mapping format | `source:target:field1,field2` | `source:target1,target2:field1,field2` |
 | Use case | All fields in one array column | Each field as its own column |
+
+### Legacy ILP transports
+
+The `http` and `https` protocols send rows as
+[InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over HTTP.
+Use them with QuestDB versions before 10.0 or to keep an existing HTTP
+pipeline. For new pipelines on QuestDB 10.0 or newer, use `ws` or `wss`.
+
+```properties
+client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
+```
+
+HTTP retries temporary errors for up to `retry_timeout` milliseconds (default
+10,000), then fails the task. The `qwp.*` options have no effect. You can still
+use a DLQ for invalid records and deduplication to prevent duplicates on retry.
+
+To migrate an HTTP pipeline to QWP:
+
+1. Upgrade to QuestDB 10.0 or newer and connector 0.24 or newer.
+2. Change `http::` to `ws::`, or `https::` to `wss::` for TLS.
+3. Remove `retry_timeout` and other HTTP-only keys from `client.conf.string`.
+   Keep your credentials and data mapping settings.
+4. Enable [deduplication](#exactly-once-delivery) if duplicate events are not
+   acceptable, and review [outage recovery](#outages-and-reconnects).
+
+### Configuration reference
+
+Set the QuestDB address and credentials in `client.conf.string`. Add data
+mapping and delivery options as separate connector properties.
+
+#### Connector options
+
+| Name | Type | Example | Default | Description |
+|------|------|---------|---------|-------------|
+| client.conf.string | `string` | ws::addr=localhost:9000; | N/A | Client configuration string |
+| topics | `string` | orders,audit | N/A | Kafka topics to read from |
+| table | `string` | my_table | Topic name | Target table in QuestDB |
+| key.converter | `string` | <sub>org.apache.kafka.connect.storage.StringConverter</sub> | N/A | Converter for Kafka keys |
+| value.converter | `string` | <sub>org.apache.kafka.connect.json.JsonConverter</sub> | N/A | Converter for Kafka values |
+| value.format | `string` | json | connect | Payload format: `connect`, `json`, or `json_envelope`. See [Raw JSON fast path](#raw-json-fast-path) |
+| include.key | `boolean` | false | true | Include message key in target table |
+| key.prefix | `string` | from_key | key | Prefix for key fields |
+| value.prefix | `string` | from_value | N/A | Prefix for value fields |
+| symbols | `string` | instrument,stock | N/A | Columns to create as [symbol](/docs/concepts/symbol/) type |
+| doubles | `string` | volume,price | N/A | Columns to always send as double type |
+| timestamp.field.name | `string` | pickup_time | N/A | Designated timestamp field. Use comma-separated names for [composed timestamps](#composed-timestamps) |
+| timestamp.units | `string` | micros | auto | Timestamp field units: `nanos`, `micros`, `millis`, `seconds`, `auto` |
+| timestamp.kafka.native | `boolean` | true | false | Use Kafka message timestamps as designated timestamps |
+| timestamp.string.fields | `string` | creation_time | N/A | String fields containing textual timestamps |
+| timestamp.string.format | `string` | yyyy-MM-dd HH:mm:ss.SSSUUU z | <sub>yyyy-MM-ddTHH:mm:ss.SSSUUUZ</sub> | Format for parsing string timestamps |
+| skip.unsupported.types | `boolean` | false | false | Skip unsupported types instead of failing |
+| allowed.lag | `int` | 250 | 1000 | Maximum wait in milliseconds for new records before sending a partial batch when idle |
+| retry.backoff.ms | `long` | 5000 | 3000 | Milliseconds to wait before reconnecting when QuestDB is unreachable. Not used by the HTTP transport |
+| dlq.send.batch.on.error | `boolean` | true | false | Send a whole rejected batch to the dead letter queue, including any valid records in it. See [Dead letter queue](#dead-letter-queue) |
+
+The connector uses Kafka Connect converters for deserialization and works with
+any format they support, including JSON, Avro, and Protobuf. When using Schema
+Registry, configure the appropriate converter (e.g.,
+`io.confluent.connect.avro.AvroConverter`).
+
+#### QWP delivery options
+
+These options apply only to `ws` and `wss`. Start with the defaults; see
+[outage recovery](#outages-and-reconnects) and
+[performance tuning](#performance-tuning) before changing them.
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| qwp.max.inflight.rows | `int` | 150000 | Soft limit on buffered or sent rows awaiting confirmation. Consumption pauses above this limit; the current Kafka poll batch can exceed it |
+| qwp.progress.timeout.ms | `long` | 300000 | Milliseconds without delivery progress before the task fails while rows are pending. New acknowledgements reset the timer |
+
+<details>
+<summary>Advanced delivery options</summary>
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| qwp.commit.ack.timeout.ms | `long` | 500 | How long an offset commit waits for delivery confirmation, in milliseconds. On timeout, unconfirmed offsets remain uncommitted; this alone does not trigger redelivery |
+| qwp.dlq.terminal.categories | `list` | SCHEMA_MISMATCH | Server errors eligible for the DLQ. Keep the default to avoid treating infrastructure failures as bad records |
+| qwp.quarantine.ack.timeout.ms | `long` | 1000 | How long each batch waits for delivery confirmation while isolating a rejected record, in milliseconds |
+
+Pre-release builds of the QWP transport used the names `max.inflight.rows` and
+`progress.timeout.ms`. Rename them to
+`qwp.max.inflight.rows` and `qwp.progress.timeout.ms`.
+
+</details>
+
+#### Client configuration string
+
+The `client.conf.string` option configures how the connector communicates with
+QuestDB. You can also set this via the `QDB_CLIENT_CONF` environment variable.
+
+Format:
+
+```
+<protocol>::<key>=<value>;<key>=<value>;...;
+```
+
+Note the trailing semicolon.
+
+**Supported protocols:**
+
+| Protocol | Transport | Notes |
+|----------|-----------|-------|
+| `ws` | QWP over WebSocket | Recommended. Acknowledged delivery, automatic reconnects |
+| `wss` | QWP over WebSocket with TLS | Requires QuestDB Enterprise, or a TLS-terminating proxy in front of QuestDB open source |
+| `http`, `https` | ILP over HTTP | Legacy. See [Legacy ILP transports](#legacy-ilp-transports) |
+| `tcp`, `tcps` | ILP over TCP | Not recommended. Offers no delivery guarantees |
+
+**Required keys:**
+- `addr` - QuestDB hostname and port (port defaults to 9000)
+
+Examples:
+
+```properties
+# Minimal configuration
+client.conf.string=ws::addr=localhost:9000;
+
+# Basic authentication with the password from an environment variable
+client.conf.string=ws::addr=questdb.example.com:9000;username=admin;password=${QUESTDB_PASSWORD};
+
+# TLS with a bearer token (QuestDB Enterprise)
+client.conf.string=wss::addr=questdb.example.com:9000;token=${QUESTDB_TOKEN};
+
+# Multi-host failover (QuestDB Enterprise)
+client.conf.string=wss::addr=node-a:9000,node-b:9000;token=${QUESTDB_TOKEN};
+```
+
+See the [connect string reference](/docs/connect/clients/connect-string/) for
+all available client keys.
+
+##### Batching and buffer options
+
+These client settings apply to `ws` and `wss`. For examples, see
+[performance tuning](#performance-tuning).
+
+| Key | Behaviour in the connector |
+|-----|----------------------------|
+| `auto_flush_rows` | Send a batch at this many rows. Default: `75000`. Cannot be `off` |
+| `auto_flush_interval` | Interval for sending pending rows, in milliseconds. Default: `1000`. Cannot be `off` |
+| `sf_max_total_bytes` | Cap on the memory buffer of encoded, unacknowledged rows. Default: `128m` |
+| `sf_append_deadline_millis` | How long sending can wait for buffer space, in milliseconds. Default: `30000`. Must be lower than the consumer's `max.poll.interval.ms` |
+
+<details>
+<summary>Client settings with connector-specific behavior</summary>
+
+- Leave `auto_flush_bytes` enabled so batches fit the server's size limit.
+- Omit `sf_dir` and `sf_durability`: disk buffering is not supported. Recovery
+  relies on [Kafka retention](#outages-and-reconnects).
+- Omit `initial_connect_retry` or set it to `off`. The connector handles
+  startup retries using `retry.backoff.ms`; `reconnect_*` settings control
+  retries after a connection drops.
+- Leave `close_flush_timeout_millis` at its default of `0`. Increasing it
+  delays shutdown without allowing more offsets to be committed.
+
+</details>
+
+##### Environment variable expansion
+
+The `client.conf.string` supports `${VAR}` syntax for environment variable
+expansion, useful for injecting secrets in Kubernetes environments:
+
+| Pattern | Result |
+|---------|--------|
+| `${VAR}` | Replaced with environment variable value |
+| `$$` | Escaped to literal `$` |
+| `$${VAR}` | Escaped to literal `${VAR}` (not expanded) |
+| `$VAR` | Not expanded (braces required) |
+
+The connector fails to start if:
+- A referenced environment variable is not defined
+- A variable reference is malformed (e.g., unclosed braces `${VAR`)
+- A variable name is empty (`${}`) or invalid (must start with letter or
+  underscore, followed by letters, digits, or underscores)
+
+:::warning
+
+Environment variable values containing semicolons (`;`) will break the
+configuration string parsing.
+
+:::
 
 ### Sample projects
 
@@ -691,7 +929,19 @@ key.converter.schemas.enable=false
 
 </details>
 
+<details>
+  <summary>The task fails with "QWP acknowledgements did not advance"</summary>
+
+QuestDB has not confirmed further delivery for `qwp.progress.timeout.ms`
+(default 5 minutes) while rows were pending. Check that QuestDB is available
+and reachable from the Kafka Connect worker, then restart the task. See
+[outage recovery](#outages-and-reconnects) for timeout and retention settings.
+
+</details>
+
 ## See also
 
+- [Delivery semantics](/docs/concepts/delivery-semantics/)
+- [Connect string reference](/docs/connect/clients/connect-string/)
 - [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium/)
 - [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector/)
