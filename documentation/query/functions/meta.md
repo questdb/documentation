@@ -517,15 +517,13 @@ available when resource group enforcement is disabled.
 
 **Return value:** a table with these columns:
 
-| Column                 | Type      | Description                                                          |
-| ---------------------- | --------- | -------------------------------------------------------------------- |
-| `principal_type`       | `VARCHAR` | `USER`, `GROUP` or `SERVICE_ACCOUNT`                                 |
-| `principal_name`       | `VARCHAR` | ACL principal name                                                   |
-| `principal_generation` | `LONG`    | Distinguishes a principal from a later recreation of the same name   |
-| `resource_group_id`    | `LONG`    | System-assigned identifier of the mapped resource group              |
-| `resource_group`       | `VARCHAR` | Group name                                                           |
-| `mapping_priority`     | `INT`     | Priority for ACL group mappings; defaults to `0`                     |
-| `mapping_revision`     | `LONG`    | Revision used to break equal-priority ties; the higher revision wins |
+| Column              | Type      | Description                                                                                                    |
+| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `principal_type`    | `VARCHAR` | `USER`, `GROUP` or `SERVICE_ACCOUNT`                                                                           |
+| `principal_name`    | `VARCHAR` | ACL principal name                                                                                             |
+| `resource_group_id` | `LONG`    | System-assigned identifier of the mapped resource group                                                        |
+| `resource_group`    | `VARCHAR` | Group name                                                                                                     |
+| `mapping_priority`  | `INT`     | Priority for ACL group mappings; defaults to `0`. Equal priorities resolve to the resource group created first |
 
 ```questdb-sql
 SELECT principal_type, principal_name, resource_group, mapping_priority
@@ -557,7 +555,6 @@ disabled; their runtime counters are zero.
 | `max_queued_queries`       | `INT`     | Queue capacity; `2147483647` represents unlimited, and `0` disables queueing                            |
 | `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds                                                             |
 | `cpu_weight`               | `INT`     | Relative scheduling weight                                                                              |
-| `cpu_max_percent`          | `DOUBLE`  | CPU percentage cap; `NULL` when uncapped                                                                |
 | `active_queries`           | `LONG`    | Queries currently holding admission slots                                                               |
 | `queued_queries`           | `LONG`    | Queries waiting for admission                                                                           |
 | `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                                       |
@@ -574,15 +571,14 @@ ORDER BY name;
 ```
 
 Counters describe the current runtime and reset on restart or group recreation.
-Worker-local memory deltas can be temporarily unpublished. The single uncapped
-group dispatch path does not sample CPU, so `cpu_nanos_total` does not cover all
-query CPU use. Dropped groups disappear from this table while their existing
-queries finish using retained state.
+Worker-local memory deltas can be temporarily unpublished. The single-group
+dispatch path does not sample CPU, so `cpu_nanos_total` does not cover all query
+CPU use. Dropped groups disappear from this table while their existing queries
+finish using retained state.
 
 For the corresponding
 [Prometheus metrics](/docs/operations/logging-metrics/#resource-group-metrics),
-an uncapped CPU limit is represented by `-1`, whereas SQL returns `NULL`. An
-unlimited group memory ceiling is `0` in both interfaces; it does not remove
+an unlimited group memory ceiling is `0` in both interfaces; it does not remove
 principal-specific, instance-default single-query or process memory limits.
 
 ## sleep()

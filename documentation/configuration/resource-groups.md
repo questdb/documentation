@@ -3,7 +3,7 @@ title: Resource groups
 sidebar_label: Resource groups
 description:
   Configuration settings for QuestDB Enterprise resource groups, covering the
-  master switch, CPU capacity, memory ceiling and admission defaults.
+  master switch and the process memory ceiling.
 ---
 
 :::note
@@ -54,21 +54,6 @@ not stop the instance from starting. `SHOW PARAMETERS` then reports `false`,
 which is the value that took effect. Set it to `true` explicitly and a legacy
 pool becomes a startup error instead.
 
-### resource.groups.cpu.capacity.cores
-
-- **Default**: `auto`
-- **Reloadable**: no
-
-The CPU capacity that `cpu_max_percent` is a percentage of, as `auto` or a
-positive decimal number of cores. `auto` detects the process affinity mask and
-the most restrictive cgroup quota, preserving fractional quotas such as `500m`,
-so a 50% cap on half a core really means a quarter of a core. An explicit value
-is capped by successful detection; if detection fails, the explicit value stands
-and the failure is logged.
-
-When detection fails and no explicit value is set, capacity falls back to the
-processor count and `questdb_resource_groups_cpu_capacity_fallback` reports `1`.
-
 ### resource.groups.process.memory.limit.bytes
 
 - **Default**: `0`
@@ -79,20 +64,11 @@ instance without a process ceiling, which is the default. When set, it bounds
 every group and every query, so no group policy can grant more than this.
 
 An unlimited process budget does not disable memory accounting or remove an
-existing single-query limit. The group-level SQL parameter `memory_limit` uses
-`RESET (memory_limit)` to clear its ceiling; it does not accept `0`.
+existing single-query limit. The group-level SQL parameter `memory_limit` treats
+`0` and `UNLIMITED` as no ceiling, as does `RESET (memory_limit)`.
 
 This is not a process RSS limit. It covers tracked query memory only, not JVM
 heap, memory-mapped table pages or long-lived engine caches.
-
-### resource.groups.queue.timeout.millis
-
-- **Default**: `30000`
-- **Reloadable**: no
-
-How long a queued query waits for an admission slot in a group that does not set
-its own `queue_timeout`. A query that waits longer fails with
-`Resource Group admission queue timeout`.
 
 ## See also
 

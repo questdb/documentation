@@ -391,13 +391,12 @@ endpoint exposes one series per group, labelled with `resource_group`:
 | `questdb_resource_group_oldest_queue_wait_millis`   | gauge   | How long the longest waiting query has waited                |
 | `questdb_resource_group_memory_bytes`               | gauge   | Tracked query memory in use                                  |
 | `questdb_resource_group_memory_limit_bytes`         | gauge   | Effective group memory ceiling, `0` when the group sets none |
-| `questdb_resource_group_cpu_nanos_total`            | counter | CPU charged to the group                                     |
+| `questdb_resource_group_cpu_nanos_total`            | counter | CPU measured under managed scheduling                        |
 | `questdb_resource_group_cpu_wait_nanos_total`       | counter | Time the group spent waiting for CPU                         |
-| `questdb_resource_group_cpu_max_percent`            | gauge   | Effective CPU cap, `-1` when uncapped                        |
 | `questdb_resource_group_admission_rejections_total` | counter | Queries rejected because the queue was full                  |
 | `questdb_resource_group_admission_timeouts_total`   | counter | Queries that timed out while queued                          |
 
-The single uncapped group dispatch path does not sample CPU. Consequently,
+The single-group dispatch path does not sample CPU. Consequently,
 `cpu_nanos_total` counts CPU measured by managed scheduling, not every query's
 CPU consumption. A flat counter does not imply that the group is idle; also
 check `questdb_resource_groups_cpu_managed_dispatch` and query activity. Memory
@@ -405,15 +404,12 @@ gauges show published accounting and can lag worker-local deltas.
 
 Instance-wide series describe the feature itself:
 
-| Metric                                                  | Type    | Description                                                           |
-| ------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `questdb_resource_groups_enabled`                       | gauge   | `1` when the feature is on                                            |
-| `questdb_resource_groups_catalog_current`               | gauge   | `1` when the group catalog is current; `0` while a replica catches up |
-| `questdb_resource_groups_catalog_lag_unmanaged_queries` | counter | Queries that ran unmanaged because the catalog was not current yet    |
-| `questdb_resource_groups_cpu_capacity_microcores`       | gauge   | Capacity that `cpu_max_percent` applies to                            |
-| `questdb_resource_groups_cpu_capacity_fallback`         | gauge   | `1` when capacity detection failed and the processor count was used   |
-| `questdb_resource_groups_cpu_managed_dispatch`          | gauge   | `1` while managed CPU scheduling is engaged                           |
-| `questdb_resource_groups_cpu_scheduler_degraded`        | gauge   | `1` when CPU scheduling has degraded to unmanaged                     |
+| Metric                                           | Type  | Description                                                           |
+| ------------------------------------------------ | ----- | --------------------------------------------------------------------- |
+| `questdb_resource_groups_enabled`                | gauge | `1` when the feature is on                                            |
+| `questdb_resource_groups_catalog_current`        | gauge | `1` when the group catalog is current; `0` while a replica catches up |
+| `questdb_resource_groups_cpu_managed_dispatch`   | gauge | `1` while managed CPU scheduling is engaged                           |
+| `questdb_resource_groups_cpu_scheduler_degraded` | gauge | `1` when CPU scheduling has degraded to unmanaged                     |
 
 A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU shares are
 no longer enforced until the instance restarts. Admission and memory limits stay

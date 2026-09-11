@@ -62,6 +62,11 @@ When `false`, disables the `reload_config()` SQL function.
 A global timeout for long-running queries, given as a duration: `500ms`, `120s`,
 `2m` and `1h` are all valid, and a plain number is read as milliseconds.
 
+The timer starts when the server receives the statement and includes any time
+the query spends queued for Resource Group admission. Over PGWire each `Execute`
+message restarts it, so a client that fetches a cursor in batches is timed per
+batch rather than across the whole result.
+
 This key replaces `query.timeout.sec`. When both are set, `query.timeout` takes
 precedence; when neither is set, queries time out after 60 seconds.
 
