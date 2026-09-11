@@ -506,35 +506,6 @@ Edit `server.conf` and run `reload_config`:
 SELECT reload_config();
 ```
 
-## resource_group_mappings
-
-_QuestDB Enterprise only. Requires administrator rights._
-
-Returns the principal mappings in the resource group catalog. Definitions remain
-available when resource group enforcement is disabled.
-
-**Arguments:** none.
-
-**Return value:** a table with these columns:
-
-| Column              | Type      | Description                                                                                                    |
-| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| `principal_type`    | `VARCHAR` | `USER`, `GROUP` or `SERVICE_ACCOUNT`                                                                           |
-| `principal_name`    | `VARCHAR` | ACL principal name                                                                                             |
-| `resource_group_id` | `LONG`    | System-assigned identifier of the mapped resource group                                                        |
-| `resource_group`    | `VARCHAR` | Group name                                                                                                     |
-| `mapping_priority`  | `INT`     | Priority for ACL group mappings; defaults to `0`. Equal priorities resolve to the resource group created first |
-
-```questdb-sql
-SELECT principal_type, principal_name, resource_group, mapping_priority
-FROM resource_group_mappings()
-ORDER BY principal_type, principal_name;
-```
-
-This lists mappings rather than expanding inherited assignments into one row per
-user. Use `current_resource_group()` from a user's own session to confirm the
-resolved assignment.
-
 ## resource_groups
 
 _QuestDB Enterprise only. Requires administrator rights._

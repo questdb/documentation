@@ -36,8 +36,8 @@ SHOW { COLUMNS FROM tableName
 
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
-- `SHOW CREATE DATABASE` returns DDL statements that recreate every object
-  in the database, one per row, ordered so dependencies come first.
+- `SHOW CREATE DATABASE` returns DDL statements that recreate every object in
+  the database, one per row, ordered so dependencies come first.
 - `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
   view.
 - `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
@@ -45,7 +45,7 @@ SHOW { COLUMNS FROM tableName
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
-    (enterprise-only)
+  (enterprise-only)
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
 - `SHOW PARTITIONS` returns the partition information for the selected table.
@@ -67,6 +67,7 @@ SHOW { COLUMNS FROM tableName
 SHOW COLUMNS FROM trades;
 
 ```
+
 | column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude |
 | --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- | --------- | ------------ |
 | symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |           |              |
@@ -76,10 +77,10 @@ SHOW COLUMNS FROM trades;
 | timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |              |
 
 The `indexType` column shows the index type (`POSTING`, `POSTING DELTA`,
-`POSTING EF`, `BITMAP`, or empty for non-indexed columns). The
-`indexInclude` column lists the names of columns included in a
-[posting index's](/docs/concepts/deep-dive/posting-index/) covering
-sidecar, as a comma-separated string.
+`POSTING EF`, `BITMAP`, or empty for non-indexed columns). The `indexInclude`
+column lists the names of columns included in a
+[posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar, as
+a comma-separated string.
 
 ### SHOW CREATE DATABASE
 
@@ -110,10 +111,9 @@ all valid. Called without a clause, the statement dumps the whole database:
 SHOW CREATE DATABASE;
 ```
 
-The result set has a single `ddl` column with one self-contained statement
-per row. Run against a database holding the
-[demo](https://demo.questdb.io) tables and materialized views, it returns one
-row per object:
+The result set has a single `ddl` column with one self-contained statement per
+row. Run against a database holding the [demo](https://demo.questdb.io) tables
+and materialized views, it returns one row per object:
 
 | ddl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -198,10 +198,9 @@ statements carry no password or token, so set these after replaying the dump.
 
 The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
 `PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
-or `USER DETAILS` permission,
-while the schema categories need no access control permission, so a user with
-only `SELECT` can still dump the structure. When access control is disabled the
-command degrades to a schema-only dump.
+or `USER DETAILS` permission, while the schema categories need no access control
+permission, so a user with only `SELECT` can still dump the structure. When
+access control is disabled the command degrades to a schema-only dump.
 
 ### SHOW CREATE LIVE VIEW
 
@@ -237,11 +236,12 @@ materialized view, including its base table, refresh strategy, and partitioning.
 SHOW CREATE TABLE trades;
 ```
 
-| ddl                                                                                                                                                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ddl                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
 
-This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
+This is printed with formatting, so when pasted into a text editor that support
+formatting characters, you will see:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -256,9 +256,9 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 
 #### Posting index with covering columns
 
-When a symbol column has a posting index with `INCLUDE`, the DDL reflects
-the index type and covered columns. The designated timestamp is appended
-to the `INCLUDE` list automatically, so a table created with
+When a symbol column has a posting index with `INCLUDE`, the DDL reflects the
+index type and covered columns. The designated timestamp is appended to the
+`INCLUDE` list automatically, so a table created with
 `INCLUDE (price, exchange)` round-trips as
 `INCLUDE (price, exchange, timestamp)`:
 
@@ -313,7 +313,8 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
+[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause
+populated with the current user.
 
 For example,
 
@@ -331,8 +332,8 @@ OWNED BY 'admin';
 
 This clause assigns permissions for the table to that user.
 
-If permissions should be assigned to a different user,
-please modify this clause appropriately.
+If permissions should be assigned to a different user, please modify this clause
+appropriately.
 
 ### SHOW CREATE VIEW
 
@@ -344,8 +345,8 @@ SHOW CREATE VIEW my_view;
 | ---------------------------------------------------------------- |
 | CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades); |
 
-This returns the `CREATE VIEW` statement that would recreate the view,
-including any `DECLARE` parameters if the view is parameterized.
+This returns the `CREATE VIEW` statement that would recreate the view, including
+any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW GROUPS
 
@@ -355,15 +356,23 @@ _Enterprise only._
 SHOW GROUPS;
 ```
 
-or
+| name       | external_alias | memory_limit | resource_group | resource_group_priority |
+| ---------- | -------------- | ------------ | -------------- | ----------------------- |
+| management |                | null         | reporting      | 10                      |
+| analysts   | analysts-sso   | 1073741824   | null           | null                    |
+
+`memory_limit` is the group's own query memory limit in bytes, `NULL` when none
+is set. `resource_group` and `resource_group_priority` are the group's
+[resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
+`NULL` when the group is not mapped.
 
 ```questdb-sql
 SHOW GROUPS john;
 ```
 
-| name       |
-| ---------- |
-| management |
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management |                | null         |
 
 ### SHOW PARAMETERS
 
@@ -378,18 +387,18 @@ The output demonstrates:
 - `value`: the current value of the key
 - `value_source`: how the value is set (default, conf or env)
 - `sensitive`: if it is a sensitive value (passwords)
-- `reloadable`: if the value can be [reloaded without a server restart](/docs/configuration/overview/#reloadable-settings)
+- `reloadable`: if the value can be
+  [reloaded without a server restart](/docs/configuration/overview/#reloadable-settings)
 
-| property_path                                | env_var_name                                     | value  | value_source | sensitive | reloadable |
-| -------------------------------------------- | ------------------------------------------------ | ------ | ------------ | --------- | ---------- |
-| http.min.net.connection.limit                | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                | 64     | default      | false     | false      |
-| line.http.enabled                            | QDB_LINE_HTTP_ENABLED                            | true   | default      | false     | false      |
-| cairo.parquet.export.row.group.size          | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE          | 100000 | default      | false     | false      |
-| http.security.interrupt.on.closed.connection | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION | true   | conf         | false     | false      |
-| pg.readonly.user.enabled                     | QDB_PG_READONLY_USER_ENABLED                     | true   | conf         | false     | true       |
-| pg.readonly.password                         | QDB_PG_READONLY_PASSWORD                         | ****   | default      | true      | true       |
-| http.password                                | QDB_HTTP_PASSWORD                                | ****   | default      | true      | false      |
-
+| property_path                                | env_var_name                                     | value    | value_source | sensitive | reloadable |
+| -------------------------------------------- | ------------------------------------------------ | -------- | ------------ | --------- | ---------- |
+| http.min.net.connection.limit                | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                | 64       | default      | false     | false      |
+| line.http.enabled                            | QDB_LINE_HTTP_ENABLED                            | true     | default      | false     | false      |
+| cairo.parquet.export.row.group.size          | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE          | 100000   | default      | false     | false      |
+| http.security.interrupt.on.closed.connection | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION | true     | conf         | false     | false      |
+| pg.readonly.user.enabled                     | QDB_PG_READONLY_USER_ENABLED                     | true     | conf         | false     | true       |
+| pg.readonly.password                         | QDB_PG_READONLY_PASSWORD                         | \*\*\*\* | default      | true      | true       |
+| http.password                                | QDB_HTTP_PASSWORD                                | \*\*\*\* | default      | true      | false      |
 
 You can optionally chain `SHOW PARAMETERS` with other clauses:
 
@@ -424,11 +433,15 @@ See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
 full column list, including `hasParquetGenerated`, `isParquet`,
 `parquetFileSize`, `seqTxn`, and `isRemotelyServed`.
 
-`isRemotelyServed` is `true` when the partition's data lives in object storage and is fetched with range reads. See [cold storage](/docs/concepts/cold-storage/) (Enterprise).
+`isRemotelyServed` is `true` when the partition's data lives in object storage
+and is fetched with range reads. See
+[cold storage](/docs/concepts/cold-storage/) (Enterprise).
 
 :::note
 
-`seqTxn` and `isRemotelyServed` are appended at the end of the result set. Tools that bind `SHOW PARTITIONS` columns by position rather than by name must account for the two new trailing columns.
+`seqTxn` and `isRemotelyServed` are appended at the end of the result set. Tools
+that bind `SHOW PARTITIONS` columns by position rather than by name must account
+for the two new trailing columns.
 
 :::
 
@@ -524,18 +537,23 @@ _Enterprise only._
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
+| name       | enabled | memory_limit | resource_group |
+| ---------- | ------- | ------------ | -------------- |
+| management | true    | null         | null           |
+| svc1_admin | true    | 536870912    | automation     |
+
+`memory_limit` is the account's own query memory limit in bytes and
+`resource_group` its
+[resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
+each `NULL` when not set.
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 536870912    |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
@@ -587,10 +605,15 @@ _Enterprise only._
 SHOW USERS;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| name  | enabled | memory_limit | resource_group |
+| ----- | ------- | ------------ | -------------- |
+| admin | true    | null         | null           |
+| john  | true    | 1073741824   | reporting      |
+
+`memory_limit` is the user's effective query memory limit in bytes and
+`resource_group` the user's direct
+[resource group](/docs/operations/resource-groups/#mapping-principals) mapping;
+a user mapped only through an ACL group shows `NULL` here.
 
 ## See also
 

@@ -61,7 +61,8 @@ Verify:
 SELECT name, cpu_weight, max_active_queries, active_queries, queued_queries
 FROM resource_groups();
 
-SELECT * FROM resource_group_mappings();
+SELECT name, resource_group FROM (SHOW USERS);
+SELECT name, resource_group, resource_group_priority FROM (SHOW GROUPS);
 ```
 
 Reconnect as `reporting_user` or `nightly_batch` and run:
@@ -416,8 +417,12 @@ with live counters:
 | `cpu_nanos_total`, `cpu_wait_nanos_total`                          | Cumulative CPU consumed and spent waiting for CPU   |
 | `admission_rejections`, `admission_timeouts`                       | Cumulative queue-full rejections and queue timeouts |
 
-`resource_group_mappings()` returns one row per mapping with `principal_type`,
-`principal_name`, `resource_group_id`, `resource_group` and `mapping_priority`.
+Mappings are attributes of the principals themselves. `SHOW USERS` and
+`SHOW SERVICE ACCOUNTS` carry a `resource_group` column, and `SHOW GROUPS`
+carries `resource_group` and `resource_group_priority`; all are `NULL` for an
+unmapped principal. Each statement can be used as a subquery, so
+`SELECT name FROM (SHOW GROUPS) WHERE resource_group = 'reporting'` lists the
+ACL groups mapped to one resource group.
 
 `current_resource_group()` returns the calling query's group, which is the
 quickest way to confirm a mapping from the client's own connection:
@@ -429,10 +434,9 @@ SELECT current_resource_group();
 It returns `NULL` when that execution is unmanaged, including when the feature
 is disabled or a replica's group catalog is not ready. See the
 [function reference](/docs/query/functions/meta/#current_resource_group) for
-permissions and return values, and the references for
-[`resource_groups()`](/docs/query/functions/meta/#resource_groups) and
-[`resource_group_mappings()`](/docs/query/functions/meta/#resource_group_mappings)
-for complete schemas.
+permissions and return values, and the
+[`resource_groups()`](/docs/query/functions/meta/#resource_groups) reference for
+its complete schema.
 
 `query_activity()` carries a `resource_group` column, so you can see which group
 each running query was admitted to. It is `NULL` for executions that resource
