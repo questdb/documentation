@@ -8,6 +8,23 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## Unreleased
+
+### New
+
+- [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - New row-level retention for materialized views, with creation syntax in [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/), immediate read filtering, and background reclamation for eligible policies
+
+### Compatibility
+
+- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-restrictions-and-existing-definitions) -
+  The release introducing `EXPIRE ROWS` also rejects `LIMIT` in query branches that
+  read the base table, including nested queries. Existing views continue
+  refreshing, but recreating affected definitions, including replaying
+  `SHOW CREATE MATERIALIZED VIEW` output, requires removing or restructuring the
+  limit. To cap query results, apply `ORDER BY ... LIMIT ...` when reading the view;
+  moving the limit changes which rows the view stores. Limited subqueries over
+  other tables remain allowed.
+
 ## September 2026
 
 ### QuestDB Enterprise Releases

@@ -12,6 +12,11 @@ their results at query time, materialized views persist their data to disk,
 making them particularly efficient for expensive aggregate queries that are run
 frequently.
 
+Most materialized views aggregate, bucketing base rows with `SAMPLE BY` or a
+time-based `GROUP BY`. A view can also be a
+[passthrough view](#passthrough-views), which projects base rows one-for-one
+instead of summarising them.
+
 ## What are materialized views for?
 
 Let's say your application ingests trade data into a table like this:
@@ -116,9 +121,10 @@ reads on a smaller, pre-aggregated dataset.
 
 ### Not suited for: data enrichment
 
-Materialized views support JOINs, but `SAMPLE BY` (aggregation) is mandatory.
-This means you can enrich aggregated results with data from other tables, but
-you cannot keep raw (non-aggregated) rows while adding enrichment columns.
+Materialized views support JOINs only in an aggregating query. A
+[passthrough view](#passthrough-views) keeps raw rows, but it must read a single
+table. So neither shape lets you keep raw rows while adding columns from another
+table.
 
 For example, joining aggregated trades with instrument metadata works:
 
@@ -156,6 +162,183 @@ refresh. Changes to joined tables do not trigger updates.
 
 **Coming soon**: We are actively developing a new type of materialized view that
 will support data enrichment use cases. Stay tuned for updates.
+
+## Passthrough views
+
+Not every materialized view aggregates. A **passthrough view** projects base
+rows one-for-one instead of bucketing them, so the view is a
+continuously-maintained copy of its base table, optionally narrowed to a subset
+of columns, a subset of rows, or both. Its query has no `SAMPLE BY` and no
+time-based `GROUP BY`:
+
+```questdb-sql title="Passthrough view: a maintained, filtered copy of trades"
+CREATE MATERIALIZED VIEW trades_btc AS (
+  SELECT timestamp, symbol, price, amount
+  FROM trades
+  WHERE symbol = 'BTC'
+);
+```
+
+Reach for one when you want a maintained *subset* of a large table rather than a
+summary of it:
+
+- **A narrowed replica**: one symbol, one tenant, one region, or a handful of
+  columns out of a wide table, kept current automatically and queried without
+  the base table's scan cost.
+- **A row-level retention target**: attach an
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy to keep only
+  some of the view's rows. The base table is left alone.
+
+Passthrough views refresh incrementally like any other materialized view, and
+accept the same `REFRESH IMMEDIATE` (the default), `REFRESH MANUAL` and
+`REFRESH EVERY` strategies. `REFRESH PERIOD` is rejected: there are no buckets
+for a period to align to.
+
+### Use cases
+
+On its own, a passthrough view is a maintained copy of the base table. Add an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy and it becomes a
+maintained *subset*: you describe which rows are worth keeping, and QuestDB
+keeps that set current as new data arrives. The three examples below are drawn
+from sensor telemetry and from capital markets, and each keeps a different kind
+of subset.
+
+#### IoT: The current reading from every sensor
+
+A building management platform records temperature and humidity from tens of
+thousands of sensors, and its operations screen shows the newest reading from
+each one.
+
+Sensors report at their own pace. Some send a reading every second, others go
+quiet for days. Against the base table that screen runs
+`LATEST ON ts PARTITION BY sensor_id`, which reads backwards until it has found
+a row for even the quietest sensor, and over a long history that is most of the
+table.
+
+A view that keeps only the newest row per sensor answers the same question from
+a handful of rows:
+
+```questdb-sql title="Latest reading per sensor"
+CREATE MATERIALIZED VIEW sensor_current AS (
+  SELECT * FROM sensor_readings
+) EXPIRE ROWS KEEP LATEST PARTITION BY sensor_id;
+```
+
+`sensor_current` holds one row per `sensor_id` and moves forward on its own as
+readings arrive. Superseded rows stop appearing in queries but stay on disk, so
+the view keeps growing at the same rate as the base table. Give it a
+[TTL](/docs/concepts/ttl/) to cap its size.
+
+#### Finance: Options that have not expired yet
+
+A market maker quotes an options chain where contracts expire every Friday, and
+the pricing screen must never show a contract that has already expired.
+
+That rule cannot live in the view's query. The query runs when rows are written
+into the view, and it may not call `now()`, so there is no way to say "expiry is
+still in the future" in a `WHERE` clause. An `EXPIRE ROWS WHEN` predicate is
+evaluated on every read, which is what this case needs:
+
+```questdb-sql title="Options that have not expired yet"
+CREATE MATERIALIZED VIEW options_live AS (
+  SELECT * FROM options_quotes
+) EXPIRE ROWS WHEN expiry < now();
+```
+
+Contracts leave `options_live` as their expiry passes. There is no job to
+schedule and nothing to re-create.
+
+One caveat, about disk rather than about results. QuestDB deletes expired rows
+only when it can tell that a row, once expired, can never qualify again. It can
+tell that for a cutoff on the view's designated timestamp, which only moves
+forward. `expiry` is a different column, so QuestDB takes the safe route:
+expired contracts stop appearing in queries straight away, but their rows stay
+on disk. Add a [TTL](/docs/concepts/ttl/) if you want that space back, and see
+[when expired rows are deleted from disk](/docs/concepts/expire-rows/#monotonicity-and-cleanup-safety).
+
+#### Finance: The largest trades per symbol
+
+A surveillance desk watches for block trades and wants the ten biggest prints
+for every instrument on hand at all times.
+
+A trade is a fact that does not change once it has happened, so "the ten biggest
+so far" is a set that only gets refined as larger trades arrive. That is what a
+top-N policy maintains:
+
+```questdb-sql title="Ten largest trades per symbol"
+CREATE MATERIALIZED VIEW trades_largest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP 10 HIGHEST amount PARTITION BY symbol;
+```
+
+`trades_largest` holds ten rows per symbol however far the base table grows, and
+the desk reads it directly instead of ranking the base table on every query.
+When an eleventh large trade arrives, the smallest of the ten drops out. Trades
+tied on `amount` at the tenth place are separated by the designated timestamp,
+with the newer one staying.
+
+Ten rows per symbol are visible, but the view still stores every base row it has
+taken in, because a top-N policy never frees disk. A [TTL](/docs/concepts/ttl/)
+is what bounds that, at the price of changing the question the view answers from
+"the biggest so far" to "the biggest still retained". See
+[combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
+
+The ranking covers everything the view holds rather than a recent window, so
+`KEEP N` fits records that stay true once written. For a value that gets
+superseded later, such as a resting order that is then cancelled, `KEEP LATEST`
+is the mode that tracks the current version.
+
+### What a passthrough view inherits
+
+A passthrough view takes its shape from the base table instead of from a
+`SAMPLE BY` clause:
+
+- **Designated timestamp and partitioning** come from the base table. The
+  projection has to keep the designated timestamp; a query that drops it is
+  rejected with `materialized view query is required to have designated
+  timestamp`. `PARTITION BY` and `TTL` can still be stated explicitly.
+- **Symbol indexes are inherited.** A base column declared `SYMBOL INDEX` stays
+  indexed in the view, under whatever alias the projection gives it, so an
+  indexed lookup on the view costs what it costs on the base. An aggregating
+  view never inherits an index, because its rows are not base rows.
+
+### Which queries are passthrough
+
+The rule is that view rows stay 1:1 with base rows. A projection over a single
+table qualifies, with or without a filter:
+
+| Query | |
+| ----- | --- |
+| `SELECT * FROM trades` | Passthrough |
+| `SELECT timestamp, symbol, price FROM trades` | Passthrough: column subset |
+| `SELECT timestamp, symbol AS ticker FROM trades` | Passthrough: aliases are fine |
+| `SELECT timestamp, price * amount AS notional FROM trades` | Passthrough: a row-local expression |
+| `SELECT * FROM trades WHERE symbol = 'BTC'` | Passthrough: a filter only removes rows |
+| `... SAMPLE BY 1h`, or `GROUP BY` on a timestamp | Aggregating view |
+| `SELECT DISTINCT ...` | Rejected |
+| `... LATEST ON timestamp PARTITION BY symbol` | Rejected |
+| `JOIN`, `UNION` | Rejected |
+| `row_number() OVER (...)` and other window functions | Rejected |
+| `LIMIT` | Rejected |
+| `ORDER BY` a non-timestamp column | Rejected: the view loses its designated timestamp |
+
+Everything in the rejected group produces output that depends on rows *other
+than* the one being emitted. An incremental refresh sees only the newly-arrived
+slice of the base table, so it cannot compute those correctly. A `LIMIT 100`
+would admit 100 rows per refresh rather than 100 in total, and a `row_number()`
+would restart within each slice.
+
+A query that is neither passthrough nor aggregating is rejected at creation
+time. Most report `materialized view query requires a sampling interval, use
+SAMPLE BY or GROUP BY timestamp_floor()`: the query looked like it meant to
+aggregate but named no bucket. `LIMIT` and window functions have their own
+messages.
+
+To keep only some of a passthrough view's rows over time, such as the latest per
+key, the top-N per group, or rows matching a predicate, attach an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. That page also
+covers
+[when to put a predicate in the view's `WHERE` clause instead](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ## Creating a materialized view
 
@@ -214,7 +397,9 @@ interval:
 
 ### The query
 
-Materialized views require a `SAMPLE BY` or time-based `GROUP BY` query.
+An aggregating materialized view uses a `SAMPLE BY` or time-based `GROUP BY`
+query. (The other shape is a [passthrough view](#passthrough-views), which does
+not aggregate; the rules below apply to aggregating views.)
 
 **Supported:**
 
@@ -454,6 +639,18 @@ modified in incompatible ways:
 - Renaming the base table
 - `TRUNCATE` or `UPDATE` operations
 
+An active [`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
+on a referenced materialized view also causes invalidation when refresh detects
+it. `SET EXPIRE` is allowed with existing dependents; invalidation is not
+synchronous with ALTER. An idle dependent may retain its status, and an
+already-running refresh may finish against its earlier snapshot. The policy does
+not retroactively filter rows already stored in the dependent.
+
+Removing the source policy does not automatically restore an invalidated view.
+Resolve the source conflict, then request a
+[FULL refresh](/docs/query/sql/refresh-mat-view/#full). FULL refresh deletes the
+existing contents before rebuilding; failure does not restore those contents.
+
 Check for invalid views:
 
 ```questdb-sql title="Find invalid views"
@@ -526,7 +723,9 @@ rows.
 
 Materialized view queries:
 
-- Must use `SAMPLE BY` or `GROUP BY` with a designated timestamp column
+- Must either aggregate with `SAMPLE BY` / `GROUP BY` on a designated timestamp
+  column, or be a [passthrough](#passthrough-views) projection over a single
+  table
 - Must not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Must not use non-deterministic functions (`now()`, `rnd_uuid4()`)
 - Must use join conditions compatible with incremental refresh
@@ -562,6 +761,93 @@ Incremental refresh process:
 This happens asynchronously, minimizing write performance impact.
 
 ## Enterprise features
+
+### Restricted access with row expiry
+
+An `EXPIRE ROWS` policy on a passthrough materialized view filters expired rows
+from queries before background cleanup removes them. In Enterprise, readers
+with column-level SELECT grants also need permission on columns used to enforce
+the policy, even when those columns are absent from the query's output.
+
+#### Direct materialized-view access
+
+Grant the requested columns and the policy's predicate, partition, and order
+columns. For example, on a materialized view `mv` with columns `sym`, `k`, `v`,
+`secret`, and designated timestamp `ts`:
+
+| Expiry policy | Grants needed for `SELECT sym FROM mv` |
+| --- | --- |
+| `WHEN v < 2.0` | `SELECT ON mv(sym, v)` |
+| `WHEN ts < '2025-01-01T00:00:01.000000Z'` | `SELECT ON mv(sym)` |
+| `KEEP LATEST PARTITION BY k` | `SELECT ON mv(sym, k)` |
+| `KEEP HIGHEST v PARTITION BY k` | `SELECT ON mv(sym, v, k)` |
+
+Column-level grants implicitly include the designated timestamp. A table-level
+SELECT grant covers all columns, including those needed by the policy.
+
+Review direct grants whenever you enable or change expiry. Granting a policy
+column lets the reader query that column explicitly. If it must remain hidden,
+use an ordinary SQL view as described below. Different readers can use either
+access pattern.
+
+**COUNT limitation:** `SELECT count() FROM mv` can require SELECT on unrelated
+columns as well as policy columns. With sufficient policy-column grants, use an
+explicit timestamp projection to count retained rows:
+
+```questdb-sql
+SELECT count() FROM (SELECT ts FROM mv);
+```
+
+This still requires the policy-column permissions. Direct COUNT also works with
+a table-level SELECT grant.
+
+#### Hide policy columns with an ordinary view
+
+After configuring expiry and waiting for it to apply, an authorized administrator
+can create an ordinary SQL view with only the intended output columns:
+
+```questdb-sql
+CREATE VIEW mv_public AS (SELECT sym FROM mv);
+GRANT SELECT ON mv_public TO reader;
+```
+
+The reader needs the appropriate connection permission, such as `PGWIRE` or
+`HTTP`, and SELECT on `mv_public`. They do not need any grant on `mv` or its
+policy columns. Both SELECT and COUNT through `mv_public` operate on retained
+rows, and its schema exposes only `sym`. Different output column sets can use
+separate ordinary views.
+
+#### Change expiry beneath an existing ordinary view
+
+Adding expiry, or replacing a policy with one that uses a new hidden column, can
+make reads through an existing ordinary view fail with access denied. The view's
+saved dependencies must be refreshed by reissuing its complete, unchanged
+original definition:
+
+```questdb-sql
+ALTER MATERIALIZED VIEW mv SET EXPIRE ROWS WHEN secret < 20;
+SELECT wait_wal_table('mv');
+ALTER VIEW mv_public AS (SELECT sym FROM mv);
+```
+
+Run these statements in order as an authorized administrator, waiting for each
+to complete successfully. The WAL wait ensures that the policy has been applied
+before `ALTER VIEW` collects its dependencies; an ALTER acknowledgement alone,
+including over the PostgreSQL protocol, does not establish application.
+
+The `ALTER VIEW` statement preserves existing grants on `mv_public`. Use the
+original definition for your view, including any filters and output restrictions.
+Readers can receive access-denied errors between policy application and the
+view-definition update. Reissuing the definition before policy application does
+not pick up the new dependencies.
+
+Background view compilation and `COMPILE VIEW` do not refresh these dependency
+permissions. This procedure also applies to timestamp-only expiry when the
+ordinary view predates the policy: implicit timestamp permission on a direct
+materialized-view grant does not extend to an ordinary-view-only reader.
+
+`ALTER MATERIALIZED VIEW mv DROP EXPIRE` requires no ordinary-view repair after
+it applies. Rows that have already been physically cleaned up are not restored.
 
 ### Replicated views
 

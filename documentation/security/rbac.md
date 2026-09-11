@@ -119,6 +119,23 @@ GRANT SELECT ON aapl_trades TO aapl_analyst;
 The user `aapl_analyst` can only see AAPL trades. They have no access to the
 underlying `trades` table.
 
+### Materialized views with row expiry
+
+Column-restricted readers of a materialized view with `EXPIRE ROWS` need SELECT
+on the requested columns and the columns used by its policy. Enabling or changing
+expiry can therefore require updating direct grants. Those grants also permit
+reading the policy columns explicitly.
+
+To keep policy columns hidden, grant access to an ordinary SQL view exposing only
+the intended output. Its readers need no underlying materialized-view grants.
+When expiry adds dependencies beneath an existing ordinary view, wait for WAL
+application and reissue the original definition with `ALTER VIEW`; reads can be
+denied until that update. `COMPILE VIEW` does not repair these dependencies.
+
+See [restricted access with row expiry](/docs/concepts/materialized-views/#restricted-access-with-row-expiry)
+for grant examples, the COUNT limitation and workaround, and the policy-change
+procedure.
+
 ## Common scenarios
 
 ### Read-only analyst
