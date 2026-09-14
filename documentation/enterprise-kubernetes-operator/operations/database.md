@@ -304,6 +304,49 @@ writer-health or separate follower contract, and the expected retained or
 deleted replica PVCs. Confirm each current primary/replica PVC's
 `questdb.io/role` label matches that role.
 
+## Move the cold-storage manager
+
+With
+[`spec.coldStorage`](/docs/enterprise-kubernetes-operator/configuration/#cold-storage),
+the cold-storage [manager role](/docs/concepts/cold-storage/#roles) is moved
+by changing `spec.coldStorage.manager`, never by running
+[`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/)
+against instances. Run the manager on a replica: that moves upload, manifest,
+and garbage-collection work off the primary, and a `Planned` promotion
+requires the manager settled away from the departing primary.
+
+Before the change, require current generation,
+`ColdStorageHealthy=True/ManagerReady`, and an empty `handoffSource`:
+
+```sh
+kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='{range .status.conditions[?(@.type=="ColdStorageHealthy")]}{.type}{"="}{.status}{" reason="}{.reason}{" observed="}{.observedGeneration}{"\n"}{end}manager={.spec.coldStorage.manager}{" current="}{.status.coldStorage.currentManager}{" term="}{.status.coldStorage.managerTerm}{" handoffSource="}{.status.coldStorage.handoffSource}{"\n"}'
+```
+
+Choose the serial of a ready replica (`<name>-3` has serial `3`) and patch:
+
+```sh
+kubectl patch questdbcluster <name> -n <namespace> --type merge \
+  -p '{"spec":{"coldStorage":{"manager":3}}}'
+```
+
+The operator demotes the old manager, verifies it settled as a refresher,
+then promotes the replacement — never two managers at once. While the handoff
+is in flight, `status.coldStorage.handoffSource` names the demoted instance.
+Uploads and remote garbage collection pause during the short managerless
+interval; reads continue everywhere. Wait for `True/ManagerReady` with
+`currentManager` naming the target and a positive `managerTerm`.
+
+`False/ManagerHandoffBlocked` fails closed rather than risking two managers —
+for example while the current manager is unreachable. Recover the named
+instance; do not work around the block with direct SQL. Two interactions to
+plan around:
+
+- An active promotion pauses new cold-manager handoffs. Finish or resolve the
+  cutover first.
+- `manager` must not exceed `instances`, so scale in only after moving the
+  manager to a remaining serial.
+
 ## Grow storage
 
 Storage is expand-only, and `spec.storage.storageClassName` is immutable.
