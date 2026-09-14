@@ -238,7 +238,9 @@ base columns its query references:
 - Renaming or dropping the base table invalidates the view.
 - Exceeding
   [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
-  during a refresh invalidates the view.
+  during a refresh invalidates the view. Before setting that limit, measure
+  what a refresh needs as described in
+  [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 

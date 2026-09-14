@@ -92,41 +92,6 @@ A global timeout in seconds for long-running queries. When `query.timeout` is
 also set, it takes precedence and this key is ignored. Per-query overrides work
 the same as for `query.timeout`.
 
-### ram.usage.limit.bytes
-
-- **Default**: `0`
-- **Reloadable**: no
-
-Process-wide limit on the native memory QuestDB may allocate, as a byte count or
-a size with a `K`, `M`, or `G` suffix. `0` means no byte limit. When both this
-key and `ram.usage.limit.percent` resolve to a limit, the smaller one applies.
-
-Despite the name, the limit counts tracked native allocations, not the process
-RSS. The JVM heap, thread stacks, and memory-mapped files such as table column
-files do not count, so a limit equal to a container's memory limit does not stop
-the kernel from killing the process. Compare the `RSS` and `NATIVE_*` rows of
-[`memory_metrics()`](/docs/query/functions/meta/#memory_metrics) to see the gap.
-
-An allocation that would cross the resolved limit fails with a
-`global RSS memory limit exceeded [usage=..., RSS_MEM_LIMIT=..., size=..., memoryTag=...]`
-error. The error lands on whichever workload
-allocates last, so a query, a view refresh, or a WAL apply batch can fail
-because of another workload's usage. A WAL apply that hits it goes through the
-same retries and suspension as a breach of its own limit. The per-workload
-[memory limits](#memory-limits) sit underneath this one and isolate workloads
-from each other.
-
-### ram.usage.limit.percent
-
-- **Default**: `90`
-- **Reloadable**: no
-
-Process-wide native memory limit as a percentage of the memory visible to the
-JVM: the host's physical memory, or the container's cgroup memory limit when one
-is set. It counts the same tracked allocations as `ram.usage.limit.bytes`. `0`
-disables the percentage limit. When both this key and `ram.usage.limit.bytes`
-resolve to a limit, the smaller one applies.
-
 ## Commit and write behavior
 
 ### cairo.commit.mode
@@ -927,7 +892,8 @@ is the approximate number of nested SELECT clauses allowed.
 
 These limits cap the native memory tracked for a single query, materialized view
 refresh, live view refresh, or WAL apply batch. They help prevent runaway
-workloads from exhausting server memory. Each workload has its own limit, in
+workloads from exhausting server memory, and are available since QuestDB
+10.0.0. Each workload has its own limit, in
 addition to the process-wide native memory limit set by
 [`ram.usage.limit.bytes`](#ramusagelimitbytes) and
 [`ram.usage.limit.percent`](#ramusagelimitpercent), which is on by default at
@@ -936,7 +902,8 @@ process-wide limit, so concurrent workloads can reach it even when each stays
 within its own budget. A limit bounds one query, refresh, or batch, not a
 connection or a principal: concurrent queries each run under the full limit.
 
-Three of the four limits are documented on this page. The fourth,
+Three of the four workload limits are documented in this section, together
+with the two process-wide keys. The fourth workload limit,
 [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes),
 lives with the other live view settings.
 
@@ -1013,16 +980,71 @@ covered.
 
 :::
 
-Live usage and the effective limit for each running query are exposed by the
-[`query_activity`](/docs/query/functions/meta/#query_activity) function through its
-`memory_used` and `memory_limit` columns. To size a limit, run with it at `0`
-and sample `memory_used` under a representative load; after a breach, the
-`used` and `size` values in the message are the only record of the workload's
-footprint. There is no dedicated metric for breaches, so alert on the message in
-the server log. QuestDB Enterprise can additionally set
-a memory limit per user, group, or service account, which overrides this workload
-limit for a principal's queries. See
-[role-based access control](/docs/security/rbac/#memory-limits).
+QuestDB Enterprise can additionally set a memory limit per user, group, or
+service account, which overrides the query workload limit for a principal's
+queries. See [role-based access control](/docs/security/rbac/#memory-limits).
+
+### Sizing a limit
+
+QuestDB does not estimate a workload's memory before running it: how much a
+query allocates depends on the data it reads, the plan the engine picks, and
+the number of worker threads it runs on. Measure it instead. Live usage and the
+effective limit of each running query are exposed by
+[`query_activity`](/docs/query/functions/meta/#query_activity) through its
+`memory_used` and `memory_limit` columns. `memory_used` is a live gauge with no
+peak value, so sample it repeatedly while the query runs and take the largest
+value as the floor for the limit. Leave headroom above it: a later run over
+more data allocates more.
+
+Run the query to size in one session with the limit at `0`, so it reports
+`memory_used` without risk of a breach, and sample it from a second session:
+
+```questdb-sql title="Session 1: the query to size"
+SELECT symbol, avg(price) AS avg_price
+FROM trades
+WHERE timestamp IN '2026-09-14'
+SAMPLE BY 1m;
+```
+
+```questdb-sql title="Session 2: sample its usage while it runs"
+SELECT query_id, memory_used, memory_limit, query
+FROM query_activity()
+WHERE query LIKE 'SELECT symbol, avg(price)%';
+```
+
+| query_id | memory_used | memory_limit | query                                              |
+| -------- | ----------- | ------------ | -------------------------------------------------- |
+| 57777    | 8388608     | null         | SELECT symbol, avg(price) AS avg_price FROM trades ... |
+
+Background workloads do not appear in `query_activity`, but each runs SQL that
+you can reproduce as a plain query and measure the same way:
+
+- A materialized view refresh runs the view's `SELECT`, taken from
+  [`SHOW CREATE MATERIALIZED VIEW`](/docs/query/sql/show/#show-create-materialized-view),
+  with the base table restricted to the time range being refreshed. Run that
+  `SELECT` with a `WHERE` clause on the base table's designated timestamp that
+  spans one refresh worth of data. An incremental refresh covers the rows
+  committed since the previous refresh, so use the busiest interval you expect
+  between refreshes. A full refresh, and a refresh after a large out-of-order
+  write, covers far more, so size for the whole base table if you need those to
+  succeed under the same limit. The measurement is a close proxy rather than an
+  exact figure, because the refresh may pick a different plan or degree of
+  parallelism.
+- A live view refresh runs the view's window functions over each batch of new
+  base table rows, so the same proxy over a batch of rows measures the
+  transient buffers of one refresh. The live view limit also counts the state
+  the view retains between refreshes: the `IN MEMORY` tier, whose capacity
+  [`live_views()`](/docs/query/functions/meta/#live_views) reports in its
+  `in_mem_bytes` column, and the window state. Add these to the transient
+  figure, and keep the limit above the
+  [allocation floor](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
+  described with the key.
+
+After a breach, the `used` and `size` values in the error message record the
+footprint at the point of failure, and are the only record of it. A limit has
+to be at least `used + size` to get past that allocation, and usually more,
+because the workload was aborted before it finished. There is no dedicated
+metric for breaches, so alert on the message in the server log.
 
 ### cairo.mat.view.refresh.memory.limit.bytes
 
@@ -1064,6 +1086,41 @@ statements and non-structural `ALTER TABLE` changes. Memory used to commit data,
 including out-of-order merges, is not tracked and is bounded only by the
 process-wide native memory limit. In practice this limit rarely fires. Its main effect is
 to keep WAL apply SQL on its own budget, separate from the query limit.
+
+### ram.usage.limit.bytes
+
+- **Default**: `0`
+- **Reloadable**: no
+
+Process-wide limit on the native memory QuestDB may allocate, as a byte count or
+a size with a `K`, `M`, or `G` suffix. `0` means no byte limit. When both this
+key and `ram.usage.limit.percent` resolve to a limit, the smaller one applies.
+
+Despite the name, the limit counts tracked native allocations, not the process
+RSS. The JVM heap, thread stacks, and memory-mapped files such as table column
+files do not count, so a limit equal to a container's memory limit does not stop
+the kernel from killing the process. Compare the `RSS` and `NATIVE_*` rows of
+[`memory_metrics()`](/docs/query/functions/meta/#memory_metrics) to see the gap.
+
+An allocation that would cross the resolved limit fails with a
+`global RSS memory limit exceeded [usage=..., RSS_MEM_LIMIT=..., size=..., memoryTag=...]`
+error. The error lands on whichever workload
+allocates last, so a query, a view refresh, or a WAL apply batch can fail
+because of another workload's usage. A WAL apply that hits it goes through the
+same retries and suspension as a breach of its own limit. The per-workload
+[memory limits](#memory-limits) sit underneath this one and isolate workloads
+from each other.
+
+### ram.usage.limit.percent
+
+- **Default**: `90`
+- **Reloadable**: no
+
+Process-wide native memory limit as a percentage of the memory visible to the
+JVM: the host's physical memory, or the container's cgroup memory limit when one
+is set. It counts the same tracked allocations as `ram.usage.limit.bytes`. `0`
+disables the percentage limit. When both this key and `ram.usage.limit.bytes`
+resolve to a limit, the smaller one applies.
 
 ## Batch operations
 

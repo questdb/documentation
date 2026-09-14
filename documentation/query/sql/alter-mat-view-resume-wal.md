@@ -48,6 +48,16 @@ WHERE suspended;
 The `trades_1h` view is suspended. The last successful commit was transaction
 `3`.
 
+`wal_tables()` also reports the `errorTag` and `errorMessage` of a suspended
+view. `OUT OF MEMORY` means a WAL apply batch on the view ran out of memory, by
+breaching its own
+[memory limit](/docs/configuration/cairo-engine/#memory-limits) or the
+process-wide one. This is distinct from a refresh that breaches
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairomatviewrefreshmemorylimitbytes):
+that does not suspend the view but, once its retries are exhausted,
+[invalidates](/docs/concepts/materialized-views/#view-invalidation) it, which
+`RESUME WAL` does not repair.
+
 ### Resume from failed transaction
 
 Restart processing from the next transaction after the last successful one:

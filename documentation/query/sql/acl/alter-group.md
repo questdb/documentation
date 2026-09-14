@@ -12,11 +12,7 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   RBAC provides fine-grained database permissions management.
 </EnterpriseNote>
 
-`ALTER GROUP` caps the query memory of a group's members with
-`SET MEMORY LIMIT`, so one team's runaway query cannot exhaust shared memory,
-and maps or unmaps an external OIDC or LDAP group with `WITH` or
-`DROP EXTERNAL ALIAS`, so logins from that identity provider inherit the
-group's permissions.
+`ALTER GROUP` modifies group settings.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.

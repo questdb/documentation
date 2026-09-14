@@ -457,7 +457,9 @@ modified in incompatible ways:
 A view is also invalidated when its refresh keeps failing with an out-of-memory
 error, including a breach of the
 [refresh memory limit](/docs/configuration/cairo-engine/#memory-limits), after
-the deferred retries are exhausted.
+the deferred retries are exhausted. Before setting that limit, measure what a
+refresh needs by running the view's query over one refresh worth of data, as
+described in [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
 
 Check for invalid views:
 

@@ -43,6 +43,12 @@ mapping flow, see the
 [OpenID Connect (OIDC) integration](/docs/security/oidc/#mapping-user-permissions)
 guide.
 
+`CREATE GROUP` cannot set a memory limit: a new group has none, and
+`SHOW GROUPS` reports `null` in its `memory_limit` column. To cap the native
+memory each query from the group's members may allocate, use
+[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group/#set-memory-limit)
+after creating the group.
+
 The chosen name must be unique across all users (including the built-in admin),
 groups and service accounts. If the name has already been reserved, the command
 fails and an error is raised, unless the `IF NOT EXISTS` clause is included in

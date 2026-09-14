@@ -142,11 +142,11 @@ GRANT INSERT ON sensor_data TO ingest_app;  -- Can only insert into sensor_data
 
 ### Cap a noisy tenant's query memory
 
-Bound the native memory each query from a group may allocate, so one tenant's
+Bound the native memory each of a user's queries may allocate, so one tenant's
 runaway query fails instead of exhausting shared memory:
 
 ```questdb-sql
-ALTER GROUP tenant_a SET MEMORY LIMIT 1G;
+ALTER USER tenant_a SET MEMORY LIMIT 1G;
 ```
 
 See [Memory limits](#memory-limits) for how limits resolve.
@@ -597,7 +597,9 @@ QuestDB Enterprise can limit the native memory tracked for a single query,
 overriding the server-wide query memory limit for a specific user, group, or
 service account. Use it to help prevent one tenant's runaway query from
 exhausting shared memory, or to grant a trusted principal more headroom than the
-default.
+default. Per-principal limits are available since QuestDB Enterprise 4.0.2; the
+server-wide [workload limits](/docs/configuration/cairo-engine/#memory-limits)
+they override are available since QuestDB 10.0.0.
 
 Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/), or

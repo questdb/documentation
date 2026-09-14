@@ -34,8 +34,9 @@ suspended WAL transactions from the failed transaction. Alternatively, an
 optional `sequencerTxn` value can be provided to skip the failed transaction.
 
 `wal_tables()` also reports the `errorTag` and `errorMessage` of a suspended
-table; `OUT OF MEMORY` means a WAL apply batch breached its
-[memory limit](/docs/configuration/cairo-engine/#memory-limits).
+table; `OUT OF MEMORY` means a WAL apply batch ran out of memory, by breaching
+its own [memory limit](/docs/configuration/cairo-engine/#memory-limits) or the
+process-wide one.
 
 ## Examples
 
