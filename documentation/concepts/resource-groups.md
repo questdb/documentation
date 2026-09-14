@@ -116,11 +116,10 @@ usable.
 ### CPU weight is a share, not a reservation
 
 Weights only matter when groups compete. A group that is alone on the instance
-uses everything it can, regardless of its weight, and a query that started while
-its group was alone keeps running that way until it next suspends or finishes.
-When two groups both have work, the scheduler hands out CPU so that measured CPU
-divided by `cpu_weight` stays balanced: weights 100 and 50 converge to a 2:1
-split of query CPU.
+uses everything it can, regardless of its weight. When two groups both have
+work, the scheduler hands out CPU so that measured CPU divided by `cpu_weight`
+stays balanced: weights 100 and 50 converge to a 2:1 split of query CPU. A query
+that was running alone starts sharing at its next checkpoint.
 
 Weights are relative. 100 and 50 are the same as 2 and 1. A group that becomes
 active starts level with the groups already running, so it neither banks the CPU
@@ -164,8 +163,9 @@ A yielded worker runs other queries and, within a bounded window, returns to
 accepting connections; the query that yielded resumes later. A long
 single-threaded query that reaches these checkpoints therefore shares its worker
 before finishing, which keeps the instance responsive while heavy queries run.
-Slicing happens only under managed scheduling: while no policy is in force, a
-query holds its worker exactly as it does with the feature disabled.
+Slicing happens only under managed scheduling, which engages once a second
+resource group exists. With `DEFAULT` alone, a query holds its worker exactly as
+it does with the feature disabled.
 
 Two consequences follow.
 
@@ -209,14 +209,19 @@ replica receives group definitions and mappings through normal replication.
 
 ## Cost when nothing competes
 
-While a single group owns all running queries, dispatch is unmanaged: no CPU is
+While `DEFAULT` is the only resource group, dispatch is unmanaged: no CPU is
 sampled, no query yields, and every query holds its worker exactly as it does
 with the feature disabled. Registration, admission and memory accounting still
 run, so this is not free, but the cost is a fixed few microseconds per query.
-Managed scheduling engages as soon as a second group has work, and disengages
-again when it does not. A query that is already running stays unmanaged until it
-next suspends or finishes; the new policy applies to queries that start or
-resume after the change.
+Managed scheduling engages when a second group is created and disengages once
+the last other group has been dropped and its queries have finished. A query
+that is already running when a group is created stays unmanaged until it next
+suspends or finishes; the new policy applies to queries that start or resume
+after the change.
+
+Under managed scheduling a query whose group is alone still keeps its worker: at
+each checkpoint it renews its grant in place and yields only when another query
+is waiting for its worker.
 
 ## See also
 

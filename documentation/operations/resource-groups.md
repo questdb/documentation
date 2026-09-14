@@ -263,12 +263,12 @@ each pool. With the instance running, `SHOW PARAMETERS` must report
 be `1`. Anything else means a SQL pool is in legacy mode and the feature turned
 itself off; the startup log names the pool.
 
-**2. Separate the workloads into groups.** With no policy written, queries hold
-their workers exactly as they do with the feature disabled. Managed scheduling
-engages while two groups have queries in flight at the same time. Under it a
-query yields its worker at the checkpoints that already make it cancellable, so
-a long single-threaded scan releases the worker while it is still running and
-the instance keeps accepting connections, and CPU is split by weight:
+**2. Separate the workloads into groups.** While `DEFAULT` is the only group,
+queries hold their workers exactly as they do with the feature disabled. Managed
+scheduling engages as soon as a second group exists. Under it a query yields its
+worker at the checkpoints that already make it cancellable, so a long
+single-threaded scan releases the worker while it is still running and the
+instance keeps accepting connections, and CPU is split by weight:
 
 ```questdb-sql
 CREATE RESOURCE GROUP dashboards WITH (cpu_weight = 400);
@@ -279,8 +279,9 @@ ALTER USER analyst SET RESOURCE GROUP adhoc;
 ```
 
 `questdb_resource_groups_cpu_managed_dispatch` reports `1` while managed
-scheduling is engaged. A query that started while its group was alone keeps its
-worker until it finishes, and a query that never reaches a checkpoint holds its
+scheduling is engaged, which is whenever a group besides `DEFAULT` exists. A
+query that started before the second group was created keeps its worker until it
+next suspends or finishes, and a query that never reaches a checkpoint holds its
 worker either way, so this does not remove every cause of an unresponsive
 instance.
 
@@ -498,13 +499,13 @@ settings are rejecting work the application expects to succeed.
 
 **A group's CPU share is not what I configured.** Weights only apply while
 groups compete. Check `active_queries` on both groups at the same moment: if one
-is idle, the other is expected to use everything. A query that started while its
-group was alone stays outside CPU scheduling until it next suspends or finishes,
-so only work that starts or resumes under contention is weighted. Also confirm
-the work you are watching is managed at all, since ingestion, WAL apply and view
-refresh are outside the feature. `query_activity()` shows the group each running
-query belongs to, which is the quickest way to tell whether the load you are
-watching is attributed where you expect.
+is idle, the other is expected to use everything. A query that started before
+the second group was created stays outside CPU scheduling until it next suspends
+or finishes; every other query starts sharing at its next checkpoint. Also
+confirm the work you are watching is managed at all, since ingestion, WAL apply
+and view refresh are outside the feature. `query_activity()` shows the group
+each running query belongs to, which is the quickest way to tell whether the
+load you are watching is attributed where you expect.
 
 **Queries on a fresh replica are not limited.** Until the catalog has
 replicated, a replica runs queries unmanaged and counts them in
