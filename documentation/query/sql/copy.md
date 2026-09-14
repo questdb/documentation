@@ -254,6 +254,13 @@ COPY (selectQuery) TO 'destinationPath'
 - Supports partitioned exports matching table partitioning
 - Configurable size limits
 
+An export runs under the query
+[memory limit](/docs/configuration/cairo-engine/#memory-limits); on QuestDB
+Enterprise it uses the issuing principal's
+[per-principal limit](/docs/security/rbac/#memory-limits). A breach fails the
+export with `query memory limit exceeded [workload=QUERY, ...]`, where `queryId`
+is the copy id in decimal. Exports do not appear in `query_activity`.
+
 ### Export root
 
 :::warning

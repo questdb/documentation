@@ -236,6 +236,11 @@ base columns its query references:
 - Dropping, renaming, or changing the type of a referenced column invalidates the
   view.
 - Renaming or dropping the base table invalidates the view.
+- Exceeding
+  [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
+  during a refresh invalidates the view. Before setting that limit, measure
+  what a refresh needs as described in
+  [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 
@@ -245,8 +250,11 @@ Invalidation is permanent: reversing the schema change does not automatically
 revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
 suspended WAL writer.
 
-To recover, inspect `invalidation_reason`, repair the base-table schema, and
-save the definition before dropping the view:
+To recover, inspect `invalidation_reason`, repair the base-table schema or
+raise
+[`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
+when the reason is a memory limit breach, and save the definition before
+dropping the view:
 
 ```questdb-sql
 SHOW CREATE LIVE VIEW trades_ma;
