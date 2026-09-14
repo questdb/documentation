@@ -166,7 +166,7 @@ A legitimate change of version, after restoring onto a different host or migrati
 - **No materialized views.** A materialized view accepts no storage policy at all, so it cannot be tiered to object storage. It uses [TTL](/docs/query/sql/alter-mat-view-set-ttl/) for retention instead.
 - **No downgrade after the first upload.** Enabling remote upload is a one-way version change.
 - **Upgrade replicas first.** Older instances and open source nodes do not understand the seal event and suspend WAL apply rather than skipping it.
-- **Operator-driven manager failover.** The manager role moves at runtime, but nothing detects manager death or elects a replacement, and a hot-switched role does not survive a restart.
+- **Operator-driven manager failover.** The manager role moves at runtime, but nothing detects manager death or elects a replacement, and a hot-switched role does not survive a restart. On Kubernetes, the [Enterprise Kubernetes Operator](/docs/enterprise-kubernetes-operator/configuration/#cold-storage) declares the manager in `spec.coldStorage.manager` and re-applies it across restarts; electing a replacement is still a human decision.
 - **Backups do not contain cold data.** A backup captures a cold partition's local metadata and symbol indexes, but not its `data.parquet` bytes, which exist only in the object store. The database backup and the object store prefix have to be kept, and recovered, as one set. See [Backup and restore](/docs/operations/backup/#cold-storage-partitions).
 - **No idle warm cache.** Chunks are shared only while an active read holds a lease.
 - **Fixed key layout.** Object key templates are not configurable.
