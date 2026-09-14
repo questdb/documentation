@@ -140,6 +140,12 @@ persistent window state, the `IN MEMORY` recent-row tier, staging memory, and
 transient buffers such as Parquet row-group decode buffers. Exceeding the limit
 invalidates the view immediately; recovery requires dropping and recreating it.
 
+This is one of the four workload
+[memory limits](/docs/configuration/cairo-engine/#memory-limits) and counts
+tracked native allocations only. A view acquires the limit when it is first
+compiled and keeps it across refreshes, so a reloaded value reaches an existing
+view only after invalidation, recreation, or a server restart.
+
 Size the limit above the refresh workload's allocation floor. In particular, a
 bounded `ROWS` frame allocates at least one `cairo.sql.window.store.page.size`
 page (1 MiB by default), and a Parquet-backed refresh may decode a complete row

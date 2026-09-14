@@ -1,11 +1,14 @@
 ---
 title: SHOW keyword
 sidebar_label: SHOW
-description: SHOW SQL keyword reference documentation.
+description:
+  SHOW statements for columns, partitions, parameters, and CREATE DDL, plus
+  Enterprise users, groups, and service accounts with their memory limits.
 ---
 
-This keyword provides table, column, and partition information including
-metadata. The `SHOW` keyword is useful for checking the
+`SHOW` returns metadata about tables, columns, partitions, and configuration
+parameters and, in QuestDB Enterprise, about users, groups, service accounts,
+and permissions. It is useful for checking the
 [designated timestamp setting](/docs/concepts/designated-timestamp/) column, the
 [partition attachment settings](/docs/query/sql/alter-table-attach-partition/),
 and partition storage size on disk.
@@ -26,7 +29,7 @@ SHOW { COLUMNS FROM tableName
      | PERMISSIONS [entityName]
      | SERVER_VERSION
      | SERVICE ACCOUNT [accountName]
-     | SERVICE ACCOUNTS [userName]
+     | SERVICE ACCOUNTS [{ userName | groupName }]
      | TABLES
      | USER [userName]
      | USERS };
@@ -44,8 +47,8 @@ SHOW { COLUMNS FROM tableName
   recreate a materialized view.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
-- `SHOW GROUPS` shows all groups the user belongs or all groups in the system
-  (enterprise-only)
+- `SHOW GROUPS` lists all groups with their external alias, memory limit and
+  resource group mapping, or the groups a user belongs to (enterprise-only)
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
 - `SHOW PARTITIONS` returns the partition information for the selected table.
@@ -53,11 +56,13 @@ SHOW { COLUMNS FROM tableName
   (enterprise-only)
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
 - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
-- `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
-  user/group (enterprise-only)
+- `SHOW SERVICE ACCOUNTS` lists all service accounts with their enabled flag,
+  memory limit and resource group, or those a user or group can assume with the
+  grant option (enterprise-only)
 - `SHOW TABLES` returns all the tables.
 - `SHOW USER` shows user secret (enterprise-only)
-- `SHOW USERS` shows all users (enterprise-only)
+- `SHOW USERS` lists all users with their enabled flag, memory limit and
+  resource group (enterprise-only)
 
 ## Examples
 
@@ -350,7 +355,8 @@ any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW GROUPS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user requires
+`USER DETAILS`.
 
 ```questdb-sql
 SHOW GROUPS;
@@ -361,10 +367,16 @@ SHOW GROUPS;
 | management |                | null         | reporting      | 10                      |
 | analysts   | analysts-sso   | 1073741824   | null           | null                    |
 
-`memory_limit` is the group's own query memory limit in bytes, `NULL` when none
-is set. `resource_group` and `resource_group_priority` are the group's
+`memory_limit` is the group's own query memory limit in bytes (`1073741824` is 1
+GiB), `null` when none is set. `external_alias` is empty when the group is not
+mapped to an external group. `resource_group` and `resource_group_priority` are
+the group's
 [resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
-`NULL` when the group is not mapped.
+`null` when the group is not mapped. See
+[memory limits](/docs/security/rbac/#memory-limits).
+
+Filtering by a user lists the groups that user belongs to, without the resource
+group columns. Each row's `memory_limit` is that group's own limit:
 
 ```questdb-sql
 SHOW GROUPS john;
@@ -531,7 +543,8 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 
 ### SHOW SERVICE ACCOUNTS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user or group
+requires `USER DETAILS`.
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS;
@@ -539,13 +552,19 @@ SHOW SERVICE ACCOUNTS;
 
 | name       | enabled | memory_limit | resource_group |
 | ---------- | ------- | ------------ | -------------- |
-| management | true    | null         | null           |
-| svc1_admin | true    | 536870912    | automation     |
+| client_app | true    | null         | null           |
+| svc1_admin | true    | 268435456    | automation     |
 
-`memory_limit` is the account's own query memory limit in bytes and
-`resource_group` its
+`memory_limit` is the account's own query memory limit in bytes (`268435456` is
+256 MiB) and `resource_group` its
 [resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
-each `NULL` when not set.
+each `null` when not set.
+
+Filtering by a user or group instead lists the service accounts that principal
+can assume, without the `resource_group` column. The result has a `grant_option`
+column in place of `enabled`, showing whether the user or group may grant the
+assumption to others, and `memory_limit` reports each listed service account's
+own limit:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
@@ -553,15 +572,15 @@ SHOW SERVICE ACCOUNTS john;
 
 | name       | grant_option | memory_limit |
 | ---------- | ------------ | ------------ |
-| svc1_admin | false        | 536870912    |
+| svc1_admin | false        | 268435456    |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 268435456    |
 
 ### SHOW TABLES
 
@@ -599,7 +618,7 @@ SHOW USER john;
 
 ### SHOW USERS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`.
 
 ```questdb-sql
 SHOW USERS;
@@ -608,12 +627,30 @@ SHOW USERS;
 | name  | enabled | memory_limit | resource_group |
 | ----- | ------- | ------------ | -------------- |
 | admin | true    | null         | null           |
-| john  | true    | 1073741824   | reporting      |
+| john  | true    | 536870912    | reporting      |
 
-`memory_limit` is the user's effective query memory limit in bytes and
-`resource_group` the user's direct
+The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
+the user's own limit or, when it has none, the most restrictive of its groups'.
+`null` means no principal override; the workload limit
+(`cairo.query.memory.limit.bytes`) still applies, unlike the `memory_limit`
+column of [`query_activity`](/docs/query/functions/meta/#query_activity), which
+reports the effective limit and includes it. In `SHOW GROUPS` and
+`SHOW SERVICE ACCOUNTS` above it is instead the listed entity's own limit, since
+neither inherits one. See [memory limits](/docs/security/rbac/#memory-limits).
+
+`resource_group` is the user's direct
 [resource group](/docs/operations/resource-groups/#mapping-principals) mapping;
-a user mapped only through an ACL group shows `NULL` here.
+a user mapped only through an ACL group shows `null` here.
+
+:::note
+
+`memory_limit` is appended after the original columns of `SHOW USERS`,
+`SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, and
+the unfiltered forms then append the resource group columns. Tools that bind
+these columns by position rather than by name must account for them. See
+[upgrading](/docs/security/rbac/#memory-limit-upgrade).
+
+:::
 
 ## See also
 

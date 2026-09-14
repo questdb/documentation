@@ -31,6 +31,14 @@ CREATE USER [IF NOT EXISTS] userName
 `CREATE USER` adds a new user with no permissions, optionally a password can
 also be set for the user.
 
+`CREATE USER` cannot set a memory limit. To cap the native memory each of the
+user's queries may allocate, set a limit on the user with
+[`ALTER USER ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-user/#set-memory-limit),
+or on one of its groups with
+[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group/#set-memory-limit).
+See [memory limits](/docs/security/rbac/#memory-limits) for how the two
+interact.
+
 The chosen name must be unique across all users (including the built-in admin),
 groups and service accounts. If the name has already been reserved, the command
 fails and an error is raised, unless the `IF NOT EXISTS` clause is included in
