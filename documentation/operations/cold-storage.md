@@ -132,6 +132,17 @@ WHERE timestamp IN '2026-02-10';
 
 The manager role moves between instances at runtime, with no restart. Role switching requires database administrator (system admin) privileges. See [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) for the full syntax.
 
+:::note
+
+On a cluster managed by the
+[Enterprise Kubernetes Operator](/docs/enterprise-kubernetes-operator/), do not
+run these statements directly. Change `spec.coldStorage.manager` and follow the
+[operator's manager-move runbook](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager):
+the operator performs this same demote-then-promote sequence and would treat a
+hand-switched role as drift.
+
+:::
+
 The supported handoff is two steps, in this order:
 
 ```questdb-sql title="1. On the current manager"

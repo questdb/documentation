@@ -454,6 +454,13 @@ modified in incompatible ways:
 - Renaming the base table
 - `TRUNCATE` or `UPDATE` operations
 
+A view is also invalidated when its refresh keeps failing with an out-of-memory
+error, including a breach of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits), after
+the deferred retries are exhausted. Before setting that limit, measure what a
+refresh needs by running the view's query over one refresh worth of data, as
+described in [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
+
 Check for invalid views:
 
 ```questdb-sql title="Find invalid views"
@@ -464,7 +471,10 @@ WHERE view_status = 'invalid';
 
 ### Refreshing an invalid view
 
-To restore an invalid view with a full refresh:
+Restore an invalid view with a full refresh. If `invalidation_reason` reports
+a memory limit breach, raise
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+first, because the full refresh runs under the same limit:
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW view_name FULL;
