@@ -1,7 +1,9 @@
 ---
 title: Meta functions
 sidebar_label: Meta
-description: Database and table metadata function reference documentation.
+description:
+  Meta functions for inspecting tables, WAL status, running queries with their
+  memory usage and limits, configuration, and server metadata.
 ---
 
 These functions provide instance-level information and table, column and
@@ -355,7 +357,13 @@ FROM materialized_views();
 
 **Return value:**
 
-Returns granular memory metrics.
+Returns granular memory metrics. `RSS` is the process resident set size and
+`TOTAL_USED` the sum of all tracked allocations. The `NATIVE_*` rows are the
+tracked allocations that count toward
+[`ram.usage.limit.bytes`](/docs/configuration/cairo-engine/#ramusagelimitbytes)
+and the per-workload
+[memory limits](/docs/configuration/cairo-engine/#memory-limits); the `MMAP_*`
+rows do not.
 
 **Examples:**
 
@@ -429,7 +437,7 @@ because inserted rows replicate as data.
 
 **Return value:**
 
-Returns metadata on running SQL queries, including columns such as:
+Returns metadata on running SQL queries, with the following columns:
 
 - query_id - identifier of the query that can be used with
   [cancel query](/docs/query/sql/cancel-query) command or
@@ -441,18 +449,35 @@ Returns metadata on running SQL queries, including columns such as:
 - query_start - timestamp of when query started
 - state_change - timestamp of latest query state change, such as a cancellation
 - state - state of running query, can be `active` or `cancelled`
+- is_wal - `true` when the SQL is being applied by the WAL apply job, such as
+  an `UPDATE` on a WAL table. Such queries cannot be cancelled
 - query - text of sql query
+- memory_used - native memory currently allocated by the query, in bytes, as
+  tracked by the
+  [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits)
+- memory_limit - effective native memory limit for the query, in bytes, or
+  `null` when the query runs unlimited. On QuestDB Enterprise this is the
+  principal's [memory limit](/docs/security/rbac/#memory-limits) when one is
+  set, otherwise the workload limit. Unlike the `memory_limit` column of
+  `SHOW USERS`, it includes the workload limit
+
+`memory_used` is a live gauge with no peak value, and it is reported even when
+`memory_limit` is `null`. Both memory columns are `null` for SQL that runs
+under a background workload's tracker, such as the `SELECT` a materialized view
+refresh runs or an `UPDATE` applied by the WAL apply job, because that SQL
+charges the workload's budget instead of acquiring its own.
 
 **Examples:**
 
 ```questdb-sql
-SELECT * FROM query_activity();
+SELECT query_id, username, state, memory_used, memory_limit, query
+FROM query_activity();
 ```
 
-| query_id | worker_id | worker_pool | username | query_start                 | state_change                | state  | query                                                     |
-| -------- | --------- | ----------- | -------- | --------------------------- | --------------------------- | ------ | --------------------------------------------------------- |
-| 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397  | active | select \* from query_activity()                           |
-| 57777    | 6         | shared      | bob      | 2024-01-09T08:58:55.988017Z | 2024-01-09T08:58:55.988017Z | active | SELECT symbol,approx_percentile(price, 50, 2) from trades |
+| query_id | username | state  | memory_used | memory_limit | query                                                                                 |
+| -------- | -------- | ------ | ----------- | ------------ | ------------------------------------------------------------------------------------- |
+| 62179    | john     | active | 262144      | 536870912    | SELECT query_id, username, state, memory_used, memory_limit, query FROM query_activity() |
+| 57777    | john     | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 0.5, 2) FROM trades                           |
 
 ## reader_pool
 
@@ -1287,10 +1312,11 @@ SELECT wait_wal_table('trades', 42);
 :::note
 
 For monitoring and observability, use [`tables()`](#tables) instead.
-`tables()` provides all the same information plus additional metrics
+`tables()` provides the same status information plus additional metrics
 (pending rows, memory pressure, deduplication stats, throughput histograms),
 and is fully in-memory. `wal_tables()` reads from disk and is less suitable
-for frequent polling.
+for frequent polling, but it is the only function that reports the `errorTag`
+and `errorMessage` of a suspended table.
 
 :::
 
@@ -1309,10 +1335,19 @@ Returns a `table` including the following information:
 - `name` - table or materialized view name
 - `suspended` - suspended status flag
 - `writerTxn` - the last committed transaction in TableWriter (equivalent to `table_txn` in `tables()`)
-- `writerLagTxnCount` - the number of transactions that are kept invisible when
+- `bufferedTxnSize` - the number of transactions that are kept invisible when
   writing to the table; these transactions will be eventually moved to the table
   data and become visible for readers (equivalent to `wal_txn - table_txn`)
 - `sequencerTxn` - the last committed transaction in the sequencer (equivalent to `wal_txn` in `tables()`)
+- `errorTag` - short classification of the error that suspended the table, such
+  as `OUT OF MEMORY` when a WAL apply batch breached its
+  [memory limit](/docs/configuration/cairo-engine/#memory-limits), or empty
+  when the table is not suspended
+- `errorMessage` - full text of the error that suspended the table, or empty
+  when the table is not suspended
+- `memoryPressure` - memory pressure level of the table writer: `0` for none,
+  `1` when parallelism is reduced, `2` when the writer backs off between
+  attempts (equivalent to `table_memory_pressure_level` in `tables()`)
 
 **Examples:**
 
@@ -1320,11 +1355,11 @@ Returns a `table` including the following information:
 wal_tables();
 ```
 
-| name        | suspended | writerTxn | writerLagTxnCount | sequencerTxn |
-| ----------- | --------- | --------- | ----------------- | ------------ |
-| sensor_wal  | false     | 2         | 1                 | 4            |
-| weather_wal | false     | 3         | 0                 | 3            |
-| test_wal    | true      | 7         | 1                 | 9            |
+| name        | suspended | writerTxn | bufferedTxnSize | sequencerTxn | errorTag      | errorMessage                                                                                                                | memoryPressure |
+| ----------- | --------- | --------- | --------------- | ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| sensor_wal  | false     | 2         | 1               | 4            |               |                                                                                                                             | 0              |
+| weather_wal | false     | 3         | 0               | 3            |               |                                                                                                                             | 0              |
+| test_wal    | true      | 7         | 1               | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 2              |
 
 ## writer_pool
 

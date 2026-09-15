@@ -55,9 +55,9 @@ the effects of running SQL commands that follow are shown with
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | false        |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | false        | null         |
 
 ### Assign a service account to a user with grant option
 
@@ -65,9 +65,9 @@ GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john WITH GRANT OPTION;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | true         |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | true         | null         |
 
 ### Removing grant option
 
@@ -76,9 +76,9 @@ GRANT ASSUME SERVICE ACCOUNT ingestion TO john WITH GRANT OPTION;
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | false        |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | false        | null         |
 
 ### Owner grants
 
@@ -94,6 +94,6 @@ CREATE SERVICE ACCOUNT ingestion;
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | true         |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | true         | null         |

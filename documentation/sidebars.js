@@ -288,6 +288,10 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
+                  id: "query/sql/acl/alter-group",
+                  type: "doc",
+                },
+                {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
                 },

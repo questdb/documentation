@@ -639,17 +639,29 @@ modified in incompatible ways:
 - Renaming the base table
 - `TRUNCATE` or `UPDATE` operations
 
-An active [`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
-on a referenced materialized view also causes invalidation when refresh detects
-it. `SET EXPIRE` is allowed with existing dependents; invalidation is not
-synchronous with ALTER. An idle dependent may retain its status, and an
-already-running refresh may finish against its earlier snapshot. The policy does
-not retroactively filter rows already stored in the dependent.
+Two further conditions invalidate a view from the refresh side rather than
+from a base-table change:
 
-Removing the source policy does not automatically restore an invalidated view.
-Resolve the source conflict, then request a
-[FULL refresh](/docs/query/sql/refresh-mat-view/#full). FULL refresh deletes the
-existing contents before rebuilding; failure does not restore those contents.
+- **Out-of-memory failures.** An incremental or scheduled refresh that fails
+  with an out-of-memory error, including a breach of the
+  [refresh memory limit](/docs/configuration/cairo-engine/#memory-limits), is
+  retried on a timer. The view is invalidated once the
+  [deferred retries](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrylimit)
+  are exhausted. Before setting that limit, measure what a refresh needs by
+  running the view's query over one refresh worth of data, as described in
+  [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
+- **An `EXPIRE ROWS` policy on a source view.** A refresh that reads a
+  materialized view with an active
+  [`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
+  invalidates the dependent view as soon as it detects the policy. `SET EXPIRE`
+  is allowed while dependents exist, and the invalidation is not synchronous
+  with the `ALTER`: an idle dependent keeps its current status until it next
+  refreshes, and a refresh already underway finishes against its earlier
+  snapshot. The policy does not retroactively filter rows already stored in the
+  dependent, which keeps serving them.
+
+In every case, invalidation is sticky: reverting the base-table change, freeing
+memory, or dropping the source policy does not revalidate the view on its own.
 
 Check for invalid views:
 
@@ -661,7 +673,13 @@ WHERE view_status = 'invalid';
 
 ### Refreshing an invalid view
 
-To restore an invalid view with a full refresh:
+Restore an invalid view with a full refresh. Remove the cause first, because the
+full refresh runs the same query under the same conditions: if
+`invalidation_reason` reports a memory limit breach, raise
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits);
+if it reports an `EXPIRE ROWS` conflict, drop the policy on the source view.
+A full refresh that still hits the conflict fails before touching the view's
+contents, but a failure later in the rebuild does not restore them.
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW view_name FULL;

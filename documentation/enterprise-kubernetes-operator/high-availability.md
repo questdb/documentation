@@ -52,7 +52,11 @@ It does not use the database's in-place
 [role switch](/docs/high-availability/failover/) (`SWITCH ROLE`,
 `POST /lifecycle/switch`). Do not run those against instances managed by the
 operator: `status.currentPrimary` and the PVC role labels would no longer
-describe the cluster.
+describe the cluster. The same applies to
+[`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/):
+change
+[`spec.coldStorage.manager`](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager)
+instead.
 
 :::
 
@@ -83,6 +87,27 @@ Choose the integer serial from the target instance name (`<name>-2` has target
 kubectl get questdbcluster <name> -n <namespace> \
   -o jsonpath='{.status.replication.activePromotion}{"\n"}'
 ```
+
+On a cluster with
+[`spec.coldStorage`](/docs/enterprise-kubernetes-operator/configuration/#cold-storage),
+also require settled cold-manager ownership away from the departing primary:
+current-generation `ColdStorageHealthy=True/ManagerReady`,
+`status.coldStorage.currentManager` equal to `spec.coldStorage.manager` and
+not the current primary, a positive `managerTerm`, and an empty
+`handoffSource`:
+
+```sh
+kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='manager={.spec.coldStorage.manager}{" current="}{.status.coldStorage.currentManager}{" term="}{.status.coldStorage.managerTerm}{" handoffSource="}{.status.coldStorage.handoffSource}{"\n"}'
+```
+
+Otherwise a non-no-op `Planned` promotion fails fast with
+`ColdManagerMoveRequired`. The promotion never moves the cold manager itself:
+[move `spec.coldStorage.manager`](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager)
+to a ready replica, wait for `ManagerReady`, and create a new promotion
+object. Moving it to the promotion target is allowed but leaves the manager on
+the new primary after the cutover. An active promotion pauses new cold-manager
+handoffs, so move the manager before creating the promotion.
 
 The defaults reflect two different costs:
 
@@ -189,6 +214,15 @@ writer-health, connectivity, data, and PVC current-role checks. Before
 promotion, the fenced loss state must have zero ready `<name>-rw` EndpointSlice
 endpoints; afterward the selected target is the only live primary. Record the
 accepted recovery point and any expected lost-write window.
+
+Emergency promotion never waits on cold-storage ownership. If the lost primary
+was also the cold manager, `ColdStorageHealthy` reports
+`False/ManagerHandoffBlocked` and the handoff fails closed rather than risking
+two managers: refreshers continue serving already-offloaded partitions, while
+new uploads and remote garbage collection wait. Cold health recovers through
+the ordinary handoff once the fenced instance returns as a replica. To place
+the manager elsewhere afterward,
+[move `spec.coldStorage.manager`](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager).
 
 ## If promotion stalls or fails
 

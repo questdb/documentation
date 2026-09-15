@@ -1,11 +1,14 @@
 ---
 title: SHOW keyword
 sidebar_label: SHOW
-description: SHOW SQL keyword reference documentation.
+description:
+  SHOW statements for columns, partitions, parameters, and CREATE DDL, plus
+  Enterprise users, groups, and service accounts with their memory limits.
 ---
 
-This keyword provides table, column, and partition information including
-metadata. The `SHOW` keyword is useful for checking the
+`SHOW` returns metadata about tables, columns, partitions, and configuration
+parameters and, in QuestDB Enterprise, about users, groups, service accounts,
+and permissions. It is useful for checking the
 [designated timestamp setting](/docs/concepts/designated-timestamp/) column, the
 [partition attachment settings](/docs/query/sql/alter-table-attach-partition/),
 and partition storage size on disk.
@@ -26,7 +29,7 @@ SHOW { COLUMNS FROM tableName
      | PERMISSIONS [entityName]
      | SERVER_VERSION
      | SERVICE ACCOUNT [accountName]
-     | SERVICE ACCOUNTS [userName]
+     | SERVICE ACCOUNTS [{ userName | groupName }]
      | TABLES
      | USER [userName]
      | USERS };
@@ -44,8 +47,8 @@ SHOW { COLUMNS FROM tableName
   recreate a materialized view, including its retention clauses.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
-- `SHOW GROUPS` shows all groups the user belongs or all groups in the system
-    (enterprise-only)
+- `SHOW GROUPS` lists all groups, or the groups a user belongs to, with each
+  group's external alias and memory limit (enterprise-only)
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
 - `SHOW PARTITIONS` returns the partition information for the selected table.
@@ -53,11 +56,13 @@ SHOW { COLUMNS FROM tableName
   (enterprise-only)
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
 - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
-- `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
-  user/group (enterprise-only)
+- `SHOW SERVICE ACCOUNTS` lists all service accounts with their enabled flag and
+  memory limit, or those a user or group can assume with the grant option
+  (enterprise-only)
 - `SHOW TABLES` returns all the tables.
 - `SHOW USER` shows user secret (enterprise-only)
-- `SHOW USERS` shows all users (enterprise-only)
+- `SHOW USERS` lists all users with their enabled flag and memory limit
+  (enterprise-only)
 
 ## Examples
 
@@ -351,21 +356,32 @@ including any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW GROUPS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user requires
+`USER DETAILS`.
 
 ```questdb-sql
 SHOW GROUPS;
 ```
 
-or
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management |                | 2147483648   |
+
+Filtering by a user lists the groups that user belongs to, with the same
+columns. Each row's `memory_limit` is that group's own limit:
 
 ```questdb-sql
 SHOW GROUPS john;
 ```
 
-| name       |
-| ---------- |
-| management |
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management |                | 2147483648   |
+
+The `memory_limit` column is reported in bytes (`2147483648` is 2 GiB) and is
+`null` when the group has no limit of its own. `external_alias` is empty when
+the group is not mapped to an external group. See
+[memory limits](/docs/security/rbac/#memory-limits).
 
 ### SHOW PARAMETERS
 
@@ -520,32 +536,38 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 
 ### SHOW SERVICE ACCOUNTS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`; filtering by another user or group
+requires `USER DETAILS`.
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| client_app | true    | null         |
+| svc1_admin | true    | 268435456    |
+
+Filtering by a user or group instead lists the service accounts that principal
+can assume. The result has a `grant_option` column in place of `enabled`,
+showing whether the user or group may grant the assumption to others, and
+`memory_limit` reports each listed service account's own limit:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 268435456    |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 268435456    |
 
 ### SHOW TABLES
 
@@ -583,16 +605,35 @@ SHOW USER john;
 
 ### SHOW USERS
 
-_Enterprise only._
+_Enterprise only._ Requires `LIST USERS`.
 
 ```questdb-sql
 SHOW USERS;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| name  | enabled | memory_limit |
+| ----- | ------- | ------------ |
+| admin | true    | null         |
+| john  | true    | 536870912    |
+
+The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
+the user's own limit or, when it has none, the most restrictive of its groups'.
+`null` means no principal override; the workload limit
+(`cairo.query.memory.limit.bytes`) still applies, unlike the `memory_limit`
+column of [`query_activity`](/docs/query/functions/meta/#query_activity), which
+reports the effective limit and includes it. In `SHOW GROUPS` and
+`SHOW SERVICE ACCOUNTS` above it is instead the
+listed entity's own limit, since neither inherits one. See
+[memory limits](/docs/security/rbac/#memory-limits).
+
+:::note
+
+`memory_limit` is appended as the last column of `SHOW USERS`, `SHOW GROUPS`,
+and `SHOW SERVICE ACCOUNTS`, including their filtered forms. Tools that bind
+these columns by position rather than by name must account for it. See
+[upgrading](/docs/security/rbac/#memory-limit-upgrade).
+
+:::
 
 ## See also
 
