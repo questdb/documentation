@@ -186,7 +186,7 @@ Returns a `table` with the following columns:
 | `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                            |
 | `base_table_name`                              | STRING    | Base table name                                                                                                        |
 | `view_sql`                                     | STRING    | Query used to maintain the view                                                                                        |
-| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
+| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `suspended`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
 | `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                     |
 | `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                           |
 | `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                |

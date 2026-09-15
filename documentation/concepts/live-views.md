@@ -235,7 +235,11 @@ base columns its query references:
   the view keeps refreshing.
 - Dropping, renaming, or changing the type of a referenced column invalidates the
   view.
-- Renaming or dropping the base table invalidates the view.
+- Renaming or dropping the base table invalidates the view. A table created
+  later under the base table's name does not revive it, including across a
+  restart: the view records which table it was created over, and a view whose
+  base table name now resolves to a different table is invalidated with
+  `base table was replaced`.
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 
@@ -244,6 +248,13 @@ An invalidated view keeps serving its existing data and reports the reason in
 Invalidation is permanent: reversing the schema change does not automatically
 revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
 suspended WAL writer.
+
+The invalidation is written to the view's state before the base-table operation
+commits. If that write fails, the operation is refused rather than committed
+over a view that would load as valid after a restart. This applies to
+`DROP TABLE`, `RENAME TABLE`, `UPDATE` and `ALTER TABLE ... REBASE WAL` on the
+base table, and to a full refresh of a base materialized view. Dropping the
+live view removes the obstacle.
 
 To recover, inspect `invalidation_reason`, repair the base-table schema, and
 save the definition before dropping the view:

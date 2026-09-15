@@ -82,7 +82,9 @@ unreadable at a known point in time.
 
 A suspended view applies nothing until [`RESUME WAL`](#resume-wal), including
 these statements. Suspension is visible in
-[`wal_tables()`](/docs/query/functions/meta/#wal_tables).
+[`wal_tables()`](/docs/query/functions/meta/#wal_tables), and
+[`live_views()`](/docs/query/functions/meta/#live_views) reports the view's
+status as `suspended`.
 
 ## CONVERT PARTITION
 
@@ -270,6 +272,17 @@ order. Suspending and resuming share a single authorization.
 ```questdb-sql title="Suspend a live view"
 ALTER LIVE VIEW trades_ma SUSPEND WAL;
 ```
+
+While the suspension holds, [`live_views()`](/docs/query/functions/meta/#live_views)
+reports the view as `suspended`. A view that is still seeding keeps sweeping the
+base table, but does not complete its seed until `RESUME WAL` has applied every
+queued transaction, so it becomes `active` only after the resume.
+
+With `cairo.wal.apply.suspended.write.denied` enabled, a suspension refuses WAL
+writes as well as the apply. A suspended live view then stops refreshing instead
+of queueing transactions, and picks up where it stopped after `RESUME WAL`. For
+as long as the suspension lasts, the base table's WAL that the view has not yet
+consumed is retained rather than purged.
 
 ## Unsupported clauses
 
