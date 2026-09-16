@@ -36,7 +36,7 @@ SELECT build();
 | ---------------------------------------------------------------------------------------------- |
 | Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
-## current_data_id()
+## current_data_id
 
 Returns the data ID: a UUID that identifies this database, generated on first
 start and stored in the database root. Replication and restore use it to tell
@@ -61,56 +61,141 @@ SELECT current_data_id();
 | ------------------------------------ |
 | 75f5a084-7a53-5d7f-941a-c2b4c4c6f127 |
 
-## current database, schema, or user
+## current_database
 
-`current_database()`, `current_schema()`, `current_user()`, and `session_user()`
-are standard SQL functions that return information about the current database,
-schema, and user.
+Returns the name of the database the session is connected to.
+
+**Arguments:**
+
+- `current_database()` does not require arguments.
+
+**Return value:**
+
+Returns a `string`.
+
+**Examples:**
 
 ```questdb-sql
--- Get the current database
 SELECT current_database();
-
--- Get the current schema
-SELECT current_schema();
-
--- Get the current user
-SELECT current_user();
-
--- Get the authenticated user of the current session
-SELECT session_user();
 ```
 
-Each of these functions returns a single value, so you can use them in a SELECT
-statement without any arguments.
-
-`current_user()` and `session_user()` both return the authenticated principal
-and are interchangeable in QuestDB. Both report the user that authenticated on
-the current connection, whichever protocol it arrived on.
+| current_database |
+| ---------------- |
+| qdb              |
 
 ## current_resource_group
 
-_QuestDB Enterprise only._
+:::note
 
-Returns the resource group assigned to the calling query. Ordinary users can use
-this function to check their own assignment; administrator rights are not
-required. See [resource groups](/docs/concepts/resource-groups/) for mapping
-precedence and the scope of managed execution.
+Resource groups and the `current_resource_group()` function are available in
+**QuestDB Enterprise** only.
 
-**Arguments:** none.
+:::
 
-**Return value:** `STRING`. Returns `NULL` when the execution is unmanaged,
-including when resource groups are disabled or a replica's catalog is not ready.
-A managed query without a principal mapping returns `DEFAULT`.
+`current_resource_group()` returns the name of the
+[resource group](/docs/concepts/resource-groups/) the calling query was admitted
+to. Run it from a client session to confirm which group that session's queries
+land in, which is the quickest way to check that a principal mapping took
+effect. Any authenticated session can call it, with no permission of its own,
+unlike [`resource_groups()`](#resource_groups) which requires
+[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions). An ordinary user can
+therefore check their own group but not read anyone else's policy.
 
-```questdb-sql
+**Arguments:**
+
+- `current_resource_group()` does not require arguments.
+
+**Return value:**
+
+Returns a string naming the group. A principal with no mapping of its own
+resolves to `DEFAULT`, so on an instance where nobody has been mapped yet every
+session sees `DEFAULT`:
+
+```questdb-sql title="Check which group the calling session's queries run in"
 SELECT current_resource_group();
 ```
 
-The result follows the query's acquired group, including across suspended cursor
-pages. A subsequent mapping change affects the next query.
+| current_resource_group |
+| ---------------------- |
+| DEFAULT                |
 
-## flush_query_cache()
+It returns `null` only when the query was never admitted to a group at all: when
+`resource.groups.enabled` is `false`, or on a replica that has not yet received
+the group catalog. A group name and `null` therefore mean
+different things: `DEFAULT` says the feature placed the query in the built-in
+group, while `null` says the feature was not in force for that query.
+
+The group is resolved when the query starts and stays fixed for its lifetime,
+including across the pages of a suspended cursor. Changing a mapping affects the
+next query, never one already running.
+
+**Confirming a mapping end to end:**
+
+```questdb-sql title="Map a user, then confirm from that user's own session"
+ALTER USER analyst SET RESOURCE GROUP reporting;
+```
+
+Reconnect as `analyst` and run:
+
+```questdb-sql title="Confirm the mapping took effect"
+SELECT current_resource_group();
+```
+
+| current_resource_group |
+| ---------------------- |
+| reporting              |
+
+A principal with `SQL ENGINE ADMIN` can check the same thing without
+reconnecting, because [`query_activity()`](#query_activity) carries a
+`resource_group` column for every running query.
+
+## current_schema
+
+Returns the name of the current schema.
+
+**Arguments:**
+
+- `current_schema()` does not require arguments.
+
+**Return value:**
+
+Returns a `string`.
+
+**Examples:**
+
+```questdb-sql
+SELECT current_schema();
+```
+
+| current_schema |
+| -------------- |
+| public         |
+
+## current_user
+
+Returns the user that authenticated on the current connection, whichever
+protocol it arrived on. [`session_user()`](#session_user) is a compatibility
+alias for it, and the two are interchangeable in QuestDB.
+
+**Arguments:**
+
+- `current_user()` does not require arguments.
+
+**Return value:**
+
+Returns a `string`.
+
+**Examples:**
+
+```questdb-sql
+SELECT current_user();
+```
+
+| current_user |
+| ------------ |
+| admin        |
+
+## flush_query_cache
 
 `flush_query_cache' invalidates cached query execution plans.
 
@@ -150,7 +235,7 @@ functions();
 | and  | and(TT)   | and(boolean, boolean) | FALSE            | STANDARD |
 | not  | not(T)    | not(boolean)          | FALSE            | STANDARD |
 
-## hydrate_table_metadata('table1', 'table2' ...)
+## hydrate_table_metadata
 
 `hydrate_table_metadata' re-reads table metadata from disk to update the static
 metadata cache.
@@ -445,13 +530,18 @@ Returns metadata on running SQL queries, with the following columns:
   tracked by the
   [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits)
 - memory_limit - effective native memory limit for the query, in bytes, or
-  `null` when the query runs unlimited. On QuestDB Enterprise this is the
+  `null` when the query runs unlimited. On QuestDB Enterprise it starts from the
   principal's [memory limit](/docs/security/rbac/#memory-limits) when one is
-  set, otherwise the workload limit. Unlike the `memory_limit` column of
-  `SHOW USERS`, it includes the workload limit
+  set, otherwise the workload limit, and is then capped by the
+  [resource group](/docs/concepts/resource-groups/) budget and the process
+  budget. Unlike the `memory_limit` column of `SHOW USERS`, it includes the
+  workload limit and the group budget, so a principal with no limit of its own
+  still reports a value here when its group sets one
 - resource_group - the [resource group](/docs/concepts/resource-groups/) the
-  query was admitted to in QuestDB Enterprise, `null` when resource groups do
-  not manage the execution
+  query was admitted to on QuestDB Enterprise. A query whose principal has no
+  mapping reports `DEFAULT`; `null` means the query was never admitted to a
+  group at all, which happens when resource groups are disabled and when a
+  replica has not yet received the group catalog
 
 `memory_used` is a live gauge with no peak value, and it is reported even when
 `memory_limit` is `null`. Both memory columns are `null` for SQL that runs under
@@ -473,10 +563,19 @@ FROM query_activity();
 
 To inspect query memory and resource group assignment in QuestDB Enterprise:
 
-```questdb-sql
+```questdb-sql title="See which group each running query was admitted to"
 SELECT query_id, username, resource_group, memory_used, memory_limit
 FROM query_activity();
 ```
+
+| query_id | username | resource_group | memory_used | memory_limit |
+| -------- | -------- | -------------- | ----------- | ------------ |
+| 47       | analyst  | reporting      | 0           | 2147483648   |
+
+`analyst` has no memory limit of its own here, so the 2 GiB ceiling is the one
+the `reporting` group sets. Joining this against
+[`resource_groups()`](#resource_groups) shows how much of a group's budget its
+running queries are actually holding.
 
 ## reader_pool
 
@@ -503,7 +602,7 @@ SELECT * FROM reader_pool();
 | ---------- | --------------- | --------------------------- | ----------- |
 | sensors    | null            | 2023-12-01T19:28:14.311703Z | 1           |
 
-## reload_config()
+## reload_config
 
 `reload_config' reloads server configuration file's contents (`server.conf`)
 without server restart. The list of reloadable settings can be found
@@ -528,51 +627,150 @@ SELECT reload_config();
 
 ## resource_groups
 
-_QuestDB Enterprise only. Requires administrator rights._
+:::note
 
-Returns one row per current catalog group, including `DEFAULT`, with resolved
-policies and live counters. Group definitions remain visible when enforcement is
-disabled; their runtime counters are zero.
+Resource groups and the `resource_groups()` function are available in **QuestDB
+Enterprise** only.
 
-**Arguments:** none.
+:::
 
-**Return value:** a table with these columns:
+`resource_groups()` returns one row per
+[resource group](/docs/concepts/resource-groups/) that currently exists,
+including the built-in `DEFAULT`, pairing each group's policy with its live
+counters. It is the main way to see what a group is configured to do and what it
+is doing right now. Groups stay visible when `resource.groups.enabled` is
+`false`; only their counters sit at zero.
 
-| Column                     | Type      | Description                                                                                             |
-| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
-| `name`                     | `VARCHAR` | Group name                                                                                              |
-| `memory_limit_bytes`       | `LONG`    | Effective group ceiling in bytes, capped by the process budget when enabled; `0` means no group ceiling |
-| `max_active_queries`       | `INT`     | Concurrent admission limit; `2147483647` represents unlimited                                           |
-| `max_queued_queries`       | `INT`     | Queue capacity; `2147483647` represents unlimited, and `0` disables queueing                            |
-| `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds                                                             |
-| `cpu_weight`               | `INT`     | Relative scheduling weight                                                                              |
-| `active_queries`           | `LONG`    | Queries currently holding admission slots                                                               |
-| `queued_queries`           | `LONG`    | Queries waiting for admission                                                                           |
-| `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                                       |
-| `memory_used_bytes`        | `LONG`    | Published tracked native query memory in bytes                                                          |
-| `cpu_nanos_total`          | `LONG`    | CPU nanoseconds measured by managed scheduling                                                          |
-| `cpu_wait_nanos_total`     | `LONG`    | Cumulative query waiting time for CPU, in nanoseconds                                                   |
-| `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                                        |
-| `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                           |
+Calling it requires the database-level
+[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission, the same
+permission that gates managing groups and listing or cancelling running queries.
+A principal without it gets `Access denied for <user> [SQL ENGINE ADMIN]`.
 
-```questdb-sql
-SELECT name, memory_limit_bytes, memory_used_bytes, active_queries, queued_queries
+**Arguments:**
+
+- `resource_groups()` does not require arguments.
+
+**Return value:**
+
+Returns a table with these columns:
+
+| Column                     | Type      | Description                                                                                  |
+| -------------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `name`                     | `VARCHAR` | Group name                                                                                   |
+| `memory_limit_bytes`       | `LONG`    | Effective memory ceiling in bytes, after the process budget caps it; `0` means no group ceiling |
+| `max_active_queries`       | `INT`     | Concurrent admission limit as configured; `null` when the group sets none                     |
+| `max_queued_queries`       | `INT`     | Queue capacity as configured; `null` when the group sets none, `0` to disable queueing        |
+| `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds, falling back to the instance default             |
+| `cpu_weight`               | `INT`     | Effective relative scheduling weight; `100` when the group sets none                          |
+| `active_queries`           | `LONG`    | Queries currently holding admission slots                                                    |
+| `queued_queries`           | `LONG`    | Queries waiting for admission                                                                |
+| `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                            |
+| `memory_used_bytes`        | `LONG`    | Published tracked native query memory in bytes                                               |
+| `cpu_nanos_total`          | `LONG`    | CPU nanoseconds measured by managed scheduling                                               |
+| `cpu_wait_nanos_total`     | `LONG`    | Cumulative time queries spent waiting for CPU, in nanoseconds                                |
+| `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                             |
+| `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                |
+
+The policy columns do not all report the same thing. `max_active_queries` and
+`max_queued_queries` show what the group itself sets, and are `null` when it sets
+nothing. `memory_limit_bytes`, `queue_timeout_millis` and `cpu_weight` show the
+effective value after instance defaults and the process budget have been applied,
+so they are never `null`.
+
+**Inspecting group policy:**
+
+Given a group created like this:
+
+```questdb-sql title="Create a group with an explicit policy"
+CREATE RESOURCE GROUP reporting WITH (
+    cpu_weight = 50,
+    max_active_queries = 4,
+    max_queued_queries = 32,
+    memory_limit = '2G'
+);
+```
+
+```questdb-sql title="Compare each group's policy against its live admission state"
+SELECT name, cpu_weight, max_active_queries, max_queued_queries,
+       memory_limit_bytes, active_queries, queued_queries
 FROM resource_groups()
 ORDER BY name;
 ```
 
-Counters describe the current runtime and reset on restart or group recreation.
-Worker-local memory deltas can be temporarily unpublished. The single-group
-dispatch path does not sample CPU, so `cpu_nanos_total` does not cover all query
-CPU use. Dropped groups disappear from this table while their existing queries
-finish using retained state.
+| name      | cpu_weight | max_active_queries | max_queued_queries | memory_limit_bytes | active_queries | queued_queries |
+| --------- | ---------- | ------------------ | ------------------ | ------------------ | -------------- | -------------- |
+| DEFAULT   | 100        | null               | null               | 0                  | 1              | 0              |
+| reporting | 50         | 4                  | 32                 | 2147483648         | 0              | 0              |
 
-For the corresponding
+`DEFAULT` sets no admission limits of its own, so both columns are `null`, while
+its `cpu_weight` of 100 is the effective default rather than something anyone
+configured. Its `active_queries` counts the introspection query itself, which is
+why the group you are querying from is never idle in its own output.
+
+**Finding groups under admission pressure:**
+
+```questdb-sql title="List groups where queries are waiting or being turned away"
+SELECT name, active_queries, queued_queries, oldest_queue_wait_millis,
+       admission_rejections, admission_timeouts
+FROM resource_groups()
+WHERE queued_queries > 0
+   OR admission_rejections > 0
+   OR admission_timeouts > 0;
+```
+
+A high `queued_queries` with a rising `oldest_queue_wait_millis` means work is
+being held at the admission gate rather than by a busy machine, which is the
+signal that distinguishes a concurrency limit from a slow query.
+
+**Constraints and edge cases:**
+
+- Counters describe the current runtime. They reset when the instance restarts,
+  and recreating a group under the same name starts it from zero.
+- `cpu_nanos_total` counts only CPU that managed scheduling actually measured, so
+  it is a floor rather than a full account of query CPU. While `DEFAULT` is the
+  only group, scheduling is disengaged and nothing is sampled, so the column sits
+  at `0` however busy the instance is. It also undercounts once scheduling is
+  engaged: a query already running when a second group was created stays outside
+  scheduling until it next suspends or finishes, and a scheduler that has
+  degraded after an internal fault stops sampling from then on, which
+  `questdb_resource_groups_cpu_scheduler_degraded` reports as `1`.
+- `memory_used_bytes` can lag real usage, because workers accumulate allocation
+  deltas locally and publish them to the shared counter in batches.
+- A dropped group disappears from this table immediately, while its running and
+  queued queries finish under the settings it had.
+
+The same values are published as
 [Prometheus metrics](/docs/operations/logging-metrics/#resource-group-metrics),
-an unlimited group memory ceiling is `0` in both interfaces; it does not remove
-principal-specific, instance-default single-query or process memory limits.
+where a group with no memory ceiling also reports `0`.
 
-## sleep()
+No group ceiling does not mean unlimited memory. A principal-specific limit, the
+instance default `cairo.query.memory.limit.bytes` and the process budget
+`resource.groups.process.memory.limit.bytes` all still apply.
+
+## session_user
+
+Compatibility alias for [`current_user()`](#current_user). The two are
+interchangeable in QuestDB.
+
+**Arguments:**
+
+- `session_user()` does not require arguments.
+
+**Return value:**
+
+Returns a `string`.
+
+**Examples:**
+
+```questdb-sql
+SELECT session_user();
+```
+
+| session_user |
+| ------------ |
+| admin        |
+
+## sleep
 
 Pauses the query for the given number of seconds, then returns the timestamp at
 which it resumed. Intended for testing and demonstration, for example to hold a
@@ -1320,7 +1518,7 @@ WHERE view_status = 'invalid';
 SELECT * FROM views() ORDER BY view_name;
 ```
 
-## wait_wal_table()
+## wait_wal_table
 
 Blocks until the WAL writer for a table has applied its transactions up to a
 target sequencer transaction, then returns `true`.

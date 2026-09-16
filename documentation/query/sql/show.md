@@ -371,7 +371,7 @@ SHOW GROUPS;
 GiB), `null` when none is set. `external_alias` is empty when the group is not
 mapped to an external group. `resource_group` and `resource_group_priority` are
 the group's
-[resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
+[resource group](/docs/query/sql/acl/alter-group-set-resource-group/) mapping,
 `null` when the group is not mapped. See
 [memory limits](/docs/security/rbac/#memory-limits).
 
@@ -557,7 +557,7 @@ SHOW SERVICE ACCOUNTS;
 
 `memory_limit` is the account's own query memory limit in bytes (`268435456` is
 256 MiB) and `resource_group` its
-[resource group](/docs/operations/resource-groups/#mapping-principals) mapping,
+[resource group](/docs/query/sql/acl/alter-service-account-set-resource-group/) mapping,
 each `null` when not set.
 
 Filtering by a user or group instead lists the service accounts that principal
@@ -639,7 +639,7 @@ reports the effective limit and includes it. In `SHOW GROUPS` and
 neither inherits one. See [memory limits](/docs/security/rbac/#memory-limits).
 
 `resource_group` is the user's direct
-[resource group](/docs/operations/resource-groups/#mapping-principals) mapping;
+[resource group](/docs/query/sql/acl/alter-user-set-resource-group/) mapping;
 a user mapped only through an ACL group shows `null` here.
 
 :::note

@@ -396,11 +396,18 @@ endpoint exposes one series per group, labelled with `resource_group`:
 | `questdb_resource_group_admission_rejections_total` | counter | Queries rejected because the queue was full                  |
 | `questdb_resource_group_admission_timeouts_total`   | counter | Queries that timed out while queued                          |
 
-The single-group dispatch path does not sample CPU. Consequently,
-`cpu_nanos_total` counts CPU measured by managed scheduling, not every query's
-CPU consumption. A flat counter does not imply that the group is idle; also
-check `questdb_resource_groups_cpu_managed_dispatch` and query activity. Memory
-gauges show published accounting and can lag worker-local deltas.
+`cpu_nanos_total` counts only CPU that managed scheduling measured, so treat it
+as a floor rather than a full account. While `DEFAULT` is the only group, CPU
+scheduling is disengaged and nothing is sampled, so the series reads `0` however
+busy the instance is. It also undercounts once scheduling is engaged: a query
+already running when a second group was created stays outside scheduling until
+it next suspends, and a degraded scheduler stops sampling altogether.
+
+A flat counter therefore does not imply an idle group. Check
+`questdb_resource_groups_cpu_managed_dispatch` and
+`questdb_resource_groups_cpu_scheduler_degraded` before drawing that conclusion,
+along with query activity. Memory gauges show published accounting and can lag
+worker-local deltas.
 
 Instance-wide series describe the feature itself:
 
@@ -410,7 +417,7 @@ Instance-wide series describe the feature itself:
 | `questdb_resource_groups_catalog_current`                     | gauge   | `1` when the group catalog is current; `0` while a replica catches up |
 | `questdb_resource_groups_catalog_lag_unmanaged_queries_total` | counter | Queries that ran unmanaged because the catalog was not current yet    |
 | `questdb_resource_groups_cpu_managed_dispatch`                | gauge   | `1` while managed CPU scheduling is engaged                           |
-| `questdb_resource_groups_cpu_scheduler_degraded`              | gauge   | `1` when CPU scheduling has degraded to unmanaged                     |
+| `questdb_resource_groups_cpu_scheduler_degraded`              | gauge   | `1` after an internal fault has disengaged CPU scheduling             |
 
 A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU shares are
 no longer enforced until the instance restarts. Admission and memory limits stay

@@ -288,12 +288,36 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
-                  id: "query/sql/acl/alter-group",
+                  type: "category",
+                  label: "ALTER GROUP",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-group-drop-external-alias", // DROP EXTERNAL ALIAS
+                    "query/sql/acl/alter-group-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-group-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-group-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-group-with-external-alias", // WITH EXTERNAL ALIAS
+                  ],
+                },
+                {
+                  id: "query/sql/acl/alter-resource-group",
                   type: "doc",
                 },
                 {
-                  id: "query/sql/acl/alter-service-account",
-                  type: "doc",
+                  type: "category",
+                  label: "ALTER SERVICE ACCOUNT",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-service-account-create-token", // CREATE TOKEN
+                    "query/sql/acl/alter-service-account-disable", // DISABLE
+                    "query/sql/acl/alter-service-account-drop-token", // DROP TOKEN
+                    "query/sql/acl/alter-service-account-enable", // ENABLE
+                    "query/sql/acl/alter-service-account-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-service-account-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-service-account-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-service-account-with-no-password", // WITH NO PASSWORD
+                    "query/sql/acl/alter-service-account-with-password", // WITH PASSWORD
+                  ],
                 },
                 {
                   type: "category",
@@ -352,8 +376,20 @@ module.exports = {
                   ],
                 },
                 {
-                  id: "query/sql/acl/alter-user",
-                  type: "doc",
+                  type: "category",
+                  label: "ALTER USER",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-user-create-token", // CREATE TOKEN
+                    "query/sql/acl/alter-user-disable", // DISABLE
+                    "query/sql/acl/alter-user-drop-token", // DROP TOKEN
+                    "query/sql/acl/alter-user-enable", // ENABLE
+                    "query/sql/acl/alter-user-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-user-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-user-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-user-with-no-password", // WITH NO PASSWORD
+                    "query/sql/acl/alter-user-with-password", // WITH PASSWORD
+                  ],
                 },
                 "query/sql/alter-view",
               ],
@@ -374,6 +410,10 @@ module.exports = {
                 },
                 "query/sql/create-live-view",
                 "query/sql/create-mat-view",
+                {
+                  id: "query/sql/acl/create-resource-group",
+                  type: "doc",
+                },
                 {
                   id: "query/sql/acl/create-service-account",
                   type: "doc",
@@ -396,6 +436,10 @@ module.exports = {
                 },
                 "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
+                {
+                  id: "query/sql/acl/drop-resource-group",
+                  type: "doc",
+                },
                 {
                   id: "query/sql/acl/drop-service-account",
                   type: "doc",

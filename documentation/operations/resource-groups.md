@@ -13,237 +13,104 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   instance.
 </EnterpriseNote>
 
-This page covers day-to-day use: creating groups, mapping principals, choosing
-limits, and watching the result. For what the limits actually guarantee, read
-[the concept page](/docs/concepts/resource-groups/) first.
-
-## Quick start
-
-This example separates reporting from the default workload and limits its
-concurrency and memory. Run it as an administrator on an instance that meets the
-[requirements](#requirements). Use unused example names and replace the password
-placeholders. Later examples on this page can be adapted independently.
-
-First create the ACL principals and allow SQL connections:
-
-```questdb-sql
-CREATE GROUP analysts;
-GRANT HTTP, PGWIRE TO analysts;
-CREATE USER reporting_user WITH PASSWORD '<choose-a-password>';
-ADD USER reporting_user TO analysts;
-
-CREATE USER nightly_batch WITH PASSWORD '<choose-another-password>';
-GRANT HTTP, PGWIRE TO nightly_batch;
-```
-
-Then create the resource group and mappings:
-
-```questdb-sql
--- 1. Create a group. Unset parameters fall back to the instance defaults.
-CREATE RESOURCE GROUP reporting WITH (
-    cpu_weight = 50,
-    max_active_queries = 4,
-    max_queued_queries = 32,
-    queue_timeout = '15s',
-    memory_limit = '2G'
-);
-
--- 2. reporting_user inherits this mapping unless a higher-precedence one applies.
-ALTER GROUP analysts SET RESOURCE GROUP reporting MAPPING PRIORITY 10;
-
--- 3. Map one user directly. A direct mapping beats any ACL group mapping.
-ALTER USER nightly_batch SET RESOURCE GROUP reporting;
-```
-
-Verify:
-
-```questdb-sql
-SELECT name, cpu_weight, max_active_queries, active_queries, queued_queries
-FROM resource_groups();
-
-SELECT name, resource_group FROM (SHOW USERS);
-SELECT name, resource_group, resource_group_priority FROM (SHOW GROUPS);
-```
-
-Reconnect as `reporting_user` or `nightly_batch` and run:
-
-```questdb-sql
-SELECT current_resource_group();
-```
-
-| current_resource_group |
-| ---------------------- |
-| reporting              |
-
-These grants allow connections. Grant access to the application's tables
-separately, as described in [RBAC](/docs/security/rbac/).
-
-Everything not mapped keeps running in `DEFAULT`, which has a CPU weight of 100.
-Against `reporting`'s weight of 50, that is a 2:1 split of query CPU while both
-have work.
+This page covers running the feature: what an instance needs, how to choose
+limits, what to watch, and what to do when something looks wrong. For what the
+limits guarantee, read [the concept page](/docs/concepts/resource-groups/). For
+statement syntax, see
+[`CREATE RESOURCE GROUP`](/docs/query/sql/acl/create-resource-group/) and its
+siblings.
 
 ## Requirements
 
 - QuestDB Enterprise.
 - Access control enabled (`acl.enabled=true`). Groups can be created without it,
   but mapping statements require it, since mappings attach to ACL principals.
-- The pools that execute SQL must run in Fiber mode, which is the default and
-  which the feature depends on. On an instance whose pools are in legacy mode,
-  resource groups left at their default turn themselves off and log an error
-  naming the pool and the setting to change. Setting
-  `resource.groups.enabled=true` on such an instance fails startup with that
-  same error.
-- Administrator rights for group management, mappings and instance-wide
-  inspection. Ordinary users can call `current_resource_group()` to check their
-  own query's group.
+- The worker pools that execute SQL must run in Fiber mode, which is the
+  default.
+- The [`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission for group
+  management, mappings and instance-wide inspection. Ordinary users need no
+  permission to call `current_resource_group()` and check their own query's
+  group.
 
-A protocol runs on its own pool when its worker count is above zero, otherwise
-on the shared network pool. The setting that matters is the one for the pool it
-actually uses:
+Mapping a principal to a resource group grants it nothing by itself. The user
+still needs `HTTP` or `PGWIRE` to connect and `SELECT` on the tables it queries,
+as described in [RBAC](/docs/security/rbac/).
 
-| Where the protocol runs                              | Setting to check                      |
-| ---------------------------------------------------- | ------------------------------------- |
-| Its own HTTP pool (`http.worker.count` above zero)   | `http.worker.fiber.enabled`           |
-| Its own PGWire pool (`pg.worker.count` above zero)   | `pg.worker.fiber.enabled`             |
-| The shared network pool (worker count zero, default) | `shared.network.worker.fiber.enabled` |
+### Fiber mode
 
-Parallel query work is separate and follows `shared.query.worker.fiber.enabled`
-whenever the shared query pool has workers. A shared query pool set to zero
-workers turns parallel SQL off by default and needs no check of its own.
+Every Fiber setting defaults to `true`, so a stock instance already satisfies
+this requirement and there is nothing to check. It matters only on an instance
+whose worker pools were tuned by hand.
 
-The first two settings default to `true`, so a dedicated pool is a Fiber pool
-unless someone turned it off. `shared.network.worker.fiber.enabled` defaults to
-`true` exactly when HTTP or PGWire actually runs there, which is the case out of
-the box because both worker counts default to zero. Check these only when the
-instance was tuned by hand.
+If a SQL pool is in legacy mode, resource groups left at their default turn
+themselves off at startup and log an error naming the pool and the setting to
+change. Setting `resource.groups.enabled=true` explicitly on such an instance
+fails startup with that same error.
 
-## Configuration
+Each protocol is governed by the setting for the pool that actually serves it:
 
-Resource groups are enabled by default. These are instance-wide settings; the
-per-group policy is set in SQL. Each setting is described in full in the
+- HTTP and PostgreSQL run on their own pool when `http.worker.count` or
+  `pg.worker.count` is above zero, governed by
+  [`http.worker.fiber.enabled`](/docs/configuration/http-server/#httpworkerfiberenabled)
+  and
+  [`pg.worker.fiber.enabled`](/docs/configuration/postgres-wire-protocol/#pgworkerfiberenabled).
+- With those counts at their default of zero, both run on the shared network
+  pool, governed by
+  [`shared.network.worker.fiber.enabled`](/docs/configuration/shared-workers/#sharednetworkworkerfiberenabled).
+- Parallel query work follows
+  [`shared.query.worker.fiber.enabled`](/docs/configuration/shared-workers/#sharedqueryworkerfiberenabled)
+  whenever the shared query pool has workers. A pool set to zero workers turns
+  parallel SQL off and needs no check of its own.
+
+The two instance-wide settings, `resource.groups.enabled` and
+`resource.groups.process.memory.limit.bytes`, are described in the
 [resource groups configuration reference](/docs/configuration/resource-groups/).
+Neither is reloadable, so turning the feature off is a restart. Definitions and
+mappings stay in the catalog either way, so nothing is lost while it is off.
 
-| Property                                     | Default | Meaning                                                                                                |
-| -------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
-| `resource.groups.enabled`                    | `true`  | Set to `false` to disable resource group enforcement. Existing single-query memory limits still apply. |
-| `resource.groups.process.memory.limit.bytes` | `0`     | Ceiling for tracked query memory across all groups, `0` for none. Every group limit is capped by it.   |
+## Changing a live instance
 
-Turning the feature off is a restart with `resource.groups.enabled=false`.
-Definitions and mappings stay in the catalog, so nothing is lost and the
-policies apply again when it is re-enabled.
+Three things are worth knowing before you change policy on a running system:
 
-## Managing groups
+- **Changes apply online.** An `ALTER` does not cancel anything running at that
+  moment. Slots already held are kept, an already queued request keeps its
+  deadline, and only subsequent allocations check a new memory budget. See
+  [effect on queries already running](/docs/query/sql/acl/alter-resource-group/#effect-on-queries-already-running).
+- **A drop is refused while principals are still mapped.** Unmap them first. Once
+  unmapped, the group can be dropped while its queries are still running, and
+  they carry on under the settings it had. See
+  [what happens to queries still using it](/docs/query/sql/acl/drop-resource-group/#what-happens-to-queries-still-using-it).
+- **`DEFAULT` is alterable but cannot be dropped or renamed.** Giving it limits
+  is how you bound everything that is not explicitly mapped.
 
-```questdb-sql
-CREATE RESOURCE GROUP analytics;
+Mapping changes affect queries that start after the change, never one already
+running. For the resolution order, including `ASSUME SERVICE ACCOUNT`, see
+[who a resource group applies to](/docs/concepts/resource-groups/#who-a-resource-group-applies-to).
 
-CREATE RESOURCE GROUP IF NOT EXISTS analytics WITH (cpu_weight = 300);
+On a replicated cluster a change takes effect on each instance as the catalog
+reaches it, so a replica that is behind keeps applying the previous policy. See
+[Replication and catalog lag](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
 
-ALTER RESOURCE GROUP analytics SET (cpu_weight = 300, max_active_queries = 8);
+## Choosing limits
 
--- Clear parameters so they fall back to the instance defaults again.
-ALTER RESOURCE GROUP analytics RESET (memory_limit, max_active_queries);
+The accepted values and their defaults are in the
+[`CREATE RESOURCE GROUP` parameter table](/docs/query/sql/acl/create-resource-group/#parameters).
+What matters when picking them:
 
-ALTER RESOURCE GROUP analytics RENAME TO reporting;
+- **An unset parameter is not always "unlimited".** `cpu_weight` falls back to
+  100 and `queue_timeout` to 30 seconds, while the two admission counts really
+  are unlimited when unset.
+- **Weights are only meaningful relative to other groups.** A group at
+  `cpu_weight = 50` gets a third of query CPU while `DEFAULT` also has work, and
+  all of it when `DEFAULT` is idle. Setting a weight on a lone group does
+  nothing.
+- **No group memory ceiling does not mean unlimited memory.** A principal's own
+  limit, `cairo.query.memory.limit.bytes` and the process budget all still
+  apply, and a group ceiling only ever lowers the result. See
+  [memory limits](/docs/concepts/resource-groups/#memory-limits-use-batched-accounting).
 
-DROP RESOURCE GROUP reporting;
-DROP RESOURCE GROUP IF EXISTS reporting;
-```
-
-A group policy change applies online to the shared group budget. It does not
-cancel existing queries at the moment `ALTER` runs:
-
-| Change                 | Effect on existing work                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| CPU weight             | Subsequent scheduling uses the new policy                                                         |
-| Active-query limit     | Existing slots are retained; subsequent admission, including a resumed cursor, uses the new limit |
-| Queue limit or timeout | New admission requests use the new settings; an already queued request keeps its deadline         |
-| Group memory limit     | Subsequent allocations check the new budget; existing memory is released normally                 |
-
-Lowering a memory budget below current usage can make subsequent allocations
-fail. The principal-specific or instance-default single-query limit is captured
-when the query starts; updating the group budget does not replace that limit.
-Changing a principal mapping affects new queries only.
-
-`DROP` is refused while any live principal is still mapped to the group; unmap
-them first. Once unmapped, a group can be dropped while queries still use it. It
-disappears from `resource_groups()` immediately. Running and queued queries,
-including suspended cursors, continue using the deleted group's existing
-settings. Their memory still counts towards the process budget.
-
-Recreating a group with the same name starts fresh usage counters. Queries that
-still use the deleted group do not move to the new group or use its settings.
-Map principals to the new group to assign their subsequent queries to it.
-
-`DEFAULT` cannot be dropped or renamed, but it can be altered:
-
-```questdb-sql
-ALTER RESOURCE GROUP DEFAULT SET (max_active_queries = 16);
-```
-
-## Mapping principals
-
-```questdb-sql
-ALTER USER alice SET RESOURCE GROUP analytics;
-ALTER SERVICE ACCOUNT ingest_bot SET RESOURCE GROUP analytics;
-ALTER GROUP analysts SET RESOURCE GROUP analytics MAPPING PRIORITY 10;
-
-ALTER USER alice UNSET RESOURCE GROUP;
-ALTER GROUP analysts UNSET RESOURCE GROUP;
-```
-
-`MAPPING PRIORITY` is a non-negative integer and applies only to ACL group
-mappings, because a user can belong to several ACL groups. The highest priority
-wins; if two ACL groups tie, the mapping to the resource group that was created
-first wins, so give them distinct priorities when the order matters. It defaults
-to 0 and is rejected on user and service account mappings, which are one-to-one.
-
-Resolution order for a query is: direct mapping on the principal, then the
-highest-priority mapping among the user's ACL groups, then `DEFAULT`. Service
-accounts do not inherit ACL group mappings. `ASSUME SERVICE ACCOUNT` does not
-change the group: the session keeps the group of the principal that logged in.
-
-## Policy parameters
-
-All parameters are optional. An unset parameter is not "unlimited" in every
-case: it falls back to the instance default shown here.
-
-| Parameter            | Accepted values                                                                           | Unset behaviour                                   |
-| -------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `cpu_weight`         | integer, 1 to 10000                                                                       | 100                                               |
-| `max_active_queries` | integer, 1 or more                                                                        | unlimited                                         |
-| `max_queued_queries` | integer, 0 or more                                                                        | unlimited                                         |
-| `queue_timeout`      | a positive whole number of milliseconds, or a duration such as `'15s'`, `'2m'`            | 30 seconds                                        |
-| `memory_limit`       | a byte size, plain or suffixed such as `'8G'`, or `0` or `UNLIMITED` for no group ceiling | no group ceiling; other memory limits still apply |
-
-`memory_limit` is the budget for everything the group runs at once. Where the
-instance sets `resource.groups.process.memory.limit.bytes`, the group budget is
-capped by it, so a group cannot be granted more than the instance allows. A
-group ceiling only lowers what its queries may use; it never raises a limit set
-elsewhere.
-
-A group that does not set `memory_limit` carries no ceiling of its own, and
-`resource_groups().memory_limit_bytes` reports `0` for it. Its queries are then
-bounded by any existing single-query limit and the process limit. A principal's
-effective query memory limit takes precedence over the instance default
-`cairo.query.memory.limit.bytes`; group and process budgets can only lower the
-resulting ceiling.
-
-To remove a group memory ceiling, use
-`ALTER RESOURCE GROUP reporting RESET (memory_limit)` or set `memory_limit` to
-`0` or `UNLIMITED`; `0` matches the instance process-memory property. Accounting
-continues when limits are unlimited.
-
-An example of what a weight means in practice:
-
-```questdb-sql
--- A share: reporting gets a third of query CPU when DEFAULT also has work,
--- and all of it when DEFAULT is idle.
-CREATE RESOURCE GROUP reporting WITH (cpu_weight = 50);
-```
-
-Weights arbitrate only between groups that have work at the same time; they
-never hold CPU back from a group that is alone.
+Start permissive, watch the counters in [inspecting](#inspecting), then tighten.
+Policy changes apply online, so there is no need to get this right first time.
 
 ## Common scenarios
 
@@ -253,22 +120,12 @@ Every HTTP or PGWire worker is occupied by a large query, new requests are not
 picked up, and instance CPU is low because those queries run on one core each.
 Clients time out and retry, which produces more of the same queries.
 
-Three steps. The first is a prerequisite to confirm; the other two are policy
-you choose.
-
-**1. Confirm the SQL pools are Fiber pools.** This is the prerequisite for
-everything below; the [requirements](#requirements) list which setting governs
-each pool. With the instance running, `SHOW PARAMETERS` must report
-`resource.groups.enabled` as `true` and `questdb_resource_groups_enabled` must
-be `1`. Anything else means a SQL pool is in legacy mode and the feature turned
-itself off; the startup log names the pool.
-
-**2. Separate the workloads into groups.** While `DEFAULT` is the only group,
-queries hold their workers exactly as they do with the feature disabled. Managed
-scheduling engages as soon as a second group exists. Under it a query yields its
+**1. Separate the workloads into groups.** While `DEFAULT` is the only group,
+queries hold their workers exactly as they do with the feature disabled. CPU
+scheduling engages as soon as a second group exists, and a query then yields its
 worker at the checkpoints that already make it cancellable, so a long
-single-threaded scan releases the worker while it is still running and the
-instance keeps accepting connections, and CPU is split by weight:
+single-threaded scan releases the worker while it is still running, the instance
+keeps accepting connections, and CPU is split by weight:
 
 ```questdb-sql
 CREATE RESOURCE GROUP dashboards WITH (cpu_weight = 400);
@@ -278,14 +135,14 @@ ALTER USER app SET RESOURCE GROUP dashboards;
 ALTER USER analyst SET RESOURCE GROUP adhoc;
 ```
 
-`questdb_resource_groups_cpu_managed_dispatch` reports `1` while managed
-scheduling is engaged, which is whenever a group besides `DEFAULT` exists. A
-query that started before the second group was created keeps its worker until it
-next suspends or finishes, and a query that never reaches a checkpoint holds its
+`questdb_resource_groups_cpu_managed_dispatch` reports `1` while scheduling is
+engaged, which is whenever a group besides `DEFAULT` exists. A query that
+started before the second group was created keeps its worker until it next
+suspends or finishes, and a query that never reaches a checkpoint holds its
 worker either way, so this does not remove every cause of an unresponsive
 instance.
 
-**3. Bound concurrent requests with admission.**
+**2. Bound concurrent requests with admission.**
 
 ```questdb-sql
 ALTER RESOURCE GROUP adhoc SET (
@@ -363,10 +220,8 @@ held.
 
 ### An ingestion or automation account runs queries too
 
-Service accounts resolve differently from users: they honour a direct mapping,
-but they never inherit a mapping from an ACL group. A service account with no
-direct mapping runs in `DEFAULT` however its ACL groups are mapped, so map it
-explicitly:
+A service account cannot belong to an ACL group, so it has no mapping to
+inherit. Without a direct mapping it runs in `DEFAULT`, so map it explicitly:
 
 ```questdb-sql
 CREATE RESOURCE GROUP automation WITH (cpu_weight = 50, max_active_queries = 2);
@@ -403,20 +258,16 @@ this from the client's own session with `SELECT current_resource_group();`.
 
 ## Inspecting
 
-`resource_groups()` returns one row per group, combining the configured policy
-with live counters:
+[`resource_groups()`](/docs/query/functions/meta/#resource_groups) returns one
+row per group, combining the configured policy with live counters. The columns
+that matter day to day:
 
-| Column                                                             | Meaning                                             |
-| ------------------------------------------------------------------ | --------------------------------------------------- |
-| `name`                                                             | Group name                                          |
-| `memory_limit_bytes`                                               | Effective group memory budget                       |
-| `max_active_queries`, `max_queued_queries`, `queue_timeout_millis` | Effective admission policy                          |
-| `cpu_weight`                                                       | Effective CPU weight                                |
-| `active_queries`, `queued_queries`                                 | Live admission state                                |
-| `oldest_queue_wait_millis`                                         | How long the longest waiting query has waited       |
-| `memory_used_bytes`                                                | Tracked query memory in use                         |
-| `cpu_nanos_total`, `cpu_wait_nanos_total`                          | Cumulative CPU consumed and spent waiting for CPU   |
-| `admission_rejections`, `admission_timeouts`                       | Cumulative queue-full rejections and queue timeouts |
+- `active_queries` and `queued_queries` for live admission state, and
+  `oldest_queue_wait_millis` for how long the longest waiter has waited. A high
+  queue with a rising wait means work is held at the gate, not that the machine
+  is busy.
+- `admission_rejections` and `admission_timeouts` for work already turned away.
+- `memory_used_bytes` against `memory_limit_bytes` for headroom.
 
 Mappings are attributes of the principals themselves. `SHOW USERS` and
 `SHOW SERVICE ACCOUNTS` carry a `resource_group` column, and `SHOW GROUPS`
@@ -432,16 +283,17 @@ quickest way to confirm a mapping from the client's own connection:
 SELECT current_resource_group();
 ```
 
-It returns `NULL` when that execution is unmanaged, including when the feature
-is disabled or a replica's group catalog is not ready. See the
+An unmapped principal gets `DEFAULT`, not `NULL`. `NULL` means the query was
+never admitted to a group at all, which happens when the feature is disabled and
+on a replica whose group catalog is not ready. Note that `DEFAULT` is returned
+even while CPU scheduling is disengaged, because assignment and CPU slicing are
+separate things. See the
 [function reference](/docs/query/functions/meta/#current_resource_group) for
-permissions and return values, and the
-[`resource_groups()`](/docs/query/functions/meta/#resource_groups) reference for
-its complete schema.
+permissions and return values.
 
 `query_activity()` carries a `resource_group` column, so you can see which group
-each running query was admitted to. It is `NULL` for executions that resource
-groups do not manage:
+each running query was admitted to. It follows the same rule, `DEFAULT` for an
+unmapped principal and `NULL` only when no group was assigned:
 
 ```questdb-sql
 SELECT resource_group, username, query_start, query
@@ -452,31 +304,11 @@ ORDER BY query_start;
 
 ## Monitoring
 
-The Prometheus endpoint exposes one series per group, labelled with
-`resource_group`. The full list lives in the
-[metrics reference](/docs/operations/logging-metrics/#resource-group-metrics):
-
-```
-questdb_resource_group_active_queries{resource_group="reporting"}
-questdb_resource_group_queued_queries{resource_group="reporting"}
-questdb_resource_group_oldest_queue_wait_millis{resource_group="reporting"}
-questdb_resource_group_memory_bytes{resource_group="reporting"}
-questdb_resource_group_memory_limit_bytes{resource_group="reporting"}
-questdb_resource_group_cpu_nanos_total{resource_group="reporting"}
-questdb_resource_group_cpu_wait_nanos_total{resource_group="reporting"}
-questdb_resource_group_admission_rejections_total{resource_group="reporting"}
-questdb_resource_group_admission_timeouts_total{resource_group="reporting"}
-```
-
-Instance-wide series:
-
-| Metric                                                        | Meaning                                                               |
-| ------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `questdb_resource_groups_enabled`                             | 1 when the feature is on                                              |
-| `questdb_resource_groups_catalog_current`                     | 1 when the catalog is current; 0 while a replica is still catching up |
-| `questdb_resource_groups_catalog_lag_unmanaged_queries_total` | Queries that ran unmanaged because the catalog was not current yet    |
-| `questdb_resource_groups_cpu_managed_dispatch`                | 1 while managed CPU scheduling is engaged                             |
-| `questdb_resource_groups_cpu_scheduler_degraded`              | 1 when CPU scheduling has degraded to unmanaged                       |
+Metrics require `metrics.enabled=true`, which is off by default. The Prometheus
+endpoint then exposes one series per group, labelled with `resource_group`, plus
+five instance-wide series describing the feature itself. Every name, type and
+meaning is in the
+[metrics reference](/docs/operations/logging-metrics/#resource-group-metrics).
 
 Two signals are worth alerting on: a non-zero
 `questdb_resource_groups_cpu_scheduler_degraded`, which means CPU shares are no
@@ -492,7 +324,7 @@ settings are rejecting work the application expects to succeed.
 | `Resource Group admission queue timeout`                          | The query waited longer than `queue_timeout`                                  | Raise `queue_timeout` or `max_active_queries`, or reduce concurrency                                         |
 | Either admission error while fetching a later page                | A suspended cursor re-enters admission when the client asks for more rows     | Adjust admission limits or retry the query with backoff; the failed cursor cannot continue                   |
 | `query memory limit exceeded`                                     | A single-query, group or process memory limit rejected an allocation          | `scope` in the message names the level: `query`, `group` or `process`. Reduce memory use or raise that limit |
-| `Resource Group is assigned to an ACL entity`                     | `DROP RESOURCE GROUP` while principals are still mapped                       | `UNSET RESOURCE GROUP` on those principals first                                                             |
+| `Resource Group is assigned to an ACL entity`                     | `DROP RESOURCE GROUP` while principals are still mapped                       | `UNSET RESOURCE GROUP` on those principals first; the message names one of them in `[entity=...]`            |
 | `built-in Resource Group cannot be dropped` / `cannot be renamed` | `DROP` or `RENAME` on `DEFAULT`                                               | Alter it instead                                                                                             |
 
 ## Troubleshooting
@@ -537,24 +369,31 @@ instance start with resource groups off.
 **The feature is off although the default is on.** Check the log at startup for
 an error naming a worker pool, and check `SHOW PARAMETERS` for the value that
 took effect. A legacy SQL pool turns the feature off when the property is left
-unset.
+unset. `SHOW PARAMETERS` reporting `resource.groups.enabled` as `true`, together
+with `questdb_resource_groups_enabled` at `1`, confirms the feature is actually
+running.
 
 ## Limitations
 
 - Only query statements are managed. See
-  [what is managed](/docs/concepts/resource-groups/#what-is-managed).
+  [which statements are managed](/docs/concepts/resource-groups/#which-statements-are-managed).
 - Memory accounting covers tracked native query memory, not JVM heap, resident
-  set size or memory-mapped table pages.
+  set size or memory-mapped table pages. See
+  [memory limits](/docs/concepts/resource-groups/#memory-limits-use-batched-accounting).
 - CPU control is cooperative, so shares hold over a short window rather than
   instantaneously, and a query that cannot reach a cooperative checkpoint holds
-  its worker until it does.
+  its worker until it does. See
+  [cooperative CPU scheduling](/docs/concepts/resource-groups/#how-cooperative-cpu-scheduling-works).
 - Principal mapping changes affect new queries. Group budgets change online;
   dropping a group retains its runtime state for existing queries until they
-  finish.
+  finish. See [changing a live instance](#changing-a-live-instance).
 
 ## See also
 
 - [Resource groups concept](/docs/concepts/resource-groups/)
 - [Resource groups configuration](/docs/configuration/resource-groups/)
+- [CREATE RESOURCE GROUP](/docs/query/sql/acl/create-resource-group/)
+- [ALTER RESOURCE GROUP](/docs/query/sql/acl/alter-resource-group/)
+- [DROP RESOURCE GROUP](/docs/query/sql/acl/drop-resource-group/)
 - [Role-based access control](/docs/security/rbac/)
 - [Logging and metrics](/docs/operations/logging-metrics/)

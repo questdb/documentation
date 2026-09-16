@@ -22,7 +22,9 @@ None of these settings are reloadable: changing any of them requires a restart.
 
 Resource groups also require access control to be enabled (`acl.enabled=true`)
 before principals can be mapped to a group, and every pool that executes SQL
-must run in Fiber mode, which is the default. What happens when a pool is in
+must run in Fiber mode, which is the default. The
+[requirements](/docs/operations/resource-groups/#requirements) list the Fiber
+setting that governs each pool. What happens when a pool is in
 legacy mode depends on how the feature was turned on. Left at its default, it
 turns itself off and logs an error naming the pool and the setting to change.
 Asked for explicitly, it fails startup with the same error, because an explicit
