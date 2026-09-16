@@ -51,6 +51,23 @@ Increasing `replication.primary.keepalive.interval` lengthens this
 stale-direct-client window. Leave its 10-second default unless QuestDB advises
 otherwise.
 
+### Planned promotion requires the cold manager off the departing primary
+
+With
+[`spec.coldStorage`](/docs/enterprise-kubernetes-operator/configuration/#cold-storage),
+a `Planned` promotion starts only when the cold-storage manager is settled on
+an instance other than the departing primary; otherwise it fails fast with
+`ColdManagerMoveRequired`, and there is no override. The default `manager: 1`
+normally selects the primary, so
+[move the manager](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager)
+to a replica before the first `Planned` cutover. The operator never elects a
+replacement manager on its own: changing `spec.coldStorage.manager` is the
+only path, and an unreachable current manager blocks the handoff fail-closed
+(`ManagerHandoffBlocked`) rather than risking two managers. `Emergency`
+promotion never waits on cold ownership; while the manager is lost, new
+uploads and remote garbage collection pause and refreshers continue serving
+already-offloaded partitions.
+
 ### Promotion can be unbounded
 
 A live but hung final upload can hold `Draining`: the operator cannot
