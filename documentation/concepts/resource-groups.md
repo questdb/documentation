@@ -19,7 +19,7 @@ consume while their queries run. One instance typically serves several workloads
 at once: dashboards that must answer in milliseconds, an ad-hoc analyst, and a
 nightly report that scans a year of data. When these workloads compete without
 resource controls, the report can increase dashboard latency.
-[Common scenarios](/docs/operations/resource-groups/#common-scenarios) works
+[Common scenarios](/docs/operations/resource-groups/#common-scenarios) walks
 through that case and five others as policies you can copy.
 
 Creating one takes two statements:
