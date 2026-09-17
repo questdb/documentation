@@ -24,6 +24,9 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Python client](/docs/connect/clients/python/) - Documented 5.1.0 QWP-only row types, UUID/LONG256 binary column overrides and byte-order migration, and pandas type-preserving round trips including DATE and read-only type metadata
+- [Python](/docs/connect/clients/python/#dataframe-ingestion) and [Rust](/docs/connect/clients/rust/#arrow-and-polars-ingestion) clients - Clarified DataFrame-wide `in_doubt` status versus individual flushes and the risk of duplicating committed rows on retry
+- [Store-and-forward](/docs/high-availability/store-and-forward/concepts/#reconnect-and-replay) - Corrected replay guidance: connection-local sequence numbers do not deduplicate writes; table-level deduplication with stable row identity is required to suppress duplicates
 - [query_activity()](/docs/query/functions/meta/#query_activity) - Documented the `is_wal`, `memory_used`, and `memory_limit` columns
 - [wal_tables()](/docs/query/functions/meta/#wal_tables) - Documented the `errorTag`, `errorMessage`, and `memoryPressure` columns; `errorTag` reads `OUT OF MEMORY` after a WAL apply memory limit breach
 - [SHOW](/docs/query/sql/show/) - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, gain a trailing `memory_limit` column. Clients that read these results by position need [updating](/docs/security/rbac/#memory-limit-upgrade)
