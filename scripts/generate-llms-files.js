@@ -3,7 +3,8 @@ const path = require('path')
 const yaml = require('js-yaml')
 
 const sidebarConfig = require('../documentation/sidebars.js')
-const BASE_URL = 'https://questdb.com/docs/'
+const { generateUrl: buildDocUrl } = require('./lib/docs-urls')
+const { subtreeContainsDoc } = require('./lib/sidebar-utils')
 
 const processedFiles = new Map()
 
@@ -53,43 +54,10 @@ function extractFrontmatter(filePath) {
   }
 }
 
-function normalizeUrl(url) {
-  const clean = url.endsWith("/") ? url.slice(0, -1) : url
-  return clean + ".md"
-}
-
 function generateUrl(docId, docPath) {
   // Extract frontmatter to check for custom slug
   const { slug } = extractFrontmatter(docPath)
-
-  if (slug) {
-    let urlPath = slug
-
-    // Absolute slug (starts with /)
-    if (urlPath.startsWith('/')) {
-      urlPath = urlPath.substring(1)
-      if (urlPath === '') {
-        return BASE_URL + "index.md"
-      }
-      return normalizeUrl(BASE_URL + urlPath)
-    }
-
-    // Relative slug - resolve it relative to the document's directory
-    const docDir = path.dirname(docId)
-    if (docDir && docDir !== '.') {
-      urlPath = path.join(docDir, urlPath)
-    }
-
-    return normalizeUrl(BASE_URL + urlPath)
-  }
-
-  // Default behavior: use docId
-  if (docId === 'introduction') {
-    return BASE_URL + "index.md"
-  }
-  // Strip /index suffix to match raw-markdown plugin output (e.g. cookbook/index -> cookbook.md)
-  let urlDocId = docId.endsWith('/index') ? docId.slice(0, -'/index'.length) : docId
-  return normalizeUrl(BASE_URL + urlDocId)
+  return buildDocUrl(docId, slug)
 }
 
 function processForLlmsTxt(items, indent = 0, isTopLevel = false) {
@@ -123,13 +91,25 @@ function processForLlmsTxt(items, indent = 0, isTopLevel = false) {
       result += '\n'
       
     } else if (item.type === 'category') {
+      // A category's own link page (link: {type: 'doc'}) is a real doc too,
+      // unless the same doc is already listed among the category's items
+      const linkDoc = item.link && item.link.type === 'doc' && item.link.id &&
+        !subtreeContainsDoc(item.items, item.link.id)
+        ? [{ type: 'doc', id: item.link.id }]
+        : []
       if (isTopLevel) {
         result += `\n## ${item.label}\n`
+        if (linkDoc.length > 0) {
+          result += processForLlmsTxt(linkDoc, 0, false)
+        }
         if (item.items && item.items.length > 0) {
           result += processForLlmsTxt(item.items, 0, false)
         }
       } else {
         result += `${indentStr}${item.label}\n`
+        if (linkDoc.length > 0) {
+          result += processForLlmsTxt(linkDoc, indent + 1, false)
+        }
         if (item.items && item.items.length > 0) {
           result += processForLlmsTxt(item.items, indent + 1, false)
         }

@@ -16,6 +16,7 @@ plugins/*/compiled
 .netlify
 .cache-loader
 static/llms.txt
+static/llms-full.txt
 static/reference-full.md
 static/web-console/*.json
 
