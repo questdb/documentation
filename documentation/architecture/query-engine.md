@@ -60,7 +60,8 @@ to process data in table page frames for better CPU use.
   thread. Other queries, like those involving `GROUP BY` and `SAMPLE BY`, execute a pipeline with some  single-threaded stages and some multi-threaded stages to avoid slow downs when groups are unbalanced.
 
 - **Worker pools:** QuestDB allows to configure different pools for specialized functions, like
-parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire protocol, or responding to HTTP connections. By default, most tasks are handled by a shared worker pool.
+parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire protocol, or responding to HTTP connections. By default, work is spread across three shared pools: network I/O, query
+execution, and writes. See [shared workers](/docs/configuration/shared-workers/).
 
 - **Query plan caching:**
   The system caches query plans for reuse within the same connection. (Query results are not
