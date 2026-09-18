@@ -63,6 +63,22 @@ worker count.
 Number of threads in the private HTTP worker pool. When `0`, the HTTP server
 uses the shared worker pool. Values above `0` enable a private pool.
 
+### http.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the private HTTP worker pool in Fiber mode, where a query can suspend and
+release its worker instead of holding it until it finishes. Setting this to
+`false` puts the pool in legacy mode.
+
+This applies only when `http.worker.count` is above `0`. With the default of
+`0`, HTTP runs on the shared network pool and
+[`shared.network.worker.fiber.enabled`](/docs/configuration/shared-workers/#sharednetworkworkerfiberenabled)
+is the setting that governs it instead. QuestDB Enterprise
+[resource groups](/docs/concepts/resource-groups/) require Fiber mode on
+whichever pool actually serves HTTP.
+
 ### http.worker.haltOnError
 
 - **Default**: `false`
