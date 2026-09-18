@@ -597,6 +597,30 @@ WHERE timestamp > dateadd('M', -1, now());
 This returns in single-digit milliseconds. The data is pre-aggregated, so no
 aggregation work is needed at query time.
 
+### Performance with row expiry
+
+`EXPIRE ROWS` adds work when you query the view:
+
+- **`WHEN`** checks which rows have expired. A cutoff on the designated timestamp
+  can let QuestDB skip older partitions.
+- **`KEEP LATEST`** finds the newest row for each key. An index on the symbol key
+  can speed this up.
+- **`KEEP HIGHEST/LOWEST`, `KEEP N`, and window conditions** compare rows across
+  the view. Keeping ten rows per group does not mean QuestDB only reads ten rows
+  per group.
+
+The `KEEP` modes and window conditions hide rows without deleting them from disk.
+Queries can become slower as the stored data grows. Use TTL to remove old
+partitions, but remember that the policy then chooses only from the remaining
+rows.
+
+Some `WHEN` policies also delete expired rows in the background. This cleanup
+adds disk activity, especially when it must rewrite a partition to remove only
+some rows. `CLEANUP EVERY` sets how often cleanup runs. Queries hide expired rows
+even before cleanup runs.
+
+See [How EXPIRE ROWS works](/docs/concepts/expire-rows/#how-it-works) for details.
+
 ## Managing materialized views
 
 ### Listing views
