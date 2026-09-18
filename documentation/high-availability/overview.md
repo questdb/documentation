@@ -150,6 +150,8 @@ by you.
   primary, and replica nodes.
 - [Failover and role switch](/docs/high-availability/failover/) — switch roles
   in place, promote a replica, and recover from a refused switch.
+- [Disaster recovery](/docs/high-availability/disaster-recovery/) — failure
+  scenarios and the migration procedures that recover from them.
 - [Client failover](/docs/high-availability/client-failover/concepts/) —
   configure your applications to follow a primary promotion automatically.
 - [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —

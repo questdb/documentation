@@ -87,7 +87,7 @@ server log is the reliable source.
    host that held data before, use a fresh installation directory instead.
 
 2. **Remove
-   [`_migrate_primary`](/docs/high-availability/setup/#emergency-primary-migration)
+   [`_migrate_primary`](/docs/high-availability/disaster-recovery/#emergency-primary-migration)
    if present.** It conflicts with the recovery file, and on its own it
    replays to the **latest** state, not to a bounded instant.
 
@@ -221,7 +221,7 @@ Startup errors, verbatim, with cause and fix:
 | `The _recover_point_in_time file must contain the replication.recovery.timestamp setting`                   | The target instant key is missing                                    | Add `replication.recovery.timestamp` to the file                                                                      |
 | `The _recover_point_in_time file contains unexpected settings: ...`                                         | The file contains a key other than the two accepted ones             | Remove the extra keys; the file accepts exactly two                                                                   |
 | ``The _recover_point_in_time file can't be used if the instance has the setting `replication.role=replica`.`` | The node is configured as a replica                                  | Remove or comment `replication.role` in `server.conf`; recovery runs with the role unset or set to `primary`          |
-| `The _migrate_primary file can't be used in conjunction with _recover_point_in_time file.`                  | Both trigger files exist in the install root                         | Remove [`_migrate_primary`](/docs/high-availability/setup/#emergency-primary-migration); on its own it replays to the latest state, not to a bounded instant |
+| `The _migrate_primary file can't be used in conjunction with _recover_point_in_time file.`                  | Both trigger files exist in the install root                         | Remove [`_migrate_primary`](/docs/high-availability/disaster-recovery/#emergency-primary-migration); on its own it replays to the latest state, not to a bounded instant |
 | `ER001 - Attempted to start a primary instance over a non-empty object store after a point in time recovery.` | The recovered node started as primary against a non-empty store      | Point `replication.object.store` at a new, empty bucket or prefix; see [ER001](/docs/troubleshooting/error-codes/#er001) |
 
 A recovery that comes up healthy with data missing did not necessarily fail:

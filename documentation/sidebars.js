@@ -752,6 +752,7 @@ module.exports = {
           items: [
             "high-availability/setup",
             "high-availability/failover",
+            "high-availability/disaster-recovery",
             "high-availability/tuning",
             "high-availability/wal-cleanup",
           ],

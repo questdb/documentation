@@ -15,7 +15,7 @@ It does so by keeping a rolling ID locally and in the object store in sync.
 
 If these two IDs are out of sync, the primary instance will raise an error.
 
-For additional information, refer to the [replication overview](/docs/high-availability/overview) and [replication setup guide](/docs/high-availability/setup), especially its "Disaster Recovery" section.
+For additional information, refer to the [replication overview](/docs/high-availability/overview), the [replication setup guide](/docs/high-availability/setup), and the [disaster recovery guide](/docs/high-availability/disaster-recovery/).
 
 ### ER001
 
