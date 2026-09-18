@@ -373,9 +373,15 @@ then applies to what is left. See
 See the [Expiring rows](/docs/concepts/expire-rows/) concept page for all modes,
 examples, and details (NULLs, ties, and when rows are deleted from disk).
 
-## Complete example
+## Larger example
 
-Putting it all together:
+Create a materialized view that:
+
+- Checks for updates every 15 minutes (`EVERY 15m`)
+- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
+- Aggregates from `trades` table (`WITH BASE trades`)
+- Stores hourly averages and volumes (`SAMPLE BY 1h`)
+- Keeps 30 days of data (`TTL 30 DAYS`)
 
 ```questdb-sql title="Fully specified materialized view"
 CREATE MATERIALIZED VIEW IF NOT EXISTS trades_hourly_stats
@@ -395,13 +401,6 @@ AS (
 )
 PARTITION BY DAY TTL 30 DAYS;
 ```
-
-This creates a view that:
-- Checks for updates every 15 minutes (`EVERY 15m`)
-- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
-- Aggregates from `trades` table (`WITH BASE trades`)
-- Stores hourly averages and volumes (`SAMPLE BY 1h`)
-- Keeps 30 days of data (`TTL 30 DAYS`)
 
 ## Metadata
 
@@ -490,7 +489,9 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 ## See also
 
 - [Materialized views concept](/docs/concepts/materialized-views/)
+- [Row expiry concept](/docs/concepts/expire-rows/)
 - [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
 - [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
 - [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)
+- [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/)
