@@ -1191,15 +1191,18 @@ queue and returns before the server acks.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
    - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
-     frames. `qwpws_ack_level_durable` additionally waits until they are
-     uploaded to object storage, not just in the server's WAL (Enterprise
-     with replication; see the protocol page's
+     frames. `qwpws_ack_level_local_durable` waits for local-disk durability
+     and requires `request_durable_ack=local`, WAL tables, and
+     `cairo.commit.mode=adaptive`.
+     `qwpws_ack_level_durable` waits for replicated/object-store durability
+     and requires `request_durable_ack=replicated` or the legacy alias `on`.
+     `local,replicated` is protocol-defined but current servers deny it (see
+     the protocol page's
      [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-     section). Durable acks must be requested at pool open with
-     `request_durable_ack=on`; the connect fails with
-     `protocol_version_error` when the server cannot provide them, and
-     without the key any durable-level `wait` or `flush_and_wait` fails up
-     front with `invalid_api_call`, leaving the buffer or chunk untouched.
+     section). An unavailable or partial grant fails the connect with
+     `protocol_version_error`; a level not selected by the connect string
+     fails `wait` or `flush_and_wait` up front with `invalid_api_call`, leaving
+     the buffer or chunk untouched.
    - **Ack is not visibility.** Rows become visible to queries after WAL
      apply, typically within milliseconds of the ack, so a query issued
      right after the ack can miss the newest rows. An empty read-back is
@@ -1436,7 +1439,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
-| `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
+| `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without its matching `request_durable_ack` tier | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool
 inspects the connection and retires it if unhealthy, so a broken connection

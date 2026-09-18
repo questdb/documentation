@@ -51,9 +51,10 @@ both ends:
 - **Multi-table batches.** A single WebSocket frame can carry rows for many
   tables in one trip across the wire.
 - **Server-acknowledged commits.** Every batch gets an OK frame carrying the
-  per-table sequencer transaction it landed in, so the client knows
-  precisely what's durable. An optional `X-QWP-Request-Durable-Ack` opt-in
-  on the upgrade extends this to cluster-durable acks (Enterprise only).
+  per-table sequencer transaction it landed in. An optional
+  `X-QWP-Request-Durable-Ack` upgrade header adds cumulative local-disk and/or
+  replicated durability watermarks, so a store-and-forward client knows when
+  it can discard its copy.
 
 A minimum-viable client that supports BOOLEAN, LONG, DOUBLE, TIMESTAMP, and
 VARCHAR — the five types that cover most real workloads — is on the order of
@@ -102,22 +103,29 @@ using custom headers.
 
 **Client request headers:**
 
-| Header              | Required | Description                                                                          |
-|---------------------|----------|--------------------------------------------------------------------------------------|
-| `X-QWP-Max-Version` | No       | Maximum QWP version the client supports (positive integer). Defaults to 1 if absent. |
-| `X-QWP-Client-Id`   | No       | Free-form client identifier (e.g., `java/1.0.2`, `zig/0.1.0`).                      |
+| Header                      | Required | Description                                                                                                 |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `X-QWP-Max-Version`         | No       | Maximum QWP version the client supports (positive integer). Defaults to 1 if absent.                        |
+| `X-QWP-Client-Id`           | No       | Free-form client identifier (e.g., `java/1.0.2`, `zig/0.1.0`).                                              |
+| `X-QWP-Request-Durable-Ack` | No       | Durable-ack tier request: `true` (legacy replicated request), `local`, `replicated`, or `local,replicated`. |
 
 **Server response headers:**
 
-| Header                 | Description                                                                                                                                                                                                                                                                |
-|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `X-QWP-Version`        | The QWP version selected for this connection.                                                                                                                                                                                                                              |
+| Header                 | Description                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `X-QWP-Version`        | The QWP version selected for this connection.                                                                                                                                                                                                                                                                                                                                                    |
 | `X-QWP-Max-Batch-Size` | Server's effective per-message payload cap in bytes, computed as `min(http.recv.buffer.size − 14, 16 MiB)` (the protocol ceiling clamped by the actual WebSocket recv buffer minus the worst-case frame header). Clients should size batches to stay under this value. Absent on servers older than the introduction of this header — clients fall back to their locally configured byte budget. |
-| `X-QWP-Durable-Ack`    | `enabled` when the connection will emit `STATUS_DURABLE_ACK` frames. Sent only when the client opted in via `X-QWP-Request-Durable-Ack: true` *and* the server has durable-ack support configured. Absent in every other case.                                            |
+| `X-QWP-Durable-Ack`    | Exact durable-ack grant. The legacy `true` request is confirmed as `enabled`; explicit requests are confirmed as `local`, `replicated`, or `local,replicated`. The server omits the header when it cannot grant the complete request.                                                                                                                                                            |
 
 The server selects the version as `min(clientMax, serverMax)`. The selected
-version is never higher than either side's maximum. The server may also
-consider the `X-QWP-Client-Id` when selecting the version.
+version is never higher than either side's maximum. The server may also consider
+the `X-QWP-Client-Id` when selecting the version.
+
+Browser clients can offer the `questdb.qwp.durable-ack.v1` WebSocket
+subprotocol. Because a subprotocol token cannot carry a tier parameter, it has
+the same legacy replicated semantics as `X-QWP-Request-Durable-Ack: true`. The
+server echoes the subprotocol even when it cannot grant that tier; capability is
+confirmed only by `X-QWP-Durable-Ack: enabled`.
 
 ### Connection-level contract
 
@@ -157,38 +165,45 @@ The end-to-end shape of a QWP client session, before the encoding details:
    - `X-QWP-Max-Version: 1` — highest version supported.
    - `X-QWP-Client-Id: <name>/<version>` — recommended, helps server-side
      diagnostics and version negotiation.
-   - Authentication header (`Authorization: Basic …` or `Authorization: Bearer …`).
-   - `X-QWP-Request-Durable-Ack: true` — optional, opt-in for cluster-durable
-     acks (Enterprise).
+   - Authentication header (`Authorization: Basic …` or
+     `Authorization: Bearer …`).
+   - `X-QWP-Request-Durable-Ack: <tiers>` — optional. Request `local`,
+     `replicated`, or `local,replicated`. The legacy value `true` requests the
+     replicated tier.
 2. **Verify the upgrade.** On `101 Switching Protocols`, read the response
    headers:
    - `X-QWP-Version` — the version the connection runs on. Use it for the
-     `version` byte in every outgoing message header. Reject the connection
-     if it's outside the range your client supports.
-   - `X-QWP-Durable-Ack: enabled` — confirms durable-ack frames will follow,
-     iff you opted in. If you opted in and this header is absent, fail the
-     connection (don't silently wait for acks the server will never send).
+     `version` byte in every outgoing message header. Reject the connection if
+     it's outside the range your client supports.
+   - `X-QWP-Durable-Ack` — must exactly confirm the requested tier set. A legacy
+     `true` request expects `enabled`; explicit requests expect their canonical
+     tier token. If the header is absent, partial, or different, fail the
+     connection rather than silently weakening the guarantee.
    - `X-QWP-Max-Batch-Size` (optional, older servers omit it) — server's
      effective per-message payload cap in bytes. Clients should clamp their
      batch-size triggers to fit under this value (a safety margin of ~10%
      absorbs encoding overhead such as schema and dict-delta bytes). When
-     absent, fall back to a locally configured budget or a conservative
-     default such as 1.9 MiB to stay under the typical 2 MiB recv buffer.
-3. **Send binary frames.** Each frame is one QWP message:
-   `12-byte header` + payload (`Delta Symbol Dictionary` if any, then one or
-   more `Table Block`s). Each table block carries its column schema inline.
+     absent, fall back to a locally configured budget or a conservative default
+     such as 1.9 MiB to stay under the typical 2 MiB recv buffer.
+3. **Send binary frames.** Each frame is one QWP message: `12-byte header` +
+   payload (`Delta Symbol Dictionary` if any, then one or more `Table Block`s).
+   Each table block carries its column schema inline.
 4. **Drain server responses.** The server sends an OK (or error) binary frame
-   per request, in send order. Match responses to requests by their position
-   in your in-flight queue — the server-assigned `sequence` field in each
-   response is the authoritative confirmation. If you opted in to durable
-   ack, you'll also receive periodic `STATUS_DURABLE_ACK` frames carrying
-   cumulative per-table watermarks.
-5. **Close.** Send a WebSocket `Close` frame after the last expected OK has
-   been drained.
+   per request, in send order. Match responses to requests by their position in
+   your in-flight queue — the server-assigned `sequence` field in each response
+   is the authoritative confirmation. If you opted in to durable
+   acknowledgements, continue until the requested-tier watermarks cover every
+   committed table `seqTxn`. The server sends pending durable progress only
+   while processing inbound traffic, so an idle client must send periodic
+   WebSocket PINGs (200 ms is the client default) and keep draining
+   `STATUS_LOCAL_DURABLE_ACK` and/or `STATUS_DURABLE_ACK` frames.
+5. **Close.** Without durable acknowledgement, close after the final expected OK
+   is drained. With durable acknowledgement, close only after the applicable
+   watermarks cover the final committed batch.
 
 Every reconnect resets connection-scoped state on both sides: the symbol
-dictionary and sequence counter. Clients that want sender-restart
-durability layer a store-and-forward buffer on top — see the
+dictionary and sequence counter. Clients that want sender-restart durability
+layer a store-and-forward buffer on top — see the
 [connect string reference](/docs/connect/clients/connect-string#sf-keys).
 
 ## Encoding primitives
@@ -977,6 +992,7 @@ table that committed data in the acknowledged batch. `tableCount` is 0 when no
 | 11   | `0x0B` | LIMIT_EXCEEDED  | Egress-only. Query aborted because a server-side limit was hit: query timeout, memory cap, circuit breaker, or OOM. |
 | 12   | `0x0C` | NOT_WRITABLE    | **Reserved.** Node cannot accept writes (read-only replica, or a demoting primary). |
 | 13   | `0x0D` | DICTIONARY_GAP  | A delta symbol dictionary whose start id runs past the server's connection dictionary. |
+| 14   | `0x0E` | LOCAL_DURABLE_ACK | Batch WAL is durable on the server's local disk. |
 
 The status namespace is shared between ingress and egress, which is why the two
 egress-only codes appear here.
@@ -995,53 +1011,81 @@ Two of these carry classification instructions a client cannot infer:
 
 ### Durable acknowledgement
 
-:::note Enterprise
+A standard OK confirms that the batch was committed to the server's WAL and
+reports its per-table sequencer transaction. It is not, by itself, a promise
+that the transaction has reached durable storage.
 
-Durable acknowledgement (status code 0x02) is available in QuestDB Enterprise
-with primary replication configured. Open source QuestDB returns OK (0x00) or
-error responses only.
+A client can request one or both durability tiers during the WebSocket upgrade:
+
+| Request value      | Confirmation       | Status stream                | Guarantee                                                                                                                                                                                                              |
+| ------------------ | ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local`            | `local`            | `LOCAL_DURABLE_ACK` (`0x0E`) | The WAL transaction and sequencer record are durable on the server's disk. Survives process, OS, and power failure, but not loss of that disk. Local progress is produced for WAL tables using `adaptive` commit mode. |
+| `replicated`       | `replicated`       | `DURABLE_ACK` (`0x02`)       | The transaction has reached the configured object store and can survive loss of the server's disk or node. Requires a replication-capable QuestDB Enterprise configuration.                                            |
+| `local,replicated` | `local,replicated` | Both                         | Protocol-defined combined request. Local frames provide earlier progress, while replicated frames provide the stronger guarantee. Current servers do not yet grant this combination.                                                                                                                         |
+| `true`             | `enabled`          | `DURABLE_ACK` (`0x02`)       | Legacy alias for `replicated`, retained byte-for-byte for existing clients and servers.                                                                                                                                |
+
+Header values are case-insensitive. Servers also accept `replicated,local`, but
+clients should send and expect the canonical `local,replicated` spelling.
+
+The grant is **all-or-nothing**. The server confirms the full requested set or
+omits `X-QWP-Durable-Ack`; it never substitutes a weaker tier. A client that
+requested durable acknowledgement must compare the response with the expected
+confirmation and fail the connection on a missing, partial, or different value.
+This intentionally makes explicit tier requests fail against servers that
+predate tier negotiation. The legacy `true`/`enabled` exchange remains
+compatible with those servers.
+
+Tier availability depends on server configuration. Open source QuestDB can grant
+`local`; it denies requests containing `replicated`. Enterprise can grant
+`replicated` when replication is configured. `local,replicated` is reserved for
+a server that can provide both streams; current servers deny the combined
+request rather than granting only one tier.
+
+:::warning Local acknowledgements require adaptive commit mode
+
+The server can confirm a `local` handshake independently of table commit mode,
+but local durable watermarks advance only for WAL tables using
+[`cairo.commit.mode=adaptive`](/docs/configuration/cairo-engine/#cairocommitmode).
+Because the server default is `nosync`, requesting `local` without enabling
+`adaptive` connects successfully but produces no local durable-ack progress.
 
 :::
 
-A standard OK confirms the batch was committed to the server's local WAL. To
-receive a second acknowledgement after the WAL has been durably uploaded to the
-configured object store, include `X-QWP-Request-Durable-Ack: true`
-(case-insensitive) in the WebSocket upgrade request.
-
-If the server accepts the opt-in, it echoes `X-QWP-Durable-Ack: enabled` in
-the 101 response. Clients that opt in **must** verify this header is present
-and fail the connect attempt if it is absent.
-
-**Durable-ack response format:**
+Both status codes use the same response layout:
 
 ```text
 +------------------------------------------------------+
-| status:      uint8   (0x02)                          |
+| status:      uint8   (0x02 or 0x0E)                  |
 | tableCount:  uint16         Number of table entries  |
 | Repeated tableCount times:                           |
 |   nameLen:   uint16         Table name length        |
 |   name:      bytes          UTF-8 table name         |
-|   seqTxn:    int64          Durably-uploaded seqTxn  |
+|   seqTxn:    int64          Durable seqTxn           |
 +------------------------------------------------------+
 ```
 
-The durable-ack has no sequence field. It carries cumulative per-table
-watermarks that advance as uploads complete. Only tables whose durable
-watermark advanced since the last durable-ack are included.
+Durable-ack frames have no request sequence field. They carry cumulative
+per-table watermarks and include only tables whose watermark has advanced since
+the previous frame in that stream.
 
-The durable-ack watermark always trails the regular OK watermark. Empty
+A store-and-forward sender must trim on the strongest requested guarantee:
+
+- With `local` only, `LOCAL_DURABLE_ACK` advances the trim watermark.
+- With `replicated` only, `DURABLE_ACK` advances the trim watermark.
+- With both tiers, local frames are progress signals only. The sender must keep
+  its copy until the corresponding replicated watermark arrives.
+
+This rule prevents a combined request from being silently weakened to local
+storage. The applicable durable watermark trails the regular OK watermark. Empty
 messages (those that produced no WAL commit, for example messages that only
-reference materialized views) are trivially durable; their sequence advances
-the durable watermark as soon as all preceding messages are durable.
+reference materialized views) are trivially durable once all preceding messages
+reach the requested tier.
 
-Reconnects discard any in-flight durable-ack tracking. The new connection
-re-OKs replayed batches and the server re-emits cumulative durable-ack
-watermarks from scratch, so the client's trim watermark must restart against
-the new connection's wire sequencing.
-
-Servers without replication silently ignore the request header and never emit
-durable-ack frames. There is no durable-failure status; persistent upload
-failures surface only as absence of a durable-ack frame.
+Reconnects discard connection-local durable-ack tracking. The new connection
+re-OKs replayed batches and the server re-emits cumulative durable watermarks,
+so clients must rebuild their trim state against the new connection's request
+ordering. There is no durable-failure status; a stalled local flush or upload
+appears as the absence of further durable-ack progress.
 
 ## Protocol limits
 
@@ -1296,15 +1340,15 @@ XX XX XX XX              # Payload length
 ## Reference implementation
 
 The reference client implementation is
-[`java-questdb-client`](https://github.com/questdb/java-questdb-client)
-at commit
-[`67bb5e4`](https://github.com/questdb/java-questdb-client/commit/67bb5e49feea7e63b813ea08189c23ea11486131).
+[`java-questdb-client`](https://github.com/questdb/java-questdb-client) at
+commit
+[`c329caa`](https://github.com/questdb/java-questdb-client/commit/c329caa3fc4b3015b160744eebc9995bcc812424).
 
 The server-side protocol parser lives in the QuestDB server repository under
 `core/src/main/java/io/questdb/cutlass/qwp/protocol/`.
 
 ## Version history
 
-| Version    | Description                     |
-|------------|---------------------------------|
-| 1 (`0x01`) | Initial binary protocol release |
+| Version    | Description                                                                                                                                                                             |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 (`0x01`) | Initial binary protocol release. Optional capabilities, including tiered durable acknowledgements, are negotiated with WebSocket upgrade headers and do not change the message version. |
