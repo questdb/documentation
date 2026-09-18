@@ -244,25 +244,24 @@ base columns its query references:
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 
-When a materialized-view source gains an
+If a materialized view this live view reads gets an
 [`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views),
-the live view detects the conflict on its next refresh and becomes invalid.
-An idle view may continue reporting active, and a refresh already underway may
-finish against its earlier snapshot. Detection stops further refreshes but does
-not retroactively remove previously emitted rows.
+the live view notices the conflict on its next refresh and becomes invalid. A
+live view that is idle may keep reporting itself as active, and a refresh already
+running may finish with the data it started from. Once noticed, the view stops
+refreshing, but it does not go back and remove rows it already produced.
 
-An invalidated view keeps serving its existing data and reports the reason in
+An invalid view keeps serving the data it already has and reports why in
 [`live_views()`](/docs/query/functions/meta/#live_views). It stops refreshing.
-Invalidation is permanent: reversing the schema change or removing the source's
-expiry policy does not automatically
-revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
-suspended WAL writer.
+This is permanent: undoing the schema change or removing the source's expiry
+policy does not make the view valid again, and `ALTER LIVE VIEW ... RESUME WAL`
+only restarts a suspended WAL writer.
 
-To recover, inspect `invalidation_reason` and remove the cause first: repair
-the base-table schema, drop the source's `EXPIRE ROWS` policy, or raise
+To recover, check `invalidation_reason` and fix the cause first: repair the
+base-table schema, drop the source's `EXPIRE ROWS` policy, or raise
 [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
-when the reason is a memory limit breach (a recreated view picks up the new
-value). Then save the definition before dropping the view:
+if the reason is a memory limit breach (a recreated view picks up the new value).
+Then save the definition before dropping the view:
 
 ```questdb-sql
 SHOW CREATE LIVE VIEW trades_ma;

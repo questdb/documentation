@@ -101,11 +101,12 @@ Use `COMPILE VIEW` when you want to:
 
 ### Expiry-policy dependency changes
 
-When an expiry policy adds hidden column dependencies beneath an ordinary view,
-`COMPILE VIEW` does not refresh its saved dependency permissions. In Enterprise,
-restricted readers can continue to receive access-denied errors even if the view
-is valid. Wait for policy application, then reissue the original definition with
-`ALTER VIEW`. See the [policy-change procedure](/docs/concepts/materialized-views/#change-expiry-beneath-an-existing-ordinary-view).
+When an expiry policy adds hidden column dependencies under an ordinary view,
+`COMPILE VIEW` does not update its saved dependency permissions. In Enterprise,
+restricted readers may keep getting "access denied" errors even though the view
+is valid. Wait for the policy to take effect, then run the view's original
+definition again with `ALTER VIEW`. See the
+[policy-change procedure](/docs/concepts/materialized-views/#change-expiry-beneath-an-existing-ordinary-view).
 
 ## Errors
 

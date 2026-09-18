@@ -7,10 +7,9 @@ description:
 ---
 
 Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/expire-rows/)
-row-retention policy on a materialized view. It is designed for
-**passthrough views**; see the concept page. For filtering and disk-reclamation
-behavior, see
-[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works).
+row-retention policy on a materialized view. It is meant for **passthrough
+views**; see the concept page. For how expired rows are filtered and freed from
+disk, see [How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works).
 
 ## Syntax
 
@@ -29,16 +28,16 @@ ALTER MATERIALIZED VIEW viewName DROP EXPIRE
 | Parameter        | Description                                                                       |
 | ---------------- | --------------------------------------------------------------------------------- |
 | `viewName`       | Name of the passthrough materialized view to modify                               |
-| `WHEN predicate` | Per-row (or window) predicate; a row expires when it evaluates `TRUE`             |
+| `WHEN predicate` | A per-row (or window) condition; a row expires when it is `TRUE`                  |
 | `KEEP LATEST`    | Keep the latest row per `PARTITION BY` key, by the designated timestamp           |
-| `KEEP [N] HIGHEST\|LOWEST col` | Keep the rows at the max/min of `col` per group, or the top `N`     |
-| `CLEANUP EVERY`  | Background reclamation cadence as `<number><unit>`, where `unit` is `s`, `m`, `h`, `d`, or `w`. Defaults to `1h` if omitted |
+| `KEEP [N] HIGHEST\|LOWEST col` | Keep the rows at the highest/lowest value of `col` per group, or the top `N` |
+| `CLEANUP EVERY`  | How often the background cleanup job runs, as `<number><unit>`, where `unit` is `s`, `m`, `h`, `d`, or `w`. Defaults to `1h` |
 
 Without `N`, the keep column must be `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`,
-`DOUBLE`, `DATE`, `TIMESTAMP` or `DECIMAL`. `KEEP N HIGHEST/LOWEST` ranks with
-`ORDER BY` and accepts any orderable column type.
+`DOUBLE`, `DATE`, `TIMESTAMP`, or `DECIMAL`. `KEEP N HIGHEST/LOWEST` sorts rows
+with `ORDER BY`, so it accepts any column type you can sort.
 
-For the full description of each mode and its semantics, see the
+For a full description of each mode and how it behaves, see the
 [Expiring rows](/docs/concepts/expire-rows/) concept page.
 
 ## When to use
@@ -50,20 +49,21 @@ For the full description of each mode and its semantics, see the
 
 ## How it works
 
-`SET EXPIRE ROWS` validates the new policy against the view's columns first
-(compiling the predicate / checking the key columns), so an invalid predicate or
-an unknown column is rejected immediately rather than breaking later reads. Once
-set, the policy takes effect without rebuilding the view. See
+`SET EXPIRE ROWS` checks the new policy against the view's columns first (it
+compiles the condition and checks the key columns), so an invalid condition or an
+unknown column is rejected right away instead of breaking later reads. Once set,
+the policy takes effect without rebuilding the view. See
 [How it works](/docs/concepts/expire-rows/#how-it-works).
 
-`SET EXPIRE` is allowed when materialized or live views already depend on this
-view. Those dependents detect an applied policy when they next refresh and
-become invalid; ALTER completion and dependent invalidation are separate events.
-An idle dependent may remain active, and an already-running refresh may finish
-against its earlier snapshot. Existing dependent rows are not retroactively
-filtered. Removing the policy does not automatically reverse invalidation. See
+You can run `SET EXPIRE` even when other materialized or live views already read
+this view. Those dependents notice the policy the next time they refresh, and
+then become invalid. This does not happen at the same moment as the `ALTER`: an
+idle dependent may stay active, and a refresh already running may finish with the
+data it started from. Rows the dependents already stored are not removed.
+Dropping the policy later does not automatically make an invalid dependent valid
+again. See
 [Dependent materialized and live views](/docs/concepts/expire-rows/#dependent-materialized-and-live-views)
-for consequences and recovery.
+for the details and how to recover.
 
 ## Examples
 
@@ -80,10 +80,9 @@ ALTER MATERIALIZED VIEW trades_mirror
   SET EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now()) CLEANUP EVERY 30m;
 ```
 
-A `WHEN` predicate is the right tool for a cutoff that moves with the clock like
-this one. A deterministic predicate such as `amount < 1.5` is accepted too, but
-it selects the same rows more cheaply as a `WHERE` clause in the view's defining
-query. See
+A `WHEN` condition is the right tool for a cutoff that moves with the clock like
+this one. A fixed rule such as `amount < 1.5` is also accepted, but it picks out
+the same rows more cheaply as a `WHERE` clause in the view's query. See
 [`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ```questdb-sql title="Keep the latest row per symbol"
@@ -101,6 +100,20 @@ ALTER MATERIALIZED VIEW trades_mirror
   SET EXPIRE ROWS KEEP 2 HIGHEST price PARTITION BY symbol;
 ```
 
+For a rule the `KEEP` shortcuts do not cover, write a window condition directly
+with `WHEN ... OVER (...)`. This example keeps only the rows within 5% of each
+symbol's highest price, and expires the rest:
+
+```questdb-sql title="Window condition: keep rows within 5% of each symbol's peak"
+ALTER MATERIALIZED VIEW trades_mirror
+  SET EXPIRE ROWS WHEN price < 0.95 * max(price) OVER (PARTITION BY symbol);
+```
+
+A window condition is always `FILTER_ONLY`: reads hide the expired rows, but the
+cleanup job never frees their disk (a later row can change which rows qualify).
+See
+[When expired rows are deleted from disk](/docs/concepts/expire-rows/#monotonicity-and-cleanup-safety).
+
 ```questdb-sql title="Remove the policy"
 ALTER MATERIALIZED VIEW trades_mirror DROP EXPIRE;
 ```
@@ -109,10 +122,10 @@ ALTER MATERIALIZED VIEW trades_mirror DROP EXPIRE;
 
 | Aspect                  | Description                                                                  |
 | ----------------------- | ---------------------------------------------------------------------------- |
-| Passthrough recommended | An aggregating view is accepted with a logged advisory: a later refresh can regenerate reclaimed rows, so align base-table retention with the expiry horizon |
-| Dependent views         | SET is allowed; existing materialized and live views detect the conflict and invalidate on refresh, not synchronously with ALTER |
+| Passthrough recommended | An aggregating view is allowed, but only with a warning in the log: a later refresh can rebuild deleted rows, so line the base table's retention up with the expiry cutoff |
+| Dependent views         | SET is allowed; existing materialized and live views notice the conflict and become invalid on their next refresh, not at the same moment as the ALTER |
 | Validation              | The policy is checked against the view's columns before it is applied        |
-| Replication             | The policy and the reclamation it drives replicate as normal WAL traffic     |
+| Replication             | The policy and the row deletions it causes replicate as ordinary WAL traffic |
 
 ## Permissions (Enterprise)
 

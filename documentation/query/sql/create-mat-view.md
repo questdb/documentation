@@ -29,20 +29,20 @@ AS
 }
 ```
 
-Parentheses around `query` are optional only when the query ends the statement.
-They are required when any trailing clause follows the query, including
-`TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
+You can leave out the parentheses around `query` only when the query is the last
+thing in the statement. They are required if any clause comes after the query,
+such as `TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
 
 Where:
 
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Either an aggregating query with `SAMPLE BY` or a time-based
-  `GROUP BY`, or a
-  [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection
-  over a single table
+- `query`: Either an aggregating query (with `SAMPLE BY` or a time-based
+  `GROUP BY`), or a
+  [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that
+  copies rows from a single table
 - `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
-  This policy is designed for passthrough views (see below).
+  This policy is meant for passthrough views (see below).
 
 ## Parameters
 
@@ -64,7 +64,7 @@ Where:
 
 | Rule | Description |
 | ---- | ----------- |
-| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a 1:1 [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection over a single table |
+| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that copies rows one-for-one from a single table |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
@@ -73,23 +73,23 @@ Where:
 
 ### LIMIT restrictions and existing definitions
 
-`LIMIT` is not supported in query branches that read the base table, including
-nested queries, for both aggregating and passthrough materialized views. An
-incremental refresh evaluates the defining query over changed timestamp ranges;
-a `LIMIT 100` would cap each refreshed range rather than the view as a whole.
-Limited subqueries over other tables remain allowed.
+You cannot use `LIMIT` in any part of the query that reads the base table,
+including nested queries. This applies to both aggregating and passthrough views.
+Each refresh runs the query over the rows that just changed, so a `LIMIT 100`
+would cap each batch rather than the view as a whole. A `LIMIT` in a subquery over
+a *different* table is still allowed.
 
 :::note Upgrading existing definitions
 
-Existing materialized views whose definitions contain such a `LIMIT` continue
-refreshing. However, recreating them after an upgrade from a version that accepted
-those definitions requires removing or restructuring the limit. This also applies
-when replaying `SHOW CREATE MATERIALIZED VIEW` output during a migration or restore.
+Materialized views that already contain such a `LIMIT` keep refreshing. But if you
+recreate one after upgrading from a version that allowed it, you have to remove or
+rework the limit first. The same applies when you replay
+`SHOW CREATE MATERIALIZED VIEW` output during a migration or restore.
 
-If the limit only controls how many results an application receives, remove it
-from the view definition and apply `ORDER BY ... LIMIT ...` when querying the view.
-This changes which rows the view stores and does not preserve every original
-definition's behavior.
+If the limit was only there to cap how many rows your application receives, remove
+it from the view and instead use `ORDER BY ... LIMIT ...` when you query the view.
+Note that moving the limit changes which rows the view stores, so it does not
+behave exactly like the original.
 
 :::
 
@@ -318,17 +318,18 @@ The view's TTL is independent of the base table's TTL. See
 
 ## EXPIRE ROWS
 
-Attach a row-level retention policy with `EXPIRE ROWS`. Unlike `TTL` (which drops
-whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows: the latest
-per key, the top-N per group, or rows matching a predicate. It recomputes that
-set continuously as the view refreshes.
+Add a row-level retention policy with `EXPIRE ROWS`. Where `TTL` drops whole
+partitions by age, `EXPIRE ROWS` keeps a chosen set of rows: the latest per key,
+the top-N per group, or rows that match a condition. QuestDB keeps that set up to
+date as the view refreshes.
 
-`EXPIRE ROWS` is designed for
-[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views)
-(a projection over a single table with no `SAMPLE BY` / `GROUP BY`, whose rows
-stay 1:1 with the base). An aggregating view is accepted with a logged advisory
-(a later refresh can regenerate reclaimed rows). The defining query must not
-read another policied view, as its base or in a join:
+`EXPIRE ROWS` is built for
+[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views):
+a query over a single table with no `SAMPLE BY` / `GROUP BY`, where each view row
+matches one base row. An aggregating view is allowed, but only with a warning in
+the log, because a later refresh can rebuild rows that were deleted. The query
+must not read another view that has a policy, whether as its base table or
+through a join:
 
 ```questdb-sql title="Passthrough view that keeps the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (
@@ -336,11 +337,11 @@ CREATE MATERIALIZED VIEW trades_latest AS (
 ) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
 ```
 
-A `WHEN` predicate is for rules that move with **wall-clock time**, such as a
-rolling `timestamp < dateadd('d', -7, now())` window. The defining query cannot
-express those, because it rejects non-deterministic functions. A predicate that
-depends only on the row's own values belongs in the query's `WHERE` clause
-instead, which keeps those rows out of the view entirely; see
+A `WHEN` condition is for rules that depend on the **current time**, such as a
+rolling `timestamp < dateadd('d', -7, now())` window. The view's query cannot do
+this, because it is not allowed to call functions like `now()`. A rule that only
+looks at a row's own values belongs in the query's `WHERE` clause instead, which
+keeps those rows out of the view completely; see
 [`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 The clause goes after the query (and after `PARTITION BY` if present):
@@ -353,24 +354,24 @@ EXPIRE ROWS
   [ CLEANUP EVERY duration ]
 ```
 
-A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
-is rejected, since it would expire nothing. That covers the explicit
-`timestamp < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the
+A `WHEN` threshold that is a fixed value at definition time and comes out as
+`NULL` is rejected, because it would expire nothing. This covers the obvious
+`timestamp < CAST(NULL AS TIMESTAMP)` and also math that overflows onto the
 reserved `NULL` value, such as `timestamp < 2147483647 + 1`. See
 [A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
 
-For filtering and disk-reclamation behavior, see
+For how expired rows are filtered and freed from disk, see
 [How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works). Change or
 remove a policy with
 [`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
 
-A view can carry both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the
-statement and first in effect: it removes rows from the view, and the
-`EXPIRE ROWS` policy then applies to the rows that stay. See
+A view can have both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the statement
+and first in effect: it removes rows from the view, and the `EXPIRE ROWS` policy
+then applies to what is left. See
 [Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
 
-See the [Expiring rows](/docs/concepts/expire-rows/) concept page for
-all modes, worked examples, and semantics (NULLs, ties, monotonicity).
+See the [Expiring rows](/docs/concepts/expire-rows/) concept page for all modes,
+examples, and details (NULLs, ties, and when rows are deleted from disk).
 
 ## Complete example
 

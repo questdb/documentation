@@ -312,29 +312,29 @@ Returns a `table` including the following information:
 - `period_delay` - delay before a completed period is refreshed
   (`PERIOD (DELAY ...)`)
 - `period_delay_unit` - how long each period-delay unit is
-- `refresh_avg_commit_nanos` - moving average of one refresh commit, in
-  nanoseconds. Held in memory only, so it resets on restart
-- `refresh_avg_scan_sample_nanos` - moving average of one refresh iteration's
-  base-table scan, in nanoseconds. In memory only
-- `refresh_avg_scan_range_ts_units` - moving average of the timestamp range one
-  refresh iteration covers, in the base table's timestamp unit. In memory only
-- `refresh_gap_threshold_ts_units` - timestamp gap below which the refresh job
-  merges two adjacent intervals instead of paying for a second commit. `0` means
-  merging is disabled
+- `refresh_avg_commit_nanos` - recent average time for one refresh commit, in
+  nanoseconds. Kept in memory only, so it resets on restart
+- `refresh_avg_scan_sample_nanos` - recent average time one refresh spends
+  scanning the base table, in nanoseconds. In memory only
+- `refresh_avg_scan_range_ts_units` - recent average size of the time range one
+  refresh covers, in the base table's timestamp unit. In memory only
+- `refresh_gap_threshold_ts_units` - if two time ranges to refresh are closer
+  than this, the refresh job handles them together instead of committing twice.
+  `0` turns this off
 - `expire_clause` - the view's
-  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy as written, or
-  `NULL` when the view has no policy
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy as written, or `NULL` if
+  the view has no policy
 - `expire_cleanup_every` - how often the cleanup job runs for the policy, or
   `NULL`
-- `expire_enforcement` - `FILTER_AND_RECLAIM` when the cleanup job frees disk
-  for the policy, `FILTER_ONLY` when reads hide the expired rows but they stay
-  on disk, `NULL` when the view has no policy
+- `expire_enforcement` - `FILTER_AND_RECLAIM` if the cleanup job also frees disk
+  for the policy, `FILTER_ONLY` if reads hide the expired rows but they stay on
+  disk, `NULL` if the view has no policy
 
 **Examples:**
 
 `materialized_views()` on its own returns every column listed above. The example
-below projects a readable subset over three views: an aggregating one with no
-retention policy, and two passthrough views with an
+below picks a readable subset of columns over three views: an aggregating one
+with no retention policy, and two passthrough views with an
 [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy.
 
 ```questdb-sql title="List all materialized views"
@@ -1014,9 +1014,8 @@ On primary instances, these columns will be `0` or `false`.
 | `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy as written, or `null` |
 | `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                      |
 
-Unlike `materialized_views()`, `tables()` does not expose
-`expire_enforcement`; use `materialized_views()` to inspect whether a policy is
-`FILTER_AND_RECLAIM` or `FILTER_ONLY`.
+`tables()` does not include `expire_enforcement`. To check whether a policy is
+`FILTER_AND_RECLAIM` or `FILTER_ONLY`, use `materialized_views()` instead.
 
 ### Data precision and limitations
 

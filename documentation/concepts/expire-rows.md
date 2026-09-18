@@ -1,62 +1,76 @@
 ---
 title: Expiring rows (EXPIRE ROWS)
-sidebar_label: EXPIRE ROWS
+sidebar_label: Expiring rows
 description:
-  EXPIRE ROWS is a row-level retention policy for passthrough materialized
-  views. Keep the latest row per key, the top-N per group, or rows matching a
-  predicate. Once a policy takes effect, reads hide expired rows without waiting
-  for background reclamation under the modes that allow it.
+  EXPIRE ROWS is a way to keep only some rows in a passthrough materialized
+  view. Keep the latest row per key, the top-N per group, or rows that match a
+  condition. Once a policy is set, queries hide the expired rows right away, and
+  a background job frees their disk space later when it is safe to do so.
 ---
 
-`EXPIRE ROWS` is a row-level retention policy for
-[materialized views](/docs/concepts/materialized-views/). Where
-[TTL](/docs/concepts/ttl/) drops whole partitions once they age out, `EXPIRE
-ROWS` decides retention **row by row**. It can keep the latest row per key, the
-top-N per group, rows matching a predicate, and so on. It recomputes the result
-continuously as the view refreshes.
+`EXPIRE ROWS` lets you keep only some of the rows in a
+[materialized view](/docs/concepts/materialized-views/), and drop the rest.
 
-Once the policy takes effect, ordinary queries hide expired rows in every mode
-**without waiting for physical cleanup**. This does not mean synchronous ALTER
-completion or immediate invalidation of dependent views. A background job
-reclaims their on-disk storage afterwards under a monotonic
-`WHEN` predicate; the relative modes (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`,
-`KEEP N`) and window predicates hide rows without freeing disk. See
-[The modes](#the-modes) and
-[Monotonicity and cleanup safety](#monotonicity-and-cleanup-safety).
+[TTL](/docs/concepts/ttl/) works at the partition level: it deletes a whole
+partition once it is old enough. `EXPIRE ROWS` works **one row at a time**. You
+can keep the latest row for each key, the highest few rows per group, only the
+rows that match a condition, and so on. QuestDB keeps that set up to date as the
+view refreshes.
 
-## The modes
+Once you set a policy, queries against the view stop showing the expired rows
+straight away. You do not have to wait for anything to be cleaned up on disk.
+Two things to keep in mind:
 
-Every mode keeps a defined set of rows and expires the rest. A row is expired
-only when the rule selects it for removal.
+- Setting a policy does not instantly invalidate other views that read this one.
+  That happens later, when those views next refresh.
+- A background job deletes the expired rows from disk afterwards, but only for
+  the policies where that is safe (the plain `WHEN` condition). The other modes
+  (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N`, and window conditions) hide
+  the rows from queries but leave them on disk.
+
+See [Modes of expiry](#modes-of-expiry) and
+[When expired rows are deleted from disk](#monotonicity-and-cleanup-safety).
+
+## Modes of expiry
+
+The modes come in two shapes. A `WHEN` condition describes the rows to
+**expire**: a row expires when the condition is `TRUE`, and everything else is
+kept. A `KEEP` mode does the opposite: it describes the rows to **keep**, and
+everything else is expired.
 
 | Mode                  | What it keeps                                       | Syntax                                                              | Frees disk            |
 | --------------------- | --------------------------------------------------- | ------------------------------------------------------------------- | --------------------- |
-| Per-row predicate     | Rows for which the predicate is **not** `TRUE`      | `EXPIRE ROWS WHEN predicate`                                        | Yes, when monotonic   |
-| Keep latest           | The latest row per key (current state per key)      | `EXPIRE ROWS KEEP LATEST [ON timestamp] PARTITION BY cols`           | No (read filter only) |
-| Keep highest / lowest | Rows tied at the group max / min of a column        | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`          | No (read filter only) |
-| Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`        | No (read filter only) |
-| Window predicate      | Rows for which a window predicate is **not** `TRUE` | `EXPIRE ROWS WHEN windowPredicate`                                  | No (read filter only) |
+| Per-row condition     | Rows where the condition is **not** `TRUE`          | `EXPIRE ROWS WHEN predicate`                                        | Yes, when it is safe  |
+| Window condition      | Rows where a condition using `OVER (...)` is **not** `TRUE` | `EXPIRE ROWS WHEN predicate OVER (...)`                      | No (hides only)       |
+| Keep latest           | The latest row per key (the current value per key)  | `EXPIRE ROWS KEEP LATEST [ON timestamp] PARTITION BY cols`           | No (hides only)       |
+| Keep highest / lowest | Rows tied at the group's highest / lowest value     | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`          | No (hides only)       |
+| Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`        | No (hides only)       |
 
-`KEEP HIGHEST/LOWEST` and `KEEP N` are convenience forms that desugar to a
-window predicate, so the window `WHEN` is the general escape hatch.
+`KEEP HIGHEST/LOWEST` and `KEEP N` are shortcuts. Under the hood they turn into
+a window condition, so a window `WHEN` is the general-purpose form when the
+shortcuts do not fit.
 
-The bare `KEEP HIGHEST/LOWEST` form accepts `BYTE`, `SHORT`, `INT`, `LONG`,
-`FLOAT`, `DOUBLE`, `DATE`, `TIMESTAMP` and `DECIMAL` columns. The top-N form has
-a broader type surface: `KEEP N HIGHEST/LOWEST` ranks with `ORDER BY`, so it
-accepts any orderable column type. For example, use `KEEP 1 HIGHEST symbol`, not
-`KEEP HIGHEST symbol`, to rank a `SYMBOL` column. This changes tie and `NULL`
-behavior: the top-N form keeps exactly one row per group using the designated
-timestamp as a descending tiebreaker. An integer or timestamp `NULL` sorts last
-and is expired, while a floating-point `NULL` sorts first. The bare form keeps
-every row tied at the extreme and every `NULL`.
+The plain `KEEP HIGHEST/LOWEST` form works on these column types: `BYTE`,
+`SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `DATE`, `TIMESTAMP` and `DECIMAL`.
+The top-N form (`KEEP N HIGHEST/LOWEST`) sorts rows with `ORDER BY`, so it works
+on any column type you can sort. For example, to rank a `SYMBOL` column, use
+`KEEP 1 HIGHEST symbol`, not `KEEP HIGHEST symbol`.
 
-For how read filtering and physical reclamation differ between modes, see
-[How it works](#how-it-works). You can inspect the behavior selected for a view
-through `materialized_views().expire_enforcement`; see
+The two forms treat ties and `NULL`s differently:
+
+- The top-N form keeps exactly one row per group. It breaks ties using the
+  designated timestamp, newest first. An integer or timestamp `NULL` sorts last,
+  so it is expired. A floating-point `NULL` sorts first, so it is kept.
+- The plain form keeps every row tied at the highest (or lowest) value, and
+  keeps every `NULL`.
+
+To see how each mode handles hiding versus deleting on disk, see
+[How it works](#how-it-works). To check which behavior a view uses, look at the
+`expire_enforcement` column of `materialized_views()`; see
 [Inspecting a policy](#inspecting-a-policy).
 
-The clause is attached to a passthrough `CREATE MATERIALIZED VIEW` (after the
-query, and after `PARTITION BY` if present), or set later with
+You attach the clause to a passthrough `CREATE MATERIALIZED VIEW` (after the
+query, and after `PARTITION BY` if you use it), or add it later with
 [`ALTER MATERIALIZED VIEW ... SET EXPIRE ROWS`](/docs/query/sql/alter-mat-view-set-expire/):
 
 ```
@@ -69,21 +83,23 @@ EXPIRE ROWS
 
 | Element            | Meaning                                                                                  |
 | ------------------ | ---------------------------------------------------------------------------------------- |
-| `predicate`        | Any boolean expression over the view's columns. A row expires when it evaluates `TRUE`.  |
-| `KEEP LATEST`      | Keep the latest row per `PARTITION BY` key, by the designated timestamp.                  |
-| `ON timestampCol`  | Optional; if given it must name the view's designated timestamp.                          |
-| `HIGHEST\|LOWEST`  | Keep rows at the max / min of `col` per group (`N` omitted), or the top `N` per group.    |
-| `CLEANUP EVERY`    | How often the background reclamation job runs for this view: `<number><unit>` with unit `s`/`m`/`h`/`d`/`w`. Defaults to `1h` if omitted. |
+| `predicate`        | Any true/false expression over the view's columns. A row expires when it is `TRUE`.      |
+| `KEEP LATEST`      | Keep the latest row for each `PARTITION BY` key, by the designated timestamp.             |
+| `ON timestampCol`  | Optional. If given, it must be the view's designated timestamp.                           |
+| `HIGHEST\|LOWEST`  | Keep the rows at the highest / lowest value of `col` per group (no `N`), or the top `N`.  |
+| `CLEANUP EVERY`    | How often the background cleanup job runs for this view: `<number><unit>`, where the unit is `s`/`m`/`h`/`d`/`w`. Defaults to `1h`. |
 
 :::note
 
-`EXPIRE ROWS` is **materialized-view-only**: `CREATE TABLE ... EXPIRE ROWS` is
-rejected. It is designed for a **passthrough** (non-aggregating) view, where
-`SELECT * FROM base` has no `SAMPLE BY` / `GROUP BY`, the view mirrors base rows
-1:1, and reclamation is permanent. An aggregating view is **accepted with a
-logged advisory** because a later refresh can regenerate reclaimed rows from
-base rows that still exist (see
-[Requirements](#requirements)). For base-table retention use
+`EXPIRE ROWS` only works on materialized views. `CREATE TABLE ... EXPIRE ROWS`
+is rejected. It is built for a **passthrough** view: one that copies base rows
+directly (`SELECT * FROM base` with no `SAMPLE BY` / `GROUP BY`), so each view
+row matches one base row. On a passthrough view, deleting an expired row is
+permanent.
+
+An aggregating view is **allowed, but only with a warning in the log**, because
+a later refresh can rebuild a deleted row from base rows that still exist (see
+[Requirements](#requirements)). To trim the base table instead, use
 [TTL](/docs/concepts/ttl/) or, on Enterprise,
 [storage policies](/docs/concepts/storage-policy/).
 
@@ -91,86 +107,92 @@ base rows that still exist (see
 
 ## When to use EXPIRE ROWS
 
-Reach for `EXPIRE ROWS` on a passthrough materialized view when you want a
-continuously-maintained, pruned copy of a base table:
+Use `EXPIRE ROWS` on a passthrough materialized view when you want a trimmed,
+always-current copy of a base table:
 
-- **Current-state-per-key tables**: keep only the latest row per device,
-  symbol, or session (`KEEP LATEST`).
-- **Per-group extremes or leaderboards**: keep the highest/lowest value per
-  group, or the top-N (`KEEP HIGHEST/LOWEST`, `KEEP N`).
-- **Rolling row-level windows**: keep rows newer than a moving cutoff such as
-  `now() - 7d`, at finer granularity than TTL's whole-partition drops
+- **Current value per key**: keep only the latest row per device, symbol, or
+  session (`KEEP LATEST`).
+- **Highest/lowest per group, or leaderboards**: keep the top value per group,
+  or the top-N (`KEEP HIGHEST/LOWEST`, `KEEP N`).
+- **A rolling time window**: keep rows newer than a moving cutoff such as
+  `now() - 7d`. This is finer than TTL, which can only drop whole partitions
   (`WHEN predicate`).
 
-The `WHEN` form earns its keep on predicates that involve **wall-clock time**. A
-deterministic predicate depends only on the row's own values and selects the
-same rows more cheaply as a `WHERE` clause in the view's defining query, which
-never copies the excluded rows into the view at all. See
+The `WHEN` form is most useful when the rule depends on the **current time**. If
+your rule only looks at a row's own values, put it in the view's `WHERE` clause
+instead. That is cheaper, because those rows are never copied into the view in
+the first place. See
 [`WHERE` filter or `EXPIRE ROWS`?](#where-filter-or-expire-rows).
 
-Use [TTL](/docs/concepts/ttl/) instead when partition-granularity, age-based
-retention on a base table is enough. It is cheaper and has no passthrough-view
-requirement.
+If age-based retention on a base table, one whole partition at a time, is all you
+need, use [TTL](/docs/concepts/ttl/) instead. It is cheaper and does not require
+a passthrough view.
 
 ## Requirements
 
-`EXPIRE ROWS` is designed for a **passthrough materialized view**:
+`EXPIRE ROWS` is built for a **passthrough materialized view**:
 
-- The view query keeps view rows 1:1 with base rows as a projection over a single
-  table, with or without a `WHERE` filter. See
+- The view's query keeps one view row per base row. It reads a single table and
+  projects columns from it, with or without a `WHERE` filter. See
   [which queries are passthrough](/docs/concepts/materialized-views/#which-queries-are-passthrough)
   for the full rules.
-- The view inherits the base table's
-  [designated timestamp](/docs/concepts/designated-timestamp/), partitioning and
-  symbol indexes.
+- The view takes its
+  [designated timestamp](/docs/concepts/designated-timestamp/), partitioning,
+  and symbol indexes from the base table.
 
-A passthrough view mirrors its base table 1:1 and refreshes incrementally, so it
-is effectively a continuously-maintained replica. `EXPIRE ROWS` prunes that
-replica down to the rows you want to keep without touching the base table.
+Because a passthrough view mirrors its base table one-for-one and refreshes as
+new data arrives, it is basically a live copy of the base table. `EXPIRE ROWS`
+trims that copy down to the rows you want to keep. It never touches the base
+table.
 
-A **non-passthrough (aggregating) view is accepted with a logged advisory**
-rather than rejected: physical reclamation only sticks when base-table retention
-is aligned with the expiry horizon because a later incremental or full refresh
-can regenerate a reclaimed row from base rows that still exist.
+An **aggregating view is allowed, but you get a warning in the log** instead of
+an error. Deleting rows from disk is only reliable if the base table's own
+retention lines up with the expiry cutoff, because a later refresh can rebuild a
+deleted row from base rows that are still there.
 
 ## Dependent materialized and live views
 
-`CREATE MATERIALIZED VIEW` and `CREATE LIVE VIEW` reject a defining query that
-reads a materialized view with an active `EXPIRE ROWS` policy, including references
-through joins and subqueries.
+`CREATE MATERIALIZED VIEW` and `CREATE LIVE VIEW` will not let you create a view
+whose query reads a materialized view that has an active `EXPIRE ROWS` policy.
+This includes reading it through a join or a subquery.
 
-`SET EXPIRE` is allowed when dependent views already exist:
+You *can* add a policy with `SET EXPIRE` even when other views already read this
+one:
 
 ```questdb-sql
 -- Both views already exist.
 ALTER MATERIALIZED VIEW source
 SET EXPIRE ROWS WHEN v < 2;
 
--- The dependent may remain active until it next refreshes.
+-- The dependent view may keep working until it next refreshes.
 ```
 
-Dependent views detect the conflict when they next refresh and become invalid.
-ALTER completion and dependent invalidation are separate events: an idle
-dependent may continue reporting active, and a refresh already underway may
-finish against its earlier snapshot. A policy on a joined source may remain
-undetected until the dependent's declared base triggers work or an operator
-requests a refresh.
+A dependent view notices the conflict the next time it refreshes, and then marks
+itself invalid. This does not happen at the same moment as the `ALTER`:
 
-Ordinary queries against the source apply its expiry filter once the policy
-takes effect. The policy does not retroactively filter rows already stored in
-dependent views, and invalidated views keep serving their existing contents.
+- A dependent view that is idle may keep reporting itself as active.
+- A refresh that was already running may finish using the older data it started
+  with.
+- If the policy is on a table reached through a join, the dependent view may not
+  notice until something triggers it to do work, or someone asks it to refresh.
 
-`DROP EXPIRE` does not automatically restore an invalidated dependent. After
-resolving the source conflict, materialized views require
-[FULL refresh](/docs/query/sql/refresh-mat-view/#full); live views require saving
-the definition and [recreation](/docs/concepts/live-views/#base-table-lifecycle).
-FULL refresh retains its general truncate-first failure behavior; see the linked
-reference for visibility during rebuilding and failure recovery. Rebuilding can
-only recover source rows that still exist.
+Queries against the source view apply the expiry filter as soon as the policy is
+set. The policy does not go back and remove rows that dependent views already
+stored, and an invalidated view keeps serving whatever it already has.
 
-## Worked examples
+`DROP EXPIRE` does not automatically bring an invalidated dependent back to life.
+After you clear the conflict on the source, you have to rebuild the dependent:
+materialized views need a
+[FULL refresh](/docs/query/sql/refresh-mat-view/#full); live views need you to
+save the definition and
+[recreate them](/docs/concepts/live-views/#base-table-lifecycle). A FULL refresh
+still deletes the view's contents before rebuilding (see the linked reference for
+what queries see during the rebuild and what happens if it fails). Rebuilding
+can only recover rows that still exist in the source.
 
-The following walks through every mode on a small fixed dataset so you can see
+## Examples
+
+These examples run every mode over one small, fixed dataset, so you can see
 exactly which rows each policy keeps.
 
 ### Setup
@@ -185,31 +207,32 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
 INSERT INTO trades VALUES
-  ('BTC', 'buy',  100.0, 1.0, '2024-01-01T10:00:00.000000Z'),
-  ('BTC', 'sell', 105.0, 2.0, '2024-01-01T11:00:00.000000Z'),
-  ('BTC', 'buy',  102.0, 1.5, '2024-01-02T09:00:00.000000Z'),
-  ('ETH', 'sell',  50.0, 3.0, '2024-01-01T10:30:00.000000Z'),
-  ('ETH', 'buy',   55.0, 1.0, '2024-01-02T08:00:00.000000Z');
+  ('BTC', 'buy',  100.0, 1.0, '2026-01-01T10:00:00.000000Z'),
+  ('BTC', 'sell', 105.0, 2.0, '2026-01-01T11:00:00.000000Z'),
+  ('BTC', 'buy',  102.0, 1.5, '2026-01-02T09:00:00.000000Z'),
+  ('ETH', 'sell',  50.0, 3.0, '2026-01-01T10:30:00.000000Z'),
+  ('ETH', 'buy',   55.0, 1.0, '2026-01-02T08:00:00.000000Z');
 ```
 
 :::note
 
-A materialized view starts an **asynchronous initial refresh** on creation, so
-it may briefly return no rows. Check progress with
+A materialized view starts refreshing in the background as soon as you create
+it, so it may return no rows for a moment. Check its progress with:
 `SELECT view_name, view_status, base_table_txn, refresh_base_table_txn FROM materialized_views();`
-The view is up to date when `refresh_base_table_txn = base_table_txn`. With
-this small dataset that is effectively instant.
+The view is up to date when `refresh_base_table_txn = base_table_txn`. With a
+dataset this small, that is basically instant.
 
 :::
 
-### Per-row predicate: `WHEN`
+### Per-row condition: `WHEN`
 
-A per-row predicate expires a row when it evaluates `TRUE`. The example below
-uses a deterministic predicate to expire small trades (`amount < 1.5`) because
-it makes the keep-set easy to read off the sample data. In production
-that rule belongs in the view's `WHERE` clause (`WHERE amount >= 1.5`), which
-keeps those rows out of the view entirely; the rolling window further down is
-the case `WHEN` exists for.
+A per-row condition expires a row when it is `TRUE`. The example below expires
+small trades (`amount < 1.5`), just because it makes the kept rows easy to read
+off the sample data.
+
+In real use, that rule belongs in the view's `WHERE` clause
+(`WHERE amount >= 1.5`), which keeps those rows out of the view entirely. The
+rolling window further down is the case `WHEN` is really for.
 
 ```questdb-sql title="Expire rows where amount < 1.5"
 CREATE MATERIALIZED VIEW trades_sized AS (
@@ -221,18 +244,18 @@ SELECT * FROM trades_sized ORDER BY timestamp;
 
 | symbol | side | price | amount | timestamp                   |
 | ------ | ---- | ----- | ------ | --------------------------- |
-| ETH    | sell | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
-| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
+| ETH    | sell | 50.0  | 3.0    | 2026-01-01T10:30:00.000000Z |
+| BTC    | sell | 105.0 | 2.0    | 2026-01-01T11:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2026-01-02T09:00:00.000000Z |
 
-The two `amount = 1.0` rows are expired. `amount = 1.5` is kept (`1.5 < 1.5` is
-`FALSE`), and any `NULL` amount would be kept too because a comparison against
-`NULL` evaluates to `FALSE` in QuestDB. See [NULLs](#nulls).
+The two `amount = 1.0` rows are expired. `amount = 1.5` is kept, because
+`1.5 < 1.5` is `FALSE`. A row with a `NULL` amount would also be kept, because
+comparing anything to `NULL` gives `FALSE` in QuestDB. See [NULLs](#nulls).
 
-A predicate on the designated timestamp gives a **rolling retention window**,
-which is the main use for `WHEN`. It is re-evaluated on every read, so the
-visible set rolls forward with the clock, and no `WHERE` clause can express it
-because the defining query rejects `now()`:
+A condition on the designated timestamp gives you a **rolling window**, which is
+the main reason to use `WHEN`. QuestDB re-checks it on every read, so the visible
+rows move forward with the clock. You cannot do this with a `WHERE` clause,
+because the view's query is not allowed to call `now()`:
 
 ```questdb-sql title="Keep the last 1 day"
 CREATE MATERIALIZED VIEW trades_recent AS (
@@ -240,17 +263,18 @@ CREATE MATERIALIZED VIEW trades_recent AS (
 ) EXPIRE ROWS WHEN timestamp < dateadd('d', -1, now());
 ```
 
-(With the 2024 sample timestamps above, every row is already older than a day
-and would be hidden; use recent data to see rows retained.)
+(With the 2026 timestamps above, every row is already more than a day old and
+would be hidden. Use recent data to see rows stay.)
 
 `WHEN timestamp < dateadd('d', -1, now())` and
-`WHEN timestamp < now() - 86400000000` retain the same rows and both reclaim
-disk because the cleanup job proves either form monotonic.
+`WHEN timestamp < now() - 86400000000` keep the same rows, and both let the
+cleanup job free disk, because QuestDB can tell that either form only moves
+forward in time.
 
 ### Keep latest per key: `KEEP LATEST`
 
-Keep only the most recent row per key to turn the passthrough view into a live,
-current-state-per-symbol table:
+Keep only the most recent row per key, to turn the view into a live
+"current value per symbol" table:
 
 ```questdb-sql title="Keep the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (
@@ -262,18 +286,18 @@ SELECT * FROM trades_latest ORDER BY timestamp;
 
 | symbol | side | price | amount | timestamp                   |
 | ------ | ---- | ----- | ------ | --------------------------- |
-| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
-| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
+| ETH    | buy  | 55.0  | 1.0    | 2026-01-02T08:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2026-01-02T09:00:00.000000Z |
 
-The designated `timestamp` column determines the latest row for each symbol. As
-new trades arrive, the kept row advances automatically. `PARTITION BY` may list
-multiple key columns. You may write
-`KEEP LATEST ON timestamp PARTITION BY symbol`, but the `ON` column must be the
+The designated `timestamp` column decides which row is the latest for each
+symbol. As new trades arrive, the kept row moves forward on its own. You can list
+several key columns in `PARTITION BY`. You may also write
+`KEEP LATEST ON timestamp PARTITION BY symbol`, but the `ON` column has to be the
 view's designated timestamp.
 
-### Keep extremes per group: `KEEP HIGHEST` / `KEEP LOWEST`
+### Keep highest/lowest per group: `KEEP HIGHEST` / `KEEP LOWEST`
 
-Keep the rows tied at the group maximum (or minimum) of a column:
+Keep the rows tied at the highest (or lowest) value of a column, per group:
 
 ```questdb-sql title="Keep the highest-priced trade per symbol"
 CREATE MATERIALIZED VIEW trades_peak AS (
@@ -285,16 +309,16 @@ SELECT * FROM trades_peak;
 
 | symbol | side | price | amount | timestamp                   |
 | ------ | ---- | ----- | ------ | --------------------------- |
-| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
+| BTC    | sell | 105.0 | 2.0    | 2026-01-01T11:00:00.000000Z |
+| ETH    | buy  | 55.0  | 1.0    | 2026-01-02T08:00:00.000000Z |
 
 `KEEP LOWEST price PARTITION BY symbol` keeps the cheapest instead (BTC `100.0`,
-ETH `50.0`). All rows **tied** at the extreme are kept, and `NULL`-valued rows
-are kept (a `NULL` is never less than the max).
+ETH `50.0`). Every row tied at the highest (or lowest) value is kept, and
+`NULL`-valued rows are kept too (a `NULL` is never below the highest value).
 
 ### Keep top-N per group: `KEEP N HIGHEST` / `KEEP N LOWEST`
 
-Keep a per-group leaderboard with the `N` highest (or lowest) rows:
+Keep a per-group leaderboard: the `N` highest (or lowest) rows.
 
 ```questdb-sql title="Keep the 2 highest-priced trades per symbol"
 CREATE MATERIALIZED VIEW trades_top2 AS (
@@ -306,220 +330,220 @@ SELECT * FROM trades_top2 ORDER BY symbol, price DESC;
 
 | symbol | side | price | amount | timestamp                   |
 | ------ | ---- | ----- | ------ | --------------------------- |
-| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
-| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
-| ETH    | sell | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
+| BTC    | sell | 105.0 | 2.0    | 2026-01-01T11:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2026-01-02T09:00:00.000000Z |
+| ETH    | buy  | 55.0  | 1.0    | 2026-01-02T08:00:00.000000Z |
+| ETH    | sell | 50.0  | 3.0    | 2026-01-01T10:30:00.000000Z |
 
-BTC keeps its two highest (`105`, `102`) and drops `100`; ETH has only two rows,
-so both survive. Ties are broken by the designated timestamp, so the N-th
-boundary is deterministic.
+BTC keeps its two highest (`105`, `102`) and drops `100`. ETH has only two rows,
+so both stay. Ties are broken by the designated timestamp, so the cutoff at the
+N-th row is always decided the same way.
 
-### Window predicate: the escape hatch
+### Window condition: the general-purpose form
 
-`KEEP HIGHEST/LOWEST` and `KEEP N` are shorthand for window predicates. When you
-need a rule they do not cover, write the window predicate directly in `WHEN`.
-For example, this is exactly what `KEEP HIGHEST price PARTITION BY symbol`
-expands to:
+`KEEP HIGHEST/LOWEST` and `KEEP N` are just shortcuts for window conditions. When
+you need a rule they do not cover, write the window condition directly in `WHEN`.
+For example, this is exactly what `KEEP HIGHEST price PARTITION BY symbol` turns
+into:
 
-```questdb-sql title="Equivalent to KEEP HIGHEST, written as a window predicate"
+```questdb-sql title="The same as KEEP HIGHEST, written as a window condition"
 CREATE MATERIALIZED VIEW trades_peak_win AS (
   SELECT * FROM trades
 ) EXPIRE ROWS WHEN price < max(price) OVER (PARTITION BY symbol);
 ```
 
-A row expires when its price is below its symbol's maximum, so only the peak per
-symbol survives. This produces the same result as `trades_peak` above. From here
-you can express richer rules, for example keeping rows within 5% of the peak
-(`WHEN price < 0.95 * max(price) OVER (PARTITION BY symbol)`) or a ranked window
+A row expires when its price is below the highest price for its symbol, so only
+the peak per symbol survives. This gives the same result as `trades_peak` above.
+From here you can write richer rules, for example keep rows within 5% of the peak
+(`WHEN price < 0.95 * max(price) OVER (PARTITION BY symbol)`) or keep the 100
+newest rows per symbol
 (`WHEN row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) > 100`).
 
 ## `WHERE` filter or `EXPIRE ROWS`?
 
-A passthrough view can exclude rows in two places: a `WHERE` clause in its
-defining query, or an `EXPIRE ROWS WHEN` predicate. The dividing line is the
-clock.
+A passthrough view can drop rows in two places: a `WHERE` clause in its query, or
+an `EXPIRE ROWS WHEN` condition. The deciding factor is whether the rule depends
+on the current time.
 
-**Use `EXPIRE ROWS WHEN` for rules that move with wall-clock time.** A rolling
-window cannot be written as a `WHERE` clause at all: a view's defining query
-rejects non-deterministic functions, so
-`WHERE timestamp > dateadd('d', -7, now())` is not accepted.
-`EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now())` is the supported way to
-say "keep the last 7 days". The read filter re-evaluates `now()` on every read,
-so the window rolls forward on its own and the cleanup job reclaims the disk
-behind it. This is what the `WHEN` form is for.
+**Use `EXPIRE ROWS WHEN` when the rule moves with the clock.** A rolling window
+cannot be a `WHERE` clause at all, because a view's query is not allowed to call
+non-deterministic functions, so `WHERE timestamp > dateadd('d', -7, now())` is
+rejected. `EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now())` is the supported
+way to say "keep the last 7 days". The filter re-checks `now()` on every read, so
+the window rolls forward by itself, and the cleanup job frees the disk behind it.
+This is what `WHEN` is for.
 
-**Put a deterministic predicate in the `WHERE` clause.** A predicate that
-depends only on the row's own values, such as `symbol = 'BTC'` or
-`amount >= 1.5`, describes the same surviving rows either way, so the two are
-near-equivalent in what the view contains, and `WHERE` is the cheaper of the two
-at every stage. A row the `WHERE` clause excludes is never copied into the view:
+**Put a rule that only looks at the row itself in the `WHERE` clause.** A
+condition like `symbol = 'BTC'` or `amount >= 1.5` picks out the same rows either
+way, so the view ends up with almost the same contents. But `WHERE` is cheaper at
+every step, because a row the `WHERE` clause drops is never copied into the view:
 
 | | `WHERE` in the query | `EXPIRE ROWS WHEN` |
 | --- | --- | --- |
-| Storage | Row is never written | Row is written; only a `FILTER_AND_RECLAIM` policy can reclaim it later |
-| Read cost | None | The keep-set filter is applied on every read of the view |
-| Write cost | None | Cleanup can rewrite partitions for `FILTER_AND_RECLAIM` policies |
-| After a full refresh | Still excluded | Re-materialized from the base, then hidden; eligible policies sweep it again |
-| Can remain a usable source for other views | Yes | No: CREATE rejects an active policy; existing dependents detect SET on refresh |
+| Storage | Row is never written | Row is written; only a `FILTER_AND_RECLAIM` policy can delete it later |
+| Read cost | None | The keep rule is applied on every read of the view |
+| Write cost | None | Cleanup may rewrite partitions for `FILTER_AND_RECLAIM` policies |
+| After a full refresh | Still dropped | Written again from the base, then hidden; an eligible policy sweeps it again |
+| Can still be a source for other views | Yes | No: CREATE rejects an active policy; existing dependents notice a SET on refresh |
 
-If this view must remain a usable source for other views, put the predicate in
-the defining query's `WHERE` clause. Existing dependents do not prevent setting
-an expiry policy, but they become invalid when a refresh detects it. See
+If this view has to stay usable as a source for other views, put the rule in the
+query's `WHERE` clause. Existing dependents do not stop you from adding an expiry
+policy, but they become invalid when a refresh notices it. See
 [Dependent materialized and live views](#dependent-materialized-and-live-views).
 
-The two forms are not exact negations of each other on `NULL`s: `WHERE` keeps a
-row only when the predicate is `TRUE`, while `EXPIRE ROWS WHEN` expires a row
-only when it is `TRUE`. A `NULL` amount is dropped by `WHERE amount >= 1.5` and
-kept by `EXPIRE ROWS WHEN amount < 1.5`. See [NULLs](#nulls).
+The two forms are not exact opposites when it comes to `NULL`s. `WHERE` keeps a
+row only when the condition is `TRUE`, while `EXPIRE ROWS WHEN` expires a row
+only when the condition is `TRUE`. So a `NULL` amount is dropped by
+`WHERE amount >= 1.5` but kept by `EXPIRE ROWS WHEN amount < 1.5`. See
+[NULLs](#nulls).
 
-The two compose, and on a passthrough view that combination is usually the right
-shape: the `WHERE` clause fixes what the view is about, and the `WHEN` policy
-fixes how long it keeps what it has.
+You can use both together, and on a passthrough view that is usually the right
+setup: the `WHERE` clause decides what the view is about, and the `WHEN` policy
+decides how long it keeps what it has.
 
-```questdb-sql title="A filter for the subject, a policy for the horizon"
+```questdb-sql title="A filter for the subject, a policy for the time window"
 CREATE MATERIALIZED VIEW trades_btc_recent AS (
   SELECT * FROM trades WHERE symbol = 'BTC'
 ) EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now()) CLEANUP EVERY 1h;
 ```
 
-### When a deterministic cutoff still belongs in a policy
+### When a fixed cutoff still belongs in a policy
 
-One case pulls a deterministic predicate back into `EXPIRE ROWS`: a fixed
-threshold you expect to advance by hand. There is no
-`ALTER MATERIALIZED VIEW ... AS <new query>`, so changing a `WHERE` clause means
-dropping the view and re-creating it, which re-materializes it from the base.
-Changing a policy is a metadata operation:
+There is one case where a fixed (non-time-based) cutoff still belongs in
+`EXPIRE ROWS`: a threshold you plan to move by hand from time to time. There is
+no `ALTER MATERIALIZED VIEW ... AS <new query>`, so changing a `WHERE` clause
+means dropping the view and creating it again, which rebuilds it from the base.
+Changing a policy is just a metadata change:
 
-```questdb-sql title="Retuning a retention horizon without a rebuild"
+```questdb-sql title="Moving a cutoff without a rebuild"
 ALTER MATERIALIZED VIEW trades_recent
-  SET EXPIRE ROWS WHEN timestamp < '2024-06-01T00:00:00.000000Z';
+  SET EXPIRE ROWS WHEN timestamp < '2026-06-01T00:00:00.000000Z';
 ALTER MATERIALIZED VIEW trades_recent
-  SET EXPIRE ROWS WHEN timestamp < '2024-07-01T00:00:00.000000Z';
+  SET EXPIRE ROWS WHEN timestamp < '2026-07-01T00:00:00.000000Z';
 ALTER MATERIALIZED VIEW trades_recent DROP EXPIRE;
 ```
 
-The rebuild a `WHERE` change forces is not only slow, it can lose data: if the
-base table has its own [TTL](/docs/concepts/ttl/), re-creating the view reads a
-base that no longer holds everything the view held. A view whose retention
-horizon is longer than its base table's cannot afford to be rebuilt, so its
-cutoff belongs in a policy.
+Rebuilding for a `WHERE` change is not just slow, it can lose data. If the base
+table has its own [TTL](/docs/concepts/ttl/), rebuilding the view reads a base
+that no longer holds everything the view held. A view that keeps data for longer
+than its base table cannot afford to be rebuilt, so its cutoff belongs in a
+policy.
 
-A rule that compares rows against each other has no `WHERE` equivalent either:
-`KEEP LATEST`, `KEEP N HIGHEST/LOWEST` and window predicates cannot be expressed
-in the defining query, because a `LATEST ON` or a window function there makes
-the view non-passthrough.
+A rule that compares rows against each other has no `WHERE` equivalent either.
+`KEEP LATEST`, `KEEP N HIGHEST/LOWEST`, and window conditions cannot go in the
+query, because a `LATEST ON` or a window function there would stop the view from
+being passthrough.
 
 ## How it works
 
-`EXPIRE ROWS` has two cooperating parts: an authoritative read-time filter and a
-best-effort background cleanup.
+`EXPIRE ROWS` has two parts that work together: a read-time filter that always
+applies, and a background cleanup that runs when it can.
 
-### Read-time filter (authoritative)
+### Read-time filter (always applies)
 
-Once a policy takes effect, ordinary queries against its source view apply a
-read filter so that only the kept rows are visible, **regardless of whether
-cleanup has run**. Dependent-view refreshes reject an active policy instead of
-materializing this time-varying keep-set:
+Once a policy is set, queries against the view apply a filter so that only the
+kept rows show up, **whether or not cleanup has run yet**. (Refreshes of
+dependent views are the exception: they reject an active policy rather than try
+to copy this moving set of rows.)
 
-- **Per-row `WHEN`** keeps rows where the predicate is not `TRUE`. QuestDB
-  comparisons use two-valued boolean semantics, so a comparison against `NULL`
-  is `FALSE`. Whether the complete predicate keeps or expires a `NULL` row
-  depends on operators such as `NOT`, `!=`, and `IS NULL` (see [NULLs](#nulls)).
-- **`KEEP LATEST`** returns the latest row per key using the designated
+- **Per-row `WHEN`** keeps rows where the condition is not `TRUE`. In QuestDB, a
+  comparison against `NULL` is `FALSE`, so whether a `NULL` row is kept or
+  expired depends on the operators you use, such as `NOT`, `!=`, and `IS NULL`
+  (see [NULLs](#nulls)).
+- **`KEEP LATEST`** returns the latest row per key, using the designated
   timestamp.
-- **`KEEP HIGHEST/LOWEST/N` and window `WHEN`** compute the keep-set with a
+- **`KEEP HIGHEST/LOWEST/N` and window `WHEN`** work out the kept rows with a
   window function over the whole view.
 
-Because the filter is applied at query time, a freshly-refreshed row that should
-be expired is hidden the moment it lands, and a row that should reappear (under a
-time-based predicate) reappears on the next read.
+Because this filter runs at query time, a freshly-refreshed row that should be
+expired is hidden the moment it lands, and a row that should come back (under a
+time-based rule) shows up again on the next read.
 
-### Physical cleanup (best-effort)
+### Physical cleanup (best effort)
 
-A background job reclaims disk for non-active partitions. It never rewrites the
-active logical partition that receives new rows. A young view with only one
-partition therefore reclaims no disk yet, even when its policy reports
-`FILTER_AND_RECLAIM`. Once data creates a newer active partition, the older one
-becomes eligible for cleanup. Read filtering remains effective throughout.
+A background job frees disk for partitions that are no longer being written to.
+It never rewrites the active partition, the one currently receiving new rows. So
+a young view with only one partition frees no disk yet, even if its policy is
+`FILTER_AND_RECLAIM`. Once new data creates a newer active partition, the older
+one can be cleaned up. Read filtering still works the whole time.
 
-A fully-expired eligible partition is removed. Under a rolling clock-based
-predicate, a partially-expired partition is compacted down to its survivors only
-when the expired-row fraction reaches
-`cairo.mat.view.row.expiry.cleanup.min.expired.fraction`, which defaults to
-`0.5`. This avoids repeatedly rewriting a boundary partition as the cutoff moves
-through it. Set the property to `0` to compact on the first expired row, or to
-`1` to disable partial-partition compaction; fully-expired partitions are still
-removed. The threshold does not delay a fixed, deterministic predicate, whose
-expired-row verdicts cannot change with time.
+When a partition is fully expired and eligible, the job removes it. Under a
+rolling time-based rule, a partition that is only partly expired is rewritten
+down to just its surviving rows, but only once the share of expired rows reaches
+`cairo.mat.view.row.expiry.cleanup.min.expired.fraction` (default `0.5`). This
+avoids rewriting the same boundary partition over and over as the cutoff creeps
+through it. Set the property to `0` to rewrite as soon as any row expires, or to
+`1` to turn off rewriting of partly-expired partitions (fully-expired ones are
+still removed). This threshold does not delay a fixed rule, whose expired rows
+never change over time.
 
-The job runs at the `CLEANUP EVERY` cadence (default `1h`) and is **best-effort**.
-The read filter is authoritative, so deferred or skipped reclamation only
-affects disk usage, never query results.
+The job runs on the `CLEANUP EVERY` schedule (default `1h`) and is best effort.
+Because the read filter is what queries rely on, cleanup running late or not at
+all only affects disk usage, never query results.
 
-The job runs only under a monotonic `WHEN` predicate. It skips `KEEP LATEST`,
-`KEEP HIGHEST/LOWEST`, `KEEP N` and window policies entirely: a later refresh
-can remove the row those modes currently keep, which promotes an older row back
-into the keep-set, and the job cannot reconstruct a row it has already deleted.
-Those views accumulate their expired rows on disk.
+The job only runs for a `WHEN` condition that QuestDB can prove only ever expires
+more rows over time. It skips `KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N`, and
+window policies entirely. In those modes, a later refresh can remove the row the
+mode currently keeps, which would bring an older row back into the kept set, and
+the job cannot bring back a row it already deleted. Those views keep their
+expired rows on disk.
 
-On QuestDB Enterprise, cleanup runs on the **primary only**, but the reclamation
-still replicates: the compaction commits are ordinary WAL transactions, so
-replicas reclaim the identical rows by applying them. A read-only replica neither
-runs the job nor needs to. Disable the job with
+On QuestDB Enterprise, cleanup runs on the **primary only**, but the freed space
+still shows up on replicas. The rewrites are ordinary WAL transactions, so
+replicas delete the same rows when they apply them. A read-only replica does not
+run the job and does not need to. Turn the job off with
 `cairo.mat.view.row.expiry.cleanup.enabled=false` in `server.conf` (reads stay
-filtered, but only reclamation stops; the setting does not disable `EXPIRE ROWS`
+filtered; this only stops disk cleanup, it does not turn off `EXPIRE ROWS`
 itself). Cleanup settings are read at startup, so changing this property or the
-minimum expired fraction requires a restart. A failing sweep retries after one
-second, doubling the per-view retry gap up to a 10-minute cap.
+minimum expired fraction needs a restart. If a cleanup pass fails, it retries
+after one second, then doubles the gap for that view each time, up to a 10-minute
+cap.
 
-To observe reclamation, compare the physical row count per partition before and
-after a sweep:
+To watch cleanup happen, compare the number of rows per partition before and
+after a pass:
 
-```questdb-sql title="Physical rows still on disk per partition"
+```questdb-sql title="Rows still on disk per partition"
 SELECT name, numRows FROM table_partitions('trades_recent');
 ```
 
 Use a view whose `expire_enforcement` is `FILTER_AND_RECLAIM`, such as
-`trades_recent`, for this check. Its active partition remains unchanged after a
-sweep. Insert data into a newer partition before expecting the current active
-partition to become eligible for reclamation.
+`trades_recent`, for this check. Its active partition stays the same after a
+pass. Insert data into a newer partition before you expect the current active
+partition to be cleaned up.
 
-Reclamation **defers while a view is being refreshed continuously** and resumes
-on a quiet sweep.
+Cleanup **pauses while a view is refreshing continuously** and resumes on a quiet
+pass.
 
 ## Semantics
 
 ### NULLs
 
-QuestDB comparisons use two-valued boolean semantics: a comparison against
-`NULL` evaluates to `FALSE`, not `UNKNOWN`, and `EXPIRE ROWS WHEN` expires a row
-only when the complete predicate evaluates to `TRUE`. The complete predicate
-therefore determines whether a `NULL` row survives:
+In QuestDB, a comparison against `NULL` is `FALSE` (not "unknown"), and
+`EXPIRE ROWS WHEN` expires a row only when the whole condition is `TRUE`. So the
+whole condition decides whether a `NULL` row survives:
 
-- **A direct comparison such as `amount < 1.5`** is `FALSE` for a `NULL` amount,
-  so the policy keeps the row.
-- **`NOT (amount >= 1.5)`** is `TRUE` for a `NULL` amount because the inner
-  comparison is `FALSE`, so the policy expires the row. Although this predicate
-  resembles `amount < 1.5`, the two differ for `NULL` values.
+- **A plain comparison like `amount < 1.5`** is `FALSE` for a `NULL` amount, so
+  the row is kept.
+- **`NOT (amount >= 1.5)`** is `TRUE` for a `NULL` amount (the inner comparison
+  is `FALSE`), so the row is expired. Even though this looks like `amount < 1.5`,
+  the two behave differently for `NULL`.
 - **`amount != 1.5` and `amount IS NULL`** are also `TRUE` for a `NULL` amount,
   so both expire the row.
-- **`KEEP HIGHEST/LOWEST`** keeps a `NULL` because its comparison against the
-  group extreme is `FALSE`.
+- **`KEEP HIGHEST/LOWEST`** keeps a `NULL`, because its comparison against the
+  group's extreme is `FALSE`.
 - **`KEEP LATEST`** uses the designated timestamp, which is never `NULL`.
 - **`KEEP N` is the exception.** It ranks rows with `row_number()`, and QuestDB
-  has no `NULLS LAST`, so where a `NULL` lands is **type-dependent**: under
-  `DESC` a floating-point `NULL` (NaN) sorts first (kept while there is room in
+  has no `NULLS LAST`, so where a `NULL` lands depends on the column type. Under
+  `DESC`, a floating-point `NULL` (NaN) sorts first (kept while there is room in
   `N`), while an integer/timestamp `NULL` sorts last (expired first). Use
-  `KEEP HIGHEST/LOWEST` (no `N`) when every `NULL` must be kept regardless of
+  `KEEP HIGHEST/LOWEST` (no `N`) when every `NULL` must be kept, whatever the
   type.
 
 ### A `NULL` threshold is rejected
 
-A `WHEN` threshold that evaluates to a constant `NULL` expires nothing because
-`timestamp < NULL` is never `TRUE`, so the policy would be inert. QuestDB
-refuses it at `CREATE` and `ALTER` time rather than storing a view that silently
-never reclaims:
+A `WHEN` threshold that comes out as a constant `NULL` would expire nothing,
+because `timestamp < NULL` is never `TRUE`. QuestDB rejects it at `CREATE` and
+`ALTER` time rather than store a view that quietly never cleans up:
 
 ```questdb-sql title="Rejected: the threshold is NULL"
 CREATE MATERIALIZED VIEW trades_recent AS (
@@ -528,42 +552,41 @@ CREATE MATERIALIZED VIEW trades_recent AS (
 -- invalid EXPIRE ROWS predicate: the threshold is NULL, so no row can ever expire
 ```
 
-The check matters most where the `NULL` is not written down. QuestDB stores a
-`NULL` `TIMESTAMP`, `LONG` or `INT` as a reserved value at the bottom of the
-type's range, and integer arithmetic wraps silently when it overflows, so an
-arithmetic threshold can land on that value:
+This check matters most when the `NULL` is not obvious. QuestDB stores a `NULL`
+`TIMESTAMP`, `LONG`, or `INT` as a special value at the very bottom of the type's
+range, and integer math wraps around silently when it overflows, so an arithmetic
+threshold can land right on that value:
 
-```questdb-sql title="Also rejected: arithmetic that overflows onto NULL"
+```questdb-sql title="Also rejected: math that overflows onto NULL"
 -- LONG overflow
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
 ) EXPIRE ROWS WHEN timestamp < 4611686018427387904 * 2;
 
--- INT overflow, reached three orders of magnitude sooner
+-- INT overflow, reached a thousand times sooner
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
 ) EXPIRE ROWS WHEN timestamp < 2147483647 + 1;
 ```
 
-Only thresholds that are constant at definition time are checked this way. One
-built from a clock, such as `timestamp < now() - 3600000000`, is evaluated per
-read and cannot be checked in advance.
+Only thresholds that are constant when the view is defined are checked this way.
+A threshold built from the clock, such as `timestamp < now() - 3600000000`, is
+worked out on every read and cannot be checked ahead of time.
 
 ### Ties and determinism
 
-`KEEP HIGHEST/LOWEST` keeps **all** rows tied at the max/min, making the result
-deterministic by construction. `KEEP N` makes the order total by appending the
-designated timestamp as a tiebreak, so the N-th boundary is deterministic (pair
-the base table with [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) if
-`(col, timestamp)` is not already unique).
+`KEEP HIGHEST/LOWEST` keeps **all** rows tied at the highest/lowest value, so the
+result is always the same. `KEEP N` breaks ties with the designated timestamp, so
+the cutoff at the N-th row is always decided the same way (pair the base table
+with [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) if `(col, timestamp)`
+is not already unique).
 
 ### Combining with TTL
 
-A view can carry a [TTL](/docs/concepts/ttl/) and an `EXPIRE ROWS` policy at the
-same time, and the order is fixed: **TTL removes rows from the view first, then
-the policy applies to the rows that stay.** TTL drops whole partitions from the
-view's own storage as they age out, and the keep-set is computed over what
-remains.
+A view can have both a [TTL](/docs/concepts/ttl/) and an `EXPIRE ROWS` policy at
+the same time, and the order is fixed: **TTL removes rows from the view first,
+then the policy applies to what is left.** TTL drops whole partitions from the
+view as they age out, and the kept set is worked out over whatever remains.
 
 ```questdb-sql title="Highest price per symbol, over a 3-day window"
 CREATE MATERIALIZED VIEW trades_peak_3d AS (
@@ -572,79 +595,75 @@ CREATE MATERIALIZED VIEW trades_peak_3d AS (
   EXPIRE ROWS KEEP HIGHEST price PARTITION BY symbol;
 ```
 
-`TTL` goes before `EXPIRE ROWS` in the statement, as it does after any
+`TTL` goes before `EXPIRE ROWS` in the statement, just as it goes after any
 `PARTITION BY`.
 
-This view reports the highest price of the **last three days**, so its answer
-can go **down** as the window moves: when the day holding a symbol's maximum
-ages out, the next-highest price within the window takes over. That is what the
-two clauses ask for together. The view is no longer "the highest price ever";
-it is "the highest price still retained". The base table is unaffected; it keeps
-whatever its own retention settings keep.
+This view reports the highest price of the **last three days**, so its answer can
+go **down** as the window moves: when the day holding a symbol's high ages out,
+the next-highest price still in the window takes over. That is what the two
+clauses ask for together. The view is no longer "the highest price ever"; it is
+"the highest price still kept". The base table is not affected; it keeps whatever
+its own settings keep.
 
-TTL is also the only control that bounds the size of a `KEEP LATEST`,
-`KEEP HIGHEST/LOWEST` or `KEEP N` view, since the cleanup job never reclaims
-disk for those modes.
+TTL is also the only way to cap the size of a `KEEP LATEST`, `KEEP HIGHEST/LOWEST`
+or `KEEP N` view, because the cleanup job never frees disk for those modes.
 
 ### Monotonicity and cleanup safety
 
-Physical deletion is only safe when expiry is **monotonic**: a row that is
-expired now must stay expired forever. Two separate things can break that.
+Deleting rows from disk is only safe when expiry is a one-way street: a row that
+is expired now must stay expired forever. Two things can break that.
 
 The relative and window modes (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N`,
 window `WHEN`) decide each row's fate by comparing it against the other rows in
 the view. A later refresh can remove or replace the row a key currently keeps,
-which promotes an older row back into the keep-set. For this reason, the cleanup
-job never deletes for these modes, whatever their predicate looks like.
+which brings an older row back into the kept set. Because of this, the cleanup job
+never deletes rows for these modes, no matter what their condition looks like.
 
-A scalar `WHEN predicate` judges each row on its own, so it is eligible. It is
-arbitrary SQL. QuestDB recognizes `now()`, `now_ns()`, `sysdate()`,
-`systimestamp()` and `systimestamp_ns()` as wall-clock functions, and gives each
-the same monotonicity proof. The cleanup job reclaims disk only for predicates
-it can **prove** monotonic:
+A plain `WHEN predicate` judges each row on its own, so it can be eligible. It is
+ordinary SQL. QuestDB treats `now()`, `now_ns()`, `sysdate()`, `systimestamp()`,
+and `systimestamp_ns()` as clock functions and checks each the same way. The
+cleanup job only frees disk for conditions it can **prove** are one-way:
 
-- clock-free predicates (`WHEN amount < 1.5`), and
-- designated-timestamp thresholds of a proven advancing-clock shape: a bare
-  clock (for example, `timestamp < now()`), a bare clock minus a non-negative
-  constant (for example, `timestamp < now() - 7200000000`), or a fixed-unit
-  look-back `dateadd` on a bare clock (for example,
+- conditions that do not use the clock (`WHEN amount < 1.5`), and
+- cutoffs on the designated timestamp that only ever move forward: a bare clock
+  (for example `timestamp < now()`), a bare clock minus a fixed non-negative
+  amount (for example `timestamp < now() - 7200000000`), or a fixed-unit
+  look-back with `dateadd` on a bare clock (for example
   `timestamp < dateadd('d', -1, now())`, with units `s`/`m`/`h`/`d`/`w` and
   finer).
 
-Anything else **skips cleanup**: calendar units such as
-`dateadd('M', -1, now())` (a month is a variable amount), look-forward offsets
-(`dateadd('h', 1, now())`),
-further clock arithmetic, non-constant offsets, and arbitrary window `WHEN`
-predicates. A skipped policy stays correct at read time (the filter recomputes
-on every read), but its disk is not reclaimed until the policy is changed to a
-proven shape.
+Everything else **skips cleanup**: calendar units such as
+`dateadd('M', -1, now())` (a month is not a fixed length), look-forward offsets
+(`dateadd('h', 1, now())`), further clock math, offsets that are not constant,
+and general window `WHEN` conditions. A skipped policy still gives correct query
+results (the filter re-runs on every read), but its disk is not freed until you
+change the policy to a shape QuestDB can prove.
 
 :::warning
 
-A non-monotonic predicate such as `WHEN timestamp > now()` expires *future*
-rows that **un-expire** as `now()` advances. The read filter recomputes `now()`
-on every read and stays correct, and the cleanup job skips such a policy rather
-than risk physically deleting a row a later read must show. The tradeoff is that
-its disk is never reclaimed. Write `WHEN` predicates that expire things in the
-**past** or against fixed thresholds, never rows that the passage of time will
-later keep.
+A condition like `WHEN timestamp > now()` expires *future* rows, which
+**un-expire** as `now()` moves forward. The read filter re-checks `now()` on
+every read and stays correct, and the cleanup job skips this kind of policy
+rather than risk deleting a row a later read has to show. The cost is that its
+disk is never freed. Write `WHEN` conditions that expire things in the **past**,
+or against fixed thresholds, never rows that time will later bring back.
 
 :::
 
 ## Inspecting a policy
 
-`SHOW CREATE MATERIALIZED VIEW` renders the policy in replayable DDL. It omits
-`CLEANUP EVERY` when the cadence is the default `1h` and includes it for a
-non-default cadence:
+`SHOW CREATE MATERIALIZED VIEW` shows the policy as DDL you can replay. It leaves
+out `CLEANUP EVERY` when the schedule is the default `1h`, and includes it
+otherwise:
 
 ```questdb-sql
 SHOW CREATE MATERIALIZED VIEW trades_latest;
 -- ... EXPIRE ROWS KEEP LATEST PARTITION BY symbol
 ```
 
-The [`materialized_views()`](/docs/query/functions/meta/) function exposes the
-policy in the `expire_clause`, `expire_cleanup_every` and `expire_enforcement`
-columns (all `NULL` when no policy is set):
+The [`materialized_views()`](/docs/query/functions/meta/) function shows the
+policy in the `expire_clause`, `expire_cleanup_every`, and `expire_enforcement`
+columns (all `NULL` when there is no policy):
 
 ```questdb-sql title="List EXPIRE ROWS policies"
 SELECT view_name, expire_clause, expire_cleanup_every, expire_enforcement
@@ -657,17 +676,17 @@ FROM materialized_views();
 | trades_latest | KEEP LATEST PARTITION BY symbol | 1h                   | FILTER_ONLY        |
 | trades_top2   | KEEP 2 HIGHEST price ...        | 1h                   | FILTER_ONLY        |
 
-`expire_enforcement` is the verdict the cleanup job acts on:
+`expire_enforcement` tells you what the cleanup job does:
 
-- `FILTER_AND_RECLAIM`: reads hide the expired rows and the job deletes them
-  from disk.
-- `FILTER_ONLY`: reads hide the expired rows and they stay on disk. Every
-  relative and window policy reports this, as does a `WHEN` predicate that
-  cannot be proven monotonic.
+- `FILTER_AND_RECLAIM`: reads hide the expired rows, and the job also deletes
+  them from disk.
+- `FILTER_ONLY`: reads hide the expired rows, but they stay on disk. Every
+  relative and window policy is `FILTER_ONLY`, and so is a `WHEN` condition that
+  QuestDB cannot prove is one-way.
 
 ## Changing or removing a policy
 
-Set, change, or drop a policy on an existing passthrough view. See
+You can set, change, or drop a policy on an existing passthrough view. See
 [`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/):
 
 ```questdb-sql
@@ -678,41 +697,39 @@ ALTER MATERIALIZED VIEW trades_latest SET EXPIRE ROWS KEEP LATEST PARTITION BY s
 ALTER MATERIALIZED VIEW trades_latest DROP EXPIRE;
 ```
 
-`SET EXPIRE ROWS` validates the new policy against the view's columns before
-applying it, so an invalid predicate or an unknown column is rejected up front
-rather than breaking subsequent reads.
+`SET EXPIRE ROWS` checks the new policy against the view's columns before
+applying it, so an invalid condition or an unknown column is rejected up front
+instead of breaking later reads.
 
 ## Limitations and operational notes
 
-- **Reads recompute the keep-set.** A relative/window policy computes its
-  keep-set over the whole physical view on every read. `KEEP LATEST` on an
+- **Reads recompute the kept set.** A relative or window policy works out its
+  kept set over the whole view on every read. `KEEP LATEST` on an
   [indexed](/docs/concepts/deep-dive/indexes/) symbol key is cheap; the window
-  modes (and non-indexed keep-latest) scan the view.
-- **Cleanup tuning applies only to reclaiming policies.** For a monotonic scalar
-  `WHEN` policy that reports `FILTER_AND_RECLAIM`, a tighter `CLEANUP EVERY`
-  reduces how long expired rows remain in eligible non-active partitions. It has
-  no reclamation effect on relative or window policies that report
-  `FILTER_ONLY`.
-- **Cleanup defers under continuous refresh.** Reclamation only proceeds when the
-  view is quiescent and fully applied, so a view being refreshed continuously
-  defers reclamation to a quiet sweep. The read filter stays authoritative
-  meanwhile.
+  modes (and keep-latest on a non-indexed column) scan the view.
+- **Cleanup tuning only affects reclaiming policies.** For a `WHEN` policy that
+  reports `FILTER_AND_RECLAIM`, a shorter `CLEANUP EVERY` means expired rows are
+  removed sooner from older partitions. It does nothing for relative or window
+  policies that report `FILTER_ONLY`.
+- **Cleanup pauses under continuous refresh.** Cleanup only runs when the view is
+  idle and fully up to date, so a view that is refreshing continuously defers
+  cleanup to a quiet pass. The read filter still works in the meantime.
 - **`KEEP LATEST [ON timestamp]`.** The optional `ON timestamp` is accepted for
-  familiarity, but the view's designated timestamp is always used; naming a
-  different column is rejected.
-- **Cleanup eligibility.** See
-  [monotonicity and cleanup safety](#monotonicity-and-cleanup-safety), and check
-  a view's verdict with `materialized_views().expire_enforcement`.
-- **Reserved column name.** The window/keep modes compute the keep-set through a
-  synthetic boolean column named `__qdb_re_keep`; a policy is rejected on a view
-  that exposes a column with that name.
-- **No line comments in the clause.** The clause text is stored verbatim and
-  embedded into generated SQL, so `--` comments are rejected inside an
-  `EXPIRE ROWS` clause; terminated block comments (`/* ... */`) are fine.
-- **Compacting a Parquet partition rewrites it as native storage.** When cleanup
-  compacts a *partially*-expired partition held in Parquet, the partition
-  reverts to native QuestDB storage until the Parquet-conversion job re-converts
-  it. Reclamation correctness is unaffected.
+  readability, but the view always uses its designated timestamp; naming any
+  other column is rejected.
+- **When cleanup runs.** See
+  [Monotonicity and cleanup safety](#monotonicity-and-cleanup-safety), and check
+  a view's behavior with `materialized_views().expire_enforcement`.
+- **Reserved column name.** The window/keep modes work through a hidden true/false
+  column named `__qdb_re_keep`, so a policy is rejected on a view that already has
+  a column with that name.
+- **No line comments in the clause.** The clause text is stored as-is and put into
+  generated SQL, so `--` comments are rejected inside an `EXPIRE ROWS` clause.
+  Block comments (`/* ... */`) are fine.
+- **Cleaning a Parquet partition rewrites it as native storage.** When cleanup
+  rewrites a *partly*-expired partition held in Parquet, that partition goes back
+  to native QuestDB storage until the Parquet-conversion job converts it again.
+  The row deletion itself is still correct.
 
 ## Related documentation
 
@@ -725,5 +742,5 @@ rather than breaking subsequent reads.
 - [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/):
   set, change, or drop a policy
 - [Time To Live (TTL)](/docs/concepts/ttl/): partition-level retention by age
-- [Storage policy](/docs/concepts/storage-policy/): graduated partition
-  lifecycle (Enterprise)
+- [Storage policy](/docs/concepts/storage-policy/): staged partition lifecycle
+  (Enterprise)

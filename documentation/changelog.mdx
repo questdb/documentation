@@ -8,22 +8,26 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
-## Unreleased
-
 ### New
 
-- [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - New row-level retention for materialized views, with creation syntax in [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/), immediate read filtering, and background reclamation for eligible policies
-
-### Compatibility
+- [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
 
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-restrictions-and-existing-definitions) -
-  The release introducing `EXPIRE ROWS` also rejects `LIMIT` in query branches that
-  read the base table, including nested queries. Existing views continue
-  refreshing, but recreating affected definitions, including replaying
-  `SHOW CREATE MATERIALIZED VIEW` output, requires removing or restructuring the
-  limit. To cap query results, apply `ORDER BY ... LIMIT ...` when reading the view;
-  moving the limit changes which rows the view stores. Limited subqueries over
-  other tables remain allowed.
+  You can no longer use `LIMIT` in the part of a materialized view's query that
+  reads its base table (this includes a subquery on the base table). A `LIMIT` in
+  a subquery over a *different* table is still allowed.
+
+  Views created before this change keep refreshing. The restriction only matters
+  when you **recreate** such a view — most often when you run
+  `SHOW CREATE MATERIALIZED VIEW` and replay its output during an upgrade,
+  migration, or restore. That statement is now rejected until you remove the
+  `LIMIT` or rewrite the query without it.
+
+  If the `LIMIT` was only there to return fewer rows to your application, remove
+  it from the view definition and instead add `ORDER BY ... LIMIT ...` to the
+  query you run against the view. This is not an exact swap: once the `LIMIT` is
+  gone from the definition, the view stores all matching rows rather than a
+  capped set.
 
 ## September 2026
 

@@ -6,7 +6,7 @@ description:
 ---
 
 These settings control materialized view SQL support, background refresh, and
-row-expiry cleanup. Materialized views can use dedicated worker threads or share
+row-expiry cleanup. Materialized views can use their own worker threads or share
 the server's common pool.
 
 To cap the native memory a single refresh may allocate, see
@@ -75,19 +75,20 @@ has no effect; deferred out-of-memory retries use this backoff.
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables the background job that reclaims rows removed by an eligible
-[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. Disabling the job does not
-disable read filtering, so expired rows remain hidden from query results.
+Turns on the background job that frees disk for rows removed by an eligible
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. Turning the job off does not
+turn off read filtering, so expired rows stay hidden from query results either
+way.
 
 ## cairo.mat.view.row.expiry.cleanup.min.expired.fraction
 
 - **Default**: `0.5`
 - **Reloadable**: no
 
-Minimum fraction of expired rows required before the background cleanup job
-compacts a partially expired partition. Set this property to `0` to compact on
-the first expired row, or to `1` to disable partial-partition compaction. Fully
-expired partitions are still removed.
+How large the share of expired rows in a partition must be before the background
+cleanup job rewrites that partly-expired partition to reclaim the space. Set this
+to `0` to rewrite as soon as any row expires, or to `1` to turn off rewriting of
+partly-expired partitions. Fully expired partitions are still removed.
 
 ## mat.view.refresh.worker.affinity
 
