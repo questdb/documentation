@@ -5,9 +5,9 @@ description:
   SQL, and the retry limits that govern out-of-memory and busy refresh failures.
 ---
 
-These settings control materialized view SQL support and the background refresh
-job. Materialized views can use dedicated worker threads or share the server's
-common pool.
+These settings control materialized view SQL support, background refresh, and
+row-expiry cleanup. Materialized views can use their own worker threads or share
+the server's common pool.
 
 To cap the native memory a single refresh may allocate, see
 [`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
@@ -69,6 +69,26 @@ Delay in milliseconds before a deferred retry for an incremental or scheduled
 period refresh. The retry is timer-driven and does not block a refresh worker.
 The deprecated `cairo.mat.view.refresh.oom.retry.timeout` key is accepted but
 has no effect; deferred out-of-memory retries use this backoff.
+
+## cairo.mat.view.row.expiry.cleanup.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Turns on the background job that frees disk for rows removed by an eligible
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. Turning the job off does not
+turn off read filtering, so expired rows stay hidden from query results either
+way.
+
+## cairo.mat.view.row.expiry.cleanup.min.expired.fraction
+
+- **Default**: `0.5`
+- **Reloadable**: no
+
+How large the share of expired rows in a partition must be before the background
+cleanup job rewrites that partly-expired partition to reclaim the space. Set this
+to `0` to rewrite as soon as any row expires, or to `1` to turn off rewriting of
+partly-expired partitions. Fully expired partitions are still removed.
 
 ## mat.view.refresh.worker.affinity
 
