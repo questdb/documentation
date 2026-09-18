@@ -206,14 +206,8 @@ A building management platform records temperature and humidity from tens of
 thousands of sensors, and its operations screen shows the newest reading from
 each one.
 
-Sensors report at their own pace. Some send a reading every second, others go
-quiet for days. Against the base table, that screen runs
-`LATEST ON ts PARTITION BY sensor_id`, which reads backwards until it finds a row
-for even the quietest sensor. Over a long history, that means reading most of the
-table.
-
-A view that keeps only the newest row per sensor answers the same question from
-just a handful of rows:
+A view can give every application the newest reading per sensor without requiring
+each application to write its own `LATEST ON` query:
 
 ```questdb-sql title="Latest reading per sensor"
 CREATE MATERIALIZED VIEW sensor_current AS (
@@ -221,10 +215,16 @@ CREATE MATERIALIZED VIEW sensor_current AS (
 ) EXPIRE ROWS KEEP LATEST PARTITION BY sensor_id;
 ```
 
-`sensor_current` holds one row per `sensor_id` and updates itself as readings
-arrive. Older rows stop showing up in queries but stay on disk, so the view keeps
-growing at the same rate as the base table. Give it a [TTL](/docs/concepts/ttl/)
-to cap its size.
+Applications can query `sensor_current` with a simple `SELECT` and get one row
+per `sensor_id`. As the view refreshes, new readings replace older ones in query
+results. QuestDB still finds the latest rows at query time, and older readings
+remain on disk. This simplifies application queries; it does not by itself make
+the lookup faster.
+
+A [TTL](/docs/concepts/ttl/) can limit disk usage by removing old partitions.
+However, if a sensor stops reporting, TTL can remove its last reading too. Use TTL
+only if it is acceptable for sensors with no recent readings to disappear from
+results.
 
 #### Finance: Options that have not expired yet
 
