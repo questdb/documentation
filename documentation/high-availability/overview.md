@@ -35,7 +35,9 @@ applications follow it. The rest of this page covers replication — see the
 
 - **High availability** - Replicas can take over if the primary fails
 - **Read scaling** - Distribute query load across multiple replicas
-- **Disaster recovery** - Restore from any point in time using stored WAL files
+- **Disaster recovery** -
+  [Recover to an arbitrary instant](/docs/operations/point-in-time-recovery/)
+  using stored WAL files
 - **Geographic distribution** - Place replicas closer to users in different regions
 - **Zero performance impact** - Replicas don't affect primary performance
 

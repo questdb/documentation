@@ -315,7 +315,10 @@ instead; that path refuses rather than losing data.
 1. Stop the failed primary (ensure it cannot restart)
 2. Stop the replica
 3. Set `replication.role=primary` on the replica
-4. Create an empty `_migrate_primary` file in the installation directory
+4. Create an empty `_migrate_primary` file in the installation directory.
+   This replays the object store to the **latest** state; for a recovery
+   bounded to an earlier instant, use
+   [point-in-time recovery](/docs/operations/point-in-time-recovery/) instead
 5. Start the replica (now the new primary)
 6. Create a new replica to replace the promoted one
 
@@ -333,18 +336,9 @@ automatically — see
 
 ### Point-in-time recovery
 
-Restore the database to a specific historical timestamp.
-
-1. Locate a snapshot from before your target timestamp
-2. Create a new instance from the snapshot (do not start it)
-3. Create a `_recover_point_in_time` file containing:
-   ```ini
-   replication.object.store=<source object store>
-   replication.recovery.timestamp=YYYY-MM-DDThh:mm:ss.mmmZ
-   ```
-4. If using a snapshot, create a `_restore` file to trigger recovery
-5. Optionally configure `server.conf` to replicate to a **new** object store
-6. Start the instance
+To recover the database to an arbitrary instant, for example to undo an
+accidental `DROP TABLE`, follow the
+[point-in-time recovery](/docs/operations/point-in-time-recovery/) procedure.
 
 ## Next steps
 

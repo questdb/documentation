@@ -386,7 +386,9 @@ A coordinator drives a switch as follows:
 - [`SWITCH ROLE`](/docs/query/sql/switch-role/) reference, with the statement
   errors and the result columns.
 - [Replication setup guide](/docs/high-availability/setup/) for the
-  restart-based migration procedures and point-in-time recovery.
+  restart-based migration procedures.
+- [Point-in-time recovery](/docs/operations/point-in-time-recovery/) for
+  recovering the database to an arbitrary instant.
 - [Client failover](/docs/high-availability/client-failover/concepts/) for how
   clients follow the primary role.
 - [Failover operator](/docs/security/rbac/#failover-operator) for the account

@@ -15,8 +15,10 @@ QuestDB Enterprise.
 QuestDB supports two backup methods:
 
 - **Built-in incremental backup** (Enterprise only): Fully automated—configure
-  once, set a schedule, and backups run automatically. Supports point-in-time
-  recovery to any backup timestamp.
+  once, set a schedule, and backups run automatically. Restore from any
+  retained backup. To recover to an arbitrary instant rather than a backup
+  snapshot, see
+  [point-in-time recovery](/docs/operations/point-in-time-recovery/).
 
 - **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)**
   (OSS and Enterprise): Relies on external tools to copy data. Requires manual
@@ -24,7 +26,7 @@ QuestDB supports two backup methods:
   `CHECKPOINT RELEASE`. Works well with cloud disk snapshots (AWS EBS, Azure
   disks, etc.) where you simply trigger a snapshot. For on-premises environments
   without snapshot capabilities, you'll need external tools or custom scripts
-  (e.g., rsync), which do not provide point-in-time recovery.
+  (e.g., rsync), which restore only to the moment the copy was taken.
 
 ## QuestDB Enterprise: built-in backup and restore
 
@@ -464,27 +466,49 @@ Parameters:
 | -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
 | `backup.object.store`      | Sometimes | Object store connection string; required unless already specified in `server.conf`                           |
 | `backup.instance.name`     | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
-| `backup.restore.timestamp` | No        | Timestamp for point-in-time recovery; omit for latest backup                                                 |
+| `backup.restore.timestamp` | No        | Selects the most recent backup at or before this timestamp; omit for the latest backup                       |
 
-#### Point-in-time recovery
+The file also accepts the restore tuning keys
+`backup.max.concurrent.network.requests`, `backup.async.io.threads`,
+`backup.max.blocking.threads`, `backup.requests.min.throughput`,
+`backup.download.requests.min.throughput` and `backup.requests.max.backoff`.
+Any other key aborts startup with the error:
+`The _backup_restore file contains unexpected settings: ...`.
 
-Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
-finds the most recent successful backup at or before the specified timestamp.
+#### Restoring an older backup
+
+Use `backup.restore.timestamp` to restore a specific backup snapshot. QuestDB
+selects the most recent successful backup at or before the specified
+timestamp. The restore itself brings back nothing past that backup; to recover
+to an arbitrary instant between backups, use
+[point-in-time recovery](/docs/operations/point-in-time-recovery/) instead.
+
+:::warning Restoring in order to stay at the snapshot
+
+A restore does not stop what happens afterwards. If the restored node has a
+replication object store configured and that store is not empty, the node
+applies **every transaction in it** once the restore completes, advancing the
+restored snapshot to the current state of the cluster. That behaviour is what
+[creating a replica from a backup](#create-a-replica-from-a-backup) relies on,
+but it silently undoes a restore whose purpose was to return to an older
+state.
+
+When the intent is to **stay** at the restored snapshot, configure a new,
+empty replication object store, or none at all.
+
+:::
 
 :::warning
 
-Point-in-time recovery does not bring cold data back on its own. A backup carries the local metadata for [cold storage partitions](#cold-storage-partitions), but not their `data.parquet` bytes, which exist only in the object store.
-
-This matters most in the situation point-in-time recovery is usually reached for: undoing an accidental drop. Dropping a table or partition also hands its remote objects to garbage collection, which holds them for a grace period and then reclaims them:
-
-| What was dropped | Objects are reclaimed after              | Default    |
-| ---------------- | ---------------------------------------- | ---------- |
-| A partition      | `cold.storage.gc.partition.grace.period` | 30 minutes |
-| A whole table    | `cold.storage.gc.table.grace.period`     | 60 minutes |
-
-Restoring to a point before the drop recovers that data only while those objects still exist. **The grace period, not your backup retention, is the deadline for recovering cold data after a drop.**
-
-If a drop touched cold partitions, stop reclamation before the grace period expires: run [`SWITCH COLD STORAGE ROLE TO REFRESHER`](/docs/query/sql/switch-cold-storage-role/) on the cold storage manager. That halts garbage collection immediately and needs no restart. Restore, then promote a manager again once the data is back.
+A restored backup does not bring cold data back on its own. The backup
+carries the local metadata for
+[cold storage partitions](#cold-storage-partitions), but not their
+`data.parquet` bytes, which exist only in the object store. Dropping a table
+or partition also hands its remote objects to garbage collection after a
+grace period measured in minutes, so **the grace period, not your backup
+retention, is the deadline for recovering cold data after a drop**. See
+[cold storage in point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage)
+for the grace periods and how to halt reclamation.
 
 :::
 
@@ -493,9 +517,6 @@ To find available backup timestamps, query the source instance:
 ```questdb-sql
 SELECT start_ts FROM backups() WHERE status = 'backup complete';
 ```
-
-You can also specify an arbitrary timestamp (e.g., just before an accidental
-deletion). QuestDB restores from the nearest available backup before that time.
 
 If no backup exists at or before the specified timestamp, QuestDB fails to start
 with the error: `backup restore error: No backup timestamp found that is <=`.
@@ -562,6 +583,16 @@ more recent than the oldest available WAL data.
 
    QuestDB restores from the backup first, then switches to WAL replay to catch
    up with the primary.
+
+:::note
+
+Catching up from the replication store is the purpose of this flow, so a
+`backup.restore.timestamp` in the `_backup_restore` file has no lasting effect
+here: whichever backup the replica starts from, it ends at the cluster's
+current state. To stop at an earlier instant instead, see
+[point-in-time recovery](/docs/operations/point-in-time-recovery/).
+
+:::
 
 For more details on replication setup, see the
 [replication guide](/docs/high-availability/setup/).

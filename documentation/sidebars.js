@@ -786,6 +786,7 @@ module.exports = {
       items: [
         "operations/upgrade",
         "operations/backup",
+        "operations/point-in-time-recovery",
         {
           id: "operations/cold-storage",
           type: "doc",

@@ -19,11 +19,12 @@ For additional information, refer to the [replication overview](/docs/high-avail
 
 ### ER001
 
-This code indicates that a point in time recovery completed successfully.
+Raised at startup when a node that has just completed a
+[point-in-time recovery](/docs/operations/point-in-time-recovery/) is
+configured with `replication.role=primary` while its
+`replication.object.store` points at a non-empty location.
 
-It confirms that the database is configured with `replication.role=primary`, and that the associated object store is not empty. 
-
-However, the configured location may contain WAL data from a different replication "timeline".
+A recovered node is a new cluster, so the configured location may contain WAL data from a different replication "timeline".
 
 **As such, this error is raised to prevent an overwrite of the existing data.**
 
