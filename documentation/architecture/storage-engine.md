@@ -125,15 +125,31 @@ deduplicated on additional columns.
 
 ### Durability
 
-By default, QuestDB relies on OS-level durability, letting the OS write dirty pages to disk.
-For stronger guarantees, enable sync commit mode:
+By default, QuestDB uses `nosync` commit mode and lets the OS write dirty pages
+to disk. This provides the highest throughput, but an OS crash or power loss can
+lose acknowledged writes.
+
+For WAL workloads that need local durability without flushing the whole
+materialized table on every commit, use adaptive commit mode:
 
 ```ini title="server.conf"
-cairo.commit.mode=sync
+cairo.commit.mode=adaptive
 ```
 
-This invokes `fsync()` on each commit, ensuring data survives OS crashes or power loss
-at the cost of reduced write throughput.
+Adaptive mode makes the WAL authoritative, applies it lazily to table files, and
+periodically creates a durable epoch. Recovery restores the latest valid epoch
+and replays the durable WAL tail. Ordinary acknowledgements have a bounded RPO:
+the configured group-commit window plus the background flush-sweep scheduling
+delay. Set `cairo.adaptive.commit.group.window=0` or use QWP local durable
+acknowledgements for a zero-loss acknowledgement boundary.
+
+Use `sync` when every commit to a non-WAL table, or every materialized-table
+commit, must be locally durable. `async` schedules writeback without waiting and
+does not provide an acknowledgement durability guarantee.
+
+See
+[Cairo commit and write behavior](/docs/configuration/cairo-engine/#commit-and-write-behavior)
+for a mode comparison, adaptive tuning, and rollback guidance.
 
 ## Next up
 

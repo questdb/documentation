@@ -836,20 +836,23 @@ borrow (see [Ingestion errors](#ingestion-errors)).
 
 ### Durable acknowledgement
 
-:::note Enterprise
-
-Durable acknowledgement requires QuestDB Enterprise with primary replication
-configured.
-
-:::
-
-By default, the server confirms a batch when it is committed to the local
-[WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
-uploaded to object storage:
+By default, the server's OK response confirms a WAL commit but not a durable
+storage boundary. A store-and-forward sender can retain its copy until the
+requested tier is acknowledged:
 
 ```text
-ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+# Local disk durability; requires adaptive commit mode
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=local;
+
+# Object-store durability; requires Enterprise replication
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=replicated;
 ```
+
+`request_durable_ack=on` remains the legacy alias for `replicated`. The Java
+builder also accepts `requestDurableAck("local")`,
+`requestDurableAck("replicated")`, and `requestDurableAck("local,replicated")`.
+The combined tier is protocol-defined but current servers do not grant it. A
+server must grant the complete requested set or the connection fails.
 
 ### Awaiting acknowledgements
 
@@ -878,11 +881,12 @@ Related accessors:
 | `getAckedFsn()` | Highest FSN the server has acknowledged. `-1` if no batch has been published yet. |
 | `awaitAckedFsn(fsn, timeoutMillis)` | Block until `getAckedFsn()` reaches `fsn`, or the timeout elapses. |
 
-When `request_durable_ack=on` is set, `getAckedFsn()` advances after the
-durable upload to object storage, not on the ordinary commit ACK. The same
-FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
-rejected batches, so the value returned by `flushAndGetSequence()` is also
-the correlation key for async error reports.
+When a durable tier is requested, `getAckedFsn()` advances only after the
+strongest requested tier covers the batch: local disk for `local`, or object
+storage for `replicated` and the combined request. The same FSN span is reported
+on `SenderError.getFromFsn()` / `getToFsn()` for rejected batches, so the value
+returned by `flushAndGetSequence()` is also the correlation key for async error
+reports.
 
 These methods are no-ops on transports that do not track frame sequence
 numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
@@ -1586,7 +1590,7 @@ Common WebSocket-specific options:
 | `auto_flush_bytes` | disabled | Bytes before auto-flush. |
 | `sf_dir` | unset | Store-and-forward directory. |
 | `sender_id` | `default` | Sender slot identity for SF. |
-| `request_durable_ack` | `off` | Request durable upload ACK (Enterprise). |
+| `request_durable_ack` | `off` | Durable tier: `local`, `replicated`, `local,replicated`, legacy `on`, or `off`. |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget only. |
 | `failover` | `on` | Egress per-query reconnect switch. |
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`, `auto`). |
