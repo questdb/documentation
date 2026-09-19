@@ -120,6 +120,7 @@ ALTER VIEW trades_filtered AS (
 - Dependent views may become invalid if the altered view's output changes
 - Use `CREATE OR REPLACE VIEW` as an alternative if you want to create the view
   when it doesn't exist
+- An [audited view](/docs/security/audited-views/) stays audited (Enterprise)
 
 ### Definer permissions transfer (Enterprise)
 
