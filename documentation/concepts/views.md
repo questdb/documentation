@@ -186,6 +186,23 @@ CREATE VIEW mixed_params AS (
 DECLARE @limit := 50 SELECT * FROM mixed_params
 ```
 
+### List parameters
+
+A parameter can hold a list of values for an `IN` filter. A caller can override
+it with a list of any length:
+
+```questdb-sql
+CREATE VIEW trades_for AS (
+  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
+)
+
+-- A list of one needs the trailing comma
+DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for
+```
+
+See [value lists](/docs/query/sql/declare/#value-lists) for the rules.
+
 ## View hierarchies
 
 Views can reference other views, tables, and materialized views:
@@ -442,6 +459,23 @@ GRANT SELECT ON desk_a_trades TO desk_a_users;
 For more details on permissions, see
 [Role-Based Access Control (RBAC)](/docs/security/rbac/).
 
+### Audited views (Enterprise)
+
+A view created `WITH AUDIT` records every read of it in the `sys.view_audit`
+table: who read it, when, and the values its `AUDITED` parameters resolved to,
+including a caller's overrides and bind variables. Use it to keep an audit
+trail of access to sensitive data:
+
+```questdb-sql
+CREATE VIEW trades_by_symbol AS (
+  DECLARE OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price, amount FROM trades WHERE symbol IN @symbols
+) WITH AUDIT;
+```
+
+See [Audited views](/docs/security/audited-views/) for what a read records, the
+audit table, permissions, and limitations.
+
 ## Performance considerations
 
 ### Views don't cache results
@@ -496,3 +530,4 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [Materialized Views](/docs/concepts/materialized-views/): Incrementally maintained `SAMPLE BY` aggregates
   - [Live views](/docs/concepts/live-views/): Incrementally maintained row-per-input window-function results
   - [DECLARE](/docs/query/sql/declare/): Parameter declaration for views
+  - [Audited views](/docs/security/audited-views/): Record every read of a view (Enterprise)
