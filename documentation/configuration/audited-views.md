@@ -28,7 +28,9 @@ to a power of two, and the queue is allocated on the heap at startup.
 Recording never makes a read wait. When the queue is full, the read still runs,
 its row is dropped, and the server logs `view audit queue is full, dropping
 rows`. Raise the capacity if that message appears during bursts of audited
-reads.
+reads. Auditing is lossy by design: see
+[Delivery](/docs/security/audited-views/#delivery) for every case in which a
+read goes unrecorded.
 
 ## view.audit.storage.policy
 

@@ -279,15 +279,33 @@ The rule in full:
 
 ## Delivery
 
-Recording never makes a read wait. A read puts its rows on a bounded in-memory
-queue, and a background job writes them to the table. The queue holds
+Auditing is lossy by design, and there is no lossless mode. Recording a read
+never makes the read wait, and a read is never refused because its row cannot
+be recorded, except on a
+[read-only instance](#replication-and-read-only-instances). Treat the trail as a
+best-effort record: under overload, or when a write fails, a read can go
+unrecorded.
+
+A read puts its row on a bounded in-memory queue, and a background job writes
+the queue to the table. The queue holds
 [`view.audit.queue.capacity`](/docs/configuration/audited-views/#viewauditqueuecapacity)
 rows, 4096 by default.
 
-If audited reads outpace the job and the queue fills, the read still runs and
-its row is dropped. The server logs `view audit queue is full, dropping rows`
-with a running total, on the first drop and every 1024th after that. Raise the
-capacity if this appears during bursts of audited reads.
+A read goes unrecorded when:
+
+- **The queue is full when the read finishes**, because audited reads outpace
+  the job. The server logs `view audit queue is full, dropping rows` with a
+  running total, on the first drop and every 1024th after that. Raise the
+  capacity if this appears during bursts of audited reads.
+- **The job fails to write a batch.** The batch, up to 1024 rows, is lost, and
+  the server logs `could not write view audit rows`.
+- **The audit table is missing a column, or a column has the wrong type.** The
+  server discards audit rows until the table is repaired and the server
+  restarted. See [Retention](#retention).
+- **The server stops or crashes with rows still in the queue.** The queue is
+  held in memory only.
+
+Lost rows show in the server log only. No metric reports them.
 
 ## Permissions
 
@@ -342,7 +360,9 @@ audited are unaffected.
 - **Copies are recorded once.** `INSERT INTO ... SELECT` and
   `CREATE TABLE AS SELECT` record the read that made the copy. Reads of the copy
   are not audited.
-- **Rows can be dropped** when the queue is full. See [Delivery](#delivery).
+- **The trail is best-effort.** Auditing is lossy, and there is no lossless
+  mode. A read goes unrecorded when the queue is full, when a write fails, or
+  when the server stops with rows still queued. See [Delivery](#delivery).
 
 ## See also
 
