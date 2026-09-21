@@ -1,13 +1,15 @@
 ---
 title: SUBSAMPLE keyword
 sidebar_label: SUBSAMPLE
-description: SUBSAMPLE SQL keyword reference for time-series downsampling using the LTTB, M4, MinMax, uniform, and cadence algorithms.
+description: SUBSAMPLE SQL keyword reference for time-series downsampling using the LTTB, M4, MinMax, uniform, cadence, and SDT algorithms.
 ---
 
 `SUBSAMPLE` reduces the number of rows in a query result while preserving the
 visual shape of the data. It selects the most representative points from a
 time-ordered dataset, making it ideal for rendering charts at screen resolution
-without transferring millions of rows to the client.
+without transferring millions of rows to the client. One method, `sdt`,
+reduces rows to within a value tolerance instead of to a row budget, which
+suits error-bounded telemetry compression.
 
 Unlike [SAMPLE BY](/docs/query/sql/sample-by/), which computes new aggregate
 values at synthetic bucket boundaries, `SUBSAMPLE` selects rows from its
@@ -27,21 +29,47 @@ the designation.
 
 ## Syntax
 
-```questdb-sql title="Value-based algorithms"
+```questdb-sql
+SELECT columns
+FROM table
+[WHERE conditions]
+[LATEST ON ...]
+[SAMPLE BY ... | GROUP BY ...]
+[WINDOW ...]
+SUBSAMPLE method(arguments)
+[ORDER BY ...]
+[LIMIT ...]
+```
+
+`SUBSAMPLE` goes after the `WHERE`, `LATEST ON`, `SAMPLE BY`, `GROUP BY`,
+and `WINDOW` clauses, and before `ORDER BY` and `LIMIT`. The `SELECT` list
+must include the designated timestamp, and for the value-based and
+tolerance-based methods it must also include `valueColumn`.
+
+`method(arguments)` is one of:
+
+```questdb-sql title="Value-based methods"
 SUBSAMPLE lttb(valueColumn, targetPoints [, gapThreshold])
 SUBSAMPLE { m4 | minmax }(valueColumn, targetPoints)
 ```
 
-```questdb-sql title="Position-based algorithms"
+```questdb-sql title="Position-based methods"
 SUBSAMPLE uniform(targetPoints)
 SUBSAMPLE cadence(stride [, seed])
 ```
 
+```questdb-sql title="Tolerance-based method"
+SUBSAMPLE sdt(valueColumn, compdev)
+```
+
+`sdt` cannot share a query level with `SAMPLE BY`, `GROUP BY`, `DISTINCT`,
+or a join. See [query shape restrictions](#query-shape-restrictions).
+
 Where:
 
 - **`valueColumn`** - the numeric column used to decide which points are
-  visually significant. Required for `lttb`, `m4`, and `minmax`. Not used
-  by `uniform` or `cadence`.
+  visually significant. Required for `lttb`, `m4`, `minmax`, and `sdt`. Not
+  used by `uniform` or `cadence`.
 - **`targetPoints`** - target number of output rows. Supports integer
   literals, [DECLARE](/docs/query/sql/declare/) variables, and bind
   variables (`$1`). Must be at least 2. Maximum is 2,147,483,647.
@@ -51,6 +79,10 @@ Where:
   [cadence](#cadence---every-nth-row).
 - **`gapThreshold`** - (`lttb` only) optional interval that enables
   gap-preserving mode. See [gap-preserving LTTB](#gap-preserving-lttb).
+- **`compdev`** - (`sdt` only) the compression deviation: a constant,
+  finite, non-negative error tolerance in the units of `valueColumn`. This
+  is not an output count: the data decides how many rows `sdt` retains. See
+  [sdt](#sdt---swinging-door-trending).
 
 ### Execution order
 
@@ -84,17 +116,24 @@ methods, a row is not eligible for selection when its value is `NULL` or
 non-finite, or when its timestamp is `NULL`. Rows skipped this way still
 count toward the [input row limit](#configuration).
 
+The value column of `sdt` accepts the same numeric types and is compared as
+`DOUBLE`. Unlike the three methods above, `sdt` does not skip a `NULL` or
+non-finite value. It retains that row as a run boundary. See
+[NULLs and run boundaries](#nulls-and-run-boundaries).
+
 `uniform` and `cadence` take no value column. `NULL` values in any projected
 column do not prevent a row from being selected.
 
 ## Algorithms
 
-Five algorithms are available. The first three (`lttb`, `minmax`, `m4`)
-inspect values to decide which rows are visually significant. The last two
+Six algorithms are available. The first three (`lttb`, `minmax`, `m4`)
+inspect values to decide which rows are visually significant. The next two
 (`uniform`, `cadence`) ignore values and select rows purely by position.
-They are useful when the input is dense or as a baseline.
+They are useful when the input is dense or as a baseline. The last one
+(`sdt`) also inspects values, but takes an error tolerance instead of a
+target row count or a stride, so the data decides how many rows it keeps.
 
-All five select existing rows from their input. No values are ever
+All six select existing rows from their input. No values are ever
 interpolated or computed. The diagrams below use a 24-point series as input
 (think 24 hourly bars over one day):
 
@@ -384,17 +423,209 @@ WHERE symbol = 'EURUSD'
 SUBSAMPLE cadence(1000, 42)
 ```
 
+### sdt - Swinging Door Trending
+
+Swinging Door Trending (SDT) is an error-bounded compression method. It
+replaces a run of samples with a smaller set of retained samples whose
+connecting line approximates the original values within a known bound.
+Instead of a target row count or a stride, you supply `compdev`, short for
+compression deviation, a tolerance in the units of the value column, and the
+data decides how many rows are retained. A flat signal keeps few rows. A noisy signal, or a smaller
+tolerance, keeps more.
+
+SDT suits historian, telemetry, and industrial-sensor workloads, where the
+acceptable error is known in engineering units (for example, half a degree)
+and the right number of points is not.
+
+![SDT downsampling](/images/docs/subsample/sdt.svg)
+
+On the same 24-point series, `sdt` with `compdev = 0.05` retains 10 rows.
+That count was not requested: it is what the tolerance allows on this data.
+Near-straight stretches, such as the climb from i=0 to i=4 and the recovery from
+i=16 to i=22, collapse to their two endpoints, while the sharp turns around
+the spike keep more points. Unlike `minmax` and `m4`, `sdt` does not pin
+extremes. The trough at i=15 is dropped because the line from i=14 to i=16
+stays within `2 * compdev` of it.
+
+How it works:
+
+1. The first eligible sample is retained and becomes the current anchor.
+2. Each later eligible sample constrains a lower and an upper permissible
+   slope from that anchor, `compdev` below and above the sample.
+3. The intersection of those slope constraints forms a narrowing corridor,
+   the swinging door.
+4. When a new sample makes the corridor empty, the previous eligible sample
+   is retained and becomes the next anchor.
+5. Processing resumes from the new anchor.
+6. The final eligible sample is retained when the input ends.
+
+The animation below steps through the mechanism on a separate 20-sample
+series with `compdev = 0.05`. It retains 5 samples (0, 6, 8, 14, and 19),
+and the reconstruction error is bounded by `2 * compdev = 0.10`.
+
+![SDT swinging door animation](/images/docs/subsample/sdt-swinging-door.svg)
+
+In the animation, the corridor closes when samples 7, 9, and 15 arrive, so
+samples 6, 8, and 14 are retained. Sample 19 is retained because the input
+ends there, not because a corridor closed.
+
+```questdb-sql title="Compress a temperature series to within a known error"
+SELECT ts, temperature, device_id
+FROM sensor_readings
+SUBSAMPLE sdt(temperature, 0.5);
+```
+
+```questdb-sql title="One-pip tolerance on a tick series" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SUBSAMPLE sdt(price, 0.0001)
+```
+
+#### The compdev tolerance
+
+`compdev` means compression deviation. It is the value-domain tolerance
+that `sdt` uses to constrain the swinging-door corridor. Because the
+retained endpoints are original samples, the end-to-end reconstruction bound
+is `2 * compdev`. See [error guarantee](#error-guarantee).
+
+- `compdev` must be a constant, finite, non-negative numeric expression. A
+  numeric literal is the normal form. A constant expression such as
+  `abs(-0.5)` and a [DECLARE](/docs/query/sql/declare/) variable holding a
+  constant also work.
+- Bind variables and row-dependent expressions, such as a column reference,
+  are rejected.
+- A negative, `NULL`, `NaN`, or infinite `compdev` is invalid.
+- `compdev = 0` retains a point whenever finite-precision arithmetic finds a
+  departure from exact collinearity. It is not lossless compression of
+  arbitrary floating-point input.
+- `valueColumn` must be a numeric column that appears directly in the
+  `SELECT` list.
+
+`compdev` controls fidelity, not row count. The output count is
+data-dependent and there is no way to request a fixed number of points from
+`sdt`. When you need a row budget, use `lttb`, `m4`, `minmax`, or `uniform`.
+
+#### Error guarantee
+
+For finite values and strictly increasing timestamps within an SDT run,
+linear interpolation between consecutive retained samples differs from every
+original eligible sample in that run by no more than `2 * compdev`, apart
+from normal floating-point rounding.
+
+:::warning
+
+The bound is `2 * compdev`, not `compdev`. The corridor extends `compdev` on
+each side, and the retained endpoints are original samples rather than
+points shifted to the center of the corridor. With `compdev = 0.05`, the
+maximum reconstruction error is `0.10`. To guarantee a maximum error of `E`,
+use `compdev = E / 2`.
+
+:::
+
+Comparisons are conservative in floating-point arithmetic. Near a numerical
+boundary, `sdt` can retain an extra point rather than risk violating the
+bound.
+
+#### NULLs and run boundaries
+
+`sdt` handles ineligible values differently from `lttb`, `m4`, and `minmax`,
+which skip them:
+
+- A row with a `NULL` or non-finite value is a hard boundary, and the row
+  itself is retained.
+- The last eligible sample before the boundary is retained, as it would be
+  at the end of the input.
+- The next eligible finite row starts a new run with a fresh anchor.
+- A `NULL` designated timestamp also interrupts normal processing of finite
+  samples.
+
+The error guarantee applies within each run.
+
+#### Timestamp gaps
+
+A timestamp gap on its own is not a boundary. `sdt` uses the actual
+timestamp distance in its slope calculations, so a long gap influences which
+points the corridor retains, but `sdt` does not promise to retain both sides
+of the gap. The result contains no `NULL` separator row and no segment
+identifier. As with
+[gap-preserving LTTB](#gap-preserving-lttb), a chart that must show a
+discontinuity needs a timestamp-gap rule in the client.
+
+The example below has 41 samples at positions 0 to 19 and 40 to 60, with no
+data in between:
+
+```text
+(0, 0.50), (1, 0.55), (2, 0.60), (3, 0.65), (4, 0.70),
+(5, 0.95), (6, 0.85), (7, 0.70), (8, 0.60), (9, 0.55),
+(10, 0.50), (11, 0.45), (12, 0.40), (13, 0.35), (14, 0.28),
+(15, 0.20), (16, 0.25), (17, 0.30), (18, 0.35), (19, 0.40),
+(40, 0.45), (41, 0.50), (42, 0.55), (43, 0.58), (44, 0.60),
+(45, 0.65), (46, 0.70), (47, 0.75), (48, 0.70), (49, 0.55),
+(50, 0.40), (51, 0.25), (52, 0.15), (53, 0.25), (54, 0.40),
+(55, 0.55), (56, 0.60), (57, 0.62), (58, 0.60), (59, 0.58),
+(60, 0.55)
+```
+
+With `compdev = 0.05`, `sdt` retains 11 rows:
+
+```text
+(0, 0.50), (4, 0.70), (5, 0.95), (9, 0.55), (15, 0.20),
+(19, 0.40), (42, 0.55), (48, 0.70), (52, 0.15), (56, 0.60),
+(60, 0.55)
+```
+
+![SDT across a timestamp gap](/images/docs/subsample/sdt-gap.svg)
+
+The jump from 19 to 40 does not create a boundary. Sample 19 is retained
+because the corridor closes when sample 40 arrives, and sample 40 itself is
+not retained: the first retained row after the gap is 42. The largest
+reconstruction error in this example is 0.087, at sample 40. That is above
+`compdev` and within the `2 * compdev = 0.10` bound.
+
+#### Query shape restrictions
+
+`sdt` accepts a narrower set of query shapes than the other five methods.
+It is rejected when the same query level contains:
+
+- aggregate functions or `GROUP BY`
+- `SAMPLE BY`
+- `DISTINCT`
+- a join
+
+Filters with `WHERE`, additional plain columns in the `SELECT` list, and a
+final `ORDER BY` or `LIMIT` are all supported. To apply `sdt` to aggregated
+data, compute the aggregation in a subquery or CTE and apply `sdt` outside
+it:
+
+```questdb-sql title="Aggregate in a CTE, then apply SDT to the result" demo
+WITH bars AS (
+  SELECT timestamp, avg(price) avg_price
+  FROM fx_trades
+  WHERE symbol = 'EURUSD'
+    AND timestamp IN '$today'
+  SAMPLE BY 1m
+)
+SELECT timestamp, avg_price
+FROM bars
+SUBSAMPLE sdt(avg_price, 0.0001)
+```
+
 ### Algorithm comparison
 
-| Property | lttb | minmax | m4 | uniform | cadence |
-|----------|------|--------|-----|---------|---------|
-| Parameter | targetPoints | targetPoints | targetPoints | targetPoints | stride |
-| Inspects values | Yes | Yes | Yes | No | No |
-| Bucket type | Equal row count | Equal time intervals | Equal time intervals | Equal row spacing | Fixed row stride |
-| Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) | N/A | N/A |
-| Output count | Exactly N when N or more eligible rows exist, otherwise all eligible rows. Gap mode can return fewer or more than N | Up to N | Up to N | Exactly N (or all rows if fewer) | ~rowCount/stride |
-| Gap handling | Connects across. With a threshold, segments are selected independently; a line renderer may still bridge the gap | Empty buckets emit no rows; a line renderer may still bridge the gap | Empty buckets emit no rows; a line renderer may still bridge the gap | Connects across | Connects across |
-| Best use case | Line charts | Value range overview | Dashboards, SLA | Dense uniform data | Decimation, anti-aliasing |
+| Property | lttb | minmax | m4 | uniform | cadence | sdt |
+|----------|------|--------|-----|---------|---------|-----|
+| Parameter | targetPoints | targetPoints | targetPoints | targetPoints | stride | compdev (value tolerance) |
+| Inspects values | Yes | Yes | Yes | No | No | Yes, as `DOUBLE` |
+| Bucket type | Equal row count | Equal time intervals | Equal time intervals | Equal row spacing | Fixed row stride | None: adaptive swinging corridor |
+| Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) | N/A | N/A | N/A |
+| Output count | Exactly N when N or more eligible rows exist, otherwise all eligible rows. Gap mode can return fewer or more than N | Up to N | Up to N | Exactly N (or all rows if fewer) | ~rowCount/stride | Data-dependent, no target |
+| Error bound | None | None | None | None | None | Linear reconstruction within `2 * compdev`, for finite values with strictly increasing timestamps |
+| Gap handling | Connects across. With a threshold, segments are selected independently; a line renderer may still bridge the gap | Empty buckets emit no rows; a line renderer may still bridge the gap | Empty buckets emit no rows; a line renderer may still bridge the gap | Connects across | Connects across | A gap is not a boundary and both sides are not guaranteed; no automatic visual break |
+| `NULL` values | Skipped | Skipped | Skipped | Not inspected | Not inspected | Retained as run boundaries |
+| Best use case | Line charts | Value range overview | Dashboards, SLA | Dense uniform data | Decimation, anti-aliasing | Error-bounded telemetry and historian compression |
+| Row limit applies | Yes | Yes | Yes | Yes | Yes | No |
 
 ## Examples
 
@@ -442,6 +673,13 @@ WHERE symbol = 'EURUSD'
 SUBSAMPLE cadence(1000)
 ```
 
+```questdb-sql title="SDT: error within 2 pips, row count decided by the data" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE sdt(price, 0.0001)
+```
+
 ### Composing with SAMPLE BY
 
 ```questdb-sql title="Aggregate to 1-minute bars, then downsample" demo
@@ -455,6 +693,10 @@ SUBSAMPLE lttb(avg_price, 500)
 `SAMPLE BY` computes aggregate values at bucket boundaries. `SUBSAMPLE` then
 selects the most representative rows from that output. The two operations
 complement each other: aggregate first, then reduce for display.
+
+`sdt` cannot share a query level with `SAMPLE BY`. Put the aggregation in a
+subquery or CTE, as shown in
+[query shape restrictions](#query-shape-restrictions).
 
 ### Multiple columns pass through
 
@@ -531,13 +773,16 @@ SELECT count() FROM (
 
 - For the target-based methods (`lttb`, `minmax`, `m4`, `uniform`), if the
   input has fewer eligible rows than the target, all of them are returned
-  unchanged. `cadence` uses a stride rather than a target.
+  unchanged. `cadence` uses a stride rather than a target, and `sdt` uses a
+  tolerance: its output count is data-dependent.
 - Selected rows are returned in the order of the incoming query, not
   necessarily in timestamp-ascending order. See
   [output order](#output-order).
 - All columns from the `SELECT` clause pass through for selected rows.
-- `SUBSAMPLE` works with `WHERE`, `SAMPLE BY`, `GROUP BY`, `PIVOT`, joins,
-  `UNION`, CTEs, subqueries, window functions, `ORDER BY`, and `LIMIT`.
+- `lttb`, `minmax`, `m4`, `uniform`, and `cadence` work with `WHERE`,
+  `SAMPLE BY`, `GROUP BY`, `PIVOT`, joins, `UNION`, CTEs, subqueries, window
+  functions, `ORDER BY`, and `LIMIT`. `sdt` accepts fewer shapes. See
+  [query shape restrictions](#query-shape-restrictions).
 - A final `ORDER BY` and `LIMIT` operate on the selected rows.
 - `SUBSAMPLE` inside a parenthesized subquery applies inside that subquery,
   not the outer query.
@@ -546,11 +791,14 @@ SELECT count() FROM (
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `cairo.sql.subsample.max.rows` | 100,000,000 | Maximum number of input rows `SUBSAMPLE` accepts. Exceeding this limit returns an error. |
+| `cairo.sql.subsample.max.rows` | 100,000,000 | Maximum number of input rows accepted by the count-based and stride-based methods: `lttb`, `m4`, `minmax`, `uniform`, and `cadence`. Exceeding this limit returns an error. Does not apply to `sdt`. |
 
 The limit counts every input row, including rows that `lttb`, `m4`, or
 `minmax` skip because of a `NULL` or non-finite value. It is independent of
 the `targetPoints` maximum.
+
+`sdt` is not governed by this limit. It remains subject to the query's
+normal memory limits.
 
 Memory use depends on the method:
 
@@ -558,6 +806,9 @@ Memory use depends on the method:
   of the selected rows. They do not buffer a timestamp/value pair per row.
 - `lttb`, `m4`, and `minmax` buffer a 16-byte timestamp/value entry for each
   eligible row, plus bookkeeping for skipped rows and selected positions.
+- `sdt` keeps approximately one byte per input row for its keep flags. It
+  runs through the same two-pass window execution as the other methods, so
+  it is not a constant-memory streaming implementation.
 
 Depending on input order and query shape, the query can need additional row
 or sort storage, so no single bytes-per-row figure describes a whole query.
@@ -573,3 +824,13 @@ or sort storage, so no single bytes-per-row figure describes a whole query.
   the original LTTB algorithm and thesis reference
 - [Jugel, U. et al. (2014). "M4: A Visualization-Oriented Time Series Data Aggregation"](https://www.vldb.org/pvldb/vol7/p797-jugel.pdf) -
   the M4 paper
+- [Bristol, E. H. (1990). "Swinging Door Trending: Adaptive Trend Recording?"](https://cir.nii.ac.jp/crid/1574231875546173824) -
+  ISA National Conference Proceedings, pp. 749-754. The original SDT
+  description
+- [Khan, M. A. et al. (2020). "Impacts of swinging door lossy compression of synchrophasor data"](https://doi.org/10.1016/j.ijepes.2020.106182) -
+  a peer-reviewed explanation of the slope corridor and the compression
+  deviation concept
+
+The SDT references are background only. They are not the normative
+specification of QuestDB's implementation, whose behavior is described on
+this page.

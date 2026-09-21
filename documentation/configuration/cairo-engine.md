@@ -875,11 +875,15 @@ SAMPLE BY index query page size (maximum values returned in a single scan).
 - **Default**: `100000000`
 - **Reloadable**: no
 
-Maximum number of input rows a
-[SUBSAMPLE](/docs/query/sql/subsample/) query accepts. Exceeding this limit
-returns an error. Every input row counts, including rows that a value-based
-method skips because of a `NULL` value. The limit is independent of the
-`targetPoints` argument. Must be between 1 and 2,147,483,647.
+Maximum number of input rows accepted by the count-based and stride-based
+[SUBSAMPLE](/docs/query/sql/subsample/) methods: `lttb`, `m4`, `minmax`,
+`uniform`, and `cadence`. Exceeding this limit returns an error. Every input
+row counts, including rows that `lttb`, `m4`, or `minmax` skip because of a
+`NULL` value. The limit is independent of the `targetPoints` argument. Must
+be between 1 and 2,147,483,647.
+
+This limit does not apply to `sdt`, which remains subject to the query's
+normal memory limits.
 
 ## Window functions
 

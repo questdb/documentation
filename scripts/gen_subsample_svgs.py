@@ -371,6 +371,72 @@ def gen_gap_detect():
 </svg>"""
 
 
+def gen_sdt():
+    N = len(SEG_A)
+    im, ix = 0, N - 1
+    ri = list(range(N))
+    # sdt(v, 0.05) on SEG_A, rows returned by QuestDB master 6f1d196f.
+    # The count is decided by the data, not requested. SDT does not pin
+    # extremes: the trough at i=15 (0.20) is dropped because the line from
+    # i=14 to i=16 passes within 2 * compdev of it.
+    si = [0, 4, 5, 9, 11, 12, 14, 16, 22, 23]
+    sv = [SEG_A[i] for i in si]
+    return f"""{hdr(W, H, "SDT downsampling", f"SDT with compdev 0.05 retains {len(si)} points from 24.")}
+<text class="t" x="{XL}" y="35">SDT: compdev 0.05, retained {len(si)} of 24 (count decided by the data)</text>
+{rpl(ri, SEG_A, im, ix, YT, YB)}
+<polyline points="{pl(si,sv,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(si,sv,im,ix,YT,YB,GRAY)}
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Retained points ({len(si)} of 24)</text>
+</svg>"""
+
+
+# SDT gap dataset: 41 points, i=0..19 and i=40..60, no data for i=20..39.
+SDT_SEG_A_I = list(range(0, 20))
+SDT_SEG_A_V = [
+    0.50, 0.55, 0.60, 0.65, 0.70, 0.95, 0.85, 0.70, 0.60, 0.55,
+    0.50, 0.45, 0.40, 0.35, 0.28, 0.20, 0.25, 0.30, 0.35, 0.40,
+]
+SDT_SEG_B_I = list(range(40, 61))
+SDT_SEG_B_V = [
+    0.45, 0.50, 0.55, 0.58, 0.60, 0.65, 0.70, 0.75, 0.70, 0.55,
+    0.40, 0.25, 0.15, 0.25, 0.40, 0.55, 0.60, 0.62, 0.60, 0.58, 0.55,
+]
+
+
+def gen_sdt_gap():
+    """SDT at compdev 0.05 across a timestamp gap.
+
+    Retained rows come from QuestDB master 6f1d196f. The gap is not a run
+    boundary: i=19 is retained because the corridor closes when i=40 arrives,
+    and i=40 itself is not retained. The output is one connected line.
+    """
+    im, ix = 0, 60
+    si = [0, 4, 5, 9, 15, 19, 42, 48, 52, 56, 60]
+    raw = dict(zip(SDT_SEG_A_I + SDT_SEG_B_I, SDT_SEG_A_V + SDT_SEG_B_V))
+    sv = [raw[i] for i in si]
+    total = len(raw)
+    skipped_x, skipped_y = xp(40, im, ix), yp(raw[40], YT, YB)
+    desc = (f"SDT retains {len(si)} of {total} points. The timestamp gap is not a boundary: "
+            "the first point after the gap is not retained and the line crosses the gap.")
+    return f"""{hdr(W, H, "SDT across a timestamp gap", desc)}
+<text class="t" x="{XL}" y="35">SDT, compdev 0.05: {total} points reduced to {len(si)}, the gap is not a boundary</text>
+{rpl(SDT_SEG_A_I, SDT_SEG_A_V, im, ix, YT, YB)}
+{rpl(SDT_SEG_B_I, SDT_SEG_B_V, im, ix, YT, YB)}
+<polyline points="{pl(si,sv,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(si,sv,im,ix,YT,YB,GRAY)}
+<circle cx="{skipped_x:.1f}" cy="{skipped_y:.1f}" r="{DOT_R}" fill="none" stroke="{CYAN}" stroke-width="1.5"/>
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Retained points ({len(si)} of {total})</text>
+<circle cx="{XL+330}" cy="{LY}" r="{LEG_DOT}" fill="none" stroke="{CYAN}" stroke-width="1.5"/>
+<text class="l" x="{XL+342}" y="{LY+5}">First point after the gap, not retained</text>
+</svg>"""
+
+
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in [("raw.svg", gen_raw), ("lttb.svg", gen_lttb),
@@ -378,7 +444,9 @@ if __name__ == "__main__":
                      ("uniform.svg", gen_uniform), ("cadence.svg", gen_cadence),
                      ("gap-raw.svg", gen_gap_raw),
                      ("gap-no-detect.svg", gen_gap_no_detect),
-                     ("gap-detect.svg", gen_gap_detect)]:
+                     ("gap-detect.svg", gen_gap_detect),
+                     ("sdt.svg", gen_sdt),
+                     ("sdt-gap.svg", gen_sdt_gap)]:
         path = os.path.join(OUT_DIR, name)
         with open(path, "w") as f:
             f.write(fn())
