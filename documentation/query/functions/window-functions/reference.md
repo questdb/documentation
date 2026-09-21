@@ -1259,14 +1259,16 @@ row set. Each one returns a `boolean` keep flag for every input row: `true`
 means the row is selected, `false` means it is discarded. Filter on the flag
 in an outer query to get the selected rows:
 
-```questdb-sql title="Filter on the keep flag in an outer query"
+```questdb-sql title="Filter on the keep flag in an outer query" demo
 SELECT *
 FROM (
     SELECT
-        ts,
+        timestamp,
         price,
-        lttb(ts, price, 500) OVER (ORDER BY ts) AS keep
-    FROM trades
+        lttb(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
 )
 WHERE keep;
 ```

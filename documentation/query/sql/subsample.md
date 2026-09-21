@@ -420,7 +420,7 @@ WHERE symbol = 'EURUSD'
 SUBSAMPLE cadence(1000)
 ```
 
-```questdb-sql title="Anti-aliasing with reproducible seed"
+```questdb-sql title="Anti-aliasing with reproducible seed" demo
 SELECT timestamp, price
 FROM fx_trades
 WHERE symbol = 'EURUSD'
@@ -794,14 +794,16 @@ timestamp order as the clause form, the rows flagged `true` are the rows the
 clause form returns. Neither form interpolates values or creates replacement
 rows.
 
-```questdb-sql title="Filter on the keep flag in an outer query"
+```questdb-sql title="Filter on the keep flag in an outer query" demo
 SELECT *
 FROM (
     SELECT
-        ts,
+        timestamp,
         price,
-        lttb(ts, price, 500) OVER (ORDER BY ts) AS keep
-    FROM trades
+        lttb(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
 )
 WHERE keep;
 ```
@@ -867,9 +869,11 @@ function.
 
 ## Configuration
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `cairo.sql.subsample.max.rows` | 100,000,000 | Maximum number of input rows accepted by the count-based and stride-based methods: `lttb`, `m4`, `minmax`, `uniform`, and `cadence`. Exceeding this limit returns an error. Does not apply to `sdt`. |
+[`cairo.sql.subsample.max.rows`](/docs/configuration/cairo-engine/#cairosqlsubsamplemaxrows)
+caps the number of input rows that `lttb`, `m4`, `minmax`, `uniform`, and
+`cadence` accept, in both the clause form and the window-function form. A
+query that exceeds it returns an error. See the configuration reference for
+the default and the valid range.
 
 The limit counts every input row, including rows that `lttb`, `m4`, or
 `minmax` skip because of a `NULL` or non-finite value. It is independent of
@@ -877,6 +881,8 @@ the `targetPoints` maximum.
 
 `sdt` is not governed by this limit. It remains subject to the query's
 normal memory limits.
+
+### Memory use
 
 Memory use depends on the method:
 
@@ -896,6 +902,9 @@ or sort storage, so no single bytes-per-row figure describes a whole query.
 - [SAMPLE BY](/docs/query/sql/sample-by/) - time-based aggregation
   (computes new values at bucket boundaries, while `SUBSAMPLE` selects
   existing rows)
+- [SUBSAMPLE window functions](/docs/query/functions/window-functions/reference/#subsample-window-functions) -
+  the same six algorithms as window functions that return a keep flag per
+  row
 - [Designated timestamp](/docs/concepts/designated-timestamp/) - required
   for `SUBSAMPLE` to operate
 - [Steinarsson, S. (2013). "Downsampling Time Series for Visual Representation"](https://github.com/sveinn-steinarsson/flot-downsample) -
