@@ -27,6 +27,10 @@ list must preserve it. A table with a designated timestamp is not enough if
 the projection omits that column or replaces it with an expression that loses
 the designation.
 
+Every method is also available as a window function that returns a keep flag
+for each row instead of the reduced row set. See
+[window-function form](#window-function-form).
+
 ## Syntax
 
 ```questdb-sql
@@ -612,6 +616,11 @@ FROM bars
 SUBSAMPLE sdt(avg_price, 0.0001)
 ```
 
+The clause form treats its input as a single series. To compress several
+series independently in one query, use the
+[`sdt()` window function](/docs/query/functions/window-functions/reference/#sdt)
+with `PARTITION BY`.
+
 ### Algorithm comparison
 
 | Property | lttb | minmax | m4 | uniform | cadence | sdt |
@@ -768,6 +777,75 @@ SELECT count() FROM (
     SUBSAMPLE lttb(price, 500)
 )
 ```
+
+## Window-function form
+
+`SUBSAMPLE` has two interfaces:
+
+- The **clause form**, such as `SUBSAMPLE lttb(price, 500)`, directly
+  returns the selected rows.
+- The **window-function form**, such as
+  `lttb(ts, price, 500) OVER (ORDER BY ts)`, returns one `BOOLEAN` keep flag
+  for every input row. `true` means the row is selected and `false` means
+  it is discarded.
+
+Both forms select existing rows. When the window uses the same ascending
+timestamp order as the clause form, the rows flagged `true` are the rows the
+clause form returns. Neither form interpolates values or creates replacement
+rows.
+
+```questdb-sql title="Filter on the keep flag in an outer query"
+SELECT *
+FROM (
+    SELECT
+        ts,
+        price,
+        lttb(ts, price, 500) OVER (ORDER BY ts) AS keep
+    FROM trades
+)
+WHERE keep;
+```
+
+Window functions cannot be used directly in a `WHERE` clause at the same
+query level, so filtering on the keep flag needs a subquery or a CTE. The
+value-based functions take the timestamp as an explicit first argument, so
+their argument order differs from the clause form:
+
+| Clause form | Window-function form |
+|-------------|----------------------|
+| `SUBSAMPLE lttb(value, target [, gapThreshold])` | [`lttb(ts, value, target [, gapThreshold]) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#lttb) |
+| `SUBSAMPLE m4(value, target)` | [`m4(ts, value, target) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#m4) |
+| `SUBSAMPLE minmax(value, target)` | [`minmax(ts, value, target) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#minmax) |
+| `SUBSAMPLE uniform(target)` | [`uniform(target) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#uniform) |
+| `SUBSAMPLE cadence(stride [, seed])` | [`cadence(stride [, seed]) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#cadence) |
+| `SUBSAMPLE sdt(value, compdev)` | [`sdt(ts, value, compdev) OVER (ORDER BY ts)`](/docs/query/functions/window-functions/reference/#sdt) |
+
+### When to use which form
+
+Prefer the clause form when you simply want the reduced row set, for
+charting or to cut the size of a result. It is shorter and clearer.
+
+Prefer the window-function form when the keep or drop decision must be:
+
+- exposed as a column, for example to inspect or debug a selection
+- composed with other window calculations in the same query
+- filtered at another query level
+- computed per series with `PARTITION BY`, which only
+  [`sdt()`](/docs/query/functions/window-functions/reference/#sdt) supports
+
+| Need | Preferred form |
+|------|----------------|
+| Return only the downsampled rows | Clause form: `SUBSAMPLE ...` |
+| Keep the selection decision as a column | Window form: `... OVER (...) AS keep` |
+| Filter the decision in another query level | Window form inside a subquery or CTE |
+| Straightforward chart downsampling | Clause form |
+
+The window-function form also lifts two clause-form restrictions. The value
+argument can be an expression instead of a directly selected column, and
+`sdt()` can run over several series at once with `PARTITION BY`. See
+[SUBSAMPLE window functions](/docs/query/functions/window-functions/reference/#subsample-window-functions)
+for the signatures, ordering, framing, partition, and `NULL` rules of each
+function.
 
 ## Behavior notes
 
