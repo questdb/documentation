@@ -5,7 +5,7 @@ description:
   Learn how to automate QuestDB tasks using the REST HTTP API, or one of our recommended workflow orchestrators.
 ---
 
-QuestDB provides a simple [HTTP API](/docs/query/rest-api/) that allows you to interact with the database using SQL queries.
+QuestDB provides a simple [HTTP API](/docs/connect/compatibility/rest-api/) that allows you to interact with the database using SQL queries.
 This API can be leveraged for automation using Bash scripts and scheduled execution via cron jobs. This is a lightweight
 approach that requires minimal dependencies.
 
@@ -27,7 +27,7 @@ The following example demonstrates how to execute a query using the HTTP API:
 #!/bin/bash
 
 # QuestDB API URL
-QUESTDB_URL="http://localhost:9000/exec"
+QUESTDB_URL="http://localhost:9000/api/v1/sql/execute"
 
 # Query: Drop partitions older than 30 days
 QUERY="ALTER TABLE my_table DROP PARTITION WHERE timestamp < dateadd('d', -30, now());"

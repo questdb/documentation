@@ -43,6 +43,8 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
+  - Buying through Azure? QuestDB Enterprise is also available via
+    [Azure Marketplace](/docs/deployment/azure/#buy-through-azure-marketplace).
 - Use of a [supported file system](/docs/getting-started/capacity-planning/#supported-filesystems)
   - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
@@ -234,7 +236,7 @@ ALTER SERVICE ACCOUNT ingest_ilp CREATE TOKEN TYPE REST WITH TTL '3000d' REFRESH
 This command returns a token. **Copy it immediately**, as it's shown only once.
 
 | name       | token                                          | expires_at                  | refresh |
-|------------|------------------------------------------------|-----------------------------|---------|
+| ---------- | ---------------------------------------------- | --------------------------- | ------- |
 | ingest_ilp | qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY | 2033-09-19T15:32:51.628453Z | true    |
 
 ### Step 3: Use the Token in Your Client
@@ -266,18 +268,19 @@ the server's certificate. For local testing with self-signed certificates, you c
 
 Connecting a client to ILP is a common path.
 
-However, you may use something like [Kafka](/docs/ingestion/message-brokers/kafka).
+However, you may use something like [Kafka](/docs/connect/message-brokers/kafka).
 
 For more on ILP ingestion, see:
-- [ILP Overview](/docs/ingestion/ilp/overview/) — Protocol details and configuration
-- [Ingestion Overview](/docs/ingestion/overview/) — Client libraries and ingestion methods
+- [ILP Overview](/docs/connect/compatibility/ilp/overview/) — Protocol details and configuration
+- [Ingestion Overview](/docs/connect/overview/) — Client libraries and ingestion methods
 
 ## 5. Ingest data, Kafka Connect (optional)
 
 _If you're not using Kafka, you can skip to section 6._
 
-The official **QuestDB Kafka Connect sink** forwards messages from Kafka topics directly to your database using ILP protocol.
-The setup process is straightforward:
+Use the **QuestDB Kafka connector** to stream messages from Kafka topics into
+QuestDB. The configuration below requires QuestDB 10.0 or newer and connector
+0.24 or newer.
 
 1. Create a dedicated service account in QuestDB.
 2. Generate an authentication token for the account.
@@ -312,7 +315,7 @@ ALTER SERVICE ACCOUNT kafka CREATE TOKEN TYPE REST WITH TTL '365d';
 The command returns a token. **Copy it immediately**, as it will not be shown again.
 
 | name  | token                                            | expires\_at                   |
-|-------|--------------------------------------------------|-------------------------------|
+| ----- | ------------------------------------------------ | ----------------------------- |
 | kafka | `qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY` | `2026-07-03T18:05:00.000000Z` |
 
 Save the private key in a secure location!
@@ -332,19 +335,19 @@ tasks.max=1
 topics=your_kafka_topic
 
 # --- QuestDB Connection ---
-# Use https:: if your QuestDB server has TLS enabled.
-# Replace the placeholder with the token you generated.
-client.conf.string=https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;
+# Use ws:: if your QuestDB server does not have TLS enabled.
+# Replace YOUR_TOKEN with the token you generated.
+client.conf.string=wss::addr=localhost:9000;token=YOUR_TOKEN;
 
 # --- Optional: Data Mapping ---
 # Use a field from the Kafka message key or value as a QuestDB symbol.
-# symbol.columns=device_id
+# symbols=device_id
 ```
 
 Once you deploy this configuration, the connector will start sending data from your Kafka topic to QuestDB. If you
 encounter any issues, check the logs for both your Kafka Connect worker and your QuestDB server for more details.
 
-See the [QuestDB Kafka Connector documentation](/docs/ingestion/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
+See the [QuestDB Kafka Connector documentation](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
 on the configuration options and how to set up the connector.
 
 ## 6. Query data, PostgreSQL query
@@ -404,7 +407,7 @@ This covers the very basics of user creation and service accounts.
 We have an `ingest` service account and a `dashboard` service account.
 
 For more on querying, see:
-- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) — Connection details and compatibility
+- [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/) — Connection details and compatibility
 - [Query & SQL Overview](/docs/query/overview/) — SQL syntax and functions
 
 > For the full role-based access control docs, including group management, see
@@ -478,48 +481,48 @@ too — on a schedule you define. This supersedes plain TTL in Enterprise, where
 
 ### Migrating from TTL when upgrading from OSS
 
-Tables and materialized views that were created in OSS keep their existing
-`TTL` setting after you upgrade to Enterprise — no data is lost at upgrade
-time. However, Enterprise rejects any **new** `TTL` changes (both
-`CREATE ... TTL` and `ALTER ... SET TTL <non-zero>`) with:
+Tables that were created in OSS keep their existing `TTL` setting after you
+upgrade to Enterprise — no data is lost at upgrade time. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is then rejected with:
 
 ```
-TTL settings are deprecated, please, create a storage policy instead
+TTL is not supported on Enterprise tables; use a storage policy instead
 ```
 
-To move a legacy table or materialized view from `TTL` to a storage policy:
+(`CREATE TABLE ... TTL` is still accepted for backward compatibility: Enterprise
+translates it into a `STORAGE POLICY(DROP LOCAL ...)`.) Materialized views are
+not affected: they continue to use `TTL` for retention in Enterprise.
+
+To move a legacy table from `TTL` to a storage policy:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts, and it is required before a storage policy can be
-   attached:
+   value Enterprise accepts on a table, and it is required before a storage
+   policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
    ALTER TABLE trades SET TTL 0;
-   -- or, for a materialized view:
-   ALTER MATERIALIZED VIEW trades_hourly SET TTL 0;
    ```
 
 2. **Attach a storage policy** that reproduces — and ideally extends — the
    retention the TTL used to provide. A policy lets you keep data in Parquet
-   after you would previously have dropped it, so `DROP LOCAL` (or
-   `DROP NATIVE` if you don't want Parquet at all) is the stage that replaces
-   the old TTL horizon:
+   after you would previously have dropped it, so `DROP LOCAL` is the stage
+   that replaces the old TTL horizon:
 
    ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
    ALTER TABLE trades SET STORAGE POLICY(
        TO PARQUET 3 DAYS,
-       DROP NATIVE 10 DAYS,
        DROP LOCAL 1 MONTH
    );
    ```
 
    If you want the policy to behave exactly like the old TTL (delete the
-   partition outright after the same interval), use a single-stage policy —
-   for example `STORAGE POLICY(DROP NATIVE 1 MONTH)` to match `TTL 1 MONTH`.
+   partition outright after the same interval, with no Parquet conversion),
+   use a single-stage policy — for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
+   to match `TTL 1 MONTH`.
 
-Do this for every table and materialized view you want to keep managed
-automatically. Tables without a storage policy retain their data indefinitely
-once their legacy TTL has been cleared.
+Do this for every table you want to keep managed automatically. Tables without
+a storage policy retain their data indefinitely once their legacy TTL has been
+cleared.
 
 ### Creating new tables with a storage policy
 
@@ -531,8 +534,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
-  WAL;
+  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 Or attach a policy to an existing table:
@@ -540,7 +542,6 @@ Or attach a policy to an existing table:
 ```questdb-sql title="Web Console - Set a storage policy on an existing table"
 ALTER TABLE trades SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
-    DROP NATIVE 10 DAYS,
     DROP LOCAL 1 MONTH
 );
 ```
@@ -555,6 +556,20 @@ For the full concept, including the stage model, timing, and replication
 behavior, see
 [Storage Policy](/docs/concepts/storage-policy/) and
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+### Tiering partitions to object storage
+
+The policies above keep everything on local disk. To keep historical partitions queryable without keeping them on local disk, add the `TO REMOTE` stage. It uploads a Parquet copy to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store, and `DROP LOCAL` then evicts the local copy while queries keep working:
+
+```questdb-sql title="Web Console - Tier partitions to object storage"
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS
+);
+```
+
+This requires [cold storage](/docs/concepts/cold-storage/) to be enabled and an object store prefix to be configured first. See [Operating cold storage](/docs/operations/cold-storage/) for the setup procedure.
 
 ## 10. Double-check kernel limits
 
@@ -574,7 +589,7 @@ Enterprise.
 
 If you're new to QuestDB, consider checking out:
 
-- [Ingestion overview](/docs/ingestion/overview/): Learn the various ingestion
+- [Ingestion overview](/docs/connect/overview/): Learn the various ingestion
   methods and their benefits and tradeoffs, and pick a language client.
 - [Query & SQL overview](/docs/query/overview/): Learn how to query
   QuestDB.

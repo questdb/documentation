@@ -10,10 +10,12 @@ and ending timestamp, not only between the first and last existing row in the fi
 
 ## Problem
 
-QuestDB has a built-in [`SAMPLE BY .. FROM/TO`](/docs/query/sql/sample-by/#from-to) syntax available for non-keyed queries (queries that include only aggregated columns beyond the timestamp), and for the `NULL` FILL strategy.
-
-If you use `FROM/TO` in a keyed query (for example, an OHLC with timestamp, symbol, and aggregations) you will get the
-following error: _FROM-TO intervals are not supported for keyed SAMPLE BY queries_.
+QuestDB's [`SAMPLE BY .. FROM/TO`](/docs/query/sql/sample-by/#from-to) supports
+keyed queries when `FROM`/`TO` are constants. When the bounds are bind
+variables, function calls, or arithmetic expressions (for example,
+`dateadd('m', -2, now())`), the query is rejected with: _FROM-TO intervals are
+not supported for keyed SAMPLE BY queries_. The recipe below works around this
+limitation.
 
 
 ## Solution

@@ -363,10 +363,20 @@ Look for these indicators in the plan:
 - **LIST constraints**: Offsets must be interval literals (e.g., `1s`, `-2m`,
   `0`) and monotonically increasing.
 
+:::tip Hand-rolled markout curves
+
+If you express a markout curve as a `CROSS JOIN` against a table of offsets
+rather than as a HORIZON JOIN, the
+[`markout_horizon` hint](/docs/concepts/deep-dive/sql-optimizer-hints/#markout_horizon)
+avoids materializing and sorting the whole join output.
+
+:::
+
 :::info Related documentation
 - [ASOF JOIN](/docs/query/sql/asof-join/)
 - [JOIN](/docs/query/sql/join/)
 - [PIVOT](/docs/query/sql/pivot/)
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 - [Markout analysis recipe](/docs/cookbook/sql/finance/markout/)
+- [`markout_horizon` optimizer hint](/docs/concepts/deep-dive/sql-optimizer-hints/#markout_horizon)
 :::

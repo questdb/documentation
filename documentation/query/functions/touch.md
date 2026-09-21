@@ -68,7 +68,7 @@ Use `touch()` after startup via the REST API:
 ```shell
 curl -G \
   --data-urlencode "SELECT touch(SELECT * FROM x WHERE k IN '1970-01-22');" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 ```
 
 All subsequent queries will be within performance expectations, without

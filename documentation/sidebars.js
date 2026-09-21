@@ -26,208 +26,239 @@ module.exports = {
           label: "QuestDB Enterprise Quick Start",
         },
         {
-          type: "category",
-          label: "Web Console",
-          collapsed: true,
-          items: [
-            "getting-started/web-console/overview",
-            "getting-started/web-console/code-editor",
-            "getting-started/web-console/questdb-ai",
-            "getting-started/web-console/metrics-view",
-            "getting-started/web-console/schema-explorer",
-            "getting-started/web-console/table-details",
-            "getting-started/web-console/result-grid",
-            "getting-started/web-console/query-log",
-            "getting-started/web-console/import-csv",
-          ],
+          type: "link",
+          label: "Web Console overview",
+          href: "/docs/getting-started/web-console/overview/",
         },
       ],
     },
-
     // ===================
-    // INGESTION REFERENCE
+    // CONNECT
     // ===================
     {
       type: "category",
-      label: "Ingestion Reference",
+      label: "Connect",
       items: [
         {
-          id: "ingestion/overview",
+          id: "connect/overview",
           type: "doc",
           label: "Overview",
         },
         {
           type: "category",
-          label: "Language Clients",
-          collapsed: true,
+          label: "Client Libraries",
           items: [
             {
-              id: "ingestion/clients/configuration-string",
+              id: "connect/clients/connect-string",
               type: "doc",
-              label: "Configuration String",
+              label: "Connect string",
             },
             {
-              id: "ingestion/clients/python",
-              type: "doc",
-              label: "Python",
-            },
-            {
-              id: "ingestion/clients/go",
-              type: "doc",
-              label: "Go",
-            },
-            {
-              id: "ingestion/clients/java",
+              id: "connect/clients/java",
               type: "doc",
               label: "Java",
             },
             {
-              id: "ingestion/clients/rust",
+              id: "connect/clients/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "connect/clients/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "connect/clients/rust",
               type: "doc",
               label: "Rust",
             },
             {
-              id: "ingestion/clients/nodejs",
+              id: "connect/clients/nodejs",
               type: "doc",
               label: "Node.js",
             },
             {
-              id: "ingestion/clients/c-and-cpp",
+              id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
             },
             {
-              id: "ingestion/clients/dotnet",
+              id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
             },
             {
-              id: "ingestion/clients/date-to-timestamp-conversion",
+              id: "connect/clients/date-to-timestamp-conversion",
               type: "doc",
               label: "Date to Timestamp",
             },
           ],
         },
         {
+          id: "connect/agents",
+          type: "doc",
+          label: "Agents",
+        },
+        {
           type: "category",
           label: "Message Brokers",
           collapsed: true,
           items: [
-            "ingestion/message-brokers/kafka",
-            "ingestion/message-brokers/telegraf",
-            "ingestion/message-brokers/redpanda",
-            "ingestion/message-brokers/flink",
+            "connect/message-brokers/kafka",
+            "connect/message-brokers/telegraf",
+            "connect/message-brokers/redpanda",
+            "connect/message-brokers/flink",
           ],
         },
         {
           type: "category",
-          label: "Protocols",
+          label: "REST API",
           collapsed: true,
+          items: [
+            "connect/compatibility/rest-api",
+            "connect/compatibility/import-csv",
+            {
+              label: "Parquet Export",
+              type: "link",
+              href: "/docs/concepts/parquet/#export",
+            },
+          ],
+        },
+        {
+          type: "category",
+          label: "Compatibility Protocols",
           items: [
             {
               type: "category",
               label: "InfluxDB Line Protocol (ILP)",
+              collapsed: true,
               items: [
                 {
-                  id: "ingestion/ilp/overview",
+                  id: "connect/compatibility/ilp/overview",
                   type: "doc",
                   label: "Overview",
                 },
                 {
-                  id: "ingestion/ilp/columnset-types",
+                  id: "connect/compatibility/ilp/columnset-types",
                   type: "doc",
                   label: "Columnset Types",
                 },
                 {
-                  id: "ingestion/ilp/advanced-settings",
+                  id: "connect/compatibility/ilp/advanced-settings",
                   type: "doc",
                   label: "Advanced Settings",
                 },
               ],
             },
             {
-              id: "ingestion/java-embedded",
-              type: "doc",
-              label: "Java Embedded",
+              type: "category",
+              label: "PostgreSQL Wire Protocol (PGWire)",
+              collapsed: true,
+              items: [
+                {
+                  id: "connect/compatibility/pgwire/overview",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "connect/compatibility/pgwire/large-result-sets",
+                  type: "doc",
+                  label: "Large Result Sets",
+                },
+                {
+                  id: "connect/compatibility/pgwire/python",
+                  type: "doc",
+                  label: "Python",
+                },
+                {
+                  id: "connect/compatibility/pgwire/go",
+                  type: "doc",
+                  label: "Go",
+                },
+                {
+                  id: "connect/compatibility/pgwire/java",
+                  type: "doc",
+                  label: "Java",
+                },
+                {
+                  id: "connect/compatibility/pgwire/rust",
+                  type: "doc",
+                  label: "Rust",
+                },
+                {
+                  id: "connect/compatibility/pgwire/nodejs",
+                  type: "doc",
+                  label: "Node.js",
+                },
+                {
+                  id: "connect/compatibility/pgwire/dotnet",
+                  type: "doc",
+                  label: ".NET",
+                },
+                {
+                  id: "connect/compatibility/pgwire/php",
+                  type: "doc",
+                  label: "PHP",
+                },
+                {
+                  id: "connect/compatibility/pgwire/r",
+                  type: "doc",
+                  label: "R",
+                },
+                {
+                  id: "connect/compatibility/pgwire/c-and-cpp",
+                  type: "doc",
+                  label: "C/C++",
+                },
+              ],
             },
           ],
         },
-        "ingestion/import-csv",
-      ],
-    },
-
-    // ===================
-    // QUERY & SQL REFERENCE
-    // ===================
-    {
-      type: "category",
-      label: "Query & SQL Reference",
-      items: [
-        "query/overview",
         {
+          id: "connect/java-embedded",
+          type: "doc",
+          label: "Java Embedded",
+        },
+        {
+          label: "Wire Protocols",
           type: "category",
-          label: "PostgreSQL Wire Protocol",
           collapsed: true,
           items: [
             {
-              id: "query/pgwire/overview",
+              id: "connect/wire-protocols/overview",
               type: "doc",
               label: "Overview",
             },
             {
-              id: "query/pgwire/large-result-sets",
+              id: "connect/wire-protocols/qwp-ingress-websocket",
               type: "doc",
-              label: "Large Result Sets",
+              label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "query/pgwire/python",
+              id: "connect/wire-protocols/qwp-egress-websocket",
               type: "doc",
-              label: "Python",
+              label: "QWP Egress (WebSocket)",
             },
             {
-              id: "query/pgwire/go",
+              id: "connect/wire-protocols/qwp-client-behavior",
               type: "doc",
-              label: "Go",
-            },
-            {
-              id: "query/pgwire/java",
-              type: "doc",
-              label: "Java",
-            },
-            {
-              id: "query/pgwire/rust",
-              type: "doc",
-              label: "Rust",
-            },
-            {
-              id: "query/pgwire/nodejs",
-              type: "doc",
-              label: "Node.js",
-            },
-            {
-              id: "query/pgwire/dotnet",
-              type: "doc",
-              label: ".NET",
-            },
-            {
-              id: "query/pgwire/php",
-              type: "doc",
-              label: "PHP",
-            },
-            {
-              id: "query/pgwire/r",
-              type: "doc",
-              label: "R",
-            },
-            {
-              id: "query/pgwire/c-and-cpp",
-              type: "doc",
-              label: "C/C++",
+              label: "QWP Client Behaviour",
             },
           ],
         },
-        "query/rest-api",
-        "query/export-parquet",
+      ],
+    },
+
+    // ===================
+    // SQL REFERENCE
+    // ===================
+    {
+      type: "category",
+      label: "SQL Reference",
+      items: [
+        "query/overview",
+        "concepts/deep-dive/sql-extensions",
         {
           type: "category",
           label: "Data Types",
@@ -251,15 +282,19 @@ module.exports = {
             {
               id: "query/sql/acl/add-user",
               type: "doc",
-                },
+            },
             {
               type: "category",
               label: "ALTER",
               items: [
                 {
+                  id: "query/sql/acl/alter-group",
+                  type: "doc",
+                },
+                {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
-                        },
+                },
                 {
                   type: "category",
                   label: "ALTER TABLE",
@@ -277,21 +312,25 @@ module.exports = {
                         "query/sql/alter-table-change-symbol-capacity",
                       ],
                     },
-                    "query/sql/alter-table-attach-partition",
-                    "query/sql/alter-table-change-column-type",
-                    "query/sql/alter-table-enable-deduplication",
-                    "query/sql/alter-table-disable-deduplication",
-                    "query/sql/alter-table-detach-partition",
-                    "query/sql/alter-table-drop-column",
-                    "query/sql/alter-table-drop-partition",
-                    "query/sql/alter-table-rename-column",
-                    "query/sql/alter-table-resume-wal",
-                    "query/sql/alter-table-set-param",
-                    "query/sql/alter-table-set-storage-policy",
-                    "query/sql/alter-table-set-ttl",
-                    "query/sql/alter-table-set-type",
-                    "query/sql/alter-table-squash-partitions",
-                    "query/sql/alter-table-change-symbol-capacity",
+                    // Ordered by the label the sidebar renders, not the doc id
+                    "query/sql/alter-table-attach-partition", // ATTACH PARTITION
+                    "query/sql/alter-table-change-column-type", // COLUMN TYPE
+                    "query/sql/alter-table-disable-deduplication", // DEDUP DISABLE
+                    "query/sql/alter-table-enable-deduplication", // DEDUP ENABLE
+                    "query/sql/alter-table-detach-partition", // DETACH PARTITION
+                    "query/sql/alter-table-drop-column", // DROP COLUMN
+                    "query/sql/alter-table-drop-partition", // DROP PARTITION
+                    "query/sql/alter-table-rebase-wal", // REBASE WAL
+                    "query/sql/alter-table-rename-column", // RENAME COLUMN
+                    "query/sql/alter-table-resume-wal", // RESUME WAL
+                    "query/sql/alter-table-set-format", // SET FORMAT
+                    "query/sql/alter-table-set-param", // SET PARAM
+                    "query/sql/alter-table-set-storage-policy", // SET STORAGE POLICY
+                    "query/sql/alter-table-set-ttl", // SET TTL
+                    "query/sql/alter-table-set-type", // SET TYPE
+                    "query/sql/alter-table-squash-partitions", // SQUASH PARTITIONS
+                    "query/sql/alter-table-suspend-wal", // SUSPEND WAL
+                    "query/sql/alter-table-change-symbol-capacity", // SYMBOL CAPACITY
                   ],
                 },
                 {
@@ -309,14 +348,13 @@ module.exports = {
                     "query/sql/alter-mat-view-resume-wal",
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
-                    "query/sql/alter-mat-view-set-storage-policy",
                     "query/sql/alter-mat-view-set-ttl",
                   ],
                 },
                 {
                   id: "query/sql/acl/alter-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/alter-view",
               ],
             },
@@ -333,17 +371,18 @@ module.exports = {
                 {
                   id: "query/sql/acl/create-group",
                   type: "doc",
-                        },
+                },
+                "query/sql/create-live-view",
                 "query/sql/create-mat-view",
                 {
                   id: "query/sql/acl/create-service-account",
                   type: "doc",
-                        },
+                },
                 "query/sql/create-table",
                 {
                   id: "query/sql/acl/create-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/create-view",
               ],
             },
@@ -354,29 +393,30 @@ module.exports = {
                 {
                   id: "query/sql/acl/drop-group",
                   type: "doc",
-                        },
+                },
+                "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
                 {
                   id: "query/sql/acl/drop-service-account",
                   type: "doc",
-                        },
+                },
                 "query/sql/drop",
                 {
                   id: "query/sql/acl/drop-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/drop-view",
               ],
             },
             {
               id: "query/sql/acl/exit-service-account",
               type: "doc",
-                },
+            },
             "query/sql/explain",
             {
               type: "category",
               label: "GRANT",
-                  items: [
+              items: [
                 {
                   id: "query/sql/acl/grant",
                   type: "doc",
@@ -393,12 +433,12 @@ module.exports = {
             {
               id: "query/sql/acl/remove-user",
               type: "doc",
-                },
+            },
             "query/sql/rename",
             {
               type: "category",
               label: "REVOKE",
-                  items: [
+              items: [
                 {
                   id: "query/sql/acl/revoke",
                   type: "doc",
@@ -438,6 +478,8 @@ module.exports = {
             },
             "query/sql/show",
             "query/sql/snapshot",
+            "query/sql/switch-cold-storage-role",
+            "query/sql/switch-role",
             "query/sql/truncate",
             "query/sql/union-except-intersect",
             "query/sql/update",
@@ -508,6 +550,51 @@ module.exports = {
     },
 
     // ===================
+    // WEB CONSOLE
+    // ===================
+    {
+      type: "category",
+      label: "Web Console",
+      collapsed: true,
+      link: {
+        type: "doc",
+        id: "getting-started/web-console/overview",
+      },
+      items: [
+        "getting-started/web-console/code-editor",
+        {
+          type: "category",
+          label: "Notebooks",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "getting-started/web-console/notebooks/overview",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "getting-started/web-console/notebooks/overview",
+              label: "Overview",
+            },
+            "getting-started/web-console/notebooks/cells",
+            "getting-started/web-console/notebooks/charts",
+            "getting-started/web-console/notebooks/variables",
+            "getting-started/web-console/notebooks/live-dashboards",
+            "getting-started/web-console/notebooks/manage-share",
+          ],
+        },
+        "getting-started/web-console/mcp-server",
+        "getting-started/web-console/questdb-ai",
+        "getting-started/web-console/metrics-view",
+        "getting-started/web-console/schema-explorer",
+        "getting-started/web-console/table-details",
+        "getting-started/web-console/result-grid",
+        "getting-started/web-console/query-log",
+        "getting-started/web-console/import-csv",
+      ],
+    },
+
+    // ===================
     // CONCEPTS
     // ===================
     {
@@ -520,8 +607,14 @@ module.exports = {
           collapsed: false,
           items: [
             "concepts/designated-timestamp",
+            "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
+            {
+              id: "concepts/parquet",
+              type: "doc",
+              label: "Parquet",
+            },
             "concepts/symbol",
             {
               id: "concepts/views",
@@ -533,9 +626,20 @@ module.exports = {
               type: "doc",
               label: "Materialized Views",
             },
+            {
+              id: "concepts/live-views",
+              type: "doc",
+              label: "Live Views",
+            },
             "concepts/deduplication",
+            "concepts/delivery-semantics",
             "concepts/ttl",
             "concepts/storage-policy",
+            {
+              id: "concepts/cold-storage",
+              type: "doc",
+              label: "Cold Storage",
+            },
             "concepts/write-ahead-log",
           ],
         },
@@ -545,10 +649,10 @@ module.exports = {
           collapsed: true,
           items: [
             "concepts/deep-dive/indexes",
+            "concepts/deep-dive/posting-index",
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",
-            "concepts/deep-dive/sql-extensions",
             "concepts/deep-dive/sql-optimizer-hints",
             "concepts/deep-dive/root-directory-structure",
           ],
@@ -585,16 +689,19 @@ module.exports = {
           label: "Overview",
         },
         "configuration/cairo-engine",
+        "configuration/cold-storage",
         "configuration/copy-settings",
         "configuration/http-server",
         "configuration/iam",
         "configuration/ingestion",
+        "configuration/live-views",
         "configuration/logging-metrics",
         "configuration/materialized-views",
         "configuration/http-min-server",
         "configuration/oidc",
         "configuration/parallel-sql-execution",
         "configuration/postgres-wire-protocol",
+        "configuration/qwp",
         "configuration/database-replication",
         "configuration/shared-workers",
         "configuration/storage-policy",
@@ -641,19 +748,33 @@ module.exports = {
           label: "Overview",
         },
         {
-          id: "high-availability/setup",
-          type: "doc",
-          label: "Setup Guide",
+          type: "category",
+          label: "Replication",
+          items: [
+            "high-availability/setup",
+            "high-availability/failover",
+            "high-availability/disaster-recovery",
+            "high-availability/tuning",
+            "high-availability/wal-cleanup",
+          ],
         },
         {
-          id: "high-availability/tuning",
-          type: "doc",
-          label: "Tuning",
+          type: "category",
+          label: "Client Failover",
+          items: [
+            "high-availability/client-failover/concepts",
+            "high-availability/client-failover/configuration",
+          ],
         },
         {
-          id: "high-availability/wal-cleanup",
-          type: "doc",
-          label: "WAL Cleanup",
+          type: "category",
+          label: "Store-and-Forward",
+          items: [
+            "high-availability/store-and-forward/concepts",
+            "high-availability/store-and-forward/when-to-use",
+            "high-availability/store-and-forward/operating-and-tuning",
+            "high-availability/store-and-forward/configuration",
+          ],
         },
       ],
     },
@@ -665,7 +786,14 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
+        "operations/upgrade",
         "operations/backup",
+        "operations/point-in-time-recovery",
+        {
+          id: "operations/cold-storage",
+          type: "doc",
+          label: "Cold storage",
+        },
         "operations/logging-metrics",
         "operations/monitoring-alerting",
         "operations/data-retention",
@@ -684,6 +812,67 @@ module.exports = {
       items: [
         "deployment/docker",
         "deployment/kubernetes",
+        {
+          type: "category",
+          label: "Enterprise Kubernetes Operator",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "enterprise-kubernetes-operator/index",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "enterprise-kubernetes-operator/index",
+              label: "Overview",
+            },
+            "enterprise-kubernetes-operator/installation",
+            {
+              type: "category",
+              label: "Getting Started",
+              collapsed: true,
+              items: [
+                {
+                  type: "doc",
+                  id: "enterprise-kubernetes-operator/getting-started/aws",
+                  label: "Amazon EKS",
+                },
+                {
+                  type: "doc",
+                  id: "enterprise-kubernetes-operator/getting-started/azure",
+                  label: "Azure AKS",
+                },
+                {
+                  type: "doc",
+                  id: "enterprise-kubernetes-operator/getting-started/migrate",
+                  label: "Migrate existing QuestDB",
+                },
+              ],
+            },
+            "enterprise-kubernetes-operator/configuration",
+            {
+              type: "category",
+              label: "Day 2 operations",
+              items: [
+                "enterprise-kubernetes-operator/operations/operator",
+                "enterprise-kubernetes-operator/operations/database",
+                "enterprise-kubernetes-operator/operations/backup-restore",
+                "enterprise-kubernetes-operator/high-availability",
+                "enterprise-kubernetes-operator/troubleshooting",
+              ],
+            },
+            {
+              type: "category",
+              label: "Reference",
+              items: [
+                "enterprise-kubernetes-operator/known-limitations",
+                "enterprise-kubernetes-operator/support",
+                "enterprise-kubernetes-operator/releases",
+                "enterprise-kubernetes-operator/reference/api",
+              ],
+            },
+          ],
+        },
         "deployment/systemd",
         "deployment/aws",
         "deployment/azure",
@@ -716,6 +905,16 @@ module.exports = {
             "integrations/visualization/powerbi",
             "integrations/visualization/embeddable",
           ],
+        },
+        {
+          // Message brokers live under Ingestion. This is a cross-reference to
+          // the overview section that lists them. The fragment is deliberate:
+          // Docusaurus decides sidebar activeness by comparing normalized
+          // paths without stripping it, so this link never highlights and
+          // never auto-expands a second category.
+          type: "link",
+          label: "Data Ingestion",
+          href: "/docs/integrations/overview/#data-ingestion-and-streaming",
         },
         {
           type: "category",
@@ -849,6 +1048,7 @@ module.exports = {
                         "cookbook/sql/finance/volume-profile",
                         "cookbook/sql/finance/volume-spike",
                         "cookbook/sql/finance/aggressor-volume-imbalance",
+                        "cookbook/sql/finance/order-flow-imbalance",
                         "cookbook/sql/finance/vpin",
                       ],
                     },
@@ -856,9 +1056,7 @@ module.exports = {
                       type: "category",
                       label: "Risk Metrics",
                       collapsed: true,
-                      items: [
-                        "cookbook/sql/finance/maximum-drawdown",
-                      ],
+                      items: ["cookbook/sql/finance/maximum-drawdown"],
                     },
                     {
                       type: "category",
@@ -874,9 +1072,7 @@ module.exports = {
                       type: "category",
                       label: "Market Breadth",
                       collapsed: true,
-                      items: [
-                        "cookbook/sql/finance/tick-trin",
-                      ],
+                      items: ["cookbook/sql/finance/tick-trin"],
                     },
                     {
                       type: "category",
@@ -897,6 +1093,7 @@ module.exports = {
                   items: [
                     "cookbook/sql/time-series/elapsed-time",
                     "cookbook/sql/time-series/force-designated-timestamp",
+                    "cookbook/sql/time-series/check-timestamp-order",
                     "cookbook/sql/time-series/latest-n-per-partition",
                     "cookbook/sql/time-series/session-windows",
                     "cookbook/sql/time-series/latest-activity-window",
@@ -918,6 +1115,7 @@ module.exports = {
                   items: [
                     "cookbook/sql/advanced/rows-before-after-value-match",
                     "cookbook/sql/advanced/local-min-max",
+                    "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
                     "cookbook/sql/advanced/unpivot-table",
@@ -926,6 +1124,7 @@ module.exports = {
                     "cookbook/sql/advanced/general-and-sampled-aggregates",
                     "cookbook/sql/advanced/consistent-histogram-buckets",
                     "cookbook/sql/advanced/array-from-string",
+                    "cookbook/sql/advanced/row-level-security",
                   ],
                 },
               ],
@@ -941,6 +1140,7 @@ module.exports = {
                   label: "Grafana",
                   collapsed: true,
                   items: [
+                    "cookbook/integrations/grafana/declare-time-range",
                     "cookbook/integrations/grafana/dynamic-table-queries",
                     "cookbook/integrations/grafana/read-only-user",
                     "cookbook/integrations/grafana/variable-dropdown",
@@ -958,23 +1158,17 @@ module.exports = {
                 {
                   type: "category",
                   label: "PHP",
-                  items: [
-                    "cookbook/programmatic/php/inserting-ilp",
-                  ],
+                  items: ["cookbook/programmatic/php/inserting-ilp"],
                 },
                 {
                   type: "category",
                   label: "Ruby",
-                  items: [
-                    "cookbook/programmatic/ruby/inserting-ilp",
-                  ],
+                  items: ["cookbook/programmatic/ruby/inserting-ilp"],
                 },
                 {
                   type: "category",
                   label: "C++",
-                  items: [
-                    "cookbook/programmatic/cpp/missing-columns",
-                  ],
+                  items: ["cookbook/programmatic/cpp/missing-columns"],
                 },
               ],
             },
@@ -988,6 +1182,7 @@ module.exports = {
                 "cookbook/operations/csv-import-milliseconds",
                 "cookbook/operations/tls-pgbouncer",
                 "cookbook/operations/copy-data-between-instances",
+                "cookbook/operations/copy-schema-between-instances",
                 "cookbook/operations/query-times-histogram",
                 "cookbook/operations/optimize-many-tables",
                 "cookbook/operations/check-transaction-applied",
@@ -999,6 +1194,11 @@ module.exports = {
         {
           id: "tutorials/order-book",
           label: "Order Book Analytics",
+          type: "doc",
+        },
+        {
+          id: "tutorials/questdb-to-iceberg",
+          label: "QuestDB to Iceberg",
           type: "doc",
         },
         {
@@ -1035,8 +1235,9 @@ module.exports = {
     },
 
     // ===================
-    // RELEASE NOTES
+    // CHANGELOG & RELEASE NOTES
     // ===================
+    "changelog",
     {
       label: "Release Notes",
       type: "link",

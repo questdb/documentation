@@ -15,7 +15,7 @@ QuestDB has three temporal types with different precision:
 | :--- | :-------- | :---------------- |
 | `DATE` | milliseconds | ±2.9 million years |
 | `TIMESTAMP` | microseconds | ±290,000 years |
-| `TIMESTAMP_NS` | nanoseconds | ±2,920 years |
+| `TIMESTAMP_NS` | nanoseconds | ±292 years |
 
 All three are stored as signed 64-bit integers representing offsets from the
 Unix epoch. `TIMESTAMP` is recommended for most use cases as it offers the
@@ -46,8 +46,22 @@ SELECT CAST(ts_column AS TIMESTAMP_NS) FROM my_table;
 
 To convert language-specific datetime objects (Python `datetime`, Java
 `Instant`, etc.) into QuestDB timestamps, see the
-[Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
+[Date to Timestamp conversion](/docs/connect/clients/date-to-timestamp-conversion)
 reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
+
+---
+
+:::tip Looking for `timestamp()` to elect a designated timestamp?
+
+The `timestamp(column)` clause assigns a
+[designated timestamp](/docs/concepts/designated-timestamp/) to a query result
+or to a new table. It is a structural clause rather than a value
+transformation, so it is documented on its own page:
+[Timestamp function](/docs/query/functions/timestamp/#during-a-select-operation).
+
+Use it when a table or CTE does not have a designated timestamp, or to change
+the designated timestamp for the scope of a query.
+:::
 
 ---
 
@@ -76,6 +90,7 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 | [days_in_month](#days_in_month) | Number of days in the month |
 | [extract](#extract) | Extract any time unit from timestamp |
 | [hour](#hour) | Extract hour (0-23) |
+| [is_end_of_month](#is_end_of_month) | Check if a timestamp is on the last day of its month |
 | [is_leap_year](#is_leap_year) | Check if year is a leap year |
 | [micros](#micros) | Extract microseconds (0-999) |
 | [millis](#millis) | Extract milliseconds (0-999) |
@@ -635,6 +650,45 @@ SELECT
 | interval_start              |
 | :-------------------------- |
 | 2024-10-08T11:09:47.573000Z |
+
+## is_end_of_month
+
+`is_end_of_month(value)` - returns `true` if `value` falls on the last calendar
+day of its month, `false` otherwise.
+
+The check is leap-year aware, so `29 February` is a month end in a leap year but
+`28 February` is not. The result depends only on the calendar day, so any time
+of day on the last day of the month returns `true`. A `null` input returns
+`false`.
+
+**Arguments:**
+
+- `value` is any `timestamp`, `timestamp_ns`, or `date`
+
+**Return value:**
+
+Return value type is `boolean`
+
+**Examples:**
+
+```questdb-sql demo title="Month-end check"
+SELECT
+  is_end_of_month('2024-02-29T00:00:00.000000Z'::timestamp) feb29_leap,
+  is_end_of_month('2023-02-28T00:00:00.000000Z'::timestamp) feb28_nonleap,
+  is_end_of_month('2024-02-28T00:00:00.000000Z'::timestamp) feb28_leap,
+  is_end_of_month(null) nul;
+```
+
+| feb29_leap | feb28_nonleap | feb28_leap | nul   |
+| :--------- | :------------ | :--------- | :---- |
+| true       | true          | false      | false |
+
+```questdb-sql title="Keep only month-end trades" demo
+SELECT timestamp, symbol, price
+FROM trades
+WHERE is_end_of_month(timestamp)
+LIMIT 10;
+```
 
 ## is_leap_year
 

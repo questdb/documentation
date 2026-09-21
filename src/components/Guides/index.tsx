@@ -30,14 +30,14 @@ export function Guides() {
     <div className="xl:max-w-none">
       <div className="not-prose mt-4 grid grid-cols-1 gap-8 border-t border-zinc-900/5 pt-4 sm:grid-cols-2 xl:grid-cols-4 dark:border-white/5">
         {guides.map((guide) => (
-          <div key={guide.href}>
+          <div key={guide.href} className="flex flex-col">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
               {guide.name}
             </h3>
             <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
               {guide.description}
             </p>
-            <p className="mt-4">
+            <p className="mt-auto pt-4">
               <DocButton href={guide.href} variant="text" arrow="right">
                 Read more
               </DocButton>

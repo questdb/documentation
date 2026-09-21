@@ -262,7 +262,7 @@ pg.password=your_secure_password
 ```
 
 **InfluxDB line protocol** - edit `conf/auth.json`. See
-[ILP authentication](/docs/ingestion/ilp/overview/#authentication).
+[ILP authentication](/docs/connect/compatibility/ilp/overview/#authentication).
 
 Restart after changes:
 
@@ -348,3 +348,27 @@ For EntraID integration, see the
 [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
+
+### Buy through Azure Marketplace
+
+QuestDB Enterprise is listed on
+[Azure Marketplace](https://marketplace.microsoft.com/en-us/product/questdb_com.c5f84985-0214-403e-bdd3-5d436252a35b).
+Buying through the listing puts QuestDB Enterprise on your existing Azure
+invoice and uses your organization's existing Azure procurement process.
+
+The listing is a purchasing route, not a hosted service. QuestDB Enterprise
+still runs in your own Azure subscription, on Virtual Machines, Docker or
+Kubernetes. The infrastructure guidance on this page applies.
+
+**Steps:**
+
+1. Contact [sales@questdb.com](mailto:sales@questdb.com) to agree scope, term
+   and pricing. Subscriptions are priced per deployment.
+2. QuestDB sends a private offer to your Azure account.
+3. Accept the private offer and subscribe through Azure Marketplace.
+4. Once the subscription is active, QuestDB provides access to the Enterprise
+   binaries or container images, along with deployment guidance from QuestDB
+   engineers.
+5. Follow the
+   [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) to
+   install and configure your instance.

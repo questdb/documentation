@@ -23,6 +23,10 @@ The demo instance provides two independent datasets:
 
 The FX dataset contains simulated foreign exchange market data for 30 currency pairs. We fetch real reference prices from Yahoo Finance every few seconds, but all order book levels and price updates are generated algorithmically based on these reference prices.
 
+:::note Simulation realism
+Reference prices are real, synced from Yahoo Finance every few seconds. Between syncs, individual quote prices per venue are generated within realistic pip distances from the reference, but they are not real market quotes. Volumes (`bid_volume`, `ask_volume`, `quantity`) are entirely fabricated and tend to be larger than what you would see on a production feed. Recipes that depend on volume magnitudes (VPIN, OFI, volume profile) will produce structurally correct output, but absolute numbers should not be compared to published research or live market benchmarks.
+:::
+
 ### core_price table
 
 The `core_price` table contains individual FX price updates from various liquidity providers. Each row represents a bid/ask quote update for a specific currency pair from a specific ECN.

@@ -42,6 +42,28 @@ These are additional edge-case variants:
 - `LIMIT n, 0` = `LIMIT 0, n` = `LIMIT n,` = `LIMIT , n` = `LIMIT n`
 - `LIMIT -n, 0` = `LIMIT -n,` = `LIMIT -n`
 
+### Null bounds
+
+A `LIMIT` bound can be `null`. Null bounds come from parameterized queries: a
+bind variable used as a bound (`LIMIT $1`, `LIMIT $1, $2`, or `LIMIT :lo, :hi`)
+that is bound to `null` or left unbound. A literal `null` written in the query
+text is rejected with `invalid type: NULL`.
+
+In an `ORDER BY ... LIMIT` query:
+
+- `LIMIT null`: return all records (same as omitting `LIMIT`)
+- `LIMIT null, n`: take the first `n` records
+- `LIMIT n, null`: return no records (empty result)
+
+:::note
+
+Without `ORDER BY`, a null lower bound combined with a positive upper bound
+(`LIMIT null, n`) is rejected with `LIMIT <negative>, <positive> is not
+allowed`. `LIMIT null` and `LIMIT n, null` behave the same with or without
+`ORDER BY`.
+
+:::
+
 ## Examples
 
 Examples use this schema and dataset:

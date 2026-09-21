@@ -20,6 +20,7 @@ The first two modes accept the same set of optional clauses:
 
 - [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
 - [`PARTITION BY`](#partitioning) - partition unit and WAL mode
+- [`FORMAT`](#partition-format) - partition storage format (`NATIVE` or `PARQUET`)
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
 - [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
 - [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
@@ -34,28 +35,35 @@ The first two modes accept the same set of optional clauses:
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
+    [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
     [OWNED BY ownerName];
 ```
 
+Inline indexes (including covering indexes with `INCLUDE`) are declared
+on the column itself in `columnTypeDef` — see [Type definition](#type-definition)
+and [Column indexes](#column-indexes).
+
 ```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     AS (selectQuery)
     [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
-    [, INDEX (columnRef [CAPACITY n]) ...]
+    [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -65,12 +73,13 @@ TABLE [IF NOT EXISTS] tableName
 Where `policyStage` is one of:
 
 ```
-TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration
+TO PARQUET duration | TO REMOTE duration | DROP LOCAL duration | DROP REMOTE duration
 ```
 
-Stages are Enterprise-only, all optional, and their durations must be positive
-and in ascending order. `TTL` and `STORAGE POLICY` are mutually exclusive — see
-[Storage Policy](#storage-policy).
+Stages are Enterprise-only, all optional, and their durations must be positive.
+A drop stage may not precede the write it depends on (`TO PARQUET` and
+`TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`). `TTL` and
+`STORAGE POLICY` are mutually exclusive — see [Storage Policy](#storage-policy).
 
 ```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
 CREATE TABLE tableName (LIKE sourceTableName);
@@ -197,6 +206,44 @@ one of the following:
 The partitioning strategy **cannot be changed** after the table has been
 created.
 
+## Partition format
+
+By default, table partitions are stored in QuestDB's `NATIVE` binary format. A
+partitioned [WAL](/docs/concepts/write-ahead-log/) table can instead store its
+partitions as [Parquet](/docs/concepts/parquet/) by adding a `FORMAT`
+clause after `PARTITION BY` (and after `TTL` or `STORAGE POLICY`, if present):
+
+```questdb-sql title="Store partitions as Parquet"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+FORMAT PARQUET;
+```
+
+`FORMAT` accepts one of:
+
+- `NATIVE` (default): QuestDB's native column format.
+- `PARQUET`: partitions are stored as Parquet.
+
+Notes and constraints:
+
+- `FORMAT PARQUET` is only supported on **partitioned WAL tables**. It is
+  rejected on non-partitioned or `BYPASS WAL` tables.
+- To change the format after creation, use
+  [`ALTER TABLE SET FORMAT`](/docs/query/sql/alter-table-set-format/). Changing
+  the format does not convert existing partitions; it applies to partitions
+  written afterwards.
+- Out-of-order writes into a Parquet partition are more expensive than into a
+  native partition.
+
+To convert individual existing partitions instead of setting a table-wide
+format, see
+[in-place Parquet conversion](/docs/concepts/parquet/#in-place-conversion).
+
 ## Time To Live (TTL)
 
 To store and analyze only recent data, configure a time-to-live (TTL) period on
@@ -256,10 +303,14 @@ information on the behavior of this feature.
 
 :::note
 
-In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
-rejected with `TTL settings are deprecated, please, create a storage policy
-instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
-it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+In QuestDB Enterprise, use `STORAGE POLICY` instead of `TTL`.
+`CREATE TABLE ... TTL` is still accepted for backward compatibility and is
+translated into a `STORAGE POLICY(DROP LOCAL ...)`. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is rejected with `TTL is not
+supported on Enterprise tables; use a storage policy instead`. A table can still
+carry a TTL if it was created in QuestDB Open Source and later upgraded to
+Enterprise; clear that legacy TTL with `ALTER TABLE SET TTL 0` before setting a
+storage policy.
 
 :::
 
@@ -272,9 +323,9 @@ Storage policies are available in **QuestDB Enterprise** only.
 :::
 
 A [storage policy](/docs/concepts/storage-policy/) automates the partition
-lifecycle by defining when partitions are converted to Parquet locally, when
-native data is removed, and when local copies are dropped. Place the
-`STORAGE POLICY(...)` clause after `PARTITION BY`:
+lifecycle by defining when partitions are converted to Parquet locally and
+when local copies are dropped. Place the `STORAGE POLICY(...)` clause after
+`PARTITION BY`:
 
 ```questdb-sql title="With storage policy (Enterprise)"
 CREATE TABLE trades (
@@ -284,15 +335,17 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
-WAL;
+STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
-A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
-`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
-positive, and they must be in ascending order. `DROP REMOTE` is reserved
-syntax and is currently rejected at SQL parse time with
-`'DROP REMOTE' is not supported yet`.
+A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional and all TTL values must be
+positive. A drop stage may not precede the write it depends on (`TO PARQUET`
+and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
+`TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
+removes its native files and serves reads from the Parquet file.
+
+`TO REMOTE` and `DROP REMOTE` drive [cold storage](/docs/concepts/cold-storage/): they upload the partition to object storage, where it stays queryable, and later reclaim it. Both require cold storage to be enabled and a WAL table.
 
 To modify a storage policy after table creation, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
@@ -427,7 +480,8 @@ columnTypeDef ::=
     | DOUBLE[][]...  -- array: one [] pair per dimension
     | GEOHASH(<size>)
     | SYMBOL [CAPACITY distinctValueEstimate] [CACHE | NOCACHE]
-             [INDEX [CAPACITY valueBlockSize]]
+             [INDEX [ CAPACITY valueBlockSize
+                    | TYPE POSTING [DELTA | EF] [INCLUDE (col, ...)] ]]
     -- Simple types
     | BINARY | BOOLEAN | BYTE | CHAR | DATE | DOUBLE | FLOAT
     | INT | IPV4 | LONG | LONG256 | SHORT | STRING
@@ -483,7 +537,7 @@ PARQUET(encoding [, compression[(level)]])
 Column definitions may include an optional
 `PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
 settings only affect
-[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion) and are
 ignored for native partitions. Encoding, compression, and bloom filter are all
 optional — use `default` for the encoding when specifying compression only.
 
@@ -611,7 +665,7 @@ configuration options.
 :::note
 
 When converting partitions with an explicit `bloom_filter_columns` option in
-[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+[`CONVERT PARTITION`](/docs/concepts/parquet/#bloom-filters-for-in-place-conversion),
 the explicit list overrides per-column `BLOOM_FILTER` metadata.
 
 :::
@@ -633,13 +687,31 @@ CREATE TABLE test AS (
 
 ## Column indexes
 
-Index definitions (`indexDef`) are used to create an
-[index](/docs/concepts/deep-dive/indexes/) for a table column. The referenced table column
-must be of type [symbol](/docs/concepts/symbol/).
+Index definitions are used to create an
+[index](/docs/concepts/deep-dive/indexes/) for a table column. The
+referenced column must be of type [symbol](/docs/concepts/symbol/).
+
+Each index can be declared either **inline** (on the column itself) or
+**out-of-line** (in a trailing `INDEX(...)` clause):
 
 ```questdb-sql
-INDEX (columnRef [CAPACITY valueBlockSize])
+-- Bitmap (default)
+columnRef SYMBOL INDEX [CAPACITY n]
+INDEX (columnRef [CAPACITY n])
+
+-- Posting (with optional covering and encoding variant)
+columnRef SYMBOL INDEX TYPE POSTING [DELTA | EF] [INCLUDE (col, ...)]
+INDEX (columnRef TYPE POSTING [DELTA | EF])
 ```
+
+`INCLUDE` is only valid with the inline form — see
+[Posting index with covering columns (INCLUDE)](#posting-index-with-covering-columns-include)
+below.
+
+### Bitmap index (default)
+
+Out-of-line syntax (one or more trailing `INDEX(...)` clauses after the
+column list):
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -650,13 +722,97 @@ CREATE TABLE trades (
 ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
+Inline syntax (declared on the column):
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp);
+```
+
+### Posting index
+
+The [posting index](/docs/concepts/deep-dive/posting-index/) offers better
+compression and read performance than the default bitmap index. Use
+`INDEX TYPE POSTING` with either inline or out-of-line syntax:
+
+```questdb-sql
+-- Inline syntax
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+-- Out-of-line syntax
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+), INDEX(symbol TYPE POSTING)
+TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+### Posting index with covering columns (INCLUDE)
+
+The [`INCLUDE` clause](/docs/concepts/deep-dive/posting-index/#covering-index)
+stores additional column values in the index sidecar files. Queries that
+only need these columns plus the indexed symbol can be served entirely
+from the index, bypassing column files:
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, exchange),
+  exchange SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+The designated timestamp column is automatically included — you do not need
+to list it in the `INCLUDE` clause. With this schema, the following query
+reads only from the index sidecar:
+
+```questdb-sql
+SELECT timestamp, price FROM trades WHERE symbol = 'AAPL';
+```
+
+:::note
+
+`INCLUDE` is only supported with inline column syntax (not out-of-line
+`INDEX(col ...)`). Use `ALTER TABLE` to add covering columns to an existing
+table.
+
+:::
+
+:::tip
+
+Posting indexes (with or without `INCLUDE`) work on both WAL and `BYPASS WAL`
+tables.
+
+:::
+
+See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
+for a comprehensive guide including supported column types, query patterns,
+and performance characteristics.
+
 :::warning
 
 - The **index capacity** and
   [**symbol capacity**](/docs/concepts/symbol/) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
-  the implications. :::
+  the implications.
+- `CAPACITY` is only supported for bitmap indexes — it cannot be used with
+  posting indexes.
+
+:::
 
 See the [Index concept](/docs/concepts/deep-dive/indexes/#how-indexes-work) for more
 information about indexes.

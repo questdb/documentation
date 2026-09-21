@@ -14,7 +14,7 @@ Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 SELECT columns, aggregate_functions
 FROM table
 [WHERE conditions]
-SAMPLE BY <n><unit>
+SAMPLE BY [count]unit
     [FROM timestamp TO timestamp]
     [FILL(fill_option)]
     [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset] | ALIGN TO FIRST OBSERVATION]
@@ -22,7 +22,7 @@ SAMPLE BY <n><unit>
 
 ### Key clauses
 
-- **`SAMPLE BY <n><unit>`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`)
+- **`SAMPLE BY [count]unit`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`). The count is optional and defaults to `1`, so `h` means the same as `1h`
 - **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
 - **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
 - **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`
@@ -30,11 +30,15 @@ SAMPLE BY <n><unit>
 
 ## Sample units
 
-The size of sampled groups are specified with the following syntax:
+The size of sampled groups is specified as a count and a unit:
 
 ```questdb-sql
-SAMPLE BY n{units}
+SAMPLE BY [count]unit
 ```
+
+The count is optional and defaults to `1`, so `SAMPLE BY h` and `SAMPLE BY 1h`
+return identical results. When supplied it must be a positive integer written
+immediately before the unit, with no space between the two.
 
 Where the unit for sampled groups may be one of the following:
 
@@ -60,24 +64,36 @@ FROM trades
 SAMPLE BY 1h;
 ```
 
+Written without the count, this is the same query:
+
+```questdb-sql
+SELECT ts, count()
+FROM trades
+SAMPLE BY h;
+```
+
 ## Fill options
 
 `FILL` specifies how to handle time intervals with no data. By default, missing intervals are skipped. Use `FILL` to interpolate or substitute values.
 
-| fillOption | Description                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `NONE`     | No fill applied. If there is no data, the time sample will be skipped in the results. A table could be missing intervals. |
-| `NULL`     | Fills with `NULL` values.                                                                                                 |
-| `PREV`     | Fills using the previous value.                                                                                           |
-| `LINEAR`   | Fills by linear interpolation of the 2 surrounding points.                                                                |
-| `x`        | Fills with a constant value - where `x` is the desired value, for example `FILL(100.05)`.                                 |
+| fillOption  | Description                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `NONE`      | No fill applied. If there is no data, the time sample will be skipped in the results. A table could be missing intervals. |
+| `NULL`      | Fills with `NULL` values.                                                                                                 |
+| `PREV`      | Fills using the previous value of the same aggregate column.                                                              |
+| `PREV(col)` | Fills using the previous value of another aggregate column referenced by alias.                                           |
+| `LINEAR`    | Fills by linear interpolation of the 2 surrounding points.                                                                |
+| `x`         | Fills with a constant value - where `x` is the desired value, for example `FILL(100.05)`.                                 |
 
 The following restrictions apply:
 
-- Keywords denoting fill strategies may not be combined. Only one option from
-  `NONE`, `NULL`, `PREV`, `LINEAR` and constants may be used.
+- `FILL(NONE)` cannot be combined with other fill values; the other strategies
+  may be mixed in a per-aggregate fill list.
 - `LINEAR` strategy is not supported for keyed queries, i.e. queries that
   contain non-aggregated columns other than the timestamp in the SELECT clause.
+- `PREV(col)` references another aggregate column by alias and must match its
+  type. It cannot be broadcast across multiple aggregates and is rejected when
+  source or target is `SYMBOL`.
 - The `FILL` keyword must precede alignment described in the
   [sample calculation section](#sample-calculation), i.e.:
 
@@ -226,7 +242,7 @@ ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin';
 Here, `FROM '2026-01-01T00:00:00'` means midnight January 1st in Berlin local time
 (= `2025-12-31T23:00:00Z` UTC).
 
-`FROM-TO` can only be used on non-keyed SAMPLE BY queries (queries with no grouping columns other than the timestamp).
+`FROM-TO` works with both non-keyed and keyed `SAMPLE BY` queries. Keyed queries emit one row per (bucket, key) combination across the full interval.
 
 ### `WHERE` clause optimisation
 
@@ -247,10 +263,12 @@ SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
 
 ### Limitations
 
-- Not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
+- Not compatible with `FILL(LINEAR)`.
 - Only works with `ALIGN TO CALENDAR` (default alignment).
-- Does not consider any specified `OFFSET`.
-- Only for non-keyed `SAMPLE BY` (designated timestamp and aggregate columns only). See [Fill keyed queries with arbitrary intervals](/docs/cookbook/sql/time-series/fill-keyed-arbitrary-interval/) for a workaround.
+- Keyed `FROM-TO` requires `FROM`/`TO` to be constants. Bind variables,
+  function calls, and arithmetic expressions are rejected for keyed queries.
+  See [Fill keyed queries with arbitrary intervals](/docs/cookbook/sql/time-series/fill-keyed-arbitrary-interval/)
+  for a workaround.
 
 ## Sample calculation
 
@@ -279,7 +297,7 @@ Consider a table `trades` with the following data spanning three calendar days:
 CREATE TABLE trades (
   ts TIMESTAMP,
   price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 
 INSERT INTO trades (ts, price) VALUES
   ('2021-05-31T23:10:00.000000Z', 100.5),

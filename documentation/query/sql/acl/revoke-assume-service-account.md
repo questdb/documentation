@@ -42,14 +42,14 @@ service account.
 GRANT ASSUME SERVICE ACCOUNT ingestion TO john WITH GRANT OPTION;
 ```
 
-| name      | grant_option |
-| --------- | ------------ |
-| ingestion | t            |
+| name      | grant_option | memory_limit |
+| --------- | ------------ | ------------ |
+| ingestion | true         | null         |
 
 ```questdb-sql
 REVOKE ASSUME SERVICE ACCOUNT ingestion FROM john;
 ```
 
-| name | grant_option |
-| ---- | ------------ |
-|      |              |
+| name | grant_option | memory_limit |
+| ---- | ------------ | ------------ |
+|      |              |              |

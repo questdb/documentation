@@ -30,11 +30,18 @@ GRANT permission [, permission ...] TO entityName
 ```questdb-sql title="Table or column scope"
 GRANT permission [, permission ...]
     ON { ALL TABLES
-       | tableName [(columnName [, columnName ...])]
-         [, tableName [(columnName [, columnName ...])] ...] }
+       | tableName [(columns)] [, tableName [(columns)] ...] }
     TO entityName
     [WITH GRANT OPTION]
     [WITH VERIFICATION];
+```
+
+Where `columns` is either an explicit list of columns, or `*` for all of the
+table's current columns with an optional `EXCLUDE` list:
+
+```questdb-sql title="Column specification"
+{ columnName [, columnName ...]
+| * [EXCLUDE (columnName [, columnName ...])] }
 ```
 
 ## Description
@@ -47,6 +54,8 @@ GRANT permission [, permission ...]
   permissions on table level to an entity
 - `GRANT [permissions] ON [table(columns)] TO entity` - grant column level
   permissions on column level to an entity
+- `GRANT [permissions] ON [table(*)] TO entity` - grant column level permissions
+  on all of the table's current columns, with an optional `EXCLUDE` list
 
 ### Grant database level permissions
 
@@ -115,6 +124,74 @@ GRANT SELECT ON orders(id, name), trades(id, quantity) TO john;
 | SELECT     | trades     | quantity    | f            | G      |
 | SELECT     | orders     | id          | f            | G      |
 | SELECT     | orders     | name        | f            | G      |
+
+### Grant on all columns of a table
+
+Use the `*` wildcard to grant a column level permission on every column the table
+currently has, without naming each one:
+
+```questdb-sql
+CREATE TABLE trades (
+    symbol SYMBOL, price DOUBLE, quantity DOUBLE,
+    counterparty SYMBOL, ts TIMESTAMP
+) TIMESTAMP(ts);
+GRANT SELECT ON trades(*) TO john;
+```
+
+| permission | table_name | column_name  | grant_option | origin |
+| ---------- | ---------- | ------------ | ------------ | ------ |
+| SELECT     | trades     | symbol       | f            | G      |
+| SELECT     | trades     | price        | f            | G      |
+| SELECT     | trades     | quantity     | f            | G      |
+| SELECT     | trades     | counterparty | f            | G      |
+| SELECT     | trades     | ts           | f            | G      |
+
+The `*` is expanded to the table's columns at the time the statement runs, so the
+result is a set of individual column level grants.
+
+:::note
+
+`GRANT SELECT ON trades(*)` is not the same as `GRANT SELECT ON trades`. The
+wildcard grants only on the columns that exist at that moment and does not extend
+to columns added later. A table level grant (without parentheses) covers all
+current and future columns. Use the table level form when new columns should be
+included automatically.
+
+:::
+
+#### Exclude columns from the wildcard
+
+Add an `EXCLUDE` list to grant on all columns except the ones you name. This is
+useful when you want to expose most of a table but keep a few sensitive columns
+private:
+
+```questdb-sql
+GRANT SELECT ON trades(* EXCLUDE (counterparty)) TO john;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     | trades     | symbol      | f            | G      |
+| SELECT     | trades     | price       | f            | G      |
+| SELECT     | trades     | quantity    | f            | G      |
+| SELECT     | trades     | ts          | f            | G      |
+
+`EXCLUDE` can only be used together with `*`. The following rules apply:
+
+- Every excluded column must exist, otherwise the statement fails. This catches
+  typos that would otherwise silently grant a column you meant to keep private.
+- The `EXCLUDE` list cannot be empty and cannot cover every column of the table.
+- The target table must exist. Unlike other grants, a wildcard grant cannot be
+  issued ahead of table creation.
+
+:::note
+
+Excluding the designated timestamp column does not necessarily hide it. If the
+entity still holds `SELECT` or `UPDATE` on another column of the same table, the
+timestamp keeps that permission as an
+[implicit permission](#implicit-permissions) shown with origin `I`.
+
+:::
 
 ### Grant option
 

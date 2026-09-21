@@ -15,15 +15,16 @@ It does so by keeping a rolling ID locally and in the object store in sync.
 
 If these two IDs are out of sync, the primary instance will raise an error.
 
-For additional information, refer to the [replication overview](/docs/high-availability/overview) and [replication setup guide](/docs/high-availability/setup), especially its "Disaster Recovery" section.
+For additional information, refer to the [replication overview](/docs/high-availability/overview), the [replication setup guide](/docs/high-availability/setup), and the [disaster recovery guide](/docs/high-availability/disaster-recovery/).
 
 ### ER001
 
-This code indicates that a point in time recovery completed successfully.
+Raised at startup when a node that has just completed a
+[point-in-time recovery](/docs/operations/point-in-time-recovery/) is
+configured with `replication.role=primary` while its
+`replication.object.store` points at a non-empty location.
 
-It confirms that the database is configured with `replication.role=primary`, and that the associated object store is not empty. 
-
-However, the configured location may contain WAL data from a different replication "timeline".
+A recovered node is a new cluster, so the configured location may contain WAL data from a different replication "timeline".
 
 **As such, this error is raised to prevent an overwrite of the existing data.**
 
@@ -88,6 +89,14 @@ To do so, place an empty `_migrate_primary` file in your database installation d
 This will update the primary instance to the latest state from the object
 store and have it take over as the new primary instance.
 
+An in-place promotion with
+[`SWITCH ROLE TO PRIMARY`](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss)
+runs the same check before it changes anything. A replica that has not yet
+applied everything in the object store is refused: it stays a replica and
+keeps replicating, `GET /lifecycle` reports the `replication` component as
+`DEGRADED`, and the reason is in the server log. Promote it again once it has
+caught up.
+
 ### ER006
 
 This error occurs when you start a primary instance and discover another instance is already acting as the primary.
@@ -100,6 +109,12 @@ You have the following options:
 * Destroy the extra instance
 * Reconfigure it as `replication.role=replica` and restart it
 * Perform a planned primary migration and resume the primary role on this instance
+
+This error is also the expected outcome when a node that was demoted in place
+with [`SWITCH ROLE`](/docs/query/sql/switch-role/) is restarted while
+`server.conf` still says `replication.role=primary`. Set `replication.role` to
+the node's current role before any restart, see
+[Restarts](/docs/high-availability/failover/#restarts).
 
 ### ER007
 

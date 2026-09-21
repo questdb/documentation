@@ -97,6 +97,10 @@ Materialized views are ideal for:
 - **Historical summaries**: Data that doesn't need real-time accuracy
 - **OHLC calculations**: Candlestick charts, time-bucketed analytics
 
+Use a [live view](/docs/concepts/live-views/) instead when you need to
+incrementally maintain a row-per-input window computation, such as a moving
+average, running total, or ranking.
+
 Use regular [views](/docs/concepts/views/) instead when:
 
 - Query execution cost is acceptable for your workload
@@ -336,16 +340,6 @@ CREATE MATERIALIZED VIEW trades_hourly AS (
 
 The view's TTL is independent of the base table's TTL.
 
-:::note
-
-In QuestDB Enterprise, TTL is superseded by
-[storage policies](/docs/concepts/storage-policy/). Use
-[`STORAGE POLICY(...)`](/docs/query/sql/alter-mat-view-set-storage-policy/) on
-a materialized view instead of `TTL` for graduated lifecycle management
-(convert to Parquet, then drop).
-
-:::
-
 ### Initial refresh
 
 When created, materialized views start an **asynchronous full refresh**:
@@ -460,6 +454,13 @@ modified in incompatible ways:
 - Renaming the base table
 - `TRUNCATE` or `UPDATE` operations
 
+A view is also invalidated when its refresh keeps failing with an out-of-memory
+error, including a breach of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits), after
+the deferred retries are exhausted. Before setting that limit, measure what a
+refresh needs by running the view's query over one refresh worth of data, as
+described in [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
+
 Check for invalid views:
 
 ```questdb-sql title="Find invalid views"
@@ -470,7 +471,10 @@ WHERE view_status = 'invalid';
 
 ### Refreshing an invalid view
 
-To restore an invalid view with a full refresh:
+Restore an invalid view with a full refresh. If `invalidation_reason` reports
+a memory limit breach, raise
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+first, because the full refresh runs under the same limit:
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW view_name FULL;
@@ -581,6 +585,8 @@ the replica's view was not fully up-to-date.
 - **Related Concepts**
   - [Views](/docs/concepts/views/): Virtual tables that compute results at query
     time
+  - [Live views](/docs/concepts/live-views/): Incrementally maintained
+    row-per-input window-function results
 
 - **SQL Commands**
 
@@ -602,9 +608,6 @@ the replica's view was not fully up-to-date.
     Sets the time limit for incremental refresh on a materialized view
   - [`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/):
     Sets the time-to-live (TTL) period on a materialized view
-  - [`ALTER MATERIALIZED VIEW SET STORAGE POLICY`](/docs/query/sql/alter-mat-view-set-storage-policy/):
-    Attaches a [storage policy](/docs/concepts/storage-policy/) to a
-    materialized view (QuestDB Enterprise)
 
 - **Configuration**
   - [Materialized views configs](/docs/configuration/materialized-views/):

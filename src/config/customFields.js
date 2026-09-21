@@ -34,7 +34,7 @@ module.exports = {
   <a href='https://github.com/questdb/questdb'>open source</a>
   and integrates with many tools and languages.`,
   financeLeadIn: `QuestDB is a next-generation
-  database for <a href="/market-data/">market data</a>. It offers premium ingestion throughput,
+  database for <a href="/capital-markets/">market data</a>. It offers premium ingestion throughput,
   enhanced SQL analytics that can power through analysis, and cost-saving hardware efficiency. It's
   <a href='https://github.com/questdb/questdb'>open source</a>, applies open formats, and is ideal for <a href="/glossary/tick-data/">tick data</a>.`,
 }

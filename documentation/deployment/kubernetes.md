@@ -13,6 +13,16 @@ and a
 We distribute QuestDB via [Helm](https://helm.sh) on
 [ArtifactHub](https://artifacthub.io/packages/helm/questdb/questdb).
 
+:::tip
+
+This page covers the self-managed Helm chart. QuestDB Enterprise users can
+instead run the
+[Enterprise Kubernetes Operator](/docs/enterprise-kubernetes-operator/), which
+manages the full cluster lifecycle: pods and storage, configuration, backup and
+restore, replication, and promotion.
+
+:::
+
 ## Prerequisites
 
 - [Helm](https://helm.sh/docs/intro/install/)
@@ -70,10 +80,10 @@ kubectl port-forward my-questdb-0 9000
 
 The following ports may also be used:
 
-- 9000: [REST API](/docs/query/rest-api/) and
+- 9000: [REST API](/docs/connect/compatibility/rest-api/) and
   [Web Console](/docs/getting-started/web-console/overview/)
-- 8812: [Postgres](/docs/query/pgwire/overview/)
-- 9009: [InfluxDB line protocol](/docs/ingestion/ilp/overview/)
+- 8812: [Postgres](/docs/connect/compatibility/pgwire/overview/)
+- 9009: [InfluxDB line protocol](/docs/connect/compatibility/ilp/overview/)
 
 ## Customizing the deployment
 

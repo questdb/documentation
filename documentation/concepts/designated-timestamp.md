@@ -448,15 +448,12 @@ WHERE received_ts > dateadd('h', -1, now());
 
 ### Out-of-order data
 
-QuestDB handles out-of-order data automatically—no special configuration
-needed. Data arriving out of order is merged into the correct position.
+QuestDB accepts out-of-order data automatically. The cost is write
+amplification, which scales with partition size and how far behind the
+data arrives.
 
-However, excessive out-of-order data increases write amplification. If most
-of your data arrives significantly out of order:
-- Consider using ingestion time as designated timestamp
-- Store event time as a separate indexed column
-- Use appropriate partition sizing (smaller partitions = less rewrite per
-  out-of-order event)
+See [Out-of-order data](/docs/concepts/out-of-order-data/) for behavior
+per ingestion method, tuning, and common scenarios.
 
 ### Partition size alignment
 
@@ -558,6 +555,14 @@ EXPLAIN SELECT * FROM trades WHERE timestamp IN '2024-01-15';
 
 Look for `Interval forward scan`—if you see `Async Filter` instead, the
 designated timestamp optimization isn't being used.
+
+**Check if a table without a designated timestamp is ordered:**
+
+A table with no designated timestamp carries no ordering guarantee. Since one
+cannot be added after the fact, test whether the timestamp column already
+ascends before migrating the data into a table that has one. See the
+[Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
+cookbook recipe.
 
 ## FAQ
 

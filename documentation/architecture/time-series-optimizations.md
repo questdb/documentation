@@ -32,6 +32,7 @@ sequential reads, materialized views, and in-memory processing.
 - **Out-of-order data:**
   When data arrives out of order, QuestDB [rearranges it](/docs/concepts/partitions/#partition-splitting-and-squashing) to maintain timestamp order. The
   engine splits partitions to minimize [write amplification](/docs/getting-started/capacity-planning/#write-amplification) and compacts them in the background.
+  See [Out-of-order data](/docs/concepts/out-of-order-data/) for behavior per ingestion method and tuning guidance.
 
 
 ### Data partitioning and sequential reads
@@ -78,7 +79,7 @@ QuestDB supports [Time To Live (TTL)](/docs/concepts/ttl/) configuration for bot
 materialized views. With TTL enabled, partitions older than the configured horizon will automatically
 be removed.
 
-An alternative is to use QuestDB Enterprise to automatically move older partitions to [cold storage](/docs/architecture/storage-engine/#tier-three-parquet-locally-or-in-an-object-store), with
+An alternative is to use QuestDB Enterprise to automatically move older partitions to [cold storage](/docs/architecture/storage-engine/#tier-three-remote-object-storage), with
 old partitions converted to Parquet and stored in object storage, while still being available for
 querying by the query engine.
 

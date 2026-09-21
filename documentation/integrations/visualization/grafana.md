@@ -100,36 +100,66 @@ optimizations, we can lower this rate for greater fluidity.
 To learn how, see our
 [blog post](/blog/increase-grafana-refresh-rate-frequency/).
 
-## Global variables
+## Query macros
 
-Use
-[global variables](https://grafana.com/docs/grafana/latest/variables/variable-types/global-variables/#global-variables)
-to simplify queries with dynamic elements such as date range filters.
+The QuestDB Grafana plugin provides macros that are expanded before the query
+is sent to QuestDB. Use them to inject the dashboard time range and dynamic
+intervals into your SQL.
 
-### `$__timeFilter(timestamp)`
+### `$__timeFilter(columnName)`
 
-This variable allows filtering results by sending a start-time and end-time to
-QuestDB. This expression evaluates to:
+Filters a timestamp column to the panel's time range:
 
 ```questdb-sql
-timestamp BETWEEN
-    '2018-02-01T00:00:00Z' AND '2018-02-28T23:59:59Z'
+-- expands to
+columnName >= cast(1706263425598000 as timestamp)
+  AND columnName <= cast(1706285057560000 as timestamp)
 ```
 
-### `$__interval`
+### `$__fromTime` / `$__toTime`
 
-This variable calculates a dynamic interval based on the time range applied to
-the dashboard. By using this function, the sampling interval changes
-automatically as the user zooms in and out of the panel.
+Start and end of the panel's time range, each expanding to a
+`cast(... as timestamp)` expression. Useful in `WHERE` clauses and
+arithmetic, but cannot be used inside `DECLARE` blocks because the parser
+does not support `cast` in that context. See the
+[DECLARE with time range](/docs/cookbook/integrations/grafana/declare-time-range/)
+recipe for a workaround.
 
-```questdb-sql title="An example of $__interval"
+### `$__sampleByInterval`
+
+Dynamic interval for `SAMPLE BY`, using QuestDB time units
+(`s`, `T` for milliseconds, `h`, `d`). The interval adjusts automatically
+as the user zooms in and out of the panel.
+
+### `$__conditionalAll(condition, $templateVar)`
+
+Returns `condition` when the template variable has a specific selection,
+or `1=1` when "All" is selected. Useful for optional `WHERE` filters:
+
+```questdb-sql
+SELECT timestamp, symbol, price
+FROM trades
+WHERE $__timeFilter(timestamp)
+  AND $__conditionalAll(symbol = '$symbol', $symbol);
+```
+
+```questdb-sql title="Example: time-filtered SAMPLE BY query"
 SELECT
   timestamp AS time,
   avg(price) AS avg_price
 FROM trades
 WHERE $__timeFilter(timestamp)
-SAMPLE BY $__interval;
+SAMPLE BY $__sampleByInterval;
 ```
+
+## Grafana global variables
+
+Grafana also provides
+[global variables](https://grafana.com/docs/grafana/latest/dashboards/variables/add-template-variables/#global-variables)
+that are interpolated before the query reaches the plugin. The most useful
+ones for QuestDB are `$__from` and `$__to`, which expand to the dashboard
+time range as epoch milliseconds. These are plain numbers and can be used in
+`DECLARE` blocks after converting to the right precision.
 
 ## See also
 

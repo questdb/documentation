@@ -1,12 +1,6 @@
 import customFields from "../../config/customFields"
 import styles from "./styles.module.css"
 
-type Props = {
-  href?: string
-  label: string
-  to?: string
-}
-
 const Footer = () => {
   return (
     <footer className={styles.root}>
@@ -27,12 +21,25 @@ const Footer = () => {
         <div className={styles.bottom}>
           <span>{customFields.copyright}</span>
           <div className={styles.rightLinks}>
+            <span className={styles.certificationText}>
+              SOC 2 Type 1 Compliant
+            </span>
             <a className={styles.link} href="/privacy-notice/">
               Privacy
             </a>
             <a className={styles.link} href="/terms/">
               Terms
             </a>
+            <button
+              className={styles.linkButton}
+              type="button"
+              onClick={() =>
+                (window as unknown as { Cookiebot?: { renew?: () => void } })
+                  .Cookiebot?.renew?.()
+              }
+            >
+              Cookie settings
+            </button>
           </div>
         </div>
       </div>

@@ -83,13 +83,22 @@ ORDER BY
 ### Detect suspended tables
 
 A WAL table becomes suspended when an error occurs during WAL apply, such as
-disk full, corrupted WAL segment, or kernel limits reached. While suspended,
-new data continues to be written to WAL but is not applied to the table.
+disk full, corrupted WAL segment, kernel limits reached, or a WAL apply batch
+breaching its [memory limit](/docs/configuration/cairo-engine/#memory-limits).
+While suspended, new data continues to be written to WAL but is not applied to
+the table.
 
 **Detection:**
 
 ```questdb-sql
 SELECT table_name FROM tables() WHERE table_suspended;
+```
+
+To see why a table was suspended, query `wal_tables()`. Its `errorTag` column
+reads `OUT OF MEMORY` when the cause was a memory limit breach:
+
+```questdb-sql
+SELECT name, errorTag, errorMessage FROM wal_tables() WHERE suspended;
 ```
 
 **Resolution:**
@@ -121,7 +130,10 @@ detailed recovery procedures including corrupted segment handling.
 
 Materialized views become invalid when their base table is modified in
 incompatible ways: dropping referenced columns, dropping partitions, renaming
-the table, or running TRUNCATE/UPDATE operations.
+the table, or running TRUNCATE/UPDATE operations. A view is also invalidated
+when its refresh keeps failing with an out-of-memory error, including a breach
+of the [refresh memory limit](/docs/configuration/cairo-engine/#memory-limits),
+after the deferred retries are exhausted.
 
 **Detection:**
 
@@ -133,7 +145,10 @@ WHERE view_status = 'invalid';
 
 **Resolution:**
 
-Perform a full refresh to rebuild the view:
+Perform a full refresh to rebuild the view. If `invalidation_reason` reports a
+memory limit breach, raise the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits) first,
+because the full refresh runs under the same limit:
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW my_view FULL;
@@ -144,6 +159,32 @@ this may take significant time.
 
 See [Materialized view invalidation](/docs/concepts/materialized-views/#view-invalidation)
 for more details on causes and prevention.
+
+### Detect stalled cold storage uploads
+
+_Enterprise only._
+
+A [cold storage](/docs/concepts/cold-storage/) partition that stays in the `pending` state is registered for upload but has no durable object yet. A few minutes is normal; hours are not, and usually mean the manager cannot write to the object store.
+
+**Detection:**
+
+```questdb-sql
+SELECT timestamp, state, partition_path
+FROM table_cold_partitions('trades')
+WHERE state = 'pending';
+```
+
+**Resolution:**
+
+Confirm this instance actually holds the manager role, since a refresher does not upload:
+
+```questdb-sql
+SWITCH COLD STORAGE STATUS;
+```
+
+If the role is correct, check credentials, network reachability, and quota against the object store, and confirm `storage.policy.worker.count` is greater than zero. Do not edit the manifest by hand.
+
+See [Operating cold storage](/docs/operations/cold-storage/#troubleshooting) for the full symptom table.
 
 ### Detect memory pressure
 
@@ -177,6 +218,9 @@ Other options:
 - Add more RAM to the server
 - Reduce concurrent ingestion load
 - Reduce the number of tables with active O3 writes
+- Cap the memory a single query or view refresh may allocate with the
+  per-workload [memory limits](/docs/configuration/cairo-engine/#memory-limits),
+  which leaves more headroom for O3 merges
 
 See [Capacity planning](/docs/getting-started/capacity-planning/#memory-page-size-configuration)
 and [Optimize for many tables](/docs/cookbook/operations/optimize-many-tables/)
@@ -200,7 +244,7 @@ WHERE walEnabled
 
 **Resolution:**
 
-- Use the [official client libraries](/docs/ingestion/overview/#first-party-clients)
+- Use the [official client libraries](/docs/connect/overview/#client-libraries)
   which handle batching automatically
 - For custom ILP clients, configure auto-flush by row count or time interval
   rather than flushing after each row
@@ -213,12 +257,12 @@ A value of 1.0 is ideal, meaning each row is written exactly once. Higher values
 indicate O3 merge overhead from out-of-order data being merged into existing
 partitions.
 
-| Value | Interpretation |
-|-------|----------------|
-| 1.0 – 1.5 | Excellent – minimal rewrites |
-| 1.5 – 3.0 | Normal for moderate out-of-order data |
-| 3.0 – 5.0 | Consider reducing partition size |
-| > 5.0 | High – reduce partition size or investigate ingestion patterns |
+| Value     | Interpretation                                                 |
+| --------- | -------------------------------------------------------------- |
+| 1.0 – 1.5 | Excellent – minimal rewrites                                   |
+| 1.5 – 3.0 | Normal for moderate out-of-order data                          |
+| 3.0 – 5.0 | Consider reducing partition size                               |
+| > 5.0     | High – reduce partition size or investigate ingestion patterns |
 
 **Detection:**
 

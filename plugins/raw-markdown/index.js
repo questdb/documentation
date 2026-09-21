@@ -9,6 +9,32 @@ const {
   normalizeNewLines,
 } = require("./convert-components")
 
+// Directive pointing agents at the full documentation index. An agent that
+// fetches a single page has no other signal that an index exists, or that any
+// page can be had as markdown.
+const AGENT_DIRECTIVE =
+  "> **For AI agents:** the complete documentation index is at " +
+  "[llms.txt](https://questdb.com/docs/llms.txt). Every page is available as " +
+  "markdown by appending `.md` to its URL, or by sending an " +
+  "`Accept: text/markdown` request header."
+
+/**
+ * Inserts the agent directive immediately after the page's H1, so it sits near
+ * the top without displacing the title.
+ * @param {string} content - Markdown that already starts with its H1
+ * @returns {string} Markdown with the directive inserted
+ */
+function prependAgentDirective(content) {
+  const lines = content.split("\n")
+
+  if (lines[0] && lines[0].startsWith("# ")) {
+    const rest = lines.slice(1).join("\n").replace(/^\n+/, "")
+    return `${lines[0]}\n\n${AGENT_DIRECTIVE}\n\n${rest}`
+  }
+
+  return `${AGENT_DIRECTIVE}\n\n${content}`
+}
+
 module.exports = () => ({
   name: "raw-markdown",
   async postBuild({ outDir, plugins }) {
@@ -60,6 +86,10 @@ module.exports = () => ({
 
           // Prepend title and description from frontmatter
           let processedContent = prependFrontmatter(markdownContent, frontmatter, true)
+
+          // Agent-facing directive: point at the full documentation index so an
+          // agent that lands on a single page can find its way to the rest.
+          processedContent = prependAgentDirective(processedContent)
 
           // Process partial component imports
           const currentFileRelativeDir = path.dirname(relativePath)

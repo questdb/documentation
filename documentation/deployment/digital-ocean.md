@@ -99,7 +99,7 @@ pg.password=...
 ```
 
 For details on authentication using InfluxDB line protocol, see the
-[InfluxDB line protocol authentication guide](/docs/ingestion/ilp/overview/#authentication).
+[InfluxDB line protocol authentication guide](/docs/connect/compatibility/ilp/overview/#authentication).
 
 ### Disabling authentication
 

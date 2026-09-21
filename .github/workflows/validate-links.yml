@@ -1,0 +1,40 @@
+name: Validate broken links
+
+# Kept separate from the preview build/deploy on purpose. The deploy workflow
+# keys off the "Preview trigger" workflow's conclusion, so bundling link
+# validation with the build would let a single broken link block the preview.
+# Here it runs independently and only gates the PR via its own required check.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-links-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-links:
+    name: "Validate broken links"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build site for broken link validation
+        run: yarn build

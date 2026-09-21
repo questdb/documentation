@@ -15,8 +15,10 @@ QuestDB Enterprise.
 QuestDB supports two backup methods:
 
 - **Built-in incremental backup** (Enterprise only): Fully automated—configure
-  once, set a schedule, and backups run automatically. Supports point-in-time
-  recovery to any backup timestamp.
+  once, set a schedule, and backups run automatically. Restore from any
+  retained backup. To recover to an arbitrary instant rather than a backup
+  snapshot, see
+  [point-in-time recovery](/docs/operations/point-in-time-recovery/).
 
 - **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)**
   (OSS and Enterprise): Relies on external tools to copy data. Requires manual
@@ -24,7 +26,7 @@ QuestDB supports two backup methods:
   `CHECKPOINT RELEASE`. Works well with cloud disk snapshots (AWS EBS, Azure
   disks, etc.) where you simply trigger a snapshot. For on-premises environments
   without snapshot capabilities, you'll need external tools or custom scripts
-  (e.g., rsync), which do not provide point-in-time recovery.
+  (e.g., rsync), which restore only to the moment the copy was taken.
 
 ## QuestDB Enterprise: built-in backup and restore
 
@@ -52,7 +54,8 @@ Backup supports the following storage backends:
   sensitive to the underlying filesystem type.
 
 See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
-for connection string formats.
+for connection string formats. For a private, on-prem, or self-signed store,
+see [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
 #### Permissions
 
@@ -107,17 +110,17 @@ specifies a directory for atomic write operations during backup.
 
 #### Configuration reference
 
-| Property | Description | Default |
-|----------|-------------|---------|
-| `backup.enabled` | Enable backup functionality | `false` |
-| `backup.object.store` | Object store connection string | None (required) |
-| `backup.schedule.cron` | Cron expression for [scheduled backups](#scheduled-backups) | None (manual only) |
-| `backup.schedule.tz` | <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone</a> for cron [schedule](#scheduled-backups) | `UTC` |
-| `backup.cleanup.keep.latest.n` | Number of backups to retain | `5` |
-| `backup.compression.level` | Compression level (1-22) | `5` |
-| `backup.compression.threads` | Threads for compression | CPU count |
-| `backup.enable.partition.hashes` | Compute BLAKE3 hashes during backup | `false` |
-| `backup.verify.partition.hashes` | Verify hashes during restore | `false` |
+| Property                         | Description                                                                                                                                      | Default            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| `backup.enabled`                 | Enable backup functionality                                                                                                                      | `false`            |
+| `backup.object.store`            | Object store connection string                                                                                                                   | None (required)    |
+| `backup.schedule.cron`           | Cron expression for [scheduled backups](#scheduled-backups)                                                                                      | None (manual only) |
+| `backup.schedule.tz`             | <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone</a> for cron [schedule](#scheduled-backups) | `UTC`              |
+| `backup.cleanup.keep.latest.n`   | Number of backups to retain                                                                                                                      | `5`                |
+| `backup.compression.level`       | Compression level (1-22)                                                                                                                         | `5`                |
+| `backup.compression.threads`     | Threads for compression                                                                                                                          | CPU count          |
+| `backup.enable.partition.hashes` | Compute BLAKE3 hashes during backup                                                                                                              | `false`            |
+| `backup.verify.partition.hashes` | Verify hashes during restore                                                                                                                     | `false`            |
 
 ### Run a backup
 
@@ -129,9 +132,9 @@ BACKUP DATABASE;
 
 Example output:
 
-| backup_timestamp              |
-| ----------------------------- |
-| 2024-08-24T12:34:56.789123Z   |
+| backup_timestamp            |
+| --------------------------- |
+| 2024-08-24T12:34:56.789123Z |
 
 The backup captures the committed database state at the moment the command
 executes. In-flight transactions are not included.
@@ -147,7 +150,7 @@ SELECT * FROM backups();
 Example output:
 
 | status              | progress_percent | start_ts                    | end_ts                      | backup_error     | cleanup_error |
-|---------------------|------------------|-----------------------------|-----------------------------|------------------|---------------|
+| ------------------- | ---------------- | --------------------------- | --------------------------- | ---------------- | ------------- |
 | backup complete     | 100              | 2025-07-30T12:49:30.554262Z | 2025-07-30T16:19:48.554262Z |                  |               |
 | backup complete     | 100              | 2025-08-06T14:15:22.882130Z | 2025-08-06T17:09:57.882130Z |                  |               |
 | backup failed       | 35               | 2025-08-20T11:58:03.675219Z | 2025-08-20T12:14:07.675219Z | connection error |               |
@@ -156,14 +159,14 @@ Example output:
 
 Status values:
 
-| Status                | Meaning                          | Action                          |
-|-----------------------|----------------------------------|---------------------------------|
-| `backup in progress`  | Backup is currently running      | Wait or run `BACKUP ABORT`      |
-| `backup complete`     | Backup finished successfully     | None required                   |
-| `backup failed`       | Backup encountered an error      | Check `backup_error` column     |
-| `cleanup in progress` | Old backup data is being removed | Wait for completion             |
-| `cleanup complete`    | Cleanup finished successfully    | None required                   |
-| `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column    |
+| Status                | Meaning                          | Action                       |
+| --------------------- | -------------------------------- | ---------------------------- |
+| `backup in progress`  | Backup is currently running      | Wait or run `BACKUP ABORT`   |
+| `backup complete`     | Backup finished successfully     | None required                |
+| `backup failed`       | Backup encountered an error      | Check `backup_error` column  |
+| `cleanup in progress` | Old backup data is being removed | Wait for completion          |
+| `cleanup complete`    | Cleanup finished successfully    | None required                |
+| `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column |
 
 To abort a running backup:
 
@@ -231,6 +234,14 @@ SELECT reload_config();
 
 You can also use this to enable and disable the schedule by adding or commenting out the `backup.schedule.cron` config setting.
 
+#### Schedules on a replica
+
+Scheduled backups run on the primary only. When a node is demoted with
+[`SWITCH ROLE`](/docs/query/sql/switch-role/) its schedule pauses, and it
+resumes when the node is promoted again. A backup that was still running at the
+moment of a demote is reported by the `questdb_backup_active_at_last_demote`
+metric, see [Replication metrics](/docs/operations/logging-metrics/#replication-metrics).
+
 
 ### Backup instance name
 
@@ -282,10 +293,10 @@ history and edge cases.
 
 #### How storage accumulates
 
-| Backup type | What's uploaded | Estimated size |
-|-------------|-----------------|----------------|
-| Initial (full) | Entire database | DB size ÷ 4 (default compression) |
-| Incremental | Changed partitions only | Changed data ÷ 4 |
+| Backup type    | What's uploaded         | Estimated size                    |
+| -------------- | ----------------------- | --------------------------------- |
+| Initial (full) | Entire database         | DB size ÷ 4 (default compression) |
+| Incremental    | Changed partitions only | Changed data ÷ 4                  |
 
 Total storage = full backup + (average incremental × retention count)
 
@@ -313,12 +324,12 @@ This means:
 
 A 500 GB database with daily backups, 7-day retention, and ~5% daily change:
 
-| Component | Calculation | Size |
-|-----------|-------------|------|
-| Full backup | 500 GB ÷ 4 | 125 GB |
-| Daily incremental | 25 GB ÷ 4 | ~6 GB |
-| 7 incrementals | 6 GB × 7 | ~42 GB |
-| **Total** | | **~170 GB** |
+| Component         | Calculation | Size        |
+| ----------------- | ----------- | ----------- |
+| Full backup       | 500 GB ÷ 4  | 125 GB      |
+| Daily incremental | 25 GB ÷ 4   | ~6 GB       |
+| 7 incrementals    | 6 GB × 7    | ~42 GB      |
+| **Total**         |             | **~170 GB** |
 
 In this example, actual usage (~170 GB) is well under the 2× planning estimate
 (1 TB). The 2× rule is intentionally conservative—use it for initial capacity
@@ -334,17 +345,17 @@ To find your instance name, see [Backup instance name](#backup-instance-name).
 
 ### Interaction with storage policies
 
-[Storage policies](/docs/concepts/storage-policy/) operate locally — they
-convert partitions to Parquet in place and then drop native (and eventually
-local Parquet) files on a schedule. Backups capture whatever is on local disk
-at the time the backup runs:
+[Storage policies](/docs/concepts/storage-policy/) move partitions through a
+lifecycle as they age. Backups capture whatever is on local disk at the time the
+backup runs:
 
 - Partitions still in native format are backed up as native files.
-- Partitions that have been converted to Parquet (via the `TO PARQUET` stage,
-  after `DROP NATIVE` has fired) are backed up as Parquet files.
-- Once `DROP LOCAL` fires and removes a partition from local disk, subsequent
-  backups will no longer contain that partition — restoring an earlier backup
-  is the only way to recover it.
+- Partitions converted to Parquet by the `TO PARQUET` stage are backed up as
+  Parquet files.
+- Partitions moved to object storage by the `TO REMOTE` stage are covered by [Cold storage partitions](#cold-storage-partitions) below.
+- Once `DROP LOCAL` fires on a policy without `TO REMOTE`, the partition is gone
+  from local disk and subsequent backups no longer contain it. Restoring an
+  earlier backup is the only way to recover it.
 
 Plan retention (`backup.cleanup.keep.latest.n`) with your storage policy's
 `DROP LOCAL` TTL in mind: a partition is only recoverable from a backup that
@@ -352,16 +363,34 @@ was taken **before** `DROP LOCAL` removed it from disk. If you need to keep
 historical partitions available for restore, make sure your oldest retained
 backup predates the earliest `DROP LOCAL` fire.
 
-Storage policies run per-instance, so primaries and replicas may disagree on
-which partitions are native vs. Parquet at any given moment. Typically,
-backing up the primary is sufficient (see the bullet on
+Local storage policy stages run per-instance, so primaries and replicas may
+disagree on which partitions are native vs. Parquet at any given moment.
+Typically, backing up the primary is sufficient (see the bullet on
 primary/replica backups below).
+
+### Cold storage partitions
+
+:::danger
+
+A backup of a database using [cold storage](/docs/concepts/cold-storage/) is **not** a complete copy of the data. The backup contains the local transaction state, Parquet metadata, and symbol indexes needed to reopen a cold partition, but not the `data.parquet` bytes, which live only in the object store.
+
+Protect the database backup and the cold storage prefix as one recovery set. If a cold object is lost after `DROP LOCAL` evicted the local copy, QuestDB has no local source from which to regenerate it, and no backup will contain it.
+
+:::
+
+A restore onto a different host, or onto a different object store backend, can change an object's version even when its bytes are unchanged. The first read of an affected partition fails, QuestDB re-checks the object in the background, and the retry succeeds. An object that is genuinely different is refused rather than silently accepted.
+
+See [Operating cold storage](/docs/operations/cold-storage/#backup-and-restore) for the restore paths worth testing.
 
 ### Limitations
 
 - **Database-wide only**: Backup captures the entire database. You cannot
   exclude tables or backup selected tables individually. Every backup includes
-  all user tables, materialized views, and metadata.
+  all user tables, materialized views, live views, and metadata.
+- **Cold storage data is not included**: partitions served from object storage
+  contribute their metadata and symbol indexes to the backup, but not their
+  `data.parquet` bytes. See
+  [Cold storage partitions](#cold-storage-partitions).
 - **One backup at a time**: Only one backup can run at any given time. Starting
   a new backup while one is running will return an error.
 - **Primary and replica backups are separate**: Each QuestDB instance has its
@@ -433,25 +462,61 @@ backup.restore.timestamp=2024-08-24T12:34:56.789123Z
 
 Parameters:
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `backup.object.store` | Sometimes | Object store connection string; required unless already specified in `server.conf` |
-| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
-| `backup.restore.timestamp` | No | Timestamp for point-in-time recovery; omit for latest backup |
+| Parameter                  | Required  | Description                                                                                                  |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| `backup.object.store`      | Sometimes | Object store connection string; required unless already specified in `server.conf`                           |
+| `backup.instance.name`     | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
+| `backup.restore.timestamp` | No        | Selects the most recent backup at or before this timestamp; omit for the latest backup                       |
 
-#### Point-in-time recovery
+The file also accepts the restore tuning keys
+`backup.max.concurrent.network.requests`, `backup.async.io.threads`,
+`backup.max.blocking.threads`, `backup.requests.min.throughput`,
+`backup.download.requests.min.throughput` and `backup.requests.max.backoff`.
+Any other key aborts startup with the error:
+`The _backup_restore file contains unexpected settings: ...`.
 
-Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
-finds the most recent successful backup at or before the specified timestamp.
+#### Restoring an older backup
+
+Use `backup.restore.timestamp` to restore a specific backup snapshot. QuestDB
+selects the most recent successful backup at or before the specified
+timestamp. The restore itself brings back nothing past that backup; to recover
+to an arbitrary instant between backups, use
+[point-in-time recovery](/docs/operations/point-in-time-recovery/) instead.
+
+:::warning Restoring in order to stay at the snapshot
+
+A restore does not stop what happens afterwards. If the restored node has a
+replication object store configured and that store is not empty, the node
+applies **every transaction in it** once the restore completes, advancing the
+restored snapshot to the current state of the cluster. That behaviour is what
+[creating a replica from a backup](#create-a-replica-from-a-backup) relies on,
+but it silently undoes a restore whose purpose was to return to an older
+state.
+
+When the intent is to **stay** at the restored snapshot, configure a new,
+empty replication object store, or none at all.
+
+:::
+
+:::warning
+
+A restored backup does not bring cold data back on its own. The backup
+carries the local metadata for
+[cold storage partitions](#cold-storage-partitions), but not their
+`data.parquet` bytes, which exist only in the object store. Dropping a table
+or partition also hands its remote objects to garbage collection after a
+grace period measured in minutes, so **the grace period, not your backup
+retention, is the deadline for recovering cold data after a drop**. See
+[cold storage in point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage)
+for the grace periods and how to halt reclamation.
+
+:::
 
 To find available backup timestamps, query the source instance:
 
 ```questdb-sql
 SELECT start_ts FROM backups() WHERE status = 'backup complete';
 ```
-
-You can also specify an arbitrary timestamp (e.g., just before an accidental
-deletion). QuestDB restores from the nearest available backup before that time.
 
 If no backup exists at or before the specified timestamp, QuestDB fails to start
 with the error: `backup restore error: No backup timestamp found that is <=`.
@@ -474,10 +539,10 @@ Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically
 
 If restore fails, QuestDB creates artifacts to help diagnose and recover:
 
-| Artifact | Purpose |
-|----------|---------|
+| Artifact           | Purpose                                            |
+| ------------------ | -------------------------------------------------- |
 | `.restore_failed/` | Directory containing tables that failed to restore |
-| `_restore_failed` | File listing the names of failed tables |
+| `_restore_failed`  | File listing the names of failed tables            |
 
 To recover from a failed restore:
 
@@ -518,6 +583,16 @@ more recent than the oldest available WAL data.
 
    QuestDB restores from the backup first, then switches to WAL replay to catch
    up with the primary.
+
+:::note
+
+Catching up from the replication store is the purpose of this flow, so a
+`backup.restore.timestamp` in the `_backup_restore` file has no lasting effect
+here: whichever backup the replica starts from, it ends at the cluster's
+current state. To stop at an earlier instant instead, see
+[point-in-time recovery](/docs/operations/point-in-time-recovery/).
+
+:::
 
 For more details on replication setup, see the
 [replication guide](/docs/high-availability/setup/).

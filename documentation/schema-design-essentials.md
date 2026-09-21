@@ -75,6 +75,59 @@ TIMESTAMP(ts) PARTITION BY MONTH;
 
 See [Partitions](/docs/concepts/partitions/) for details.
 
+### Out-of-order writes
+
+QuestDB accepts data in any timestamp order. Rows that arrive behind already-
+committed data are merged into the correct position automatically. The cost
+is write amplification, which scales with partition size and how far behind
+the data arrives.
+
+If late or replayed data is part of your workload (exchange corrections,
+Kafka replay, sensor backfill), see
+[Out-of-order data](/docs/concepts/out-of-order-data/) for behavior per
+ingestion method and tuning guidance.
+
+## Indexing
+
+Index your primary filter columns to speed up `WHERE` clause queries. QuestDB
+supports two index types for SYMBOL columns:
+
+```questdb-sql
+-- Default bitmap index — low overhead, good for most cases
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL INDEX,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+-- Posting index with covering columns — best for read-heavy, selective queries
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
+    price DOUBLE,
+    raw_data VARCHAR  -- not in INCLUDE, read from column files
+) TIMESTAMP(ts) PARTITION BY DAY;
+-- The designated timestamp (ts) is automatically included in the covering index.
+```
+
+**When to choose each:**
+
+| Scenario | Recommendation |
+|----------|---------------|
+| General purpose, write-heavy | Bitmap index (`INDEX`) |
+| Read-heavy, filtering on symbol | Posting index (`INDEX TYPE POSTING`) |
+| Frequent queries on a few columns | Posting with `INCLUDE` |
+| Wide table, queries select subset | Posting with `INCLUDE` — biggest win |
+
+The covering index (`INCLUDE`) lets queries that only select covered columns
+read from compact sidecar files instead of full column files. The designated
+timestamp is automatically included, so timestamp-filtered queries benefit
+without explicit listing. Use `EXPLAIN` to verify your queries use the
+`CoveringIndex` plan.
+
+See [Indexes](/docs/concepts/deep-dive/indexes/) and
+[Posting index](/docs/concepts/deep-dive/posting-index/) for details.
+
 ## Data types
 
 ### SYMBOL vs VARCHAR
@@ -359,7 +412,7 @@ permissions for access control.
 
 ## PostgreSQL compatibility
 
-QuestDB supports the [PostgreSQL wire protocol](/docs/query/pgwire/overview/),
+QuestDB supports the [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/),
 so most PostgreSQL client libraries work. However, QuestDB is not PostgreSQL:
 
 - No `PRIMARY KEY`, `FOREIGN KEY`, or `NOT NULL` constraints
@@ -461,11 +514,11 @@ CREATE TABLE metrics (
 For schema migrations, QuestDB supports [Flyway](https://documentation.red-gate.com/fd/questdb-305791448.html).
 
 You can also use ILP auto-creation for dynamic schemas, though this applies
-default settings. See [ILP Overview](/docs/ingestion/ilp/overview/) for details.
+default settings. See [ILP Overview](/docs/connect/compatibility/ilp/overview/) for details.
 
 ## Next steps
 
 - [Quick Start](/docs/getting-started/quick-start/) — Create your first table and run queries
 - [Capacity Planning](/docs/getting-started/capacity-planning/) — Size your deployment for production
-- [Connect & Ingest](/docs/ingestion/overview/) — Load data into QuestDB
+- [Connect & Ingest](/docs/connect/overview/) — Load data into QuestDB
 - [Materialized Views](/docs/concepts/materialized-views/) — Pre-compute aggregations for fast dashboards
