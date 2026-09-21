@@ -43,6 +43,8 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
+  - Buying through Azure? QuestDB Enterprise is also available via
+    [Azure Marketplace](/docs/deployment/azure/#buy-through-azure-marketplace).
 - Use of a [supported file system](/docs/getting-started/capacity-planning/#supported-filesystems)
   - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 

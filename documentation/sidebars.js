@@ -754,6 +754,7 @@ module.exports = {
           items: [
             "high-availability/setup",
             "high-availability/failover",
+            "high-availability/disaster-recovery",
             "high-availability/tuning",
             "high-availability/wal-cleanup",
           ],
@@ -788,6 +789,7 @@ module.exports = {
       items: [
         "operations/upgrade",
         "operations/backup",
+        "operations/point-in-time-recovery",
         {
           id: "operations/cold-storage",
           type: "doc",

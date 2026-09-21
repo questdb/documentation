@@ -159,7 +159,7 @@ replication enabled.
 
 The cleanup boundary determines how far back you can restore. WAL data up to
 and including the boundary is deleted; data after the boundary is retained. Any
-[point-in-time recovery](/docs/high-availability/setup/#point-in-time-recovery)
+[point-in-time recovery](/docs/operations/point-in-time-recovery/)
 target must be **after** this boundary.
 
 Backup manifests and checkpoint history records are stored per backup instance

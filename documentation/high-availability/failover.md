@@ -128,7 +128,7 @@ promote it again once it has caught up. A promotion never accepts data loss:
 transactions the failed primary committed but never uploaded are not in the
 store, and the in-place switch cannot recover them. When the loss is accepted
 and the replica cannot catch up, use the restart-based
-[emergency primary migration](/docs/high-availability/setup/#emergency-primary-migration).
+[emergency primary migration](/docs/high-availability/disaster-recovery/#emergency-primary-migration).
 
 Once the old primary is repaired, start it with `replication.role=replica`. It
 rejoins as a replica; any transactions it committed but never uploaded are
@@ -385,8 +385,10 @@ A coordinator drives a switch as follows:
 
 - [`SWITCH ROLE`](/docs/query/sql/switch-role/) reference, with the statement
   errors and the result columns.
-- [Replication setup guide](/docs/high-availability/setup/) for the
-  restart-based migration procedures and point-in-time recovery.
+- [Disaster recovery](/docs/high-availability/disaster-recovery/) for the
+  failure scenarios and the restart-based migration procedures.
+- [Point-in-time recovery](/docs/operations/point-in-time-recovery/) for
+  recovering the database to an arbitrary instant.
 - [Client failover](/docs/high-availability/client-failover/concepts/) for how
   clients follow the primary role.
 - [Failover operator](/docs/security/rbac/#failover-operator) for the account
