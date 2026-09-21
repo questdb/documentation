@@ -46,6 +46,24 @@ everything else is expired.
 | Keep highest / lowest | Rows tied at the group's highest / lowest value     | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`          | No (hides only)       |
 | Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`        | No (hides only)       |
 
+:::tip Which mode deletes rows from disk?
+
+Only a per-row `WHEN` policy can delete expired rows from disk. QuestDB does this
+when it can tell that an expired row will never be needed again. Deleting the
+rows saves disk space and gives later queries fewer rows to scan.
+
+To check a policy, run:
+
+```questdb-sql
+SELECT view_name, expire_enforcement FROM materialized_views();
+```
+
+`FILTER_AND_RECLAIM` means that QuestDB hides expired rows and later deletes them
+from disk. `FILTER_ONLY` means that QuestDB hides the rows but leaves them on
+disk. `KEEP` modes and window conditions are always `FILTER_ONLY`.
+
+:::
+
 `KEEP HIGHEST/LOWEST` and `KEEP N` are shortcuts. Under the hood they turn into
 a window condition, so a window `WHEN` is the general-purpose form when the
 shortcuts do not fit.
@@ -294,6 +312,16 @@ symbol. As new trades arrive, the kept row moves forward on its own. You can lis
 several key columns in `PARTITION BY`. You may also write
 `KEEP LATEST ON timestamp PARTITION BY symbol`, but the `ON` column has to be the
 view's designated timestamp.
+
+:::note `KEEP LATEST` does not save the result ahead of time
+
+`KEEP LATEST` makes application queries simpler, but older rows stay on disk.
+Each time you query the view, QuestDB finds the latest row for every key from the
+rows the view stores. To reduce the number of rows this lookup must search, use
+the
+[pre-aggregation approach for speeding up `LATEST ON`](/docs/concepts/materialized-views/#advanced-latest-on-optimization).
+
+:::
 
 ### Keep highest/lowest per group: `KEEP HIGHEST` / `KEEP LOWEST`
 

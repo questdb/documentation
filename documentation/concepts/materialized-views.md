@@ -268,16 +268,15 @@ CREATE MATERIALIZED VIEW trades_largest AS (
 ) EXPIRE ROWS KEEP 10 HIGHEST amount PARTITION BY symbol;
 ```
 
-`trades_largest` holds ten rows per symbol no matter how large the base table
-grows, and the desk reads it directly instead of ranking the base table on every
-query. When an eleventh large trade arrives, the smallest of the ten drops out.
-If two trades tie on `amount` at the tenth spot, the newer one stays (decided by
-the designated timestamp).
+Applications can query `trades_largest` directly and get ten rows per symbol,
+without writing the ranking in every query. When a larger trade arrives, the
+smallest result may drop out. If two trades tie on `amount` for the last place,
+the newer one stays (decided by the designated timestamp).
 
-Ten rows per symbol show up in queries, but the view still stores every base row
-it has taken in, because a top-N policy never frees disk. A
-[TTL](/docs/concepts/ttl/) caps that, but it changes the question the view
-answers from "the biggest so far" to "the biggest still kept". See
+QuestDB still stores every row and works out the ranking each time you query the
+view. A [TTL](/docs/concepts/ttl/) can reduce the number of rows stored and
+ranked, but it changes the result from "the biggest so far" to "the biggest still
+kept". See
 [combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
 
 The ranking covers everything the view holds, not just a recent window, so
@@ -609,15 +608,28 @@ aggregation work is needed at query time.
   the view. Keeping ten rows per group does not mean QuestDB only reads ten rows
   per group.
 
-The `KEEP` modes and window conditions hide rows without deleting them from disk.
-Queries can become slower as the stored data grows. Use TTL to remove old
-partitions, but remember that the policy then chooses only from the remaining
-rows.
+Only a per-row `WHEN` policy can delete expired rows from disk. QuestDB does
+this when it can tell that an expired row will never be needed again. For
+example, cleanup works with a cutoff on the designated timestamp:
 
-Some `WHEN` policies also delete expired rows in the background. This cleanup
-adds disk activity, especially when it must rewrite a partition to remove only
-some rows. `CLEANUP EVERY` sets how often cleanup runs. Queries hide expired rows
-even before cleanup runs.
+```questdb-sql
+EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now())
+```
+
+Deleting rows saves disk space and gives later queries fewer rows to scan. The
+`expire_enforcement` column returned by `materialized_views()` shows whether
+QuestDB will do this:
+
+- `FILTER_AND_RECLAIM`: hide expired rows, then delete them in the background.
+- `FILTER_ONLY`: hide expired rows, but leave them on disk.
+
+The `KEEP` modes and window conditions are always `FILTER_ONLY`. Their stored
+data keeps growing, which can make queries slower. TTL can remove old partitions,
+but the policy then works only with the rows that remain.
+
+Cleanup also uses disk resources, especially when it rewrites a partition to
+remove only some rows. `CLEANUP EVERY` sets how often cleanup runs. Expired rows
+are hidden from queries even before cleanup runs.
 
 See [How EXPIRE ROWS works](/docs/concepts/expire-rows/#how-it-works) for details.
 
@@ -720,6 +732,15 @@ SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol;
 
 This might scan billions of rows to find the latest entry for rarely-updated
 symbols.
+
+:::note `KEEP LATEST` does not replace this optimization
+
+[`EXPIRE ROWS KEEP LATEST`](/docs/concepts/expire-rows/#keep-latest-per-key-keep-latest)
+lets applications use a simple `SELECT`, but older rows stay on disk. Each query
+still finds the latest row for every key from the rows stored in the view. Use
+the pre-aggregation below to give that lookup fewer rows to search.
+
+:::
 
 ### Solution: Pre-aggregate with a materialized view
 
