@@ -212,7 +212,7 @@ each application to write its own `LATEST ON` query:
 ```questdb-sql title="Latest reading per sensor"
 CREATE MATERIALIZED VIEW sensor_current AS (
   SELECT * FROM sensor_readings
-) EXPIRE ROWS KEEP LATEST PARTITION BY sensor_id;
+) EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY sensor_id;
 ```
 
 Applications can query `sensor_current` with a simple `SELECT` and get one row
@@ -265,7 +265,7 @@ keeps:
 ```questdb-sql title="Ten largest trades per symbol"
 CREATE MATERIALIZED VIEW trades_largest AS (
   SELECT * FROM trades
-) EXPIRE ROWS KEEP 10 HIGHEST amount PARTITION BY symbol;
+) EXPIRE ROWS KEEP 10 HIGHEST ON amount PARTITION BY symbol;
 ```
 
 Applications can query `trades_largest` directly and get ten rows per symbol,
@@ -838,8 +838,8 @@ view `mv` with columns `sym`, `k`, `v`, `secret`, and designated timestamp `ts`:
 | --- | --- |
 | `WHEN v < 2.0` | `SELECT ON mv(sym, v)` |
 | `WHEN ts < '2026-01-01T00:00:01.000000Z'` | `SELECT ON mv(sym)` |
-| `KEEP LATEST PARTITION BY k` | `SELECT ON mv(sym, k)` |
-| `KEEP HIGHEST v PARTITION BY k` | `SELECT ON mv(sym, v, k)` |
+| `KEEP LATEST ON ts PARTITION BY k` | `SELECT ON mv(sym, k)` |
+| `KEEP HIGHEST ON v PARTITION BY k` | `SELECT ON mv(sym, v, k)` |
 
 A column-level grant always includes the designated timestamp. A table-level
 SELECT grant covers every column, including the ones the policy needs.

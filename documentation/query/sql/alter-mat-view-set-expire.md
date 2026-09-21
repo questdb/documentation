@@ -17,7 +17,7 @@ disk, see [How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works).
 ALTER MATERIALIZED VIEW viewName SET EXPIRE ROWS
   { WHEN predicate
   | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
-  | KEEP [ N ] ( HIGHEST | LOWEST ) col [ PARTITION BY col [, col ...] ] }
+  | KEEP [ N ] ( HIGHEST | LOWEST ) ON col [ PARTITION BY col [, col ...] ] }
   [ CLEANUP EVERY duration ]
 
 ALTER MATERIALIZED VIEW viewName DROP EXPIRE
@@ -25,12 +25,12 @@ ALTER MATERIALIZED VIEW viewName DROP EXPIRE
 
 ## Parameters
 
-| Parameter        | Description                                                                       |
-| ---------------- | --------------------------------------------------------------------------------- |
-| `viewName`       | Name of the passthrough materialized view to modify                               |
-| `WHEN predicate` | A per-row (or window) condition; a row expires when it is `TRUE`                  |
-| `KEEP LATEST`    | Keep the latest row per `PARTITION BY` key, by the designated timestamp           |
-| `KEEP [N] HIGHEST\|LOWEST col` | Keep the rows at the highest/lowest value of `col` per group, or the top `N` |
+| Parameter        | Description                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `viewName`       | Name of the passthrough materialized view to modify                                                                          |
+| `WHEN predicate` | A per-row (or window) condition; a row expires when it is `TRUE`                                                             |
+| `KEEP LATEST`    | Keep the latest row per `PARTITION BY` key, by the designated timestamp                                                      |
+| `KEEP [N] HIGHEST\|LOWEST ON col` | Keep the rows at the highest/lowest value of `col` per group, or the top `N`                                |
 | `CLEANUP EVERY`  | How often the background cleanup job runs, as `<number><unit>`, where `unit` is `s`, `m`, `h`, `d`, or `w`. Defaults to `1h` |
 
 Without `N`, the keep column must be `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`,
@@ -87,17 +87,17 @@ the same rows more cheaply as a `WHERE` clause in the view's query. See
 
 ```questdb-sql title="Keep the latest row per symbol"
 ALTER MATERIALIZED VIEW trades_mirror
-  SET EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+  SET EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ```questdb-sql title="Keep the highest-priced row per symbol"
 ALTER MATERIALIZED VIEW trades_mirror
-  SET EXPIRE ROWS KEEP HIGHEST price PARTITION BY symbol;
+  SET EXPIRE ROWS KEEP HIGHEST ON price PARTITION BY symbol;
 ```
 
 ```questdb-sql title="Keep the 2 highest-priced rows per symbol"
 ALTER MATERIALIZED VIEW trades_mirror
-  SET EXPIRE ROWS KEEP 2 HIGHEST price PARTITION BY symbol;
+  SET EXPIRE ROWS KEEP 2 HIGHEST ON price PARTITION BY symbol;
 ```
 
 For a rule the `KEEP` shortcuts do not cover, write a window condition directly
@@ -140,9 +140,10 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 | Error | Cause |
 | ----- | ----- |
 | `materialized view does not exist` | View with the specified name doesn't exist |
+| `'on' expected` | `KEEP HIGHEST`/`KEEP LOWEST` was not followed by `ON <col>`; the keep column must be introduced by `ON` |
 | `EXPIRE ROWS KEEP LATEST ON must name the designated timestamp ...` | `ON` names a column other than the designated timestamp |
 | `invalid EXPIRE ROWS KEEP LATEST PARTITION BY column: ...` | A `PARTITION BY` key column does not exist |
-| `EXPIRE ROWS KEEP HIGHEST/LOWEST requires a BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, DATE, TIMESTAMP or DECIMAL column, but '<col>' is <type>; use KEEP <N> HIGHEST/LOWEST to rank an orderable column of any type` | The bare `KEEP HIGHEST/LOWEST` form was given an unsupported column type; use a supported numeric/date type or the top-N form |
+| `EXPIRE ROWS KEEP HIGHEST/LOWEST requires a BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, DATE, TIMESTAMP or DECIMAL column, but '<col>' is <type>; use KEEP <N> HIGHEST/LOWEST ON <column> to rank an orderable column of any type` | The bare `KEEP HIGHEST/LOWEST` form was given an unsupported column type; use a supported numeric/date type or the top-N form |
 | `EXPIRE ROWS KEEP <N> HIGHEST/LOWEST requires an orderable column, but '<col>' is <type>` | The top-N form was given a column type that cannot be ordered |
 | `EXPIRE ROWS KEEP / window retention cannot be used on a view with a column named '__qdb_re_keep'` | The view exposes a column named like the reserved keep column |
 | `invalid EXPIRE ROWS predicate: ...` | The predicate does not parse, bind, or type-check against the view's columns |

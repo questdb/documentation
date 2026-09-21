@@ -41,10 +41,10 @@ everything else is expired.
 | Mode                  | What it keeps                                       | Syntax                                                              | Frees disk            |
 | --------------------- | --------------------------------------------------- | ------------------------------------------------------------------- | --------------------- |
 | Per-row condition     | Rows where the condition is **not** `TRUE`          | `EXPIRE ROWS WHEN predicate`                                        | Yes, when it is safe  |
-| Window condition      | Rows where a condition using `OVER (...)` is **not** `TRUE` | `EXPIRE ROWS WHEN predicate OVER (...)`                      | No (hides only)       |
-| Keep latest           | The latest row per key (the current value per key)  | `EXPIRE ROWS KEEP LATEST [ON timestamp] PARTITION BY cols`           | No (hides only)       |
-| Keep highest / lowest | Rows tied at the group's highest / lowest value     | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`          | No (hides only)       |
-| Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`        | No (hides only)       |
+| Window condition      | Rows where a condition using `OVER (...)` is **not** `TRUE` | `EXPIRE ROWS WHEN predicate OVER (...)`                     | No (hides only)       |
+| Keep latest           | The latest row per key (the current value per key)  | `EXPIRE ROWS KEEP LATEST [ON timestamp] PARTITION BY cols`          | No (hides only)       |
+| Keep highest / lowest | Rows tied at the group's highest / lowest value     | `EXPIRE ROWS KEEP HIGHEST\|LOWEST ON col [PARTITION BY cols]`       | No (hides only)       |
+| Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST ON col [PARTITION BY cols]`     | No (hides only)       |
 
 :::tip Which mode deletes rows from disk?
 
@@ -72,7 +72,7 @@ The plain `KEEP HIGHEST/LOWEST` form works on these column types: `BYTE`,
 `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `DATE`, `TIMESTAMP` and `DECIMAL`.
 The top-N form (`KEEP N HIGHEST/LOWEST`) sorts rows with `ORDER BY`, so it works
 on any column type you can sort. For example, to rank a `SYMBOL` column, use
-`KEEP 1 HIGHEST symbol`, not `KEEP HIGHEST symbol`.
+`KEEP 1 HIGHEST ON symbol`, not `KEEP HIGHEST ON symbol`.
 
 The two forms treat ties and `NULL`s differently:
 
@@ -95,16 +95,16 @@ query, and after `PARTITION BY` if you use it), or add it later with
 EXPIRE ROWS
   { WHEN predicate
   | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
-  | KEEP [ N ] ( HIGHEST | LOWEST ) col [ PARTITION BY col [, col ...] ] }
+  | KEEP [ N ] ( HIGHEST | LOWEST ) ON col [ PARTITION BY col [, col ...] ] }
   [ CLEANUP EVERY duration ]
 ```
 
-| Element            | Meaning                                                                                  |
-| ------------------ | ---------------------------------------------------------------------------------------- |
-| `predicate`        | Any true/false expression over the view's columns. A row expires when it is `TRUE`.      |
-| `KEEP LATEST`      | Keep the latest row for each `PARTITION BY` key, by the designated timestamp.             |
-| `ON timestampCol`  | Optional. If given, it must be the view's designated timestamp.                           |
-| `HIGHEST\|LOWEST`  | Keep the rows at the highest / lowest value of `col` per group (no `N`), or the top `N`.  |
+| Element            | Meaning                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `predicate`        | Any true/false expression over the view's columns. A row expires when it is `TRUE`.                                                 |
+| `KEEP LATEST`      | Keep the latest row for each `PARTITION BY` key, by the designated timestamp.                                                       |
+| `ON timestampCol`  | Optional. If given, it must be the view's designated timestamp.                                                                     |
+| `HIGHEST\|LOWEST ON col` | Keep the rows at the highest / lowest value of `col` per group (no `N`), or the top `N`.                                      |
 | `CLEANUP EVERY`    | How often the background cleanup job runs for this view: `<number><unit>`, where the unit is `s`/`m`/`h`/`d`/`w`. Defaults to `1h`. |
 
 :::note
@@ -297,7 +297,7 @@ Keep only the most recent row per key, to turn the view into a live
 ```questdb-sql title="Keep the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (
   SELECT * FROM trades
-) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+) EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
 
 SELECT * FROM trades_latest ORDER BY timestamp;
 ```
@@ -309,9 +309,9 @@ SELECT * FROM trades_latest ORDER BY timestamp;
 
 The designated `timestamp` column decides which row is the latest for each
 symbol. As new trades arrive, the kept row moves forward on its own. You can list
-several key columns in `PARTITION BY`. You may also write
-`KEEP LATEST ON timestamp PARTITION BY symbol`, but the `ON` column has to be the
-view's designated timestamp.
+several key columns in `PARTITION BY`. The `ON timestamp` part is optional -
+`KEEP LATEST PARTITION BY symbol` means the same thing - but when you write it,
+it has to name the view's designated timestamp.
 
 :::note `KEEP LATEST` does not save the result ahead of time
 
@@ -330,7 +330,7 @@ Keep the rows tied at the highest (or lowest) value of a column, per group:
 ```questdb-sql title="Keep the highest-priced trade per symbol"
 CREATE MATERIALIZED VIEW trades_peak AS (
   SELECT * FROM trades
-) EXPIRE ROWS KEEP HIGHEST price PARTITION BY symbol;
+) EXPIRE ROWS KEEP HIGHEST ON price PARTITION BY symbol;
 
 SELECT * FROM trades_peak;
 ```
@@ -340,7 +340,7 @@ SELECT * FROM trades_peak;
 | BTC    | sell | 105.0 | 2.0    | 2026-01-01T11:00:00.000000Z |
 | ETH    | buy  | 55.0  | 1.0    | 2026-01-02T08:00:00.000000Z |
 
-`KEEP LOWEST price PARTITION BY symbol` keeps the cheapest instead (BTC `100.0`,
+`KEEP LOWEST ON price PARTITION BY symbol` keeps the cheapest instead (BTC `100.0`,
 ETH `50.0`). Every row tied at the highest (or lowest) value is kept, and
 `NULL`-valued rows are kept too (a `NULL` is never below the highest value).
 
@@ -351,7 +351,7 @@ Keep a per-group leaderboard: the `N` highest (or lowest) rows.
 ```questdb-sql title="Keep the 2 highest-priced trades per symbol"
 CREATE MATERIALIZED VIEW trades_top2 AS (
   SELECT * FROM trades
-) EXPIRE ROWS KEEP 2 HIGHEST price PARTITION BY symbol;
+) EXPIRE ROWS KEEP 2 HIGHEST ON price PARTITION BY symbol;
 
 SELECT * FROM trades_top2 ORDER BY symbol, price DESC;
 ```
@@ -371,7 +371,7 @@ N-th row is always decided the same way.
 
 `KEEP HIGHEST/LOWEST` and `KEEP N` are just shortcuts for window conditions. When
 you need a rule they do not cover, write the window condition directly in `WHEN`.
-For example, this is exactly what `KEEP HIGHEST price PARTITION BY symbol` turns
+For example, this is exactly what `KEEP HIGHEST ON price PARTITION BY symbol` turns
 into:
 
 ```questdb-sql title="The same as KEEP HIGHEST, written as a window condition"
@@ -620,7 +620,7 @@ view as they age out, and the kept set is worked out over whatever remains.
 CREATE MATERIALIZED VIEW trades_peak_3d AS (
   SELECT * FROM trades
 ) PARTITION BY DAY TTL 3 DAYS
-  EXPIRE ROWS KEEP HIGHEST price PARTITION BY symbol;
+  EXPIRE ROWS KEEP HIGHEST ON price PARTITION BY symbol;
 ```
 
 `TTL` goes before `EXPIRE ROWS` in the statement, just as it goes after any
@@ -686,7 +686,7 @@ otherwise:
 
 ```questdb-sql
 SHOW CREATE MATERIALIZED VIEW trades_latest;
--- ... EXPIRE ROWS KEEP LATEST PARTITION BY symbol
+-- ... EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol
 ```
 
 The [`materialized_views()`](/docs/query/functions/meta/) function shows the
@@ -701,8 +701,8 @@ FROM materialized_views();
 | view_name     | expire_clause                   | expire_cleanup_every | expire_enforcement |
 | ------------- | ------------------------------- | -------------------- | ------------------ |
 | trades_sized  | amount < 1.5                    | 1h                   | FILTER_AND_RECLAIM |
-| trades_latest | KEEP LATEST PARTITION BY symbol | 1h                   | FILTER_ONLY        |
-| trades_top2   | KEEP 2 HIGHEST price ...        | 1h                   | FILTER_ONLY        |
+| trades_latest | KEEP LATEST ON timestamp PARTITION BY symbol | 1h      | FILTER_ONLY        |
+| trades_top2   | KEEP 2 HIGHEST ON price ...     | 1h                   | FILTER_ONLY        |
 
 `expire_enforcement` tells you what the cleanup job does:
 
@@ -719,7 +719,7 @@ You can set, change, or drop a policy on an existing passthrough view. See
 
 ```questdb-sql
 -- set or replace the policy
-ALTER MATERIALIZED VIEW trades_latest SET EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+ALTER MATERIALIZED VIEW trades_latest SET EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
 
 -- remove it (keeps all rows again)
 ALTER MATERIALIZED VIEW trades_latest DROP EXPIRE;

@@ -41,7 +41,7 @@ Where:
   `GROUP BY`), or a
   [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that
   copies rows from a single table
-- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) ON col [PARTITION BY cols]`.
   This policy is meant for passthrough views (see below).
 
 ## Parameters
@@ -334,7 +334,7 @@ through a join:
 ```questdb-sql title="Passthrough view that keeps the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (
   SELECT * FROM trades
-) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+) EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
 ```
 
 A `WHEN` condition is for rules that depend on the **current time**, such as a
@@ -350,7 +350,7 @@ The clause goes after the query (and after `PARTITION BY` if present):
 EXPIRE ROWS
   { WHEN predicate
   | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
-  | KEEP [ N ] ( HIGHEST | LOWEST ) col [ PARTITION BY col [, col ...] ] }
+  | KEEP [ N ] ( HIGHEST | LOWEST ) ON col [ PARTITION BY col [, col ...] ] }
   [ CLEANUP EVERY duration ]
 ```
 

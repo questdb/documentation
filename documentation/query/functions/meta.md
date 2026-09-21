@@ -322,8 +322,8 @@ Returns a `table` including the following information:
   than this, the refresh job handles them together instead of committing twice.
   `0` turns this off
 - `expire_clause` - the view's
-  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy as written, or `NULL` if
-  the view has no policy
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy in its canonical form, or
+  `NULL` if the view has no policy
 - `expire_cleanup_every` - how often the cleanup job runs for the policy, or
   `NULL`
 - `expire_enforcement` - `FILTER_AND_RECLAIM` if the cleanup job also frees disk
@@ -347,7 +347,7 @@ FROM materialized_views();
 | --------------- | ----------- | --------------- | ---------------------- | -------------- | ----------------------------------- | -------------------- | ------------------ |
 | trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                | null                 | null               |
 | trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now()) | 30m                  | FILTER_AND_RECLAIM |
-| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST PARTITION BY symbol     | 1h                   | FILTER_ONLY        |
+| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST ON timestamp PARTITION BY symbol | 1h          | FILTER_ONLY        |
 
 ## memory_metrics
 
@@ -882,7 +882,7 @@ SELECT * FROM table_storage();
 | trades         | true       | DAY         | 954            | 1000848308 | 32764798760  |
 | ethblocks_json | true       | DAY         | 3328           | 20688364   | 28311960478  |
 
-<hr />
+---
 
 Filter tables with WAL enabled.
 
@@ -899,7 +899,7 @@ WHERE walEnabled = true;
 | trades         | 1000850255 | 32764804264  |
 | ethblocks_json | 20688364   | 28311960478  |
 
-<hr />
+---
 
 Show tables partitioned by `HOUR`.
 
@@ -1009,10 +1009,10 @@ On primary instances, these columns will be `0` or `false`.
 
 ### Row-expiry policy
 
-| Column                 | Type   | Description                                                    |
-| ---------------------- | ------ | -------------------------------------------------------------- |
-| `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy as written, or `null` |
-| `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                      |
+| Column                 | Type   | Description                                                               |
+| ---------------------- | ------ | --------------------------------------------------------------            |
+| `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy in its canonical form, or `null` |
+| `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                                 |
 
 `tables()` does not include `expire_enforcement`. To check whether a policy is
 `FILTER_AND_RECLAIM` or `FILTER_ONLY`, use `materialized_views()` instead.
