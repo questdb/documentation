@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" width="1400" height="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img">
-<title>LTTB with gap detection</title>
-<desc>Small gap connected, large gap preserved.</desc>
+<title>LTTB with gap detection, client-rendered gap break</title>
+<desc>The small gap is below the threshold and stays connected. Rows on each side of the large gap are selected as separate segments. The line break between them is drawn by the client: the SQL result contains no break marker.</desc>
 <style>
   .t { font-size: 12px; font-weight: 600; }
   .l { font-size: 11px; }
@@ -19,7 +19,7 @@
     .sep { stroke: #3a3a3a; }
   }
 </style>
-<text class="t" x="10" y="35">LTTB with gap threshold '6h': small gap connected, large gap preserved</text>
+<text class="t" x="10" y="35">LTTB with gap threshold '6h': two segments, line break drawn by the client</text>
 <line class="bk" x1="312.8" y1="60" x2="312.8" y2="240"/>
 <polyline class="ref" points="10.0,150.0 18.5,141.0 27.1,132.0 35.6,123.0 44.1,114.0 52.6,69.0 61.2,87.0 69.7,114.0 78.2,132.0 86.8,141.0 95.3,150.0"/>
 <polyline class="ref" points="129.4,164.4 137.9,171.6 146.5,177.0 155.0,189.6 163.5,204.0 172.1,195.0 180.6,186.0 189.1,177.0 197.6,168.0 206.2,159.0"/>
@@ -43,5 +43,5 @@
 <circle cx="140" cy="275" r="3.5" fill="#888"/>
 <text class="l" x="152" y="280">Selected points (12)</text>
 <line class="bk" x1="320" y1="275" x2="344" y2="275"/>
-<text class="l" x="350" y="280">Gap boundary</text>
+<text class="l" x="350" y="280">Gap boundary (client-rendered break)</text>
 </svg>

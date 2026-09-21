@@ -339,14 +339,23 @@ def gen_gap_no_detect():
 
 
 def gen_gap_detect():
-    """LTTB with gap detection - small gap connected, large gap preserved."""
+    """LTTB with gap detection - two segments selected independently.
+
+    The two polylines show how a client that breaks lines on timestamp gaps
+    renders the result. The SQL output has no break marker, so the title,
+    description, and legend all attribute the line break to the client.
+    """
     im, ix, _, sg, bg, raw_pls, _, _ = _gap_helpers()
     g_ab_i = [0, 5, 10, 18, 22, 23]
     g_ab_v = [.50, .95, .50, .20, .40, .45]
     g_c_i = [48, 55, 58, 60, 65, 68]
     g_c_v = [.45, .75, .55, .15, .60, .55]
-    return f"""{hdr(W, H, "LTTB with gap detection", "Small gap connected, large gap preserved.")}
-<text class="t" x="{XL}" y="35">LTTB with gap threshold '6h': small gap connected, large gap preserved</text>
+    desc = ("The small gap is below the threshold and stays connected. "
+            "Rows on each side of the large gap are selected as separate "
+            "segments. The line break between them is drawn by the client: "
+            "the SQL result contains no break marker.")
+    return f"""{hdr(W, H, "LTTB with gap detection, client-rendered gap break", desc)}
+<text class="t" x="{XL}" y="35">LTTB with gap threshold '6h': two segments, line break drawn by the client</text>
 {bkl([bg], im, ix, YT, YB)}
 {raw_pls(YT, YB)}
 <polyline points="{pl(g_ab_i,g_ab_v,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
@@ -358,7 +367,7 @@ def gen_gap_detect():
 <circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
 <text class="l" x="{XL+142}" y="{LY+5}">Selected points (12)</text>
 <line class="bk" x1="{XL+310}" y1="{LY}" x2="{XL+334}" y2="{LY}"/>
-<text class="l" x="{XL+340}" y="{LY+5}">Gap boundary</text>
+<text class="l" x="{XL+340}" y="{LY+5}">Gap boundary (client-rendered break)</text>
 </svg>"""
 
 
