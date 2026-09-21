@@ -454,9 +454,11 @@ kubectl get pvc -n <namespace> -l questdb.io/cluster=<name> -o wide
 kubectl get questdbobjectstore -n <namespace>
 ```
 
-:::danger Deleting the custom resource stops the database and removes its
-managed runtime objects. Confirm applications are stopped and that the CR export
-and data-retention inventory are complete. :::
+:::danger
+Deleting the custom resource stops the database and removes its managed runtime
+objects. Confirm applications are stopped and that the CR export and
+data-retention inventory are complete.
+:::
 
 ```sh
 kubectl delete questdbcluster <name> -n <namespace> --timeout=5m
