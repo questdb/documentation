@@ -102,10 +102,11 @@ module.exports = {
         },
         {
           type: "category",
-          label: "Message Brokers",
+          label: "Connectors",
           collapsed: true,
           items: [
             "connect/message-brokers/kafka",
+            "integrations/other/databento",
             "connect/message-brokers/telegraf",
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
@@ -906,7 +907,7 @@ module.exports = {
           ],
         },
         {
-          // Message brokers live under Ingestion. This is a cross-reference to
+          // Connector guides live under Connect. This is a cross-reference to
           // the overview section that lists them. The fragment is deliberate:
           // Docusaurus decides sidebar activeness by comparing normalized
           // paths without stripping it, so this link never highlights and
@@ -942,7 +943,6 @@ module.exports = {
             "integrations/other/prometheus",
             "integrations/other/sqlalchemy",
             "integrations/other/mindsdb",
-            "integrations/other/databento",
             "integrations/other/cube",
             "integrations/other/ignition",
             "integrations/other/airbyte",

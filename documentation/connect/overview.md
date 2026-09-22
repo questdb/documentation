@@ -19,7 +19,8 @@ Pick the path that matches your environment.
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Greenfield app — want the best throughput, durability, and feature set  | [**Client Libraries**](#client-libraries)                        |
 | An AI agent or MCP tooling driving the database                         | [Agents](/docs/connect/agents/)                                  |
-| Kafka, Flink, Redpanda, or Telegraf pipelines                           | [Message brokers](/docs/integrations/overview/#data-ingestion-and-streaming) |
+| Kafka, Flink, Redpanda, or Telegraf pipelines                           | [Connectors](/docs/integrations/overview/#data-ingestion-and-streaming) |
+| Databento Live feeds or Historical market data                         | [Databento connector](/docs/integrations/other/databento/)          |
 | HTTP scripts, ad-hoc `curl`, or CSV imports                             | [REST API](#rest-api)                                            |
 | Existing InfluxDB collectors, or anything that already emits ILP        | [Compatibility → ILP](/docs/connect/compatibility/ilp/overview/)             |
 | Postgres-shaped data layer, BI tools, ORMs                              | [Compatibility → PGWire](/docs/connect/compatibility/pgwire/overview/)           |

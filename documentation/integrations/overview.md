@@ -33,6 +33,8 @@ integrations:
 
 - **[Apache Kafka](/docs/connect/message-brokers/kafka):** A distributed
   event streaming platform for high-throughput data pipelines.
+- [Databento](/docs/integrations/other/databento/): Stream Live market data and run
+  Historical backfills with the QuestDB connector.
 - [Telegraf](/docs/connect/message-brokers/telegraf/): Collect and report metrics from
   various sources.
 - **[Redpanda](/docs/connect/message-brokers/redpanda/):** A Kafka-compatible streaming
@@ -71,8 +73,6 @@ Improve your interactions with QuestDB using these tools and interfaces:
   capabilities for database interactions.
 - [MindsDB](/docs/integrations/other/mindsdb/): Build machine learning models for
   predictive analytics on [time-series data](/blog/what-is-time-series-data/).
-- [Databento](/docs/integrations/other/databento/): Ingest a normalized live
-  market data feed covering multiple venues.
 - [Cube](/docs/integrations/other/cube/): Middleware connecting your data sources
   to your data applications.
 - [Ignition](/docs/integrations/other/ignition/): A software suite for industrial
