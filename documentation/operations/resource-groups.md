@@ -27,10 +27,10 @@ siblings.
   but mapping statements require it, since mappings attach to ACL principals.
 - The worker pools that execute SQL must run in Fiber mode, which is the
   default.
-- The [`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission for group
-  management, mappings and instance-wide inspection. Ordinary users need no
-  permission to call `current_resource_group()` and check their own query's
-  group.
+- The [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission for
+  group management, mappings and instance-wide inspection through
+  `resource_groups()`. Ordinary users need no permission to call
+  `current_resource_group()` and check their own query's group.
 
 Mapping a principal to a resource group grants it nothing by itself. The user
 still needs `HTTP` or `PGWIRE` to connect and `SELECT` on the tables it queries,

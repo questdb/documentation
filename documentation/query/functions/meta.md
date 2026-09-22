@@ -98,7 +98,7 @@ to. Run it from a client session to confirm which group that session's queries
 land in, which is the quickest way to check that a principal mapping took
 effect. Any authenticated session can call it, with no permission of its own,
 unlike [`resource_groups()`](#resource_groups) which requires
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions). An ordinary user can
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions). An ordinary user can
 therefore check their own group but not read anyone else's policy.
 
 **Arguments:**
@@ -642,9 +642,9 @@ is doing right now. Groups stay visible when `resource.groups.enabled` is
 `false`; only their counters sit at zero.
 
 Calling it requires the database-level
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission, the same
-permission that gates managing groups and listing or cancelling running queries.
-A principal without it gets `Access denied for <user> [SQL ENGINE ADMIN]`.
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, the same
+permission that gates creating, altering and mapping groups. A principal without
+it gets `Access denied for <user> [RESOURCE GROUP ADMIN]`.
 
 **Arguments:**
 

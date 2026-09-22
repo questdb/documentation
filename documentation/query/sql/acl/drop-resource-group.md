@@ -39,7 +39,7 @@ Resource Group is assigned to an ACL entity [entity=analyst]
 Without `IF EXISTS`, dropping a group that does not exist raises an error.
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission.
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission.
 
 `DEFAULT` cannot be dropped. `DROP RESOURCE GROUP DEFAULT` fails with
 `built-in Resource Group cannot be dropped`.

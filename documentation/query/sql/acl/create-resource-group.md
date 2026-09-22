@@ -53,7 +53,7 @@ The name must be unique across resource groups. If it is already taken the
 statement fails, unless `IF NOT EXISTS` is included.
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission.
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission.
 
 Creating a second resource group engages CPU scheduling for the whole instance.
 While `DEFAULT` is the only group there is no CPU slicing at all, so weights

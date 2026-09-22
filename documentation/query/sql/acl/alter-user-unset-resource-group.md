@@ -31,7 +31,7 @@ back to the highest-priority mapping among its ACL groups, or to `DEFAULT` when
 it belongs to none that are mapped.
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission, and affects
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and affects
 queries that start after the change rather than one already running.
 
 Unmapping is also the prerequisite for dropping a resource group:

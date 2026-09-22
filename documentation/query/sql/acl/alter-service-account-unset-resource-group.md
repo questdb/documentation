@@ -31,7 +31,7 @@ mapping to fall back to, because a service account cannot belong to a group.
 Unsetting therefore leaves it governed only by `DEFAULT`'s policy.
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission, and affects
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and affects
 queries that start after the change rather than one already running.
 
 Unmapping is also the prerequisite for dropping a resource group:

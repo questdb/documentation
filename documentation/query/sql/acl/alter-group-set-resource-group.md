@@ -29,7 +29,7 @@ ALTER GROUP groupName SET RESOURCE GROUP resourceGroupName
 ## Description
 
 Mapping an ACL group is how you cover a team without naming each member. It
-requires the [`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission,
+requires the [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission,
 and affects queries that start after the change rather than one already running.
 
 This is workload mapping: it decides how much of the instance the group's

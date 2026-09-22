@@ -36,7 +36,7 @@ exactly one mapping and there is nothing to break a tie between. It belongs to
 [`ALTER GROUP SET RESOURCE GROUP`](/docs/query/sql/acl/alter-group-set-resource-group/).
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission, and affects
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and affects
 queries that start after the change rather than one already running.
 
 This governs the queries the account runs. It does not throttle ingestion, which

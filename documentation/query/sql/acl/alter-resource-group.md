@@ -49,7 +49,7 @@ which is not always "unlimited": `RESET (cpu_weight)` returns the group to a
 weight of 100, and `RESET (queue_timeout)` returns it to 30 seconds.
 
 The statement requires the
-[`SQL ENGINE ADMIN`](/docs/security/rbac/#permissions) permission.
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission.
 
 `DEFAULT` can be altered but not renamed. `ALTER RESOURCE GROUP DEFAULT RENAME TO`
 fails with `built-in Resource Group cannot be renamed`.

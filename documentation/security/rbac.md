@@ -839,6 +839,7 @@ SELECT * FROM all_permissions();
 | REMOVE STORAGE POLICY     | Database &#124; Table               | Remove storage policies                 |
 | RENAME COLUMN             | Database &#124; Table &#124; Column | Rename columns                          |
 | RENAME TABLE              | Database &#124; Table               | Rename tables                           |
+| RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, read `resource_groups()` |
 | RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
 | SELECT                    | Database &#124; Table &#124; Column | Read data                               |
 | SET STORAGE POLICY        | Database &#124; Table               | Set storage policies                    |
@@ -846,7 +847,7 @@ SELECT * FROM all_permissions();
 | SET TABLE TYPE            | Database &#124; Table               | Change table type                       |
 | SETTINGS                  | Database                            | Change instance settings in Web Console |
 | SNAPSHOT                  | Database                            | Create snapshots                        |
-| SQL ENGINE ADMIN          | Database                            | List/cancel running queries, manage and map resource groups |
+| SQL ENGINE ADMIN          | Database                            | List/cancel running queries             |
 | SWITCH ROLE               | Database                            | Switch the replication role, read SWITCH STATUS |
 | SYSTEM ADMIN              | Database                            | System functions (reload_tls, etc.)     |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
