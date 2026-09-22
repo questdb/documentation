@@ -33,14 +33,14 @@ integrations:
 
 - **[Apache Kafka](/docs/connect/message-brokers/kafka):** A distributed
   event streaming platform for high-throughput data pipelines.
-- [Databento](/docs/integrations/other/databento/): Stream Live market data and run
-  Historical backfills with the QuestDB connector.
 - [Telegraf](/docs/connect/message-brokers/telegraf/): Collect and report metrics from
   various sources.
 - **[Redpanda](/docs/connect/message-brokers/redpanda/):** A Kafka-compatible streaming
   platform for simplified data pipelines.
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
+- [Databento](/docs/integrations/other/databento/): Stream Live market data and run
+  Historical backfills with the QuestDB connector.
 
 ## Analytics and Processing
 

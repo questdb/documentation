@@ -106,10 +106,10 @@ module.exports = {
           collapsed: true,
           items: [
             "connect/message-brokers/kafka",
-            "integrations/other/databento",
             "connect/message-brokers/telegraf",
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
+            "integrations/other/databento",
           ],
         },
         {
