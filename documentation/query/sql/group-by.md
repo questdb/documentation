@@ -112,6 +112,7 @@ LIMIT 6;
 
 ## See also
 
+- [FILTER](/docs/query/sql/filter/) - Restrict the rows a single aggregate sees
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions

@@ -12,18 +12,24 @@ Window functions perform calculations across sets of table rows related to the c
 ## Syntax
 
 ```sql
-function_name(arguments) OVER (
-    [PARTITION BY column [, ...]]
-    [ORDER BY column [ASC | DESC] [, ...]]
-    [frame_clause]
-)
+function_name(arguments)
+    [FILTER (WHERE condition) | IGNORE NULLS | RESPECT NULLS]
+    OVER (
+        [PARTITION BY column [, ...]]
+        [ORDER BY column [ASC | DESC] [, ...]]
+        [frame_clause]
+    )
 ```
 
+- **[`FILTER`](/docs/query/sql/filter/)**: Restricts an aggregate to the rows matching a condition
+- **`IGNORE NULLS` / `RESPECT NULLS`**: Controls null handling; `RESPECT NULLS` is the default
 - **`PARTITION BY`**: Divides rows into groups; the function resets for each group
 - **`ORDER BY`**: Defines the order of rows within each partition
 - **`frame_clause`**: Specifies which rows relative to the current row to include (e.g., `ROWS BETWEEN 3 PRECEDING AND CURRENT ROW`)
 
 Some functions (`first_value`, `last_value`, `lag`, `lead`) also support `IGNORE NULLS` or `RESPECT NULLS` before the `OVER` keyword to control null handling.
+
+Aggregates used in window position accept a [`FILTER (WHERE ...)`](/docs/query/sql/filter/) clause before `OVER`, which restricts the rows the aggregate sees within its frame. Every other window function rejects it. For an example, see [FILTER on window function aggregates](syntax.md#filter-on-window-function-aggregates).
 
 When multiple window functions share the same definition, use the `WINDOW` clause to define it once:
 
@@ -41,31 +47,33 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 
 ## Quick reference
 
-| Function | Description | Respects Frame |
-|----------|-------------|----------------|
-| [`avg()`](reference.md#avg) | Average value in window (also supports EMA and VWEMA) | Yes (standard) / No (EMA/VWEMA) |
-| [`corr()`](reference.md#corr) | Pearson correlation coefficient | Yes |
-| [`count()`](reference.md#count) | Count rows or non-null values | Yes |
-| [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Yes |
-| [`cume_dist()`](reference.md#cume_dist) | Cumulative distribution (0 to 1] | No |
-| [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
-| [`first_value()`](reference.md#first_value) | First value in window | Yes |
-| [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Yes |
-| [`lag()`](reference.md#lag) | Value from previous row | No |
-| [`last_value()`](reference.md#last_value) | Last value in window | Yes |
-| [`lead()`](reference.md#lead) | Value from following row | No |
-| [`max()`](reference.md#max) | Maximum value in window | Yes |
-| [`min()`](reference.md#min) | Minimum value in window | Yes |
-| [`nth_value()`](reference.md#nth_value) | N-th value in window | Yes |
-| [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
-| [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
-| [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
-| [`row_number()`](reference.md#row_number) | Sequential row number | No |
-| [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Yes |
-| [`sum()`](reference.md#sum) | Sum of values in window | Yes |
-| [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Yes |
+| Function | Description | Frame | `FILTER` |
+|----------|-------------|-------|----------|
+| [`avg()`](reference.md#avg) | Average value in window (also supports EMA and VWEMA) | Respected (standard) / ignored (EMA/VWEMA) | Yes |
+| [`corr()`](reference.md#corr) | Pearson correlation coefficient | Respected | Yes |
+| [`count()`](reference.md#count) | Count rows or non-null values | Respected | Yes |
+| [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Respected | Yes |
+| [`cume_dist()`](reference.md#cume_dist) | Cumulative distribution (0 to 1] | Rejected | No |
+| [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | Ignored | No |
+| [`first_value()`](reference.md#first_value) | First value in window | Respected | No |
+| [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Respected | Yes |
+| [`lag()`](reference.md#lag) | Value from previous row | Ignored | No |
+| [`last_value()`](reference.md#last_value) | Last value in window | Respected | No |
+| [`lead()`](reference.md#lead) | Value from following row | Ignored | No |
+| [`max()`](reference.md#max) | Maximum value in window | Respected | Yes |
+| [`min()`](reference.md#min) | Minimum value in window | Respected | Yes |
+| [`nth_value()`](reference.md#nth_value) | N-th value in window | Respected | No |
+| [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | Rejected | No |
+| [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | Rejected | No |
+| [`rank()`](reference.md#rank) | Rank with gaps for ties | Ignored | No |
+| [`row_number()`](reference.md#row_number) | Sequential row number | Ignored | No |
+| [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Respected | Yes |
+| [`sum()`](reference.md#sum) | Sum of values in window | Respected | Yes |
+| [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Respected | Yes |
 
-**Respects Frame**: Functions marked "Yes" use the frame clause (`ROWS`/`RANGE BETWEEN`). Functions marked "No" operate on the entire partition regardless of frame specification.
+**Frame**: *Respected* means the function uses the frame clause (`ROWS`/`RANGE BETWEEN`). *Ignored* means a frame clause is accepted but has no effect, and the function operates on the entire partition. *Rejected* means a frame clause is an error, for example `ntile() does not support framing; remove the frame clause`.
+
+**FILTER**: only aggregate window functions accept a [`FILTER (WHERE ...)`](/docs/query/sql/filter/) clause. The rest fail with `FILTER is supported only for aggregate functions`.
 
 ## When to use window functions
 
