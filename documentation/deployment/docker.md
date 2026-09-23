@@ -86,6 +86,59 @@ renderText={(release) => (
 )}
 />
 
+### Raise system limits
+
+QuestDB relies on two per-process OS limits that are often too low by default:
+the number of open files and the number of memory-mapped areas. See
+[capacity planning](/docs/getting-started/capacity-planning/#maximum-open-files)
+for the full explanation. In Docker they are set differently than on a bare host,
+because the container shares the host kernel.
+
+**Open files** (`ulimit -n`, recommended `1048576`): pass `--ulimit` to
+`docker run`. Without it, the Web Console can show
+`fs.file-max limit is too low [current=524288, recommended=1048576]`.
+
+```shell
+docker run \
+  --ulimit nofile=1048576:1048576 \
+  -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \
+  questdb/questdb
+```
+
+With Docker Compose:
+
+```yaml
+services:
+  questdb:
+    image: questdb/questdb
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+```
+
+To raise it for every container instead, set `default-ulimits` in
+`/etc/docker/daemon.json` and restart Docker:
+
+```json
+{
+  "default-ulimits": {
+    "nofile": { "Name": "nofile", "Soft": 1048576, "Hard": 1048576 }
+  }
+}
+```
+
+**Memory-mapped areas** (`vm.max_map_count`, recommended `1048576`): this is a
+host kernel setting rather than a container one, because the container shares the
+host kernel. Set it on the host:
+
+```shell
+sysctl -w vm.max_map_count=1048576
+```
+
+To persist it across reboots, add `vm.max_map_count=1048576` to a file such as
+`/etc/sysctl.d/99-questdb.conf`.
+
 ## Environment variables
 
 Server configuration can be passed to QuestDB running in Docker by using the
