@@ -111,6 +111,7 @@ ALTER VIEW trades_filtered AS (
 | `Invalid column` | Column in new query doesn't exist |
 | `circular dependency detected` | New definition would create circular reference |
 | `Access denied [ALTER VIEW on view_name]` | User lacks `ALTER VIEW` permission (Enterprise) |
+| `Access denied [AUDIT VIEW]` | The view is audited and the user lacks the `AUDIT VIEW` permission (Enterprise) |
 | `Access denied [SELECT on table_name]` | User lacks SELECT on tables in new definition (Enterprise) |
 
 ## Behavior
@@ -120,7 +121,8 @@ ALTER VIEW trades_filtered AS (
 - Dependent views may become invalid if the altered view's output changes
 - Use `CREATE OR REPLACE VIEW` as an alternative if you want to create the view
   when it doesn't exist
-- An [audited view](/docs/security/audited-views/) stays audited (Enterprise)
+- An [audited view](/docs/security/audited-views/) stays audited, and altering
+  one also requires the database-level `AUDIT VIEW` permission (Enterprise)
 
 ### Definer permissions transfer (Enterprise)
 

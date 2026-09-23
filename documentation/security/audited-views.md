@@ -179,7 +179,10 @@ that, change the policy with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
 
 The table cannot be dropped, so the trail cannot be erased by whoever holds
-`DROP TABLE`. It can be truncated with
+`DROP TABLE`. That holds for every route that drops a table: `DROP TABLE`,
+`DROP ALL TABLES`, and a
+[CSV import](/docs/connect/compatibility/rest-api/#imp---import-data) with
+`overwrite=true`. It can be truncated with
 [`TRUNCATE TABLE`](/docs/query/sql/truncate/), which keeps retention the
 operator's to manage.
 
@@ -205,8 +208,10 @@ values.
 These record nothing:
 
 - `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `ALTER VIEW` and
-  `CREATE OR REPLACE VIEW` whose query reads an audited view. Each opens its
-  query only to check it, and hands no rows to anyone.
+  `CREATE OR REPLACE VIEW` whose query reads an audited view, when the check
+  passes. Each opens its query only to check it, and hands no rows to anyone. A
+  check that fails records a row with status `error`, like any failed read,
+  because its error message can carry values from the rows it read.
 - Reads the database runs on its own behalf: materialized view refreshes and
   WAL apply. No principal is reading data there.
 - An `UPDATE` of a WAL table. See [Limitations](#limitations).
@@ -250,7 +255,8 @@ DECLARE @sym := 'ETH-USDT' SELECT * FROM buy_trades;
 | `symbol_trades` | `{"sym":"ETH-USDT"}` |
 
 To record one row, re-declare the parameter in the outer view. The view stays
-audited through `ALTER VIEW`:
+audited through `ALTER VIEW`, which on an audited view also needs the
+[`AUDIT VIEW`](#permissions) permission:
 
 ```questdb-sql title="The outer view records @sym itself"
 ALTER VIEW buy_trades AS (
@@ -313,14 +319,17 @@ Lost rows show in the server log only. No metric reports them.
 | ------------------------------------------------------------------- | --------------------------------------------------------- |
 | Create a view `WITH AUDIT`                                          | `CREATE VIEW` and `AUDIT VIEW`                            |
 | Drop an audited view, with `DROP VIEW` or `DROP ALL TABLES`         | `DROP VIEW` on the view and `AUDIT VIEW`                  |
-| Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view. The view stays audited          |
+| Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`. The view stays audited |
 | Read an audited view                                                | `SELECT` on the view, as for any [view](/docs/concepts/views/#definer-security-model-enterprise) |
 | Read or truncate the trail                                          | `SELECT` or `TRUNCATE TABLE` on `sys.view_audit`          |
 
 `AUDIT VIEW` is a database-level permission, included in `ALL` and
-`DATABASE ADMIN`. It guards the two statements that bind a view to the trail or
-release it, so that a principal who can drop and recreate a view cannot shed
-its auditing unremarked.
+`DATABASE ADMIN`. It guards every statement that binds a view to the trail,
+changes what it records, or releases it: creating, redefining and dropping an
+audited view. A new body can remove the view's `AUDITED` declarations, or keep
+a variable `OVERRIDABLE` while no longer recording it, so without the
+permission a principal who can alter a view, or drop and recreate it, could
+shed its auditing unremarked.
 
 A view's auditing is set when it is created. `ALTER VIEW` and
 `CREATE OR REPLACE VIEW` over an existing view keep it, and do not accept
@@ -336,6 +345,14 @@ people who review the trail, and keep write permissions such as `INSERT`,
 Every node records the reads it serves, replicas included, into its own
 `sys.view_audit`. The rows are not replicated between nodes, so the complete
 trail is the union of the tables on all nodes.
+
+A replica does not create `sys.view_audit` itself. The table's definition, and
+its storage policy, reach the replica from the primary, and the replica writes
+the reads it serves into that table. Until the definition arrives, the replica
+keeps its audit rows in the queue, and a read whose row finds the queue full
+goes unrecorded, as in [Delivery](#delivery). This matters only for a replica
+that starts before its primary has created the table, such as when replicas
+are upgraded first.
 
 An instance started with `readonly=true` cannot write the trail, so it refuses
 reads of audited views with

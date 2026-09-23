@@ -43,8 +43,10 @@ after the partition ends. An audit trail is append-only and read cold, and
 every partition converts once whatever the threshold, so a longer one keeps
 native files around without saving any work.
 
-The setting applies only when the server creates the table at startup. It does
-not change the policy of a table that already exists: use
+The setting applies only when the server creates the table at startup, which
+a primary does and a replica does not: a replica takes the table, and its
+policy, from the primary. It does not change the policy of a table that already
+exists: use
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
 for that. Set the property to an empty value to create the table with no
 storage policy. If the server rejects the policy, it logs the error and creates

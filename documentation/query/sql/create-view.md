@@ -250,7 +250,8 @@ CREATE VIEW trades_by_symbol AS (
 Creating a view `WITH AUDIT` requires the `AUDIT VIEW` permission in addition
 to `CREATE VIEW`. The view stays audited through `ALTER VIEW` and
 `CREATE OR REPLACE VIEW`, which do not accept `WITH AUDIT` for an existing
-view. To audit an existing view, drop it and create it again.
+view, and which also require `AUDIT VIEW` over an audited one. To audit an
+existing view, drop it and create it again.
 
 ## See also
 
