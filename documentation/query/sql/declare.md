@@ -226,7 +226,8 @@ and every form of `IN` works as it does with a written-out list, including
 - A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
   `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
   after the last member of a longer list.
-- A bracketed sub-query, `(SELECT ...)`, is a sub-query and not a list.
+- A bracketed sub-query, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
+  sub-query and not a list.
 
 Members can be bind variables, which lets one prepared statement filter on a
 different set of values each time:

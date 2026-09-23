@@ -118,7 +118,7 @@ It is a WAL table partitioned by day, with this schema:
 | `ts`             | `TIMESTAMP` | When the read finished and the row was recorded. The designated timestamp.                                   |
 | `principal`      | `SYMBOL`    | The user or service account that ran the query.                                                              |
 | `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
-| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object.                                     |
+| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated. |
 | `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds.                                      |
 | `status`         | `SYMBOL`    | `ok`, or `error` when the read failed or was cancelled. A failed read is recorded because it was attempted. |
 | `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id.          |
@@ -146,9 +146,30 @@ text and a report can group on the column directly:
 | `DATE`                                            | ISO 8601 string, with microseconds                                     |
 | `UUID`, `IPv4`                                    | String                                                                 |
 
-A read whose `AUDITED` variable resolves to any other type, such as an array,
-fails with `audited view parameter has a type that cannot be audited`, rather
-than record a row with a value missing.
+### Values that cannot be audited
+
+A read fails, rather than record a row that misstates it, when an `AUDITED`
+variable:
+
+- Resolves to a type the table above does not list, such as an array. The error
+  is `audited view parameter has a type that cannot be audited`.
+- Holds a sub-query anywhere in its value, such as
+  `(SELECT max(timestamp) FROM trades)`. The error is the same, with the type
+  `CURSOR`.
+- Can change while the query runs, such as `rnd_int()` or `systimestamp()`. The
+  error is `audited view parameter has a value that can change during the query`.
+  A value built on `now()` is fixed for the whole query, and is recorded.
+
+`CREATE VIEW ... WITH AUDIT`, `ALTER VIEW` and `CREATE OR REPLACE VIEW` check the
+view's own declarations the same way, so a view that no read could audit is
+refused when it is defined.
+
+A read also fails when an `AUDITED` value cannot be evaluated, for example when
+a caller's override makes a function raise an error. This holds even when the
+query never uses the variable, such as one that only feeds a column the query
+does not select. The read returns the error without reading any data, and
+records a row with status `error` and `NULL` in `params`. The trail cannot show
+what such a read was given, so the read does not run.
 
 ### Query the trail
 
@@ -186,10 +207,10 @@ The table cannot be dropped, so the trail cannot be erased by whoever holds
 [`TRUNCATE TABLE`](/docs/query/sql/truncate/), which keeps retention the
 operator's to manage.
 
-The server writes to the table by column name, so you can add columns of your
-own. The seven columns above must keep their names and types. If one is missing
-or has another type, the server logs an error and discards audit rows until the
-table is repaired and the server restarted.
+`ALTER TABLE` cannot change the table's structure: adding, dropping, renaming
+or retyping a column, and turning deduplication on or off, are refused. Each
+node keeps its own table, so such a change would stay on the node that made it.
+The storage policy, partition operations and `TRUNCATE TABLE` remain available.
 
 ## What counts as a read
 
@@ -306,8 +327,9 @@ A read goes unrecorded when:
 - **The job fails to write a batch.** The batch, up to 1024 rows, is lost, and
   the server logs `could not write view audit rows`.
 - **The audit table is missing a column, or a column has the wrong type.** The
-  server discards audit rows until the table is repaired and the server
-  restarted. See [Retention](#retention).
+  server logs the reason once and discards audit rows. The server creates the
+  table with the right columns and SQL cannot change them, so this happens only
+  to a table created some other way. See [Retention](#retention).
 - **The server stops or crashes with rows still in the queue.** The queue is
   held in memory only.
 
