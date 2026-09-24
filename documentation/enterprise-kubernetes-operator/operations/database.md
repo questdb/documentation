@@ -407,14 +407,179 @@ into a new cluster.
 
 The default PodDisruptionBudget (PDB) uses `minAvailable: 1` for a singleton and
 `instances-1` for a replicated cluster. A singleton therefore blocks voluntary
-eviction and can make `kubectl drain` wait indefinitely.
+eviction and can make `kubectl drain` wait indefinitely. A replicated cluster's
+default permits one voluntary disruption at a time.
 
-Before planned maintenance, choose one safe option:
+### Rotate a node pool without reducing replica capacity
 
-1. scale out and wait for a healthy, current replica;
-2. lower `spec.scheduling.podDisruptionBudget.minAvailable`; or
-3. set `spec.scheduling.podDisruptionBudget.enabled: false` only after accepting
-   database downtime.
+Use a temporary surge replica for planned node-pool replacement. Kubernetes node
+maintenance remains external to the operator: your infrastructure tooling
+cordons, drains, powers off, and deletes Nodes; the operator manages only the
+QuestDB Pods and PVCs.
+
+This procedure preserves each existing instance identity and PVC. After a Pod is
+evicted, the operator recreates the same instance on an eligible node and
+reattaches its PVC. The temporary highest-serial replica is removed when you
+restore the original instance count.
+
+Before starting:
+
+- use a replicated cluster with a completed backup seed, as required for
+  [scale out](#scale-out);
+- require current generation, `Available=True/PrimaryReady`,
+  `Progressing=False/Settled`, `WriteHealthy=True/Healthy`, and
+  `ReplicationHealthy=True`;
+- provide replacement capacity in every zone required by the existing PVCs,
+  matching the cluster's node selectors, affinity, and tolerations;
+- finish any ordinary rollout, promotion, or cold-manager handoff; and
+- record the original instance count, Pod UIDs, roles, Nodes, and PVCs.
+
+```sh
+ORIGINAL_INSTANCES="$(kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='{.spec.instances}')"
+[ "$ORIGINAL_INSTANCES" -ge 2 ]
+
+kubectl get questdbcluster <name> -n <namespace> -o wide
+kubectl get pods -n <namespace> -l questdb.io/cluster=<name> \
+  -L questdb.io/instance,questdb.io/role,questdb.io/ro-ready -o wide
+kubectl get pvc -n <namespace> -l questdb.io/cluster=<name> -o wide
+```
+
+#### 1. Cordon retiring nodes
+
+Cordon every retiring node before creating the surge replica. Cordon does not
+move existing Pods, but it prevents the scheduler from placing the surge or any
+replacement Pod on those nodes.
+
+```sh
+kubectl cordon <retiring-node-1> <retiring-node-2>
+kubectl get nodes <retiring-node-1> <retiring-node-2>
+```
+
+By default, QuestDB Pods have preferred hostname anti-affinity with weight 100
+and a soft zone spread with `maxSkew: 1`. These rules prefer different hosts and
+balanced zones but do not guarantee either under capacity pressure. An explicit
+`spec.scheduling.affinity` fully replaces the default hostname anti-affinity; an
+explicit `topologySpreadConstraints` list replaces the default zone spread.
+Configure any required hard placement rules before this maintenance and let the
+resulting Pod rollout settle first.
+
+#### 2. Add and verify one surge replica
+
+Increase the instance count by one. One surge is sufficient when nodes are
+drained sequentially, which the default PDB requires.
+
+```sh
+SURGE_INSTANCES=$((ORIGINAL_INSTANCES + 1))
+kubectl patch questdbcluster <name> -n <namespace> --type merge \
+  -p "{\"spec\":{\"instances\":${SURGE_INSTANCES}}}"
+
+GENERATION="$(kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='{.metadata.generation}')"
+for _ in $(seq 1 120); do
+  OBSERVED="$(kubectl get questdbcluster <name> -n <namespace> \
+    -o jsonpath='{.status.observedGeneration}')"
+  READY="$(kubectl get questdbcluster <name> -n <namespace> \
+    -o jsonpath='{.status.readyInstances}')"
+  [ "$OBSERVED" = "$GENERATION" ] && \
+    [ "$READY" = "$SURGE_INSTANCES" ] && break
+  sleep 10
+done
+[ "$OBSERVED" = "$GENERATION" ]
+[ "$READY" = "$SURGE_INSTANCES" ]
+
+kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='{range .status.conditions[?(@.type=="ReplicationHealthy")]}{.status}{" "}{.reason}{" "}{.message}{"\n"}{end}{range .status.replication.replicas[*]}{.instance}{" caughtUp="}{.caughtUp}{" caughtUpNow="}{.caughtUpNow}{" lagTxns="}{.lagTxns}{"\n"}{end}'
+kubectl get pods -n <namespace> -l questdb.io/cluster=<name> \
+  -L questdb.io/instance,questdb.io/role,questdb.io/ro-ready -o wide
+```
+
+Proceed only when `ReplicationHealthy=True`, every expected instance is Ready,
+and the new replica has a current `caughtUpNow=true` observation and
+`questdb.io/ro-ready=true`. A latched `caughtUp=true` by itself is not current
+freshness. Confirm that the surge Pod is not on a retiring node.
+
+If the surge remains Pending, do not drain anything. Add compatible capacity or
+restore `spec.instances` to `ORIGINAL_INSTANCES` and uncordon the nodes to
+abort.
+
+#### 3. Handle a primary on a retiring node
+
+Draining the primary recreates the same primary identity elsewhere and briefly
+interrupts writes. For a planned handoff instead, first re-home an original
+replica onto a non-retiring node, then create a
+[`QuestDBPromotion`](/docs/enterprise-kubernetes-operator/high-availability/#promotion-and-failover)
+targeting that replica and wait for it to complete. Drain the primary's node
+last. Do not promote the temporary highest-serial surge replica: keeping it a
+replica makes the final scale-in remove the temporary instance rather than a
+long-lived one. Structured cold storage may require moving its manager first;
+follow [Move the cold-storage manager](#move-the-cold-storage-manager).
+
+Do not use an Emergency promotion for routine maintenance. It explicitly accepts
+loss of WAL that the old primary has not uploaded.
+
+#### 4. Drain one node at a time
+
+Drain one retiring node through your cloud's managed-node workflow or with
+`kubectl drain`. The QuestDB eviction consumes the default PDB's one allowed
+voluntary disruption, so wait for full recovery before draining the next node.
+
+```sh
+kubectl drain <retiring-node-1> --ignore-daemonsets
+```
+
+Do not bypass the PDB or force-delete a QuestDB Pod to accelerate a healthy
+planned drain. After the eviction, the operator waits for the old Pod object to
+be gone, then recreates that same instance and PVC. The cordon keeps it off
+every retiring node.
+
+Before proceeding to the next node, require all of the following again:
+
+- `status.observedGeneration` equals `metadata.generation`;
+- `status.readyInstances` equals `SURGE_INSTANCES`;
+- `ReplicationHealthy=True` and every replica is currently healthy;
+- the recreated Pod has a new UID and runs on a non-retiring node; and
+- the ordinary writer-health contract is satisfied.
+
+If recovery stalls, leave the surge in place and stop the maintenance workflow.
+Inspect Pod scheduling events, PVC/PV topology, volume attachment, Node health,
+and cluster conditions. Recover the node or add same-zone capacity; do not move
+on to another drain while the cluster is below the surge count.
+
+Repeat this step sequentially for each retiring node that hosts a QuestDB Pod.
+Nodes with no QuestDB Pod do not require another database surge or recovery
+cycle.
+
+#### 5. Return to the steady instance count
+
+After every QuestDB Pod runs on a non-retiring node and the cluster is healthy,
+restore the original count. Scale-in removes the temporary highest-serial
+replica.
+
+```sh
+kubectl patch questdbcluster <name> -n <namespace> --type merge \
+  -p "{\"spec\":{\"instances\":${ORIGINAL_INSTANCES}}}"
+```
+
+Wait for current generation, `readyInstances=ORIGINAL_INSTANCES`, settled
+conditions, and the full writer and replication health contracts. Inventory Pods
+and PVCs afterward. With `pvcRetentionPolicy: Retain`, the temporary replica's
+PVC remains for deliberate inspection or cleanup; with `Delete`, the operator
+removes it during scale-in.
+
+The retiring Nodes can now remain cordoned and be removed by the external
+node-pool workflow. If maintenance is cancelled instead, uncordon only Nodes
+that remain valid destinations.
+
+It is safe to pause with the surge replica running. Restoring the steady count
+is cleanup, not a prerequisite for database availability.
+
+### Other maintenance choices
+
+When a surge replica is not appropriate, lower
+`spec.scheduling.podDisruptionBudget.minAvailable`, or set
+`spec.scheduling.podDisruptionBudget.enabled: false` only after explicitly
+accepting the resulting database downtime.
 
 ```yaml
 spec:
