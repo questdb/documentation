@@ -18,17 +18,31 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ START timestamp ] [ TIME ZONE timezone ]
            [ PERIOD ( LENGTH length [ TIME ZONE tz ] [ DELAY delay ] ) ]
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
-AS [ ( ] query [ ) ]
-[ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
-      [ TTL n timeUnit ] ]
-[ OWNED BY ownerName ]
+AS
+{ query
+| ( query )
+  [ TIMESTAMP ( columnRef ) ]
+  [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+        [ TTL n timeUnit ] ]
+  [ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
+  [ OWNED BY ownerName ]
+}
 ```
 
+You can leave out the parentheses around `query` only when the query is the last
+thing in the statement. They are required if any clause comes after the query,
+such as `TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
+
 Where:
+
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
+- `query`: Either an aggregating query (with `SAMPLE BY` or a time-based
+  `GROUP BY`), or a
+  [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that
+  copies rows from a single table
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) ON col [PARTITION BY cols]`.
+  This policy is meant for passthrough views (see below).
 
 ## Parameters
 
@@ -39,22 +53,45 @@ Where:
 | `WITH BASE` | Specify base table (required for JOINs) |
 | `REFRESH` | Refresh strategy (default: `IMMEDIATE`) |
 | `DEFERRED` | Skip initial refresh on creation |
-| `query` | A `SAMPLE BY` or time-based `GROUP BY` query |
+| `query` | An aggregating (`SAMPLE BY` / time-based `GROUP BY`) or [passthrough](/docs/concepts/materialized-views/#passthrough-views) query |
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
+| `EXPIRE ROWS` | Row-level retention for passthrough views (see below) |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
 ## Rules and defaults
 
 | Rule | Description |
 | ---- | ----------- |
-| Query must aggregate | Requires `SAMPLE BY` or `GROUP BY` with designated timestamp |
+| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that copies rows one-for-one from a single table |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
 | PERIOD requires SAMPLE BY | The `PERIOD` clause only works with `SAMPLE BY` queries |
 | EVERY minimum | Minimum timer interval is `1m` |
+
+### LIMIT restrictions and existing definitions
+
+You cannot use `LIMIT` in any part of the query that reads the base table,
+including nested queries. This applies to both aggregating and passthrough views.
+Each refresh runs the query over the rows that just changed, so a `LIMIT 100`
+would cap each batch rather than the view as a whole. A `LIMIT` in a subquery over
+a *different* table is still allowed.
+
+:::note Upgrading existing definitions
+
+Materialized views that already contain such a `LIMIT` keep refreshing. But if you
+recreate one after upgrading from a version that allowed it, you have to remove or
+rework the limit first. The same applies when you replay
+`SHOW CREATE MATERIALIZED VIEW` output during a migration or restore.
+
+If the limit was only there to cap how many rows your application receives, remove
+it from the view and instead use `ORDER BY ... LIMIT ...` when you query the view.
+Note that moving the limit changes which rows the view stores, so it does not
+behave exactly like the original.
+
+:::
 
 ## Valid clause combinations
 
@@ -69,10 +106,11 @@ Where:
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
-  timestamp TIMESTAMP,
   symbol SYMBOL,
+  side SYMBOL,
   price DOUBLE,
-  amount DOUBLE
+  amount DOUBLE,
+  timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -278,9 +316,72 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
 
-## Complete example
+## EXPIRE ROWS
 
-Putting it all together:
+Add a row-level retention policy with `EXPIRE ROWS`. Where `TTL` drops whole
+partitions by age, `EXPIRE ROWS` keeps a chosen set of rows: the latest per key,
+the top-N per group, or rows that match a condition. QuestDB keeps that set up to
+date as the view refreshes.
+
+`EXPIRE ROWS` is built for
+[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views):
+a query over a single table with no `SAMPLE BY` / `GROUP BY`, where each view row
+matches one base row. An aggregating view is allowed, but only with a warning in
+the log, because a later refresh can rebuild rows that were deleted. The query
+must not read another view that has a policy, whether as its base table or
+through a join:
+
+```questdb-sql title="Passthrough view that keeps the latest row per symbol"
+CREATE MATERIALIZED VIEW trades_latest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
+```
+
+A `WHEN` condition is for rules that depend on the **current time**, such as a
+rolling `timestamp < dateadd('d', -7, now())` window. The view's query cannot do
+this, because it is not allowed to call functions like `now()`. A rule that only
+looks at a row's own values belongs in the query's `WHERE` clause instead, which
+keeps those rows out of the view completely; see
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
+
+The clause goes after the query (and after `PARTITION BY` if present):
+
+```
+EXPIRE ROWS
+  { WHEN predicate
+  | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
+  | KEEP [ N ] ( HIGHEST | LOWEST ) ON col [ PARTITION BY col [, col ...] ] }
+  [ CLEANUP EVERY duration ]
+```
+
+A `WHEN` threshold that is a fixed value at definition time and comes out as
+`NULL` is rejected, because it would expire nothing. This covers the obvious
+`timestamp < CAST(NULL AS TIMESTAMP)` and also math that overflows onto the
+reserved `NULL` value, such as `timestamp < 2147483647 + 1`. See
+[A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
+
+For how expired rows are filtered and freed from disk, see
+[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works). Change or
+remove a policy with
+[`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
+
+A view can have both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the statement
+and first in effect: it removes rows from the view, and the `EXPIRE ROWS` policy
+then applies to what is left. See
+[Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
+
+See the [Expiring rows](/docs/concepts/expire-rows/) concept page for all modes,
+examples, and details (NULLs, ties, and when rows are deleted from disk).
+
+## Larger example
+
+Create a materialized view that:
+
+- Checks for updates every 15 minutes (`EVERY 15m`)
+- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
+- Aggregates from `trades` table (`WITH BASE trades`)
+- Stores hourly averages and volumes (`SAMPLE BY 1h`)
+- Keeps 30 days of data (`TTL 30 DAYS`)
 
 ```questdb-sql title="Fully specified materialized view"
 CREATE MATERIALIZED VIEW IF NOT EXISTS trades_hourly_stats
@@ -300,13 +401,6 @@ AS (
 )
 PARTITION BY DAY TTL 30 DAYS;
 ```
-
-This creates a view that:
-- Checks for updates every 15 minutes (`EVERY 15m`)
-- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
-- Aggregates from `trades` table (`WITH BASE trades`)
-- Stores hourly averages and volumes (`SAMPLE BY 1h`)
-- Keeps 30 days of data (`TTL 30 DAYS`)
 
 ## Metadata
 
@@ -395,7 +489,9 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 ## See also
 
 - [Materialized views concept](/docs/concepts/materialized-views/)
+- [Row expiry concept](/docs/concepts/expire-rows/)
 - [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
 - [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
 - [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)
+- [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/)
