@@ -816,6 +816,7 @@ SELECT * FROM all_permissions();
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
+| AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
 | CREATE TABLE              | Database                            | Create tables                           |
