@@ -22,8 +22,8 @@ where:
 - `columnName` used in the `LATEST ON` part of the clause is a `TIMESTAMP`
   column.
 - `columnName` list used in the `PARTITION BY` part of the clause is a list of
-  columns of one of the following types: `SYMBOL`, `STRING`, `BOOLEAN`, `SHORT`,
-  `INT`, `LONG`, `LONG256`, `CHAR`, `DECIMAL`.
+  columns of any type except `BINARY`, `ARRAY`, and `DECIMAL`, which are not
+  supported in `PARTITION BY`.
 
 ## Description
 
