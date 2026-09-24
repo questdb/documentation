@@ -942,6 +942,7 @@ module.exports = {
           items: [
             "integrations/other/prometheus",
             "integrations/other/sqlalchemy",
+            "integrations/other/drizzle",
             "integrations/other/mindsdb",
             "integrations/other/databento",
             "integrations/other/cube",
