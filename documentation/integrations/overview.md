@@ -39,6 +39,8 @@ integrations:
   platform for simplified data pipelines.
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
+- [Databento](/docs/integrations/other/databento/): Stream Live market data and run
+  Historical backfills with the QuestDB connector.
 
 ## Analytics and Processing
 
@@ -71,8 +73,6 @@ Improve your interactions with QuestDB using these tools and interfaces:
   capabilities for database interactions.
 - [MindsDB](/docs/integrations/other/mindsdb/): Build machine learning models for
   predictive analytics on [time-series data](/blog/what-is-time-series-data/).
-- [Databento](/docs/integrations/other/databento/): Ingest a normalized live
-  market data feed covering multiple venues.
 - [Cube](/docs/integrations/other/cube/): Middleware connecting your data sources
   to your data applications.
 - [Ignition](/docs/integrations/other/ignition/): A software suite for industrial
