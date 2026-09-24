@@ -97,6 +97,52 @@ docker run -p 4000:4000 -e QDB_HTTP_BIND_TO=0.0.0.0:4000 questdb/questdb
 
 For a list of configuration options, see [Configuration](/docs/configuration/overview/).
 
+## File descriptor limits
+
+QuestDB opens a file handle per column, per partition, so a busy instance can
+hold far more open files than most container runtimes allow by default. If the
+container's ulimit is too low, QuestDB logs a warning at startup such as:
+
+```
+fs.file-max limit is too low [current=524288, recommended=1048576]
+```
+
+Setting `ulimit -n` correctly on the host is not enough on its own, because
+the Docker daemon applies its own default ulimits to every container unless
+told otherwise. To raise the limit for all containers started by this daemon,
+add a `default-ulimits` entry to `/etc/docker/daemon.json`:
+
+```json title="/etc/docker/daemon.json"
+{
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 1048576,
+      "Soft": 1048576
+    }
+  }
+}
+```
+
+Restart the Docker daemon after editing this file for the new defaults to take
+effect:
+
+```shell
+sudo systemctl restart docker
+```
+
+Alternatively, the limit can be set per-container without touching the daemon
+config, by passing `--ulimit` on `docker run`:
+
+```shell
+docker run --ulimit nofile=1048576:1048576 \
+  -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \
+  questdb/questdb
+```
+
+This is preferable when only QuestDB needs the higher limit, since it avoids
+changing the default for unrelated containers on the same host.
+
 ## Container status
 
 You can check the status of your container with `docker ps`.
