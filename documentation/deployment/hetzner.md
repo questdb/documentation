@@ -337,7 +337,8 @@ questdb01$ docker restart questdb
 For comprehensive configuration options, see the [Configuration reference](/docs/configuration/overview/) documentation. Common production settings include:
 
 - **Connection limits**: `pg.connection.pool.size`
-- **Memory settings**: `shared.worker.count`
+- **Worker threads**: `shared.network.worker.count`, `shared.query.worker.count`,
+  `shared.write.worker.count`
 - **Security**: [TLS configuration](/docs/security/tls/)
 - **Authentication**: [RBAC setup](/docs/security/rbac/)
 
