@@ -106,33 +106,32 @@ batch updated. On receipt:
 3. Any segment whose last FSN is `≤ ackedFsn` is unlinked and its bytes
    returned to the available pool.
 
-This is the default and is sufficient when "data is in the server's WAL"
-is the durability bar you need.
+This is the default and is sufficient when a WAL commit, without a durable
+storage guarantee, is the acknowledgement bar you need.
 
-### `request_durable_ack=on` — WAL-durable trim
+### Tiered durable trim
 
-When the connect string sets `request_durable_ack=on`, trim is driven by
-a separate frame: `STATUS_DURABLE_ACK`. These carry per-table watermarks
-for data the server has **already uploaded from the WAL to the configured
-object store** (S3, Azure Blob, GCS, or NFS).
+`request_durable_ack=local` drives trim with `STATUS_LOCAL_DURABLE_ACK`
+watermarks after the WAL transaction is durable on the server's disk. This
+requires adaptive commit mode. `request_durable_ack=replicated` drives trim with
+`STATUS_DURABLE_ACK` after the WAL reaches the configured object store (S3,
+Azure Blob, GCS, or NFS). The legacy value `on` means `replicated`.
 
-- OK frames still arrive on every batch, but they no longer advance the
-  trim watermark. Instead, they are stashed alongside their per-table
-  `seqTxn` values.
-- A `STATUS_DURABLE_ACK` frame names tables and their durable `seqTxn`
+- OK frames still arrive on every batch, but they no longer advance the trim
+  watermark. Instead, they are stashed alongside their per-table `seqTxn`
+  values.
+- The applicable durable frame names tables and their cumulative `seqTxn`
   watermarks. The client matches the head of the OK queue against these
-  watermarks; each fully-covered head entry pops, and `ackedFsn`
-  advances to the highest covered wireSeq.
-- The client opt-in is mandatory — the connect fails loudly if the server
-  does not echo `X-QWP-Durable-Ack: enabled` on the upgrade response.
-  This avoids the silent failure mode where the producer waits forever
-  for ack frames that will never arrive.
+  watermarks; each fully-covered head entry pops, and `ackedFsn` advances to the
+  highest covered wire sequence.
+- The server must echo the complete requested tier set. Missing or partial
+  confirmation fails the connection instead of silently weakening the
+  guarantee.
 
-Durable-ack mode is the right choice when "data is in the object store"
-is the durability bar, but it has two costs: a longer time-to-trim (so
-larger steady-state disk usage in SF mode), and a small WebSocket PING
-sent every `durable_ack_keepalive_interval_millis` to nudge the server's
-flush path when the client is idle but has pending confirmations.
+Durable-ack mode has two costs: a longer time-to-trim, and therefore larger
+steady-state SF storage use, plus a small WebSocket PING every
+`durable_ack_keepalive_interval_millis` to prompt the passive server when the
+client is idle but has pending confirmations.
 
 See [When to use](/docs/high-availability/store-and-forward/when-to-use/)
 for the decision.
