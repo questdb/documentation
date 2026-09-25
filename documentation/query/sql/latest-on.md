@@ -31,14 +31,7 @@ where:
 
 `PARTITION BY` in `LATEST ON` accepts columns of any type except `BINARY`,
 `ARRAY`, and `DECIMAL`. Using one of these types fails with an
-`invalid type ... are supported in LATEST ON` error. To group by a `DECIMAL`
-value, cast it in a sub-query:
-
-```questdb-sql
-SELECT symbol, price, timestamp
-FROM (SELECT symbol, price, notional::DOUBLE AS notional_d, timestamp FROM positions)
-LATEST ON timestamp PARTITION BY notional_d;
-```
+`invalid type ... are supported in LATEST ON` error.
 
 ## Description
 
@@ -69,14 +62,8 @@ The query returns one row per distinct value of the `PARTITION BY` column(s),
 here one row per symbol. The `LATEST ON` column is the timestamp used to decide
 which row is the most recent.
 
-### Behavior details
-
-- **NULL keys**: rows with `NULL` in a `PARTITION BY` column form their own
-  group, and the latest of them is returned like any other key.
-- **Ties**: if several rows of the same key share the latest timestamp, only
-  one is returned: the row stored last.
-- **Result order**: the order of the returned rows is not guaranteed. Add
-  `ORDER BY` if you need a specific order.
+Rows with `NULL` in a `PARTITION BY` column form their own group, and the
+latest of them is returned like any other key.
 
 ## Examples
 
@@ -167,8 +154,7 @@ occur, so the query often scans the whole table.
 When `PARTITION BY` has any non-`SYMBOL` column, QuestDB scans the whole table
 (or the time range selected by `WHERE`) to find the distinct values.
 
-Scanning is fast, but it slows down on hundreds of millions of rows. Narrow the
-scan with a time filter such as `WHERE ts IN '$today'` where possible.
+Scanning is fast, but it slows down on hundreds of millions of rows.
 
 ### LATEST ON over sub-query
 
@@ -209,8 +195,8 @@ recent records per unique `cust_id` value:
 
 | cust_id | balance_ccy | balance | ts                          |
 | ------- | ----------- | ------- | --------------------------- |
-| 1       | USD         | 330.5   | 2020-04-22T16:20:14.404997Z |
 | 2       | EUR         | 880.2   | 2020-04-22T16:18:34.404665Z |
+| 1       | USD         | 330.5   | 2020-04-22T16:20:14.404997Z |
 
 ### Execution order
 
