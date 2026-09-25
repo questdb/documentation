@@ -466,9 +466,9 @@ SHOW PERMISSIONS;
 #### Named user, group, or service account
 
 ```questdb-sql
-SHOW PERMISSIONS analyst;
-SHOW PERMISSIONS trading_team;
-SHOW PERMISSIONS ingest_app;
+SHOW PERMISSIONS analyst; -- user
+SHOW PERMISSIONS trading_team; -- group
+SHOW PERMISSIONS ingest_app; -- service account
 ```
 
 The result has these columns:
@@ -480,6 +480,18 @@ The result has these columns:
 | `column_name`  | Column name, or `NULL` for a table- or database-level permission     |
 | `grant_option` | Boolean: whether the entity can grant this permission at this scope  |
 | `origin`       | `G` for granted access, `I` for implicit designated-timestamp access |
+
+For an existing `trades` table, grant `analyst` table-wide access and inspect
+its permissions:
+
+```questdb-sql title="Inspect a table-wide grant"
+GRANT SELECT ON trades TO analyst;
+SHOW PERMISSIONS analyst;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     | trades     |             | false        | G      |
 
 `G` includes direct and inherited group permissions; it does not distinguish
 between them. You can view your own permissions without `USER DETAILS`. Viewing
@@ -630,6 +642,8 @@ these columns by position rather than by name must account for it. See
 The following functions allow querying tables and views with filters and using
 the results as part of a function:
 
+- [`permissions()`](/docs/query/functions/access-control/#permissions)
+- [`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants)
 - [table_columns()](/docs/query/functions/meta/#table_columns)
 - [tables()](/docs/query/functions/meta/#tables)
 - [table_partitions()](/docs/query/functions/meta/#table_partitions)

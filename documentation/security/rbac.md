@@ -590,9 +590,12 @@ REST Token   true
 
 :::note
 
-Viewing other users' information requires `LIST USERS` (to list all) or
-`USER DETAILS` (to see details) permissions. Users can always view their own
-information without these permissions.
+Listing all users, groups, or service accounts requires `LIST USERS`. Viewing
+another entity's details requires `USER DETAILS`. Because `active_permissions()`
+and `active_grants()` perform both operations, they require both permissions.
+Users can view their own information without either permission. With
+`SHOW PERMISSIONS` or `permissions()`, they can also inspect their own groups
+and service accounts they can assume without `USER DETAILS`.
 
 :::
 
@@ -905,6 +908,7 @@ replication role, is an ordinary grantable permission.
 
 ## SQL commands reference
 
+- [Access control functions](/docs/query/functions/access-control/)
 - [ADD USER](/docs/query/sql/acl/add-user/)
 - [ALTER GROUP](/docs/query/sql/acl/alter-group/)
 - [ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/)

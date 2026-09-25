@@ -15,7 +15,11 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 `GRANT` - grants permissions to a user, group or service account.
 
 For full documentation of the Access Control List and Role-based Access Control,
-see the [RBAC operations](/docs/security/rbac) page.
+see the [RBAC operations](/docs/security/rbac) page. To inspect the resulting ACL
+state, use [`permissions()`](/docs/query/functions/access-control/#permissions)
+for one entity or
+[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants) across
+all users, groups, and service accounts.
 
 ---
 
@@ -240,7 +244,8 @@ Therefore when a table has a designated timestamp, granting `SELECT` or `UPDATE`
 permissions on any column will automatically extend those permissions to the
 timestamp column. These are known as
 [implicit permissions](/docs/security/rbac/#implicit-permissions), and they're
-indicated by an `I` in the `origin` column of the `SHOW PERMISSIONS` output.
+indicated by an `I` in the `origin` column of the
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions) output.
 
 For example, if you grant `UPDATE` permission on the `id` column of the
 `products` table, the timestamp column also receives `UPDATE` permission:
@@ -258,7 +263,8 @@ GRANT UPDATE ON products(id) TO john;
 ### Optimization
 
 When granting permissions on the table or column level, sometimes it might seem
-like there is no effect when cross-checking with the `SHOW permissions` command.
+like there is no effect when cross-checking with the
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions) command.
 If QuestDB detects that the permission is already granted on a higher level, it
 optimizes and removes any child permissions. Doing so keeps the access list
 model simple and permission checks faster.
@@ -297,7 +303,10 @@ GRANT UPDATE ON countries(id) TO john;
 GRANT UPDATE ON countries(description) TO john;
 ```
 
-Such permissions do not show on `SHOW PERMISSIONS` output.
+Such permissions do not show in
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions) output, but
+[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants) lists
+them.
 
 | permission | table_name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |

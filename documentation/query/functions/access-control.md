@@ -1,11 +1,16 @@
 ---
 title: Access control functions
 sidebar_label: Access control
-description:
-  Query QuestDB Enterprise ACL functions all_permissions(), permissions(),
-  active_permissions(), and active_grants() to inspect available and assigned
-  permissions.
+description: >-
+  Audit QuestDB Enterprise access control in SQL: list direct grants, find who
+  can read a table, and inspect a user's effective permissions.
 ---
+
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Access control functions are available in QuestDB Enterprise.
+</EnterpriseNote>
 
 QuestDB Enterprise provides four SQL table functions for inspecting
 [role-based access control](/docs/security/rbac/): `all_permissions()` lists
@@ -18,24 +23,26 @@ granted a particular permission.
 ## Syntax
 
 ```questdb-sql title="Available permission names and levels"
-SELECT * FROM all_permissions();
+all_permissions()
 ```
 
-```questdb-sql title="Current or named principal's permissions"
-SELECT * FROM permissions();
-SELECT * FROM permissions('analyst');
+```questdb-sql title="Current or named entity's permissions"
+permissions([entityName])
 ```
 
-```questdb-sql title="Effective permissions across principals"
-SELECT * FROM active_permissions();
+```questdb-sql title="Effective permissions across entities"
+active_permissions()
 ```
 
-```questdb-sql title="Direct grants across principals"
-SELECT * FROM active_grants();
+```questdb-sql title="Direct grants across entities"
+active_grants()
 ```
 
-All four functions return tables and can be filtered with SQL. The only argument
-is the optional principal name for `permissions()`, as a string.
+All four are table functions used in the `FROM` clause. Their results can be
+filtered, joined, and ordered with SQL.
+
+- `entityName` (optional, string literal): existing user, group, or service
+  account to inspect. Omit it to inspect the current entity.
 
 ## all_permissions(): available permissions {#all_permissions}
 
@@ -47,7 +54,7 @@ permissions, **not** principals or their grants. Its columns are `permission`
 
 For example, check where `SELECT` can be granted:
 
-```questdb-sql
+```questdb-sql title="Where SELECT can be granted"
 SELECT permission, level
 FROM all_permissions()
 WHERE permission = 'SELECT';
@@ -64,7 +71,7 @@ inspect that entity instead. It returns the same result as
 [`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions),
 but can be composed with `WHERE`, `ORDER BY`, and other SQL clauses:
 
-```questdb-sql
+```questdb-sql title="SELECT permissions of one user"
 SELECT permission, table_name, column_name, grant_option, origin
 FROM permissions('analyst')
 WHERE permission = 'SELECT';
@@ -80,13 +87,15 @@ WHERE permission = 'SELECT';
 
 `G` includes both direct and inherited permissions; it does not distinguish
 between them. You can inspect your own permissions without `USER DETAILS`.
-Inspecting another principal generally requires `USER DETAILS`; users can also
-inspect their own groups and service accounts they can assume. Unlike the two
-`active_*` functions, `permissions()` does not require `LIST USERS` and does not
-show all principals in a single result. It cannot be used in a materialized or
-live view.
+Inspecting another entity generally requires `USER DETAILS`; users can also
+inspect their own groups and service accounts they can assume. `permissions()`
+does not show all entities in a single result. It cannot be used in a
+materialized or live view.
 
-## active_permissions() and active_grants(): audit all principals {#active-permissions-and-grants}
+<span id="active_permissions" />
+<span id="active_grants" />
+
+## active_permissions() and active_grants(): audit all entities {#active-permissions-and-grants}
 
 Both functions take no arguments and return the same columns:
 
@@ -99,10 +108,19 @@ Both functions take no arguments and return the same columns:
 | `column_name`  | STRING  | Column name for a column scope; `NULL` for a table or database scope           |
 | `grant_option` | BOOLEAN | Whether the entity can grant this permission at this scope to others           |
 
-A database-level `SELECT` (with `table_name IS NULL`) applies to all tables,
-including future tables. When filtering for access to a particular table,
-include both its table name and `NULL`. A non-`NULL` `column_name` means access
-is limited to that column, not the whole table.
+Each row is one scope at which the entity holds a permission:
+
+- `table_name` is `NULL`: database-wide. A database-level `SELECT` applies to
+  all tables, including tables created later.
+- `table_name` is set and `column_name` is `NULL`: the whole table.
+- Both are set: that column only.
+
+An entity can have rows for the same permission at more than one scope. For
+example, a table-wide `SELECT` without the grant option can sit next to column
+rows that carry the grant option for specific columns. Access is limited to
+specific columns only when the entity has no row for that permission on the
+whole table or database. When filtering for access to a particular table,
+include both its table name and `NULL`.
 
 ### Effective permissions and direct grants
 
@@ -126,54 +144,160 @@ Both functions require `LIST USERS` and `USER DETAILS` permissions. The built-in
 admin can call them without explicit grants unless it has assumed a service
 account, in which case the assumed account needs both permissions. They return
 an empty result if ACL is disabled. They do not list external SSO/OIDC
-identities or the built-in admin, which has no persisted ACL entry. A disabled
-user can still appear with its retained permissions, so a row does not
-necessarily mean the principal can log in. Neither function can be used in a
-materialized or live view.
+identities, which get their access through the groups they are mapped to, or
+the built-in admin, which has no persisted ACL entry. A disabled user can still
+appear with its retained permissions, so a row does not necessarily mean the
+entity can connect. Check the `enabled` column of
+[`SHOW USERS`](/docs/query/sql/show/#show-users) or
+[`SHOW SERVICE ACCOUNTS`](/docs/query/sql/show/#show-service-accounts), and the
+[endpoint permissions](/docs/security/rbac/#endpoint-permissions) such as
+`PGWIRE` or `HTTP`. Neither function can be used in a materialized or live view.
 
 :::
 
 ## Examples
 
+The examples use the following entities and grants on the `trades` table, whose
+designated timestamp column is `timestamp`. The result tables show the output
+for this setup.
+
+```questdb-sql title="Example setup"
+CREATE GROUP trading_team;
+CREATE USER analyst WITH PASSWORD 'pwd';
+CREATE USER risk_manager WITH PASSWORD 'pwd';
+CREATE SERVICE ACCOUNT report_svc;
+ADD USER analyst TO trading_team;
+
+GRANT CREATE TABLE TO trading_team;
+GRANT SELECT ON trades(symbol, price) TO trading_team WITH GRANT OPTION;
+GRANT SELECT ON trades TO analyst;
+GRANT SELECT ON ALL TABLES TO risk_manager;
+GRANT SELECT ON trades(symbol, price) TO report_svc;
+```
+
+### Compare effective permissions with direct grants
+
+`active_permissions()` shows everything `analyst` can do, including what it
+inherits from `trading_team`:
+
+```questdb-sql title="Effective permissions of one user"
+SELECT permission, table_name, column_name, grant_option
+FROM active_permissions()
+WHERE entity_name = 'analyst'
+ORDER BY permission, table_name, column_name;
+```
+
+| permission   | table_name | column_name | grant_option |
+| ------------ | ---------- | ----------- | ------------ |
+| CREATE TABLE | NULL       | NULL        | false        |
+| SELECT       | trades     | NULL        | false        |
+| SELECT       | trades     | price       | true         |
+| SELECT       | trades     | symbol      | true         |
+
+`analyst` can read the whole `trades` table through its own table-wide grant.
+The `price` and `symbol` rows come from the group and carry its grant option,
+so `analyst` can grant `SELECT` on those two columns, but not on the whole
+table. `CREATE TABLE` is also inherited from the group.
+
+`active_grants()` shows only what was granted to `analyst` directly:
+
+```questdb-sql title="Direct grants of one user"
+SELECT permission, table_name, column_name, grant_option
+FROM active_grants()
+WHERE entity_name = 'analyst';
+```
+
+| permission | table_name | column_name | grant_option |
+| ---------- | ---------- | ----------- | ------------ |
+| SELECT     | trades     | NULL        | false        |
+
 ### Find who can read a table
 
-List users and service accounts with effective `SELECT` permission on `trades`.
-The `NULL` case includes database-level access, and the `column_name` field
-shows whether access is limited to specific columns. Users who inherit a grant
-from a group appear under their own names; group rows are excluded here because
-groups cannot log in.
+List every entity with effective `SELECT` permission on `trades`, including
+database-wide access:
 
-```questdb-sql
+```questdb-sql title="Entities that can read trades"
 SELECT entity_name, entity_type, table_name, column_name
 FROM active_permissions()
 WHERE permission = 'SELECT'
   AND (table_name = 'trades' OR table_name IS NULL)
-  AND entity_type IN ('User', 'Service Account')
-ORDER BY entity_name, table_name, column_name;
+ORDER BY entity_type, entity_name, table_name, column_name;
 ```
 
-For a table-wide grant, `column_name` is `NULL`; for a database-wide grant, both
-scope columns are `NULL`. Column-level rows show access to those columns only.
-Check that an account is enabled and has the required connection permission
-(such as `PGWIRE` or `HTTP`) before treating it as able to connect.
+| entity_name  | entity_type     | table_name | column_name |
+| ------------ | --------------- | ---------- | ----------- |
+| trading_team | Group           | trades     | price       |
+| trading_team | Group           | trades     | symbol      |
+| trading_team | Group           | trades     | timestamp   |
+| report_svc   | Service Account | trades     | price       |
+| report_svc   | Service Account | trades     | symbol      |
+| report_svc   | Service Account | trades     | timestamp   |
+| analyst      | User            | trades     | NULL        |
+| analyst      | User            | trades     | price       |
+| analyst      | User            | trades     | symbol      |
+| risk_manager | User            | NULL       | NULL        |
+
+- `risk_manager` can read every table, including `trades`.
+- `analyst` can read the whole table. Its column rows record the grant option
+  shown in the previous example.
+- `trading_team` and `report_svc` can read `symbol` and `price`, plus the
+  designated timestamp column, which comes with column-level `SELECT`.
+- Keep group rows when auditing: a group cannot log in, but its members can,
+  including external SSO/OIDC users mapped to it, who are not listed
+  individually.
+
+To check access to a single column, also accept table-wide rows, and use
+`DISTINCT` to get one row per entity:
+
+```questdb-sql title="Entities that can read trades.price"
+SELECT DISTINCT entity_name, entity_type
+FROM active_permissions()
+WHERE permission = 'SELECT'
+  AND (table_name = 'trades' OR table_name IS NULL)
+  AND (column_name = 'price' OR column_name IS NULL)
+ORDER BY entity_type, entity_name;
+```
+
+| entity_name  | entity_type     |
+| ------------ | --------------- |
+| trading_team | Group           |
+| report_svc   | Service Account |
+| analyst      | User            |
+| risk_manager | User            |
+
+These queries do not show every way to reach the data:
+
+- **Assumed service accounts.** A user who can assume a service account gets
+  its permissions after
+  [`ASSUME SERVICE ACCOUNT`](/docs/security/rbac/#service-account-assumption),
+  but those permissions appear only under the service account's name. Use
+  [`SHOW SERVICE ACCOUNTS userName`](/docs/query/sql/show/#show-service-accounts)
+  to list the accounts a user or group can assume.
+- **Views.** `SELECT` on a view over `trades` lets the grantee read the view's
+  rows without any grant on `trades`. See
+  [row-level access with views](/docs/security/rbac/#row-level-access-with-views).
 
 ### Find direct recipients of a permission
 
-Find who was directly granted `CREATE TABLE`, including groups. Members who
-inherit a group's permission are **not** repeated as recipients; use
-`active_permissions()` if you want to see their effective access.
+Find who was directly granted `CREATE TABLE`. Members who inherit a group's
+permission are not repeated, so `analyst` does not appear. Use
+`active_permissions()` to see effective access.
 
-```questdb-sql
+```questdb-sql title="Direct recipients of CREATE TABLE"
 SELECT entity_name, entity_type, grant_option
 FROM active_grants()
 WHERE permission = 'CREATE TABLE'
 ORDER BY entity_type, entity_name;
 ```
 
+| entity_name  | entity_type | grant_option |
+| ------------ | ----------- | ------------ |
+| trading_team | Group       | false        |
+
 For a table-scoped permission such as `SELECT`, also filter by scope, including
 database-wide grants:
 
-```questdb-sql
+```questdb-sql title="Direct SELECT grants on trades"
 SELECT entity_name, entity_type, table_name, column_name, grant_option
 FROM active_grants()
 WHERE permission = 'SELECT'
@@ -181,20 +305,38 @@ WHERE permission = 'SELECT'
 ORDER BY entity_type, entity_name, table_name, column_name;
 ```
 
+| entity_name  | entity_type     | table_name | column_name | grant_option |
+| ------------ | --------------- | ---------- | ----------- | ------------ |
+| trading_team | Group           | trades     | price       | true         |
+| trading_team | Group           | trades     | symbol      | true         |
+| report_svc   | Service Account | trades     | price       | false        |
+| report_svc   | Service Account | trades     | symbol      | false        |
+| analyst      | User            | trades     | NULL        | false        |
+| risk_manager | User            | NULL       | NULL        | false        |
+
+Unlike `active_permissions()`, this does not include the implicit designated
+timestamp rows.
+
 ### Find who can delegate SELECT on a table
 
-Filter effective permissions by `grant_option` to find principals who can grant
+Filter effective permissions by `grant_option` to find entities that can grant
 `SELECT` on all or part of `trades` to others:
 
-```questdb-sql
+```questdb-sql title="Entities that can grant SELECT on trades"
 SELECT entity_name, entity_type, table_name, column_name
 FROM active_permissions()
 WHERE permission = 'SELECT'
   AND grant_option
   AND (table_name = 'trades' OR table_name IS NULL)
-  AND entity_type IN ('User', 'Service Account')
-ORDER BY entity_name, table_name, column_name;
+ORDER BY entity_type, entity_name, table_name, column_name;
 ```
 
-As above, a non-`NULL` `column_name` means the grant option is scoped to that
-column, not the whole table.
+| entity_name  | entity_type | table_name | column_name |
+| ------------ | ----------- | ---------- | ----------- |
+| trading_team | Group       | trades     | price       |
+| trading_team | Group       | trades     | symbol      |
+| analyst      | User        | trades     | price       |
+| analyst      | User        | trades     | symbol      |
+
+Both can grant `SELECT` on `price` and `symbol` only. No one in this setup can
+grant `SELECT` on the whole table.
