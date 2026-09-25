@@ -61,7 +61,7 @@ available permissions and their uses.
 `permissions()` without an argument returns permissions for the current
 principal. Pass an existing user, group, or service account name as a string to
 inspect that entity instead. It returns the same result as
-[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions-for-current-user),
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions),
 but can be composed with `WHERE`, `ORDER BY`, and other SQL clauses:
 
 ```questdb-sql
@@ -118,7 +118,7 @@ timestamp permissions. Results reflect the **current, normalized ACL scopes**,
 not the original `GRANT` statements: for example, revoking access to a single
 column can turn a table-wide grant into column-level rows. To inspect one
 principal instead, use [`permissions()`](#permissions) or
-[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions-for-current-user).
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions).
 
 :::note
 

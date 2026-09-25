@@ -448,57 +448,43 @@ full column list, including `hasParquetGenerated`, `isParquet`,
 
 :::
 
-### SHOW PERMISSIONS FOR CURRENT USER
+<span id="show-permissions-for-current-user" />
+<span id="show-permissions-user" />
 
-_Enterprise only._
+### SHOW PERMISSIONS
+
+_Enterprise only._ `SHOW PERMISSIONS` displays the effective permissions of one
+user, group, or service account. Omitting the name shows the current principal;
+providing a name shows that entity's permissions.
+
+#### Current principal
 
 ```questdb-sql
 SHOW PERMISSIONS;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-
-### SHOW PERMISSIONS user
-
-_Enterprise only._
+#### Named user, group, or service account
 
 ```questdb-sql
-SHOW PERMISSIONS admin;
+SHOW PERMISSIONS analyst;
+SHOW PERMISSIONS trading_team;
+SHOW PERMISSIONS ingest_app;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     | orders     |             | f            | G      |
-| UPDATE     | order_itme | quantity    | f            | G      |
+The result has these columns:
 
-### SHOW PERMISSIONS
+| Column         | Description                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `permission`   | Permission name                                                      |
+| `table_name`   | Table name, or `NULL` for a database-level permission                |
+| `column_name`  | Column name, or `NULL` for a table- or database-level permission     |
+| `grant_option` | Boolean: whether the entity can grant this permission at this scope  |
+| `origin`       | `G` for granted access, `I` for implicit designated-timestamp access |
 
-_Enterprise only._
-
-#### For a group
-
-```questdb-sql
-SHOW PERMISSIONS admin_group;
-```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| INSERT     | orders     |             | f            | G      |
-
-#### For a service account
-
-```questdb-sql
-SHOW PERMISSIONS ilp_ingestion;
-```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     |            |             | f            | G      |
-| UPDATE     |            |             | f            | G      |
+`G` includes direct and inherited group permissions; it does not distinguish
+between them. You can view your own permissions without `USER DETAILS`. Viewing
+another entity generally requires `USER DETAILS`, but users can also view their
+own groups and service accounts they can assume.
 
 To filter the result for one entity with SQL, use
 [`permissions()`](/docs/query/functions/access-control/#permissions). To search

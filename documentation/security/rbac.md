@@ -927,4 +927,4 @@ replication role, is an ordinary grantable permission.
 - [SHOW GROUPS](/docs/query/sql/show/#show-groups)
 - [SHOW SERVICE ACCOUNT](/docs/query/sql/show/#show-service-account)
 - [SHOW SERVICE ACCOUNTS](/docs/query/sql/show/#show-service-accounts)
-- [SHOW PERMISSIONS](/docs/query/sql/show/#show-permissions-for-current-user)
+- [SHOW PERMISSIONS](/docs/query/sql/show/#show-permissions)
