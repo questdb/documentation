@@ -571,7 +571,11 @@ SHOW PERMISSIONS username;     -- Show permissions for user
 ```
 
 `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS` also report each
-entity's [memory limit](#memory-limits).
+entity's [memory limit](#memory-limits). To search permissions across all
+principals rather than inspect one with `SHOW PERMISSIONS`, query
+[`active_permissions()` or `active_grants()`](/docs/query/functions/access-control/).
+These functions show effective access (including group inheritance) or direct
+grants, respectively, and require both `LIST USERS` and `USER DETAILS`.
 
 Example output from `SHOW USER`:
 

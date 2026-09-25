@@ -491,6 +491,7 @@ module.exports = {
           type: "category",
           label: "Functions",
           items: [
+            "query/functions/access-control",
             "query/functions/aggregation",
             "query/functions/array",
             "query/functions/binary",

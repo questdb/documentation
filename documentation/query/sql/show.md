@@ -500,6 +500,11 @@ SHOW PERMISSIONS ilp_ingestion;
 | INSERT     |            |             | f            | G      |
 | UPDATE     |            |             | f            | G      |
 
+To search across all users, groups, and service accounts instead of inspecting
+one entity at a time, use
+[`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/).
+Both require `LIST USERS` and `USER DETAILS`.
+
 ### SHOW SERVER_VERSION
 
 Shows PostgreSQL compatibility version.
