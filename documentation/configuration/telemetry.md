@@ -1,22 +1,23 @@
 ---
 title: Telemetry
-description: Configuration settings for anonymous telemetry in QuestDB.
+description: Configuration settings for telemetry in QuestDB.
 ---
 
-QuestDB sends anonymous telemetry data with information about usage which helps
-us improve the product over time. We do not collect any personally-identifying
-information, and we do not share any of this data with third parties.
+QuestDB collects usage telemetry that helps us improve the product. Telemetry
+does not include the data stored in your tables, and metrics such as database
+size and table count are sent as ranges rather than exact values. See our
+[Privacy Notice](https://questdb.com/privacy-notice/) for details.
 
 ## telemetry.enabled
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Enable or disable anonymous usage metrics collection.
+Enable or disable usage metrics collection.
 
 ## telemetry.hide.tables
 
-- **Default**: `false`
+- **Default**: `true`
 - **Reloadable**: no
 
 Hides telemetry tables from `select * from tables()` output. When enabled,

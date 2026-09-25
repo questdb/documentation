@@ -545,6 +545,6 @@ http.net.connection.sndbuf=2m
 | [Replication](/docs/configuration/database-replication/) | High availability cluster replication | ✓ |
 | [Shared workers](/docs/configuration/shared-workers/) | Worker thread pools | |
 | [Storage policy](/docs/configuration/storage-policy/) | Partition lifecycle management | ✓ |
-| [Telemetry](/docs/configuration/telemetry/) | Anonymous usage telemetry | |
+| [Telemetry](/docs/configuration/telemetry/) | Usage telemetry | |
 | [TLS encryption](/docs/configuration/tls/) | TLS settings for all interfaces | ✓ |
 | [WAL table configurations](/docs/configuration/wal/) | Write-Ahead Log settings | |
