@@ -188,7 +188,11 @@ GRANT ALL ON table2 TO user2 WITH GRANT OPTION;
 
 Permission grants can be specific and fine-tuned.
 
-List the full list of applied permissions with `all_permissions()`.
+Check what a user can do with `SHOW PERMISSIONS user1;`, or audit grants across
+all users, groups, and service accounts with
+[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+[`all_permissions()`](/docs/query/functions/access-control/#all_permissions)
+lists the permissions available to grant.
 
 - For the full role-based access control docs, including group management, see
   the [RBAC operations guide](/docs/security/rbac/).

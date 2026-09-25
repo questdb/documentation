@@ -448,57 +448,61 @@ full column list, including `hasParquetGenerated`, `isParquet`,
 
 :::
 
-### SHOW PERMISSIONS FOR CURRENT USER
+<span id="show-permissions-for-current-user" />
+<span id="show-permissions-user" />
 
-_Enterprise only._
+### SHOW PERMISSIONS
+
+_Enterprise only._ `SHOW PERMISSIONS` displays the effective permissions of one
+user, group, or service account. Omitting the name shows the current principal;
+providing a name shows that entity's permissions.
+
+#### Current principal
 
 ```questdb-sql
 SHOW PERMISSIONS;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-
-### SHOW PERMISSIONS user
-
-_Enterprise only._
+#### Named user, group, or service account
 
 ```questdb-sql
-SHOW PERMISSIONS admin;
+SHOW PERMISSIONS analyst; -- user
+SHOW PERMISSIONS trading_team; -- group
+SHOW PERMISSIONS ingest_app; -- service account
+```
+
+The result has these columns:
+
+| Column         | Description                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `permission`   | Permission name                                                      |
+| `table_name`   | Table name, or `NULL` for a database-level permission                |
+| `column_name`  | Column name, or `NULL` for a table- or database-level permission     |
+| `grant_option` | Boolean: whether the entity can grant this permission at this scope  |
+| `origin`       | `G` for granted access, `I` for implicit designated-timestamp access |
+
+For an existing `trades` table, grant `analyst` table-wide access and inspect
+its permissions:
+
+```questdb-sql title="Inspect a table-wide grant"
+GRANT SELECT ON trades TO analyst;
+SHOW PERMISSIONS analyst;
 ```
 
 | permission | table_name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     | orders     |             | f            | G      |
-| UPDATE     | order_itme | quantity    | f            | G      |
+| SELECT     | trades     |             | false        | G      |
 
-### SHOW PERMISSIONS
+`G` includes direct and inherited group permissions; it does not distinguish
+between them. You can view your own permissions without `USER DETAILS`. Viewing
+another entity generally requires `USER DETAILS`, but users can also view their
+own groups and service accounts they can assume.
 
-_Enterprise only._
-
-#### For a group
-
-```questdb-sql
-SHOW PERMISSIONS admin_group;
-```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| INSERT     | orders     |             | f            | G      |
-
-#### For a service account
-
-```questdb-sql
-SHOW PERMISSIONS ilp_ingestion;
-```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     |            |             | f            | G      |
-| UPDATE     |            |             | f            | G      |
+To filter the result for one entity with SQL, use
+[`permissions()`](/docs/query/functions/access-control/#permissions). To search
+across all users, groups, and service accounts, use
+[`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+The latter two require `LIST USERS` and `USER DETAILS` permissions.
 
 ### SHOW SERVER_VERSION
 
@@ -638,6 +642,8 @@ these columns by position rather than by name must account for it. See
 The following functions allow querying tables and views with filters and using
 the results as part of a function:
 
+- [`permissions()`](/docs/query/functions/access-control/#permissions)
+- [`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants)
 - [table_columns()](/docs/query/functions/meta/#table_columns)
 - [tables()](/docs/query/functions/meta/#tables)
 - [table_partitions()](/docs/query/functions/meta/#table_partitions)
