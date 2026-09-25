@@ -490,7 +490,7 @@ To filter the result for one entity with SQL, use
 [`permissions()`](/docs/query/functions/access-control/#permissions). To search
 across all users, groups, and service accounts, use
 [`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
-The latter two require `LIST USERS` and `USER DETAILS`.
+The latter two require `LIST USERS` and `USER DETAILS` permissions.
 
 ### SHOW SERVER_VERSION
 
