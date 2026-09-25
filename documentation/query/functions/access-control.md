@@ -1,33 +1,94 @@
 ---
-title: Access control functions - active_permissions() and active_grants()
+title: Access control functions
 sidebar_label: Access control
 description:
-  Audit effective permissions and direct grants for QuestDB Enterprise users,
-  groups, and service accounts with active_permissions() and active_grants().
+  Query QuestDB Enterprise ACL functions all_permissions(), permissions(),
+  active_permissions(), and active_grants() to inspect available and assigned
+  permissions.
 ---
 
-In QuestDB Enterprise, `active_permissions()` and `active_grants()` are SQL
-table functions for auditing [role-based access control](/docs/security/rbac/).
-Use them to find who has access to a table or who has been granted a permission
-across all internal users, groups, and service accounts. `active_permissions()`
-reports effective permissions, including those inherited from groups;
-`active_grants()` reports direct grants only.
+QuestDB Enterprise provides four SQL table functions for inspecting
+[role-based access control](/docs/security/rbac/): `all_permissions()` lists
+available permission names and scopes; `permissions()` shows one principal's
+access; `active_permissions()` and `active_grants()` let you search effective
+permissions or direct grants across all persisted internal users, groups, and
+service accounts. Use them to find who can access a table or who has been
+granted a particular permission.
 
 ## Syntax
 
-Both functions take no arguments and can be filtered like tables:
+```questdb-sql title="Available permission names and levels"
+SELECT * FROM all_permissions();
+```
 
-```questdb-sql title="Effective permissions"
+```questdb-sql title="Current or named principal's permissions"
+SELECT * FROM permissions();
+SELECT * FROM permissions('analyst');
+```
+
+```questdb-sql title="Effective permissions across principals"
 SELECT * FROM active_permissions();
 ```
 
-```questdb-sql title="Direct grants"
+```questdb-sql title="Direct grants across principals"
 SELECT * FROM active_grants();
 ```
 
-## Result columns
+All four functions return tables and can be filtered with SQL. The only argument
+is the optional principal name for `permissions()`, as a string.
 
-Both functions return the same columns:
+## all_permissions(): available permissions {#all_permissions}
+
+`all_permissions()` takes no arguments and returns the permission names
+supported by the server and the levels where they can be granted. It lists
+permissions, **not** principals or their grants. Its columns are `permission`
+(STRING) and `level` (STRING). `level` is `Database`, `Database|Table`, or
+`Database|Table|Column` according to the permission's allowed scopes.
+
+For example, check where `SELECT` can be granted:
+
+```questdb-sql
+SELECT permission, level
+FROM all_permissions()
+WHERE permission = 'SELECT';
+```
+
+See the [permissions reference](/docs/security/rbac/#permissions) for the
+available permissions and their uses.
+
+## permissions(): one principal's effective permissions {#permissions}
+
+`permissions()` without an argument returns permissions for the current
+principal. Pass an existing user, group, or service account name as a string to
+inspect that entity instead. It returns the same result as
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions-for-current-user),
+but can be composed with `WHERE`, `ORDER BY`, and other SQL clauses:
+
+```questdb-sql
+SELECT permission, table_name, column_name, grant_option, origin
+FROM permissions('analyst')
+WHERE permission = 'SELECT';
+```
+
+| Column         | Type    | Description                                                             |
+| -------------- | ------- | ----------------------------------------------------------------------- |
+| `permission`   | STRING  | Permission name                                                         |
+| `table_name`   | STRING  | Table scope, or `NULL` for database-level permissions                   |
+| `column_name`  | STRING  | Column scope, or `NULL` for table- and database-level permissions       |
+| `grant_option` | BOOLEAN | Whether the principal can grant this permission at this scope to others |
+| `origin`       | STRING  | `G` for granted access, `I` for implicit designated-timestamp access    |
+
+`G` includes both direct and inherited permissions; it does not distinguish
+between them. You can inspect your own permissions without `USER DETAILS`.
+Inspecting another principal generally requires `USER DETAILS`; users can also
+inspect their own groups and service accounts they can assume. Unlike the two
+`active_*` functions, `permissions()` does not require `LIST USERS` and does not
+show all principals in a single result. It cannot be used in a materialized or
+live view.
+
+## active_permissions() and active_grants(): audit all principals {#active-permissions-and-grants}
+
+Both functions take no arguments and return the same columns:
 
 | Column         | Type    | Description                                                                    |
 | -------------- | ------- | ------------------------------------------------------------------------------ |
@@ -43,7 +104,7 @@ including future tables. When filtering for access to a particular table,
 include both its table name and `NULL`. A non-`NULL` `column_name` means access
 is limited to that column, not the whole table.
 
-## Effective permissions and direct grants
+### Effective permissions and direct grants
 
 `active_permissions()` includes each user's direct permissions and permissions
 inherited from their groups. Groups and service accounts have their own rows. It
@@ -55,9 +116,9 @@ principal has `SELECT` or `UPDATE` on another column. For a principal with
 repeat a group's grants under its members or include implicit designated
 timestamp permissions. Results reflect the **current, normalized ACL scopes**,
 not the original `GRANT` statements: for example, revoking access to a single
-column can turn a table-wide grant into column-level rows. Use
-[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions-for-current-user)
-when you need to inspect one principal instead of searching the whole ACL.
+column can turn a table-wide grant into column-level rows. To inspect one
+principal instead, use [`permissions()`](#permissions) or
+[`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions-for-current-user).
 
 :::note
 
