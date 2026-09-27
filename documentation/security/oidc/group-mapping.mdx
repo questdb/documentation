@@ -78,6 +78,11 @@ Every external user mapped to `groupName` receives those permissions. See
 [Granting permissions](/docs/security/rbac/granting-permissions/) for endpoint,
 table, column, and system-level examples.
 
+External users cannot be given a query memory limit directly;
+`ALTER USER ... SET MEMORY LIMIT` is rejected for them. Set the limit on the
+mapped QuestDB group instead; see
+[per-principal query memory limits](/docs/security/rbac/memory-limits/).
+
 QuestDB can obtain the list of external groups from either the User Info
 response or the ID token. By default, it reads them from the User Info
 response. When

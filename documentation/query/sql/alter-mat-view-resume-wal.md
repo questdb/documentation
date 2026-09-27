@@ -35,16 +35,28 @@ due to an error. The view will be marked as `suspended = true` in the
 Use [`wal_tables()`](/docs/query/functions/meta/#wal_tables) to identify
 suspended views:
 
-```questdb-sql title="List WAL status for all tables and views"
-wal_tables();
+```questdb-sql title="List suspended tables and views"
+SELECT name, suspended, writerTxn, sequencerTxn, errorTag
+FROM wal_tables()
+WHERE suspended;
 ```
 
-| name      | suspended | writerTxn | sequencerTxn |
-| --------- | --------- | --------- | ------------ |
-| trades_1h | true      | 3         | 5            |
+| name      | suspended | writerTxn | sequencerTxn | errorTag  |
+| --------- | --------- | --------- | ------------ | --------- |
+| trades_1h | true      | 3         | 5            | DISK FULL |
 
 The `trades_1h` view is suspended. The last successful commit was transaction
 `3`.
+
+`wal_tables()` also reports the `errorTag` and `errorMessage` of a suspended
+view. `OUT OF MEMORY` means a WAL apply batch on the view ran out of memory, by
+breaching its own
+[memory limit](/docs/configuration/cairo-engine/#memory-limits) or the
+process-wide one. This is distinct from a refresh that breaches
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairomatviewrefreshmemorylimitbytes):
+that does not suspend the view but, once its retries are exhausted,
+[invalidates](/docs/concepts/materialized-views/#view-invalidation) it, which
+`RESUME WAL` does not repair.
 
 ### Resume from failed transaction
 

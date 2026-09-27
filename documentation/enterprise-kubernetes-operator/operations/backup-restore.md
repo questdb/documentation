@@ -267,8 +267,9 @@ fi
 Proceed only if the PVC inventory command ran successfully. Confirm the listed
 PVC belongs only to the failed destination and contains no needed data.
 
-:::danger Deleting the retained destination PVC permanently destroys its
-incomplete restore data. Delete only the PVC you have confirmed is disposable.
+:::danger
+Deleting the retained destination PVC permanently destroys its incomplete
+restore data. Delete only the PVC you have confirmed is disposable.
 :::
 
 In the same shell, delete only the confirmed PVC:
@@ -306,11 +307,13 @@ spec:
         timestamp: "2026-06-30T14:00:00Z"
 ```
 
-:::warning If the target is older than the retained window, supported QuestDB
-Enterprise 4.0.0 fails startup with no backup timestamp at or before the target,
-and the operator reports `RecoveryFailed=True/RestoreError`. Because
-`spec.bootstrap` is immutable, delete the failed destination safely and create a
-fresh cluster with a valid target. :::
+:::warning
+If the target is older than the retained window, supported QuestDB Enterprise
+4.0.0 fails startup with no backup timestamp at or before the target, and the
+operator reports `RecoveryFailed=True/RestoreError`. Because `spec.bootstrap` is
+immutable, delete the failed destination safely and create a fresh cluster with
+a valid target.
+:::
 
 Confirm the source retention window before creating the immutable destination,
 then follow the same bounded watch, failure checks, and data validation as a

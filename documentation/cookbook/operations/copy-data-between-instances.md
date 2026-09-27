@@ -8,7 +8,7 @@ Copy a subset of data from one QuestDB instance to another for testing or develo
 
 ## Problem
 
-You want to copy data between QuestDB instances. This method allows you to copy any arbitrary query result, but if you want a full database copy please check the [backup and restore documentation](/docs/operations/backup/).
+You want to copy data between QuestDB instances. This method allows you to copy any arbitrary query result, but if you want a full database copy please check the [backup and restore documentation](/docs/operations/backup/). To copy only the structure, see [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/).
 
 ## Solution: Table2Ilp utility
 

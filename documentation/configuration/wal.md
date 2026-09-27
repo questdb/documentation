@@ -7,6 +7,9 @@ These settings control the Write-Ahead Log (WAL) subsystem, including parallel
 apply threads, segment rollover, commit squashing, and cleanup of applied WAL
 files.
 
+To cap the native memory a single WAL apply batch may allocate, see
+[`cairo.wal.apply.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
+
 ## cairo.wal.apply.parallel.sql.enabled
 
 - **Default**: `true`

@@ -18,7 +18,8 @@ a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
 ## What you get with QuestDB Enterprise
 
 - **TLS encryption** for all network interfaces
-- **Role-based access control (RBAC)** with users, groups, and permissions
+- **Role-based access control (RBAC)** with users, groups, permissions, and
+  per-principal query memory limits
 - **Single Sign-On (SSO)** via OpenID Connect
 - **Database replication** for high availability
 - **[Storage policies](/docs/concepts/storage-policy/)** for automated partition

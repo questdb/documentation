@@ -69,10 +69,12 @@ isolation boundary:
 - `spec.replication.root` defaults to the identity-scoped
   `db/<namespace>/<cluster>/`. Leave it unset unless deliberately adopting an
   existing WAL stream.
+- `spec.coldStorage.objectStoreRef.root` defaults to the identity-scoped
+  `cold/<namespace>/<cluster>/` and is immutable once the cluster is created.
 
 A provider-level `root` on `QuestDBObjectStore` does **not** add a base prefix;
-the per-use backup or replication root overrides it. Scope cloud permissions to
-the effective per-use prefixes.
+the per-use backup, replication, or cold-storage root overrides it. Scope cloud
+permissions to the effective per-use prefixes.
 
 ## Backup and HA
 
@@ -117,6 +119,69 @@ runbooks for routing and failover.
 
 The WAL cleaner is enabled by default. Do not disable it unless another process
 owns replication-WAL retention; otherwise WAL grows without bound.
+
+## Cold storage
+
+Native [cold storage](/docs/concepts/cold-storage/) tiers sealed partitions to
+object storage. On QuestDB Enterprise 4.0.0 or later, enable it through
+`spec.coldStorage`:
+
+```yaml
+spec:
+  coldStorage:
+    objectStoreRef:
+      name: questdb-cold-store
+      # root: cold/questdb/   # defaults to cold/<namespace>/<cluster>/
+    # manager: 1              # default
+```
+
+`objectStoreRef` names a same-namespace `QuestDBObjectStore`. The operator
+resolves it into a connection Secret named `<cluster>-cold-storage-store`,
+mounts that Secret on every database Pod, and enables cold storage on every
+instance; QuestDB pods perform all object-store I/O. Recognizable QuestDB
+Enterprise image tags below 4.0.0 are rejected at admission. Unknown custom
+tags and digest-only images are allowed and fail closed at runtime if the
+engine cannot answer cold-storage observations.
+
+`manager` selects the 1-based instance serial that holds the cold-storage
+[manager role](/docs/concepts/cold-storage/#roles); every other instance is a
+refresher. Changing `manager` requests an engine-level handoff: the operator
+demotes the old manager, verifies it settled as a refresher, then promotes the
+replacement — never two managers at once. Do not run
+[`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/)
+against operator-managed instances; change `spec.coldStorage.manager` and
+follow the
+[manager-move runbook](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager).
+
+Run the manager on a replica. The default `manager: 1` normally selects the
+primary, and a `Planned` promotion requires the manager settled on an instance
+other than the departing primary — otherwise the promotion fails with
+`ColdManagerMoveRequired`. See
+[Planned prechecks](/docs/enterprise-kubernetes-operator/high-availability/#planned-prechecks).
+
+Watch the `ColdStorageHealthy` condition and `status.coldStorage`:
+
+```sh
+kubectl get questdbcluster <name> -n <namespace> \
+  -o jsonpath='{range .status.conditions[?(@.type=="ColdStorageHealthy")]}{.type}{"="}{.status}{" reason="}{.reason}{" message="}{.message}{"\n"}{end}{.status.coldStorage}{"\n"}'
+```
+
+`True/ManagerReady` with `status.coldStorage.currentManager` naming the
+desired instance and a positive `managerTerm` is the healthy steady state.
+While a handoff is in flight, `handoffSource` names the demoted manager until
+the replacement is observed stable. `False/ManagerHandoffBlocked` fails closed
+— for example while the current manager is unreachable — rather than risking
+two managers.
+
+The operator configures and observes cold storage; it never reads or deletes
+cold objects, never assigns
+[storage policies](/docs/concepts/storage-policy/) to tables, and never
+garbage-collects the prefix. Assign policies with
+[`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
+`spec.coldStorage` may be added to a running cluster but cannot be removed,
+and `objectStoreRef` is immutable: changing the store or root would re-point
+live cold data. `manager` must not exceed `instances`, so lower `instances`
+only after moving the manager to a remaining serial.
 
 ## Storage
 
@@ -330,9 +395,16 @@ Object-store keys are **not** rejected, but operator-provided primary
 
 Never put access keys, passwords, or credential-bearing connection strings in
 `spec.config`: the custom resource and rendered ConfigMap are plaintext.
-Additional backup destinations (`backup.object.store.1` through `.9`) and
-`cold.storage.object.store` are suitable only for credential-free,
-ambient-identity settings until a Secret-backed mechanism is available.
+Additional backup destinations (`backup.object.store.1` through `.9`) are
+suitable only for credential-free, ambient-identity settings until a
+Secret-backed mechanism is available.
+
+For cold storage, use [`spec.coldStorage`](#cold-storage): its connection is
+Secret-backed. When `spec.coldStorage` is absent, the legacy
+`cold.storage.enabled`, `cold.storage.object.store`, and `cold.storage.role`
+keys remain supported for credential-free settings. When it is present, those
+three keys are operator-owned and rejected, while advanced `cold.storage.*`
+and `storage.policy.*` tuning stays user-managed.
 
 The `qwp.udp.*` receiver keys are also operator-owned: `qwp.udp.enabled` and
 `qwp.udp.bind.to` are set through [`spec.protocols.qwp.udp`](#qwp-udp), and
@@ -375,11 +447,18 @@ I/O even though the operator preserves the single-writer gate.
 Important immutable choices include:
 
 - `spec.objectStoreRef` once set;
+- `spec.coldStorage` in presence once set, and `spec.coldStorage.objectStoreRef`
+  in value;
 - `spec.storage.storageClassName`;
 - `spec.bootstrap` in presence and value;
 - `spec.protocols.pgwire.tls` in presence;
 - `spec.replication.root` in presence and value; and
-- `QuestDBObjectStore.spec.provider`.
+- `QuestDBObjectStore.spec.provider` and its physical coordinates: the S3
+  bucket, region, and endpoint, and the Azure container, account name, and
+  endpoint. Credential references, Secret contents, and non-coordinate
+  transport options remain mutable, so
+  [credential rotation](#rotate-static-object-store-credentials-safely) is
+  unaffected.
 
 Storage size is expand-only. For exact transition rules and less common fields,
 use the

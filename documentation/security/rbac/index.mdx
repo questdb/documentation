@@ -3,9 +3,8 @@ title: Role-based Access Control (RBAC)
 sidebar_label: Overview
 slug: /security/rbac
 description:
-  Granular access control from database level down to individual columns and
-  rows. Learn how to secure your QuestDB instance with users, groups, and
-  fine-grained permissions.
+  Users, groups, service accounts, and permissions from database down to column
+  and row level, plus per-principal query memory limits, in QuestDB Enterprise.
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -42,6 +41,15 @@ To verify:
 ```questdb-sql
 SHOW PERMISSIONS analyst;
 ```
+
+To cap the native memory each of a user's queries may allocate:
+
+```questdb-sql
+ALTER USER analyst SET MEMORY LIMIT 1G;
+```
+
+See [Per-principal query memory limits](/docs/security/rbac/memory-limits/)
+for how user, group, and service-account limits resolve.
 
 ## Access control depth
 
@@ -88,6 +96,7 @@ via `ILP`.
 | Page                                                                           | Covers                                                                          |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | [Users, service accounts, and groups](/docs/security/rbac/users-and-groups/)   | The three principal types, and the statements that manage them                  |
+| [Per-principal query memory limits](/docs/security/rbac/memory-limits/)         | Set, resolve, and inspect query memory limits for principals                    |
 | [Authentication and endpoint access](/docs/security/rbac/authentication/)      | Passwords, JWK and REST tokens, OIDC, and the `HTTP`/`PGWIRE`/`ILP` permissions |
 | [Granting and revoking permissions](/docs/security/rbac/granting-permissions/) | Permission levels, `GRANT ALL`, the grant option, and level re-adjustment       |
 | [Permissions reference](/docs/security/rbac/permissions-reference/)            | Every permission and the level it can be granted at                             |
@@ -137,6 +146,8 @@ above when adding new links.
 | <span id="row-level-security-multi-tenant"></span> Row-level security                      | [Common scenarios](/docs/security/rbac/common-scenarios/#row-level-security-multi-tenant)               |
 | <span id="database-administrator"></span> Database administrator                           | [Common scenarios](/docs/security/rbac/common-scenarios/#database-administrator)                        |
 | <span id="failover-operator"></span> Failover operator                                   | [Common scenarios](/docs/security/rbac/common-scenarios/#failover-operator)                             |
+| <span id="memory-limits"></span> Memory limits                                       | [Per-principal query memory limits](/docs/security/rbac/memory-limits/)                                  |
+| <span id="memory-limit-upgrade"></span> Memory limit upgrade                           | [Upgrading](/docs/security/rbac/memory-limits/#memory-limit-upgrade)                                     |
 | <span id="core-concepts"></span> Core concepts                                             | [Users, service accounts, and groups](/docs/security/rbac/users-and-groups/)                            |
 | <span id="users-and-service-accounts"></span> Users and service accounts                   | [Users and groups](/docs/security/rbac/users-and-groups/#users-and-service-accounts)                    |
 | <span id="why-service-accounts"></span> Why service accounts?                              | [Users and groups](/docs/security/rbac/users-and-groups/#why-service-accounts)                          |

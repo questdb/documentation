@@ -4,7 +4,7 @@ description:
   Prepare Azure AKS and deploy QuestDB Enterprise with the Kubernetes Operator.
 ---
 
-# Get Started on Azure AKS
+# Get started on Azure AKS
 
 By the end of this guide, you'll have QuestDB running on AKS and sending backups
 to Azure Blob Storage.

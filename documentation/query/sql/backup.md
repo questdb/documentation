@@ -7,7 +7,8 @@ description: "BACKUP SQL keyword reference documentation. Applies to QuestDB Ent
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
-  Object storage backups with incremental and point-in-time recovery support.
+  Incremental backups to object storage, with restore from any retained
+  backup.
 </EnterpriseNote>
 
 `BACKUP` - start and abort incremental backups to object storage.

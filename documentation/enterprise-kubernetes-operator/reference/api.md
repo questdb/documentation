@@ -3,8 +3,8 @@ title: Kubernetes Operator API reference
 description: Custom resources provided by the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.2.1 (82c604c305719b83151ecfca7b54f13d8f803b14).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.1 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.3.0 (b215e4b84ecda400969e9c386f2c86ebafa5f2a3).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.0 -->
 # API Reference
 
 Packages:
@@ -65,7 +65,7 @@ QuestDBCluster is the Schema for the questdbclusters API.
         <td>
           spec defines the desired state of QuestDBCluster<br/>
           <br/>
-            <i>Validations</i>:<ul><li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li><li>(has(oldSelf.protocols) && has(oldSelf.protocols.pgwire) && has(oldSelf.protocols.pgwire.tls)) == (has(self.protocols) && has(self.protocols.pgwire) && has(self.protocols.pgwire.tls)): spec.protocols.pgwire.tls cannot be added or removed after cluster creation</li></ul>
+            <i>Validations</i>:<ul><li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li><li>(has(oldSelf.protocols) && has(oldSelf.protocols.pgwire) && has(oldSelf.protocols.pgwire.tls)) == (has(self.protocols) && has(self.protocols.pgwire) && has(self.protocols.pgwire.tls)): spec.protocols.pgwire.tls cannot be added or removed after cluster creation</li><li>!has(oldSelf.coldStorage) || has(self.coldStorage): spec.coldStorage cannot be removed once set</li><li>!has(self.coldStorage) || self.coldStorage.manager &lt;= self.instances: spec.coldStorage.manager must be less than or equal to spec.instances</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -139,6 +139,14 @@ an existing cluster (see the spec-level rules).<br/>
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#questdbclusterspeccoldstorage">coldStorage</a></b></td>
+        <td>object</td>
+        <td>
+          coldStorage configures native cold storage on every instance. It may be added
+to a running cluster but cannot be removed once present.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>config</b></td>
         <td>map[string]string</td>
         <td>
@@ -146,12 +154,16 @@ an existing cluster (see the spec-level rules).<br/>
 (acl.admin.*, http.health.check.authentication.required, replication.role,
 cairo.snapshot.instance.id, *.tls.*) are rejected.
 
-The object-store keys are NOT rejected, and setting backup.object.store or
-replication.object.store here has no effect: the operator supplies both through
-the engine's _FILE mechanism, which takes precedence over server.conf. The
-additional backup destinations (backup.object.store.1 … .9) and
-cold.storage.object.store are yours to set. Keys must match the server.conf
-allow-list below (letters, digits, '.', '_', '-'). This is an ALLOW-LIST, not a
+The object-store keys are not globally rejected. Setting backup.object.store or
+replication.object.store here has no effect because the operator supplies both
+through the engine's _FILE mechanism, which takes precedence over server.conf.
+Additional backup destinations (backup.object.store.1 … .9) remain user-managed.
+When spec.coldStorage is absent, the legacy cold.storage.enabled,
+cold.storage.object.store, and cold.storage.role keys also remain supported. When
+spec.coldStorage is present, those three keys are operator-owned and rejected;
+advanced cold.storage.* and storage.policy.* tuning remains user-managed. Keys
+must match the server.conf allow-list below (letters, digits, '.', '_', '-').
+This is an ALLOW-LIST, not a
 delimiter blocklist, on purpose: QuestDB re-parses server.conf with
 java.util.Properties, which decodes \uXXXX escapes and treats ':'/whitespace as
 separators, so a blocklist of only "\n\r=" let a reserved key be smuggled past
@@ -705,6 +717,86 @@ selects the latest backup at-or-before that instant.<br/>
             <i>Format</i>: date-time<br/>
         </td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.coldStorage
+<sup><sup>[↩ Parent](#questdbclusterspec)</sup></sup>
+
+
+
+coldStorage configures native cold storage on every instance. It may be added
+to a running cluster but cannot be removed once present.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#questdbclusterspeccoldstorageobjectstoreref">objectStoreRef</a></b></td>
+        <td>object</td>
+        <td>
+          objectStoreRef references the QuestDBObjectStore holding cold partitions. It
+is immutable because changing its store or root would re-point live cold data.<br/>
+          <br/>
+            <i>Validations</i>:<ul><li>self == oldSelf: coldStorage.objectStoreRef is immutable</li></ul>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>manager</b></td>
+        <td>integer</td>
+        <td>
+          manager is the 1-based instance serial that owns cold-storage writes. Every
+other instance is a refresher.<br/>
+          <br/>
+            <i>Format</i>: int32<br/>
+            <i>Default</i>: 1<br/>
+            <i>Minimum</i>: 1<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.coldStorage.objectStoreRef
+<sup><sup>[↩ Parent](#questdbclusterspeccoldstorage)</sup></sup>
+
+
+
+objectStoreRef references the QuestDBObjectStore holding cold partitions. It
+is immutable because changing its store or root would re-point live cold data.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          name references a QuestDBObjectStore in the cluster's namespace.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>root</b></td>
+        <td>string</td>
+        <td>
+          root is the prefix within the store's bucket/container for THIS use
+(e.g. "backup/", "db/"). It is the only isolation when multiple uses or
+clusters share a bucket.<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -3345,13 +3437,20 @@ status defines the observed state of QuestDBCluster
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#questdbclusterstatuscoldstorage">coldStorage</a></b></td>
+        <td>object</td>
+        <td>
+          coldStorage reports observed native cold-storage configuration and live manager state.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#questdbclusterstatusconditionsindex">conditions</a></b></td>
         <td>[]object</td>
         <td>
           conditions represent the current state of the QuestDBCluster.
 Types: Available, Progressing, InstanceUnreachable, ConfigRejected,
-OperatorIdentityReady, TLSReady, BackupHealthy, WriteHealthy, ReplicationHealthy,
-PromotionRequired, Recovered, RecoveryFailed, StorageResizeBlocked.<br/>
+OperatorIdentityReady, TLSReady, BackupHealthy, ColdStorageHealthy, WriteHealthy,
+ReplicationHealthy, PromotionRequired, Recovered, RecoveryFailed, StorageResizeBlocked.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3536,6 +3635,59 @@ lastBackup is the most recent run observed via backups() (nil until one runs).
         <td>string</td>
         <td>
           status is in_progress|completed|failed|unknown.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.status.coldStorage
+<sup><sup>[↩ Parent](#questdbclusterstatus)</sup></sup>
+
+
+
+coldStorage reports observed native cold-storage configuration and live manager state.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>configured</b></td>
+        <td>boolean</td>
+        <td>
+          configured is true once the resolved structured cold-storage connection has
+reached at least one intended live Pod.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>currentManager</b></td>
+        <td>string</td>
+        <td>
+          currentManager is the instance currently observed by QuestDB as manager.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>handoffSource</b></td>
+        <td>string</td>
+        <td>
+          handoffSource is operator transition state identifying the manager whose
+demotion started the active handoff. Unlike currentManager, it is not a live
+engine-role observation. It is cleared after a stable manager is observed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>managerTerm</b></td>
+        <td>integer</td>
+        <td>
+          managerTerm is the positive live engine term of currentManager.<br/>
+          <br/>
+            <i>Format</i>: int64<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4000,7 +4152,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           azure configures an Azure Blob store. Set iff provider is Azure.<br/>
           <br/>
-            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['container','account_name','account_key','root','endpoint'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['container','account_name','account_key','root','endpoint'])): extraOptions key is reserved; set it via the dedicated structured field</li><li>!oldSelf.hasValue() ? (!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['azure_container_name','container_name','azure_storage_account_name','azure_storage_endpoint','azure_endpoint']))) : ((!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['azure_container_name','container_name','azure_storage_account_name','azure_storage_endpoint','azure_endpoint']) || (has(oldSelf.value().extraOptions) && k in oldSelf.value().extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k]))) && (!has(oldSelf.value().extraOptions) || oldSelf.value().extraOptions.all(k, !(k.lowerAscii() in ['azure_container_name','container_name','azure_storage_account_name','azure_storage_endpoint','azure_endpoint']) || (has(self.extraOptions) && k in self.extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k])))): OpenDAL Azure coordinate aliases cannot be added, changed, or removed; use the structured field</li><li>self.container == oldSelf.container: azure.container is immutable</li><li>self.accountName == oldSelf.accountName: azure.accountName is immutable</li><li>(has(self.endpoint) && has(oldSelf.endpoint) && self.endpoint == oldSelf.endpoint) || ((!has(self.endpoint) || self.endpoint.size() == 0) && (!has(oldSelf.endpoint) || oldSelf.endpoint.size() == 0)): azure.endpoint is immutable</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4009,7 +4161,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           gcs configures a Google Cloud Storage store. Set iff provider is GCS.<br/>
           <br/>
-            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','endpoint','credential','credential_path','token'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','endpoint','credential','credential_path','token'])): extraOptions key is reserved; set it via the dedicated structured field</li><li>!oldSelf.hasValue() ? (!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['google_bucket','google_bucket_name','bucket_name']))) : ((!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['google_bucket','google_bucket_name','bucket_name']) || (has(oldSelf.value().extraOptions) && k in oldSelf.value().extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k]))) && (!has(oldSelf.value().extraOptions) || oldSelf.value().extraOptions.all(k, !(k.lowerAscii() in ['google_bucket','google_bucket_name','bucket_name']) || (has(self.extraOptions) && k in self.extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k])))): OpenDAL GCS coordinate aliases cannot be added, changed, or removed; use the structured field</li><li>self.bucket == oldSelf.bucket: gcs.bucket is immutable</li><li>(has(self.endpoint) && has(oldSelf.endpoint) && self.endpoint == oldSelf.endpoint) || ((!has(self.endpoint) || self.endpoint.size() == 0) && (!has(oldSelf.endpoint) || oldSelf.endpoint.size() == 0)): gcs.endpoint is immutable</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4018,7 +4170,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           s3 configures an AWS S3 (or S3-compatible) store. Set iff provider is S3.<br/>
           <br/>
-            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','region','endpoint','access_key_id','secret_access_key','session_token'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','region','endpoint','access_key_id','secret_access_key','session_token'])): extraOptions key is reserved; set it via the dedicated structured field</li><li>!oldSelf.hasValue() ? (!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['aws_bucket','aws_bucket_name','bucket_name','aws_region','aws_endpoint','aws_endpoint_url','endpoint_url']))) : ((!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['aws_bucket','aws_bucket_name','bucket_name','aws_region','aws_endpoint','aws_endpoint_url','endpoint_url']) || (has(oldSelf.value().extraOptions) && k in oldSelf.value().extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k]))) && (!has(oldSelf.value().extraOptions) || oldSelf.value().extraOptions.all(k, !(k.lowerAscii() in ['aws_bucket','aws_bucket_name','bucket_name','aws_region','aws_endpoint','aws_endpoint_url','endpoint_url']) || (has(self.extraOptions) && k in self.extraOptions && self.extraOptions[k] == oldSelf.value().extraOptions[k])))): OpenDAL S3 coordinate aliases cannot be added, changed, or removed; use the structured field</li><li>self.bucket == oldSelf.bucket: s3.bucket is immutable</li><li>(has(self.region) && has(oldSelf.region) && self.region == oldSelf.region) || ((!has(self.region) || self.region.size() == 0) && (!has(oldSelf.region) || oldSelf.region.size() == 0)): s3.region is immutable</li><li>(has(self.endpoint) && has(oldSelf.endpoint) && self.endpoint == oldSelf.endpoint) || ((!has(self.endpoint) || self.endpoint.size() == 0) && (!has(oldSelf.endpoint) || oldSelf.endpoint.size() == 0)): s3.endpoint is immutable</li></ul>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4083,8 +4235,10 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
         <td>map[string]string</td>
         <td>
           extraOptions are appended verbatim as OpenDAL key=value pairs (e.g.
-ca_builtin_roots). Keys must not contain ';' or '='; values must not
-contain ';'.<br/>
+ca_builtin_roots). They remain mutable transport tuning. New OpenDAL aliases for
+structured coordinates are rejected; aliases persisted before that validation was
+introduced remain accepted only while their key and value are unchanged. Keys must
+not contain ';' or '='; values must not contain ';'.<br/>
           <br/>
             <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
@@ -4094,10 +4248,10 @@ contain ';'.<br/>
         <td>string</td>
         <td>
           root is a path prefix within the bucket/container. NOTE: on a QuestDBObjectStore
-this field does NOT isolate data — the effective prefix is the consuming cluster's
-per-use root (spec.backup.root / spec.replication.root), which overrides it. Those
-per-use roots are what isolate clusters that share a bucket (QuestDB has no
-instance-name key).<br/>
+this field does NOT isolate data — ParamsFromStore overwrites it with the consuming
+cluster's per-use root (spec.backup.root / spec.replication.root). Those per-use
+roots are what isolate clusters that share a bucket (QuestDB has no instance-name
+key), so root remains mutable and cannot move a consuming cluster's data.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4193,8 +4347,10 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
         <td>map[string]string</td>
         <td>
           extraOptions are appended verbatim as OpenDAL key=value pairs (e.g.
-ca_builtin_roots). Keys must not contain ';' or '='; values must not
-contain ';'.<br/>
+ca_builtin_roots). They remain mutable transport tuning. New OpenDAL aliases for
+structured coordinates are rejected; aliases persisted before that validation was
+introduced remain accepted only while their key and value are unchanged. Keys must
+not contain ';' or '='; values must not contain ';'.<br/>
           <br/>
             <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
@@ -4204,10 +4360,10 @@ contain ';'.<br/>
         <td>string</td>
         <td>
           root is a path prefix within the bucket/container. NOTE: on a QuestDBObjectStore
-this field does NOT isolate data — the effective prefix is the consuming cluster's
-per-use root (spec.backup.root / spec.replication.root), which overrides it. Those
-per-use roots are what isolate clusters that share a bucket (QuestDB has no
-instance-name key).<br/>
+this field does NOT isolate data — ParamsFromStore overwrites it with the consuming
+cluster's per-use root (spec.backup.root / spec.replication.root). Those per-use
+roots are what isolate clusters that share a bucket (QuestDB has no instance-name
+key), so root remains mutable and cannot move a consuming cluster's data.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4303,8 +4459,10 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
         <td>map[string]string</td>
         <td>
           extraOptions are appended verbatim as OpenDAL key=value pairs (e.g.
-ca_builtin_roots). Keys must not contain ';' or '='; values must not
-contain ';'.<br/>
+ca_builtin_roots). They remain mutable transport tuning. New OpenDAL aliases for
+structured coordinates are rejected; aliases persisted before that validation was
+introduced remain accepted only while their key and value are unchanged. Keys must
+not contain ';' or '='; values must not contain ';'.<br/>
           <br/>
             <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
@@ -4321,10 +4479,10 @@ contain ';'.<br/>
         <td>string</td>
         <td>
           root is a path prefix within the bucket/container. NOTE: on a QuestDBObjectStore
-this field does NOT isolate data — the effective prefix is the consuming cluster's
-per-use root (spec.backup.root / spec.replication.root), which overrides it. Those
-per-use roots are what isolate clusters that share a bucket (QuestDB has no
-instance-name key).<br/>
+this field does NOT isolate data — ParamsFromStore overwrites it with the consuming
+cluster's per-use root (spec.backup.root / spec.replication.root). Those per-use
+roots are what isolate clusters that share a bucket (QuestDB has no instance-name
+key), so root remains mutable and cannot move a consuming cluster's data.<br/>
         </td>
         <td>false</td>
       </tr></tbody>

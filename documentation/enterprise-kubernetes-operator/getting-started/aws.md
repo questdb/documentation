@@ -4,7 +4,7 @@ description:
   Prepare Amazon EKS and deploy QuestDB Enterprise with the Kubernetes Operator.
 ---
 
-# Get Started on Amazon EKS
+# Get started on Amazon EKS
 
 By the end of this guide, you'll have QuestDB running on EKS and sending backups
 to Amazon S3.

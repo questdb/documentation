@@ -44,7 +44,7 @@ SHOW GROUPS john;
 
 that yields:
 
-| name       |
-| ---------- |
-| management |
-| audit      |
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management |                | 2147483648   |
+| audit      |                | null         |

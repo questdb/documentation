@@ -44,6 +44,7 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | Function | Description | Respects Frame |
 |----------|-------------|----------------|
 | [`avg()`](reference.md#avg) | Average value in window (also supports EMA and VWEMA) | Yes (standard) / No (EMA/VWEMA) |
+| [`cadence()`](reference.md#cadence) | SUBSAMPLE keep flag: every Nth row | No (frame clause rejected) |
 | [`corr()`](reference.md#corr) | Pearson correlation coefficient | Yes |
 | [`count()`](reference.md#count) | Count rows or non-null values | Yes |
 | [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Yes |
@@ -54,18 +55,23 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`lag()`](reference.md#lag) | Value from previous row | No |
 | [`last_value()`](reference.md#last_value) | Last value in window | Yes |
 | [`lead()`](reference.md#lead) | Value from following row | No |
+| [`lttb()`](reference.md#lttb) | SUBSAMPLE keep flag: Largest Triangle Three Buckets | No (frame clause rejected) |
+| [`m4()`](reference.md#m4) | SUBSAMPLE keep flag: first, last, min, max per time bucket | No (frame clause rejected) |
 | [`max()`](reference.md#max) | Maximum value in window | Yes |
 | [`min()`](reference.md#min) | Minimum value in window | Yes |
+| [`minmax()`](reference.md#minmax) | SUBSAMPLE keep flag: min and max per time bucket | No (frame clause rejected) |
 | [`nth_value()`](reference.md#nth_value) | N-th value in window | Yes |
 | [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
 | [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
 | [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
 | [`row_number()`](reference.md#row_number) | Sequential row number | No |
+| [`sdt()`](reference.md#sdt) | SUBSAMPLE keep flag: Swinging Door Trending, error-bounded | No (frame clause rejected) |
 | [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Yes |
 | [`sum()`](reference.md#sum) | Sum of values in window | Yes |
+| [`uniform()`](reference.md#uniform) | SUBSAMPLE keep flag: evenly spaced rows | No (frame clause rejected) |
 | [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Yes |
 
-**Respects Frame**: Functions marked "Yes" use the frame clause (`ROWS`/`RANGE BETWEEN`). Functions marked "No" operate on the entire partition regardless of frame specification.
+**Respects Frame**: Functions marked "Yes" use the frame clause (`ROWS`/`RANGE BETWEEN`). Functions marked "No" either operate on the entire partition or reject explicit frame specifications. See each function reference for its behavior.
 
 ## When to use window functions
 

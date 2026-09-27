@@ -3,8 +3,8 @@ title: Kubernetes Operator releases
 description: Release history for the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.2.1 (82c604c305719b83151ecfca7b54f13d8f803b14).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.1 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.3.0 (b215e4b84ecda400969e9c386f2c86ebafa5f2a3).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.0 -->
 # Changelog
 
 Notable changes to the QuestDB Enterprise Operator are documented here.
@@ -12,20 +12,20 @@ Notable changes to the QuestDB Enterprise Operator are documented here.
 <!-- generated latest operator artifacts: start -->
 ## Latest operator artifacts
 
-Latest stable release: **0.2.1**
+Latest stable release: **0.3.0**
 
 ### Operator images
 
 **AWS ECR**
 
 ```text
-695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.2.1
+695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.3.0
 ```
 
 **Non-AWS mirror**
 
 ```text
-registry.distribution.questdb.io/questdb-enterprise-operator:0.2.1
+registry.distribution.questdb.io/questdb-enterprise-operator:0.3.0
 ```
 
 Both references require the registry access supplied by QuestDB.
@@ -37,11 +37,70 @@ Both references require the registry access supplied by QuestDB.
 ```sh
 helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
   --namespace questdb-operator-system --create-namespace \
-  --version 0.2.1
+  --version 0.3.0
 ```
 
 <!-- generated latest operator artifacts: end -->
-## [Unreleased]
+## [0.3.0] - 2026-09-14
+
+### Added
+
+- Native cold storage is available through `spec.coldStorage`:
+
+  ```yaml
+  coldStorage:
+    objectStoreRef:
+      name: questdb-cold-store
+      root: cold/questdb/
+    manager: 1
+  ```
+
+  The selected 1-based serial is the independent cold-storage manager and all
+  other instances are refreshers. Recognizable QuestDB Enterprise versions below
+  4.0.0 are rejected; unknown custom tags and digest-only images are allowed.
+  Cold health is reported through the `ColdStorageHealthy` condition and
+  `status.coldStorage` (configured store, current manager, manager term).
+
+### Changed
+
+- Existing raw `spec.config` cold-storage settings remain compatible when
+  `spec.coldStorage` is absent. The operator never manages object-store data or
+  table storage policies, and it never forces a cold-manager handoff.
+- A Planned promotion on a cluster with `spec.coldStorage` requires settled
+  cold-manager ownership on an instance other than the departing primary;
+  otherwise the promotion fails fast with `ColdManagerMoveRequired`. Move
+  `spec.coldStorage.manager` to a ready replica, wait for `ManagerReady`, and
+  create a new promotion request. The default `manager: 1` normally selects the
+  primary, so move it before the first Planned promotion. Emergency promotion
+  never waits on cold ownership.
+- `QuestDBObjectStore` provider and physical coordinates (S3 bucket, region,
+  and endpoint; Azure container, account name, and endpoint; GCS bucket and
+  endpoint) are immutable after creation, for every store use. Credential
+  references, Secret contents, `root`, and non-coordinate transport options
+  remain mutable. OpenDAL coordinate aliases persisted under older CRDs stay
+  accepted while their key and value remain unchanged; new aliases are
+  rejected.
+- The CRDs now use Kubernetes validation ratcheting, which requires Kubernetes
+  1.30 or later — within the supported platform matrix.
+
+### Fixed
+
+- The Emergency-only migration gate no longer fires on Planned promotions, where
+  one transient API read could silently revert a completed drain by re-shaping
+  the departing serial as primary and wedging the promotion in `Promoting`.
+- A Planned promotion no longer fails terminally with `ColdManagerMoveRequired`
+  on a one-pass cold-storage observation transient. A trustworthy misplacement
+  or an in-flight handoff still fails fast; an unsettled observation waits in
+  `Validating`, bounded by `catchUpTimeoutSeconds`.
+- Emergency promotion persists the `Promoting` phase before fencing and waits
+  for the departed primary Pod to be absent from the API server before shaping
+  the target migration; promotion actions are authorized only from the exact
+  controller-owner UID.
+- A completed promotion settles the follower's status against the committed
+  primary in the same pass and emits a `PromotionCompleted` event, instead of
+  leaving a stale `Available=True/Following` status.
+- The undetermined follower replication status message is simplified while
+  retaining `Unknown/StreamNotDetermined` semantics.
 
 ## [0.2.1] - 2026-09-02
 

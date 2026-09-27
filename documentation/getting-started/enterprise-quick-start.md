@@ -43,6 +43,8 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
+  - Buying through Azure? QuestDB Enterprise is also available via
+    [Azure Marketplace](/docs/deployment/azure/#buy-through-azure-marketplace).
 - Use of a [supported file system](/docs/getting-started/capacity-planning/#supported-filesystems)
   - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
@@ -276,8 +278,9 @@ For more on ILP ingestion, see:
 
 _If you're not using Kafka, you can skip to section 6._
 
-The official **QuestDB Kafka Connect sink** forwards messages from Kafka topics directly to your database using ILP protocol.
-The setup process is straightforward:
+Use the **QuestDB Kafka connector** to stream messages from Kafka topics into
+QuestDB. The configuration below requires QuestDB 10.0 or newer and connector
+0.24 or newer.
 
 1. Create a dedicated service account in QuestDB.
 2. Generate an authentication token for the account.
@@ -332,13 +335,13 @@ tasks.max=1
 topics=your_kafka_topic
 
 # --- QuestDB Connection ---
-# Use https:: if your QuestDB server has TLS enabled.
-# Replace the placeholder with the token you generated.
-client.conf.string=https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;
+# Use ws:: if your QuestDB server does not have TLS enabled.
+# Replace YOUR_TOKEN with the token you generated.
+client.conf.string=wss::addr=localhost:9000;token=YOUR_TOKEN;
 
 # --- Optional: Data Mapping ---
 # Use a field from the Kafka message key or value as a QuestDB symbol.
-# symbol.columns=device_id
+# symbols=device_id
 ```
 
 Once you deploy this configuration, the connector will start sending data from your Kafka topic to QuestDB. If you

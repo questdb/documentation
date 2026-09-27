@@ -35,7 +35,9 @@ applications follow it. The rest of this page covers replication — see the
 
 - **High availability** - Replicas can take over if the primary fails
 - **Read scaling** - Distribute query load across multiple replicas
-- **Disaster recovery** - Restore from any point in time using stored WAL files
+- **Disaster recovery** -
+  [Recover to an arbitrary instant](/docs/operations/point-in-time-recovery/)
+  using stored WAL files
 - **Geographic distribution** - Place replicas closer to users in different regions
 - **Zero performance impact** - Replicas don't affect primary performance
 
@@ -148,6 +150,8 @@ by you.
   primary, and replica nodes.
 - [Failover and role switch](/docs/high-availability/failover/) — switch roles
   in place, promote a replica, and recover from a refused switch.
+- [Disaster recovery](/docs/high-availability/disaster-recovery/) — failure
+  scenarios and the migration procedures that recover from them.
 - [Client failover](/docs/high-availability/client-failover/concepts/) —
   configure your applications to follow a primary promotion automatically.
 - [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —

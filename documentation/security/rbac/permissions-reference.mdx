@@ -106,6 +106,7 @@ detail under
 | REMOVE EXTERNAL ALIAS  | Remove external group mappings          |
 | REMOVE PASSWORD        | Remove passwords                        |
 | REMOVE USER            | Remove users from groups                |
+| SET MEMORY LIMIT       | Set memory limits on users, groups, and service accounts |
 | USER DETAILS           | View user/group/service account details |
 
 ## Special permissions
@@ -134,5 +135,7 @@ handing over the rest of `SYSTEM ADMIN`.
   levels, `WITH GRANT OPTION`, and how grants shift level when you revoke
 - [Authentication and endpoint access](/docs/security/rbac/authentication/) -
   the `HTTP`, `PGWIRE` and `ILP` permissions in context
+- [Per-principal query memory limits](/docs/security/rbac/memory-limits/) -
+  precedence, coverage, and administrative implications of `SET MEMORY LIMIT`
 - [`GRANT`](/docs/query/sql/acl/grant/) and
   [`REVOKE`](/docs/query/sql/acl/revoke/) statement syntax

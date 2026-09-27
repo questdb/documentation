@@ -469,6 +469,7 @@ module.exports = {
                 "query/sql/order-by",
                 "query/sql/pivot",
                 "query/sql/sample-by",
+                "query/sql/subsample",
                 "query/sql/unnest",
                 "query/sql/where",
                 "query/sql/window-join",
@@ -733,6 +734,11 @@ module.exports = {
               label: "Users and groups",
             },
             {
+              id: "security/rbac/memory-limits",
+              type: "doc",
+              label: "Memory limits",
+            },
+            {
               id: "security/rbac/authentication",
               type: "doc",
               label: "Authentication and endpoints",
@@ -832,6 +838,7 @@ module.exports = {
           items: [
             "high-availability/setup",
             "high-availability/failover",
+            "high-availability/disaster-recovery",
             "high-availability/tuning",
             "high-availability/wal-cleanup",
           ],
@@ -866,6 +873,7 @@ module.exports = {
       items: [
         "operations/upgrade",
         "operations/backup",
+        "operations/point-in-time-recovery",
         {
           id: "operations/cold-storage",
           type: "doc",
@@ -1259,6 +1267,7 @@ module.exports = {
                 "cookbook/operations/csv-import-milliseconds",
                 "cookbook/operations/tls-pgbouncer",
                 "cookbook/operations/copy-data-between-instances",
+                "cookbook/operations/copy-schema-between-instances",
                 "cookbook/operations/query-times-histogram",
                 "cookbook/operations/optimize-many-tables",
                 "cookbook/operations/check-transaction-applied",

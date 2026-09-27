@@ -122,6 +122,8 @@ WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
 - Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
+- `cairo.wal.apply.memory.limit.bytes` — cap on the native memory a WAL apply
+  batch may allocate; see [memory limits](/docs/configuration/cairo-engine/#memory-limits)
 
 To convert an existing table between WAL and non-WAL:
 
