@@ -18,7 +18,7 @@ For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page. To inspect the resulting ACL
 state, use [`permissions()`](/docs/query/functions/access-control/#permissions)
 for one entity or
-[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants) across
+[`active_grants()`](/docs/query/functions/access-control/#active_grants) across
 all users, groups, and service accounts.
 
 ---
@@ -305,7 +305,7 @@ GRANT UPDATE ON countries(description) TO john;
 
 Such permissions do not show in
 [`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions) output, but
-[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants) lists
+[`active_grants()`](/docs/query/functions/access-control/#active_grants) lists
 them.
 
 | permission | table_name | column_name | grant_option | origin |

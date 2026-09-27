@@ -17,9 +17,9 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page. After revoking a permission,
 inspect current direct grants with
-[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants)
+[`active_grants()`](/docs/query/functions/access-control/#active_grants)
 or effective access with
-[`active_permissions()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions).
 
 ---
 

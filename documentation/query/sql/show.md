@@ -501,7 +501,8 @@ own groups and service accounts they can assume.
 To filter the result for one entity with SQL, use
 [`permissions()`](/docs/query/functions/access-control/#permissions). To search
 across all users, groups, and service accounts, use
-[`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions) and
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 The latter two require `LIST USERS` and `USER DETAILS` permissions.
 
 ### SHOW SERVER_VERSION
@@ -643,7 +644,8 @@ The following functions allow querying tables and views with filters and using
 the results as part of a function:
 
 - [`permissions()`](/docs/query/functions/access-control/#permissions)
-- [`active_permissions()` and `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants)
+- [`active_grants()`](/docs/query/functions/access-control/#active_grants)
+- [`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
 - [table_columns()](/docs/query/functions/meta/#table_columns)
 - [tables()](/docs/query/functions/meta/#tables)
 - [table_partitions()](/docs/query/functions/meta/#table_partitions)

@@ -574,7 +574,8 @@ SHOW PERMISSIONS username;     -- Show permissions for user
 entity's [memory limit](#memory-limits). To filter the permissions of one
 principal, use [`permissions()`](/docs/query/functions/access-control/#permissions)
 instead of `SHOW PERMISSIONS`. To search across all principals, use
-[`active_permissions()` or `active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions) or
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 These show effective access (including group inheritance) or direct grants,
 respectively, and require both `LIST USERS` and `USER DETAILS`.
 

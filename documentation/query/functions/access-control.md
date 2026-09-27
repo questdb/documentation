@@ -2,8 +2,9 @@
 title: Access control functions
 sidebar_label: Access control
 description: >-
-  Audit QuestDB Enterprise access control in SQL: list direct grants, find who
-  can read a table, and inspect a user's effective permissions.
+  Audit QuestDB Enterprise RBAC in SQL with active_grants(),
+  active_permissions(), permissions(), and all_permissions(): list grants and
+  find who can read a table.
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -44,7 +45,7 @@ filtered, joined, and ordered with SQL.
 - `entityName` (optional, string literal): existing user, group, or service
   account to inspect. Omit it to inspect the current entity.
 
-## all_permissions(): available permissions {#all_permissions}
+## all_permissions
 
 `all_permissions()` takes no arguments and returns the permission names
 supported by the server and the levels where they can be granted. It lists
@@ -63,9 +64,10 @@ WHERE permission = 'SELECT';
 See the [permissions reference](/docs/security/rbac/#permissions) for the
 available permissions and their uses.
 
-## permissions(): one principal's effective permissions {#permissions}
+## permissions
 
-`permissions()` without an argument returns permissions for the current
+`permissions()` returns the effective permissions of one user, group, or
+service account. Without an argument, it returns permissions for the current
 principal. Pass an existing user, group, or service account name as a string to
 inspect that entity instead. It returns the same result as
 [`SHOW PERMISSIONS`](/docs/query/sql/show/#show-permissions),
@@ -92,12 +94,14 @@ inspect their own groups and service accounts they can assume. `permissions()`
 does not show all entities in a single result. It cannot be used in a
 materialized or live view.
 
-<span id="active_permissions" />
-<span id="active_grants" />
+<span id="active-permissions-and-grants" />
 
-## active_permissions() and active_grants(): audit all entities {#active-permissions-and-grants}
+## active_permissions
 
-Both functions take no arguments and return the same columns:
+`active_permissions()` returns the effective permissions of every persisted
+user, group, and service account, including permissions users inherit from
+their groups. Use it to find who can access a table or column. It takes no
+arguments and returns these columns:
 
 | Column         | Type    | Description                                                                    |
 | -------------- | ------- | ------------------------------------------------------------------------------ |
@@ -122,17 +126,21 @@ specific columns only when the entity has no row for that permission on the
 whole table or database. When filtering for access to a particular table,
 include both its table name and `NULL`.
 
-### Effective permissions and direct grants
-
-`active_permissions()` includes each user's direct permissions and permissions
-inherited from their groups. Groups and service accounts have their own rows. It
+Each user's rows combine its direct permissions with permissions inherited
+from its groups. Groups and service accounts have their own rows. The result
 also includes implicit access to a table's designated timestamp column when a
 principal has `SELECT` or `UPDATE` on another column. For a principal with
 `DATABASE ADMIN`, it expands the effective database permissions.
 
-`active_grants()` lists permissions granted directly to each entity. It does not
-repeat a group's grants under its members or include implicit designated
-timestamp permissions. Results reflect the **current, normalized ACL scopes**,
+## active_grants
+
+`active_grants()` returns the permissions granted directly to each persisted
+user, group, and service account. Use it to audit who was granted what. It
+takes no arguments and returns the same columns and scope rows as
+[`active_permissions()`](#active_permissions).
+
+Unlike `active_permissions()`, it does not repeat a group's grants under its
+members or include implicit designated timestamp permissions. Results reflect the **current, normalized ACL scopes**,
 not the original `GRANT` statements: for example, revoking access to a single
 column can turn a table-wide grant into column-level rows. To inspect one
 principal instead, use [`permissions()`](#permissions) or
@@ -140,7 +148,8 @@ principal instead, use [`permissions()`](#permissions) or
 
 :::note
 
-Both functions require `LIST USERS` and `USER DETAILS` permissions. The built-in
+`active_permissions()` and `active_grants()` both require `LIST USERS` and
+`USER DETAILS` permissions. The built-in
 admin can call them without explicit grants unless it has assumed a service
 account, in which case the assumed account needs both permissions. They return
 an empty result if ACL is disabled. They do not list external SSO/OIDC

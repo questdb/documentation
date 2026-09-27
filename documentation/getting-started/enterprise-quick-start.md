@@ -190,7 +190,7 @@ Permission grants can be specific and fine-tuned.
 
 Check what a user can do with `SHOW PERMISSIONS user1;`, or audit grants across
 all users, groups, and service accounts with
-[`active_grants()`](/docs/query/functions/access-control/#active-permissions-and-grants).
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 [`all_permissions()`](/docs/query/functions/access-control/#all_permissions)
 lists the permissions available to grant.
 
