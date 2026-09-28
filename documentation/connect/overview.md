@@ -28,26 +28,25 @@ Pick the path that matches your environment.
 
 ## Client Libraries
 
-The first-party libraries for **Java, Python, Go, Rust, Node.js, C & C++, and
-.NET** are the recommended way to talk to QuestDB. They speak the
-**QuestDB Wire Protocol (QWP)** and unify ingest and query under one
-configuration and one connection.
+The first-party libraries for **Java, Python, Go, Rust, JavaScript (Node.js
+and browsers), C & C++, and .NET** are the recommended way to talk to
+QuestDB. They speak the **QuestDB Wire Protocol (QWP)** and unify ingest and
+query under one configuration and one connection.
 
 ### QWP support
 
-QWP ships in the libraries below. The remaining language clients are being
-updated — until they ship a QWP build, they continue to use ILP for ingestion
-and PGWire for queries.
+QWP ships in every library below. A library marked Beta may still change its
+QWP API before it is declared stable.
 
-| Language  | QWP support |
-| --------- | ----------- |
-| Java      | ✓ Stable    |
-| C & C++   | ✓ Stable    |
-| Rust      | ✓ Stable    |
-| Python    | ✓ Stable    |
-| .NET      | Beta        |
-| Go        | Beta        |
-| Node.js   | Planned     |
+| Language                          | QWP support |
+| --------------------------------- | ----------- |
+| Java                              | ✓ Stable    |
+| C & C++                           | ✓ Stable    |
+| Rust                              | ✓ Stable    |
+| Python                            | ✓ Stable    |
+| .NET                              | Beta        |
+| Go                                | Beta        |
+| JavaScript (Node.js and browsers) | Beta        |
 
 Highlights:
 
@@ -107,7 +106,8 @@ covering the WebSocket variants for ingress and egress. Read these if you are
 embedding QuestDB connectivity into an existing framework.
 
 QWP also has a UDP transport for fire-and-forget metrics, supported by the
-Java, Rust, C and C++ clients via the `udp` connect-string schema. It is
+Java, Rust, C and C++ clients, and by the JavaScript client on Node.js, via the
+`udp` connect-string schema. It is
 configured through the [`qwp.udp.*` server
 settings](/docs/configuration/qwp/#udp-receiver) and is disabled by default;
 there is no separate byte-level specification page for it.

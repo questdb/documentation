@@ -76,7 +76,7 @@ module.exports = {
             {
               id: "connect/clients/nodejs",
               type: "doc",
-              label: "Node.js",
+              label: "JavaScript",
             },
             {
               id: "connect/clients/c-and-cpp",

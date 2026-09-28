@@ -48,6 +48,14 @@
     "protocol": "QWP"
   },
   {
+    "href": "/docs/connect/clients/nodejs",
+    "name": "JavaScript",
+    "description":
+      "QWP ingestion and streaming SQL for Node.js and browsers. Beta.",
+    "logo": "/images/logos/nodejs-light.svg",
+    "protocol": "QWP"
+  },
+  {
     "href": "/docs/connect/clients/c-and-cpp",
     "name": "C & C++",
     "description":
@@ -105,9 +113,9 @@
   },
   {
     "href": "/docs/connect/clients/nodejs",
-    "name": "Node.js",
+    "name": "JavaScript",
     "description":
-      "JavaScript runtime client. Ingests over ILP; QWP support is planned.",
+      "Node.js client for ILP ingestion over HTTP and TCP, alongside QWP.",
     "logo": "/images/logos/nodejs-light.svg",
     "protocol": "ILP"
   },

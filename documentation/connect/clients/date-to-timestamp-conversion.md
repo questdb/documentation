@@ -319,28 +319,41 @@ class Program
 ```
 Learn more about the [QuestDB .NET Client](/docs/connect/clients/dotnet/)
 
-## Date to Timestamp in JavasScript/Node.js
+## Date to Timestamp in JavaScript/Node.js
 
-The Date type stores both date and time information.
-
-The QuestDB Node.js client accepts an epoch in microseconds, which can be a `number` or `bigint`.
+A JavaScript `Date` stores milliseconds since the Unix epoch. The QuestDB
+JavaScript client takes a timestamp as an integer `number` or a `bigint`
+together with a unit: `"ms"`, `"us"` (the default), or `"ns"`. A `Date`
+therefore needs no arithmetic: pass `getTime()` with the `"ms"` unit.
 
 ```javascript
-const { Sender } = require("@questdb/nodejs-client")
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const dateStr = '2024-08-05';
-const dateObj = new Date(dateStr + 'T00:00:00Z');
+const tradeDate = new Date("2024-08-05T00:00:00Z");
 
-// Convert to timestamp (milliseconds since Epoch) then convert to microseconds
-const timestamp = BigInt(dateObj.getTime()) * 1000n;
-console.log("Date:", dateObj.toISOString().split('T')[0]);
-console.log("Timestamp (microseconds):", timestamp.toString());
-
-// You can now add the column using QuestDB client, as in
-// .timestampColumn("NonDesignatedTimestampColumnName", timestamp)
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+try {
+  const sender = await db.borrowSender();
+  try {
+    await sender
+      .table("trades")
+      .symbol("symbol", "ETH-USD")
+      .timestampColumn("trade_date", tradeDate.getTime(), "ms")
+      .doubleColumn("price", 2615.54)
+      .at(Date.now(), "ms");
+  } finally {
+    await sender.close();
+  }
+} finally {
+  await db.close();
+}
 ```
 
-Learn more about the [QuestDB Node.js Client](/docs/connect/clients/nodejs/)
+For an explicit microsecond value, convert through `bigint`:
+`BigInt(tradeDate.getTime()) * 1000n`. Nanosecond timestamps, with the `"ns"`
+unit, must be a `bigint`.
+
+Learn more about the [QuestDB JavaScript client](/docs/connect/clients/nodejs/)
 
 ## Date to Timestamp in Ruby
 

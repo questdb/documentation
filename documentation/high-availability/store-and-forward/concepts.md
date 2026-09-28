@@ -184,7 +184,7 @@ The exception message distinguishes the two scenarios:
 `close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
-C, C++ and Python. If the wait succeeds, all data is acked. If the timeout
+C, C++, Python and JavaScript. If the wait succeeds, all data is acked. If the timeout
 fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the

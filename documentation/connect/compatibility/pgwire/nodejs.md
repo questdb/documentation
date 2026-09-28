@@ -29,10 +29,11 @@ for performance. Our recommendation is to use the `pg` client for most use cases
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
-querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/connect/clients/nodejs/) for data
-ingestion using ILP.
+For data ingestion, we recommend QuestDB's first-party clients instead of
+PGWire. QuestDB provides an official
+[JavaScript client](/docs/connect/clients/nodejs/) for Node.js and browsers,
+with high-throughput ingestion and streaming SQL queries over QWP. PGWire
+remains a good fit when you need a standard PostgreSQL driver or ORM.
 
 :::
 
@@ -781,8 +782,8 @@ QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard Ja
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
 We recommend the `pg` client for querying.
-For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
-throughput.
+For data ingestion, consider the QuestDB [JavaScript client](/docs/connect/clients/nodejs/), which also streams
+query results over QWP.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
 `SAMPLE BY` and `LATEST ON` for efficient queries.

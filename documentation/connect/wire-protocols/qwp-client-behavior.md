@@ -189,7 +189,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/JavaScript) |
 | `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
@@ -312,8 +312,8 @@ here.
 - Multiple independent senders sharing one `sf_dir` must use distinct
   `sender_id` values, else the second fails because the slot lock is held.
 - In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
-  pooled senders never collide. The minted name is client-specific: Java uses
-  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
+  pooled senders never collide. The minted name is client-specific: Java and
+  JavaScript use `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
   `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
   unacknowledged frames; acknowledged/truncated frames are not replayed.
@@ -374,7 +374,9 @@ has outlasted your configuration.
 :::note Alignment
 
 This is the behaviour of the Java reference client and the .NET client. Other
-clients are aligned to it. If you are implementing a new client, the contract
+clients are aligned to it, except the JavaScript client in memory mode: a
+sender with neither `sf_dir` nor `initial_connect_retry=async` gives up after
+`reconnect_max_duration_millis`. If you are implementing a new client, the contract
 is: retry transport failures forever, surface only genuine terminal conditions,
 and apply back-pressure to the producer rather than dropping data.
 

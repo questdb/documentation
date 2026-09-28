@@ -24,8 +24,8 @@ the table below summarises the failover-relevant subset.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `addr` | `host:port[,host:port…]` | required | Comma-separated peer list. The two syntactic forms (`addr=h1,h2` and repeated `addr=h1;addr=h2`) accumulate. Empty entries are rejected. |
-| `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress. |
-| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Rejected as an unknown key on an ingress connect string. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
+| `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress, except by the [JavaScript client](/docs/connect/clients/nodejs/#multiple-endpoints), which also ranks ingress endpoints by zone. |
+| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Rejected as an unknown key on an ingress connect string. The [JavaScript client](/docs/connect/clients/nodejs/#multiple-endpoints) instead applies it to ingress too, so set its query-side role through the typed `egress` option. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
 | `auth_timeout_ms` | int (ms) | `15000` | Upper bound on the HTTP-upgrade response read per host. Does **not** cover the TCP connect or TLS handshake — those use the OS default. Set lower if you have well-known network paths and want faster failover; set higher only if upgrade is genuinely slow. |
 
 `addr` syntax — both of these are equivalent and produce the same three-peer
