@@ -103,7 +103,7 @@ databento-questdb --config connector.toml
 
 `--check-config` validates local settings and prints the effective configuration
 with credentials redacted. It does not connect to either service or check
-Databento permissions.
+Databento permissions or symbol validity.
 
 With no `start` or saved checkpoint, the task receives new data as it arrives.
 Tables are created when their first records are written. If the market is
@@ -415,9 +415,19 @@ or restart.
 
 Transient source failures retry with exponential backoff. Under
 `tasks.source_retry`, `initial_backoff_ms` defaults to `1000`, `max_backoff_ms`
-to `30000`, and `max_elapsed_ms` to `300000`. Permanent errors fail the task. A
-Live `SymbolResolutionFailed` stops the whole task, including its valid symbols.
-Correct the symbol list before restarting.
+to `30000`, and `max_elapsed_ms` to `300000`. Permanent errors fail the task.
+
+A Live `SymbolResolutionFailed` means Databento could not resolve a requested
+symbol. The connector stops the whole task, including its valid symbols. To
+recover:
+
+1. Read the gateway message and check `dataset`, `stype_in`, and `symbols`. Fix
+   misspelled symbols and replace or remove contracts that are invalid for the
+   requested period.
+2. For a checkpointed task, restart changed subscriptions with a new
+   `state_dir`. Keep the original directory and set each subscription's `start`
+   from its [saved recovery boundary](#replay-availability) to cover the
+   interruption; use Historical backfill if replay has expired.
 
 The top-level `on_task_failure` setting controls what happens next:
 
