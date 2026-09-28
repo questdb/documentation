@@ -21,13 +21,20 @@ Multiple tasks can share a QuestDB connection pool in the same process.
 
 ## Quick start
 
+:::warning Databento charges
+
+This connector uses your Databento account. Live access and Historical downloads
+may incur charges depending on your plan and dataset. Review
+[Databento pricing](https://databento.com/pricing) before running the connector.
+
+:::
+
 ### Prerequisites
 
 - QuestDB 10.0 or later with QWP over WebSocket, reachable on port 9000 by
   default. The connector's integration tests use QuestDB 10.0.1.
 - A Databento API key with Live access to `EQUS.MINI` for the example below.
-  Historical backfills require Historical access and may incur Databento
-  charges.
+  Historical backfills require Historical access.
 - Rust 1.91.1 to build the connector from source.
 
 ### 1. Install the connector
