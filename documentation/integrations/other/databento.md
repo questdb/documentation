@@ -415,7 +415,9 @@ or restart.
 
 Transient source failures retry with exponential backoff. Under
 `tasks.source_retry`, `initial_backoff_ms` defaults to `1000`, `max_backoff_ms`
-to `30000`, and `max_elapsed_ms` to `300000`. Permanent errors fail the task.
+to `30000`, and `max_elapsed_ms` to `300000`. Permanent errors fail the task. A
+Live `SymbolResolutionFailed` stops the whole task, including its valid symbols.
+Correct the symbol list before restarting.
 
 The top-level `on_task_failure` setting controls what happens next:
 
