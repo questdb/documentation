@@ -32,6 +32,14 @@
     "protocol": "QWP"
   },
   {
+    "href": "/docs/connect/clients/nodejs",
+    "name": "JavaScript",
+    "description":
+      "QWP ingestion and streaming SQL for Node.js and browsers.",
+    "logo": "/images/logos/nodejs-light.svg",
+    "protocol": "QWP"
+  },
+  {
     "href": "/docs/connect/clients/dotnet",
     "name": ".NET",
     "description":
@@ -45,14 +53,6 @@
     "description":
       "Pooled QWP ingestion and queries with store-and-forward durability. Beta.",
     "logo": "/images/logos/go.svg",
-    "protocol": "QWP"
-  },
-  {
-    "href": "/docs/connect/clients/nodejs",
-    "name": "JavaScript",
-    "description":
-      "QWP ingestion and streaming SQL for Node.js and browsers. Beta.",
-    "logo": "/images/logos/nodejs-light.svg",
     "protocol": "QWP"
   },
   {

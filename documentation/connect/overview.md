@@ -44,9 +44,9 @@ QWP API before it is declared stable.
 | C & C++                           | ✓ Stable    |
 | Rust                              | ✓ Stable    |
 | Python                            | ✓ Stable    |
+| JavaScript (Node.js and browsers) | ✓ Stable    |
 | .NET                              | Beta        |
 | Go                                | Beta        |
-| JavaScript (Node.js and browsers) | Beta        |
 
 Highlights:
 

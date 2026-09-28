@@ -39,16 +39,6 @@ Key capabilities:
 - **Store-and-forward** (Node.js): a disk journal that keeps accepting rows
   while QuestDB is unreachable and survives process restarts.
 
-:::caution Beta
-
-QWP support is new in `@questdb/nodejs-client` 5.0.0 and in the first
-`@questdb/browser-client` release, and is in beta. Expect the QWP API to change
-before it is declared stable, and track the
-[client releases](https://github.com/questdb/nodejs-questdb-client/releases).
-The ILP transports (`http::`, `https::`, `tcp::`, `tcps::`) are unaffected.
-
-:::
-
 :::tip Legacy transports
 
 The Node.js `Sender` class still speaks ILP over HTTP and TCP. This page
@@ -59,6 +49,8 @@ documents the recommended QWP path. For ILP, see
 
 ## Requirements
 
+- **`@questdb/nodejs-client` 5.0.0 or newer** for QWP. Earlier versions
+  support ILP only.
 - **Node.js 20.18.1 or newer** for `@questdb/nodejs-client`.
 - **A browser with `WebSocket`, `fetch`, `URL`, `TextEncoder`, and
   `TextDecoder`** for `@questdb/browser-client`.
