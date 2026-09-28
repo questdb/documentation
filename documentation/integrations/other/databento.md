@@ -15,7 +15,7 @@ streams market data into QuestDB using
 standalone process configured with TOML and handles subscriptions, table
 creation, batching, and recovery.
 
-Each **task** reads one Databento dataset, such as `GLBX.MDP3`. Its
+Each **task** reads one Databento dataset, such as `EQUS.MINI`. Its
 **subscriptions** select schemas and symbols, and choose the destination tables.
 Multiple tasks can share a QuestDB connection pool in the same process.
 
@@ -25,7 +25,7 @@ Multiple tasks can share a QuestDB connection pool in the same process.
 
 - QuestDB 10.0 or later with QWP over WebSocket, reachable on port 9000 by
   default. The connector's integration tests use QuestDB 10.0.1.
-- A Databento API key with Live access to the dataset you want to stream.
+- A Databento API key with Live access to `EQUS.MINI` for the example below.
   Historical backfills require Historical access and may incur Databento
   charges.
 - Rust 1.91.1 to build the connector from source.
@@ -52,9 +52,8 @@ export DATABENTO_API_KEY='<your-api-key>'
 export QDB_CLIENT_CONF='ws::addr=localhost:9000;'
 ```
 
-Save the following as `connector.toml`. It collects CME E-mini S&P 500 futures
-trades and ten-level quotes. Change the dataset and symbols to match your
-Databento access.
+Save the following as `connector.toml`. It collects trades and top-of-book
+quotes for all symbols in `EQUS.MINI`.
 
 ```toml title="connector.toml"
 version = 1
@@ -64,29 +63,29 @@ on_task_failure = "exit"
 conf_env = "QDB_CLIENT_CONF"
 
 [[tasks]]
-name = "cme"
+name = "equs-mini"
 pool = "main"
-dataset = "GLBX.MDP3"
-state_dir = "./state/cme"
+dataset = "EQUS.MINI"
+state_dir = "./state/equs-mini"
 
 [tasks.source]
 api_key_env = "DATABENTO_API_KEY"
 
 [[tasks.subscriptions]]
-schema = "trades"
-symbols = ["ES.FUT"]
-stype_in = "parent"
-table = "cme_trades"
+schema = "mbp-1"
+symbols = "ALL_SYMBOLS"
+stype_in = "raw_symbol"
+table = "equs_orderbook"
 
 [[tasks.subscriptions]]
-schema = "mbp-10"
-symbols = ["ES.FUT"]
-stype_in = "parent"
-table = "cme_depth"
+schema = "trades"
+symbols = "ALL_SYMBOLS"
+stype_in = "raw_symbol"
+table = "equs_trades"
 ```
 
-`ES.FUT` selects the futures contracts under that parent symbol. The `symbol`
-column stores each record's resolved contract symbol, not the parent selector.
+`ALL_SYMBOLS` selects every instrument in the dataset. The `symbol` column
+stores each record's resolved trading symbol.
 
 ### 3. Validate and start
 
@@ -109,7 +108,7 @@ Open the QuestDB Web Console at `http://localhost:9000` and query recent trades:
 
 ```questdb-sql
 SELECT ts_recv, ts_event, symbol, price, size, side
-FROM cme_trades
+FROM equs_trades
 ORDER BY ts_recv DESC
 LIMIT 10;
 ```
@@ -281,7 +280,7 @@ SELECT ts_recv, symbol,
        asks[1][1] AS ask_price,
        asks[2][1] AS ask_size,
        asks[1][1] - bids[1][1] AS spread
-FROM cme_depth
+FROM equs_orderbook
 ORDER BY ts_recv DESC
 LIMIT 10;
 ```
