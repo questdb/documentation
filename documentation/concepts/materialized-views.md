@@ -298,6 +298,45 @@ clause:
   lookup on the view costs the same as on the base table. An aggregating view
   never inherits an index, because its rows are not base rows.
 
+### Columns are fixed at creation
+
+A passthrough view's columns are set when you create it. If the query uses
+`SELECT *`, QuestDB expands the `*` into the base table's columns at that moment
+and stores the query with that column list. The `view_sql` column of
+[`materialized_views()`](/docs/query/functions/meta/#materialized_views) and the
+output of `SHOW CREATE MATERIALIZED VIEW` both show the expanded query:
+
+```questdb-sql title="SELECT * is stored as a column list"
+CREATE MATERIALIZED VIEW trades_copy AS (SELECT * FROM trades);
+
+SELECT view_sql FROM materialized_views() WHERE view_name = 'trades_copy';
+```
+
+| view_sql                                                  |
+| --------------------------------------------------------- |
+| SELECT symbol, side, price, amount, timestamp FROM trades |
+
+A column that the base table gains later, through `ALTER TABLE ... ADD COLUMN`
+or a new field in InfluxDB Line Protocol (ILP) ingestion, does not appear in the
+view. The view keeps refreshing the columns it was created with and stays valid.
+
+:::note Limitation: new base-table columns do not reach the view
+
+To include a column added after the view was created, drop the view and create
+it again. The new view fills itself from the rows the base table holds at that
+point, so rows that a [TTL](/docs/concepts/ttl/) on the base table has already
+removed do not come back. Include any `EXPIRE ROWS` policy in the new `CREATE`
+statement, because dropping the view drops its policy too.
+
+A [SQL view](/docs/concepts/views/) behaves differently: it runs its query each
+time you read it, so its `SELECT *` includes columns added later.
+
+:::
+
+Dropping or renaming a base-table column that the view reads invalidates the
+view, as it does for any materialized view. See
+[View invalidation](#view-invalidation).
+
 ### Which queries are passthrough
 
 The rule is simple: each view row must match one base row. A query that reads a

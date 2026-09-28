@@ -65,6 +65,7 @@ Where:
 | Rule | Description |
 | ---- | ----------- |
 | Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that copies rows one-for-one from a single table |
+| Passthrough columns fixed at creation | A passthrough view stores `SELECT *` expanded into the base table's current columns. A column added to the base table later does not reach the view; recreate the view to include it. See [Columns are fixed at creation](/docs/concepts/materialized-views/#columns-are-fixed-at-creation) |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
