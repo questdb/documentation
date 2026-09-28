@@ -156,9 +156,9 @@ Each entry in `tasks.subscriptions` selects one source schema:
 | `use_snapshot` | Request an initial MBO snapshot. Live only; cannot be combined with `start`. Defaults to `false`.                         |
 | `replay_dedup` | Filter previously confirmed records during Live replay. Defaults to `false`; see [Duplicate records](#duplicate-records). |
 
-Each schema can appear once per task, and different schemas need distinct target
-tables. A Live task can combine `mbp-1` with `tbbo` when their source settings
-and `replay_dedup` values match. One MBP-1 subscription then feeds both tables.
+Each schema can appear once per task. A Live task can combine `mbp-1` with
+`tbbo` when their source settings and `replay_dedup` values match. One MBP-1
+subscription then feeds both tables.
 
 Use separate tasks when the same schema needs different symbols, start times, or
 tables. A matching saved checkpoint takes precedence over the initial start.
@@ -215,11 +215,15 @@ resolve from the configuration file's directory.
 
 ## Tables and field mapping
 
-The connector creates missing tables with daily partitions and WAL. Setting
-`table` changes the destination name, not the column mapping. Existing tables
-must accept the mapped columns and use the expected designated timestamp.
-Precreate compatible tables to customize partitioning, symbol capacity, or
-[deduplication](/docs/concepts/deduplication/).
+Each schema has fixed columns and a configurable table name. Use separate tables
+for different schemas, including across tasks and processes. Configuration
+validation checks table names case-insensitively across tasks sharing a pool.
+
+Missing tables are created with daily partitions and WAL. Precreate a compatible
+table to customize partitioning, symbol capacity, or
+[deduplication](/docs/concepts/deduplication/). Existing tables must accept the
+mapped column types and use the expected designated timestamp; the connector
+does not validate their layouts.
 
 ### Schemas and default tables
 
