@@ -354,6 +354,10 @@ Look for these indicators in the plan:
   right-hand tables must each have a designated timestamp column.
 - **Right-hand side must be a table**: Each right-hand side of HORIZON JOIN must
   be a table with an optional filter, more complex subqueries aren't supported.
+  A materialized view with an [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy
+  qualifies only when the policy compares the designated timestamp with a
+  constant, `now()`, or `dateadd()` over `now()`, such as
+  `WHEN ts < dateadd('d', -30, now())`.
 - **Left-hand side queries are restricted as well**. On the left hand side, the
   query that works best is a table with an optional filter. Some other query
   types are also supported, but they degrade the query plan to single-threaded
