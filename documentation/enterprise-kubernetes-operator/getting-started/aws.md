@@ -491,8 +491,8 @@ kubectl annotate serviceaccount default \
 The manifest below connects QuestDB to your S3 bucket and starts one instance
 with a backup every five minutes.
 
-Keep the QuestDB ECR account ID unchanged. The tested image tag for v0.2.1 is
-`4.0.0-enterprise`; change it only when QuestDB provides another one.
+Keep the QuestDB ECR account ID unchanged. The tested image tag for v0.3.1 is
+`4.0.1-enterprise`; change it only when QuestDB provides another one.
 
 ```sh
 cat <<EOF | kubectl apply -f -
@@ -513,7 +513,7 @@ metadata:
   name: questdb
   namespace: $QDB_NAMESPACE
 spec:
-  image: 695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb:4.0.0-enterprise
+  image: 695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb:4.0.1-enterprise
   instances: 1
   storage:
     storageClassName: gp3
