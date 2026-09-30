@@ -85,9 +85,13 @@ Two consequences:
 - Frames **must** be sent in strict order. The wire format does not
   serialise `wireSeq` — the server assigns it implicitly from receive
   order. Reordering breaks the FSN mapping.
-- After a reconnect, the server sees the **same payloads** at new
-  `wireSeq` values. Server-side dedup keys off `messageSequence` inside
-  the payload, not `wireSeq`, so replay does not produce double-writes.
+- After a reconnect, the server may see the **same payloads** at new
+  `wireSeq` values. An acknowledgement can be lost after a batch was
+  committed, so replay is **at least once** and can insert duplicate rows.
+  `wireSeq` is transport bookkeeping, not a deduplication key. For
+  idempotent ingestion, use stable source IDs and timestamps with table-level
+  `DEDUP UPSERT KEYS`, as in the [Node.js store-and-forward
+  example](/docs/connect/clients/nodejs/#store-and-forward).
 
 ## Trim: how unacked data is reclaimed
 
@@ -308,25 +312,26 @@ shared `sf_dir`, blindly draining unknown slots may be surprising.
 
 ## Error frames
 
-Not every server response is an OK. Server errors fall into six
-categories, each with a default policy:
+Not every server response is an OK. A rejected batch is **not** silently
+dropped and trimmed: the client either retries it or reports a terminal error.
+The defaults below apply to the Node.js QWP client; consult the
+[connect-string error policies](/docs/connect/clients/connect-string/#error-handling)
+for the shared vocabulary and per-client override support.
 
-| Category | Default | Meaning |
+| Category | Node.js default | Meaning |
 |---|---|---|
-| `SCHEMA_MISMATCH` | `DROP_AND_CONTINUE` | The batch's schema doesn't match the server. Replay won't help — the substrate logs and advances trim past the rejected span. |
-| `WRITE_ERROR` | `DROP_AND_CONTINUE` | Per-batch write failure (e.g. table is not currently accepting writes). |
-| `PARSE_ERROR` | `HALT` | Almost certainly a client bug. The substrate preserves on-disk frames for postmortem. |
-| `INTERNAL_ERROR` | `HALT` | Catch-all server fault. |
-| `SECURITY_ERROR` | `HALT` | Cluster-wide auth / authorization failure. |
-| `PROTOCOL_VIOLATION` | `HALT` (forced) | Connection is gone after a terminal WebSocket close code; no choice. |
+| `SCHEMA_MISMATCH` | `terminal` | The schema does not match. The sender stops; in SF mode, the rejected bytes remain in the journal for inspection. |
+| `WRITE_ERROR` | `retriable` | A write failed (for example, a temporary storage problem); reconnect and replay. |
+| `PARSE_ERROR` | `terminal` | Malformed payload; replaying identical bytes cannot help. |
+| `INTERNAL_ERROR` | `retriable` | Retry after an unexpected server-side failure. |
+| `SECURITY_ERROR` | `terminal` | Authentication or authorization failed. |
+| `PROTOCOL_VIOLATION` | `terminal` (forced) | Protocol failure; stop and report it. |
 
-Errors are also delivered to an **error inbox** — a bounded queue
-consumed by a daemon dispatcher that invokes your registered handler.
-Overflow drops the oldest entry rather than the newest (watermarks are
-monotonic; the latest entry is the most informative). The default
-handler logs every received error: silence is forbidden by the contract,
-because a buggy or no-op handler would hide data loss
-indistinguishably from a healthy connection.
+The Node.js client delivers asynchronous rejections to `onSenderError`; its
+default handler logs them. Other clients may use a bounded error inbox that
+drops the oldest notification on overflow. Check the client-specific error
+handling before relying on a policy override: the Node.js `on_*_error` keys
+are currently accepted but do not change these defaults.
 
 ## Next steps
 

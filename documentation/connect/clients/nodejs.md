@@ -61,11 +61,14 @@ complete API from the package root, ships ES module and CommonJS builds, and
 bundles TypeScript declarations. There are no other supported import paths.
 
 The examples on this page are TypeScript ES modules with top-level `await`.
-They also run as plain JavaScript once type annotations are removed.
+To run them as plain JavaScript, use ES modules (`.mjs` or `"type": "module"`)
+and remove type annotations, type-only imports, and TypeScript assertions
+such as `as const`.
 
 ## Quick start
 
-Connect with one connect string, write two rows, and read them back:
+Connect with one connect string, write two rows, and try to query the ETH-USD
+row. Ingestion is asynchronous, so an immediate read may not see it yet:
 
 ```typescript
 import {
@@ -152,57 +155,74 @@ microseconds since the Unix epoch; see
 When `flush()` resolves, the client has published the rows, but QuestDB may not
 have received them yet. QuestDB acknowledges a batch once it has committed it
 to its write-ahead log, and applies committed rows to the table
-asynchronously. A query that runs right after
-ingestion can therefore fail with `table does not exist` on a first run, or
-succeed and return no rows. When your code must read its own writes, poll until
-the rows appear, bounded by a deadline:
+asynchronously. A query that runs right after ingestion can therefore fail
+with `table does not exist` on a first run, or succeed and return no rows.
+
+When your code must read its own writes, create the table first, write an event
+with a unique ID, and poll for **that ID**. Pre-creating the table avoids
+mistaking an unrelated SQL error for the first-write table-creation delay. Give
+each query the time remaining until the deadline so a stalled query cannot
+leave the poll running indefinitely:
 
 ```typescript
-import {
-  connectQwpNodeClient,
-  QwpEgressQueryError,
-  type QwpClient,
-} from "@questdb/nodejs-client";
-
-async function countRows(db: QwpClient, sql: string): Promise<number> {
-  const lease = await db.borrowQuery();
-  try {
-    const query = await lease.query(sql);
-    let rows = 0;
-    for await (const batch of query) rows += batch.rowCount;
-    await query.completion;
-    return rows;
-  } finally {
-    await lease.close();
-  }
-}
+import { randomUUID } from "node:crypto";
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
 const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
 try {
-  const sql = "SELECT * FROM trades WHERE symbol = 'ETH-USD' LIMIT 10";
-  const deadline = Date.now() + 10_000;
-  let rows = 0;
-  while (rows === 0) {
+  const lease = await db.borrowQuery();
+  try {
+    const ddl = await lease.query(
+      "CREATE TABLE IF NOT EXISTS trades_readback (" +
+        "timestamp TIMESTAMP, trade_id VARCHAR, symbol SYMBOL" +
+        ") TIMESTAMP(timestamp) PARTITION BY DAY",
+    );
+    await ddl.completion;
+
+    const tradeId = randomUUID();
+    const sender = await db.borrowSender();
     try {
-      rows = await countRows(db, sql);
-    } catch (error) {
-      // The table may not exist yet: keep polling until the deadline.
-      if (!(error instanceof QwpEgressQueryError) || Date.now() >= deadline) {
-        throw error;
+      await sender
+        .table("trades_readback")
+        .stringColumn("trade_id", tradeId)
+        .symbol("symbol", "ETH-USD")
+        .at(Date.now(), "ms");
+      await sender.flush();
+    } finally {
+      await sender.close();
+    }
+
+    const deadline = Date.now() + 10_000;
+    let visible = false;
+    while (!visible) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) throw new Error("trade not visible in time");
+      const query = await lease.query(
+        "SELECT trade_id FROM trades_readback WHERE trade_id = $1 LIMIT 1",
+        {
+          binds: (binds) => binds.setVarchar(0, tradeId),
+          timeoutMs: remainingMs,
+        },
+      );
+      for await (const batch of query) visible ||= batch.rowCount > 0;
+      await query.completion;
+      if (!visible) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(100, Math.max(0, deadline - Date.now()))),
+        );
       }
     }
-    if (rows === 0) {
-      if (Date.now() >= deadline) throw new Error("rows not visible in time");
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    console.log(`visible trade: ${tradeId}`);
+  } finally {
+    await lease.close();
   }
-  console.log(`visible rows: ${rows}`);
 } finally {
   await db.close();
 }
 ```
 
-Do not replace the poll with a fixed sleep: the apply latency varies with load.
+SQL errors now surface instead of being retried. Do not replace the poll with a
+fixed sleep: the apply latency varies with load.
 
 ## Connecting
 
@@ -647,7 +667,10 @@ until the first query.
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
 // Resolves immediately, even if QuestDB is not running yet.
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;lazy_connect=on;");
+const db = await connectQwpNodeClient(
+  "ws::addr=localhost:9000;lazy_connect=on;" +
+    "sf_dir=/var/lib/my-service/qdb-sf;sender_id=startup-a;sf_durability=append;",
+);
 try {
   const sender = await db.borrowSender();
   try {
@@ -665,6 +688,10 @@ try {
   await db.close();
 }
 ```
+
+Use a writable, persistent `sf_dir` and reuse the same `sender_id` after a
+restart so the example's rows survive shutdown while QuestDB is down. Without
+`sf_dir`, the example would discard them when `db.close()` finishes.
 
 `lazy_connect=on` forces `query_pool_min=0` and `initial_connect_retry=async`,
 and rejects an explicit conflicting value. Setting `initial_connect_retry=async`
@@ -1229,8 +1256,11 @@ try {
     await sender.waitForAcknowledged(sender.publishedSequence, 10_000);
   } catch (error) {
     if (error instanceof QwpIngressAckTimeoutError) {
-      // Not acknowledged in time. The rows are still pending, not lost.
-      console.warn("ACK timeout at", error.acknowledgedSequence);
+      // Still pending in memory, but closing without sf_dir can lose them.
+      console.warn(
+        "ACK timeout; rows may be lost on close at",
+        error.acknowledgedSequence,
+      );
     } else {
       throw error;
     }
@@ -2505,10 +2535,10 @@ connect string and calling `connect()`:
 | Auto-flush interval | 1,000 ms | 100 ms |
 | `flush()` completes when | QuestDB responds to the HTTP request | The batch is published; the ACK arrives later |
 | Server rejection | `flush()` throws | Asynchronous: `onSenderError`, `waitForAcknowledged()`, or `flush()` with `awaitServerAck` |
-| Rows staged at `close()` | Lost unless flushed | Published, then acknowledged within 5 seconds |
+| Rows staged at `close()` | Lost unless flushed | Published; waits up to 5 seconds for ACK, then unacknowledged rows may be lost without `sf_dir` |
 | Reconnect and replay | Retries one request for `retry_timeout` | Automatic, with replay of unacknowledged batches |
 | Store-and-forward, querying, pooling | Not available | Available |
-| Column types | ILP types | Every QuestDB type |
+| Column types | ILP types | More types, subject to [column-method](#column-methods) and [array](#arrays) support |
 
 Legacy keys such as `retry_timeout`, `request_timeout`, `init_buf_size`,
 `max_buf_size`, `protocol_version`, and `tls_ca` are rejected on `ws`/`wss`,
@@ -2578,8 +2608,26 @@ and the [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 ## Full example: ingestion and querying with failover
 
-A production service that ingests trades and queries recent prices, with TLS,
-a token, several hosts, error handling, and failover handling:
+A production-oriented pattern that ingests trades and queries recent prices,
+with TLS, a token, several hosts, error handling, and failover handling. Before
+running it, create the deduplicated table on the primary (or reuse the table
+from [Store-and-forward](#store-and-forward)):
+
+```questdb-sql
+CREATE TABLE IF NOT EXISTS trades_sf (
+  timestamp TIMESTAMP,
+  trade_id SYMBOL,
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, trade_id);
+```
+
+Replace the sample events with source-assigned trade IDs and timestamps. Keep
+both values unchanged when retrying the same event, and use a writable,
+persistent `sf_dir` so unacknowledged rows survive a shutdown:
 
 ```typescript
 import {
@@ -2604,7 +2652,8 @@ const db = await connectQwpNodeClient(
   "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;" +
     `token=${token};` +
     // query_pool_min=0: start, and ingest, even while no replica is reachable.
-    "sender_pool_max=4;query_pool_min=0;query_pool_max=8;",
+    "sf_dir=/var/lib/my-service/qdb-sf;sender_id=trade-service;" +
+    "sf_durability=append;sender_pool_max=4;query_pool_min=0;query_pool_max=8;",
   {
     // Queries run on replicas only, never on the primary; ingestion always
     // follows the primary.
@@ -2630,26 +2679,41 @@ const db = await connectQwpNodeClient(
 );
 
 try {
-  // Ingestion: one borrowed sender per producer.
+  // Ingestion: one borrowed sender per producer. IDs and timestamps must
+  // come from the source, not be regenerated on an application retry.
+  const events = [
+    {
+      tradeId: "trade-12345",
+      timestampMs: 1723000000000,
+      symbol: "ETH-USD",
+      price: 2615.54,
+      amount: 0.5,
+    },
+    {
+      tradeId: "trade-12346",
+      timestampMs: 1723000000001,
+      symbol: "BTC-USD",
+      price: 39269.98,
+      amount: 0.001,
+    },
+  ];
   const sender = await db.borrowSender();
   try {
-    for (const [symbol, price, amount] of [
-      ["ETH-USD", 2615.54, 0.5],
-      ["BTC-USD", 39269.98, 0.001],
-    ] as const) {
+    for (const event of events) {
       await sender
-        .table("trades")
-        .symbol("symbol", symbol)
+        .table("trades_sf")
+        .symbol("trade_id", event.tradeId)
+        .symbol("symbol", event.symbol)
         .symbol("side", "buy")
-        .doubleColumn("price", price)
-        .doubleColumn("amount", amount)
-        .at(Date.now(), "ms");
+        .doubleColumn("price", event.price)
+        .doubleColumn("amount", event.amount)
+        .at(event.timestampMs, "ms");
     }
     await sender.flush();
     await sender.waitForAcknowledged(sender.publishedSequence, 10_000);
   } catch (error) {
     if (!(error instanceof QwpIngressAckTimeoutError)) throw error;
-    console.warn("rows not acknowledged yet; they stay queued for replay");
+    console.warn("ACK timed out; rows remain in sf_dir for replay after close");
   } finally {
     await sender.close();
   }
@@ -2659,7 +2723,7 @@ try {
   const lease = await db.borrowQuery();
   try {
     const query = await lease.query(
-      "SELECT timestamp, symbol, price FROM trades " +
+      "SELECT timestamp, trade_id, symbol, price FROM trades_sf " +
         "WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 10",
       { binds: (binds) => binds.setVarchar(0, "ETH-USD") },
     );
@@ -2681,6 +2745,11 @@ try {
   await db.close();
 }
 ```
+
+The query can still miss newly acknowledged rows until WAL apply catches up;
+use the [Read-after-write](#read-after-write) pattern for a visibility guarantee.
+A replayed batch is idempotent only because this example retains the event's
+ID and timestamp and enables table-level deduplication.
 
 ## Next steps
 

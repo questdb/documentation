@@ -364,7 +364,9 @@ applications must call `flush()` explicitly; see the
 *Applies to: ingress (encode buffer).*
 
 These keys control the in-memory row buffer that the client uses before
-flushing.
+flushing. The Node.js QWP `ws`/`wss` client rejects `init_buf_size` and
+`max_buf_size` as legacy-transport options; use
+[`auto_flush_rows`](#auto-flush) to control its row batches instead.
 
 - `init_buf_size` — initial buffer size in bytes. Default: `65536`
   (64 KiB). Accepts [size suffixes](#size-suffixes).
@@ -909,7 +911,7 @@ description and behaviour notes.
 | `failover_backoff_max_ms`               | int (ms)                      | `1000`                        | [Egress failover](#reconnect-keys)                            |
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
-| `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
+| `init_buf_size`                         | size                          | `65536` (Node.js QWP: unsupported) | [Buffer sizing](#buffer)                               |
 | `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
@@ -918,7 +920,7 @@ description and behaviour notes.
 | `max_background_drainers`               | int                           | `4`                           | [Store-and-forward](#sf-keys)                                 |
 | `max_batch_rows`                        | int (`1`–`1048576`)           | server default                | [Query client keys](#egress-keys)                             |
 | `max_lifetime_ms`                       | int (ms)                      | `1800000` (`0` ⇒ infinite)    | [Connection pool](#pool-keys)                                 |
-| `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
+| `max_buf_size`                          | size                          | `104857600` (Node.js QWP: unsupported) | [Buffer sizing](#buffer)                           |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
 | `max_name_len`                          | int                           | `127`                         | [Buffer sizing](#buffer)                                      |
 | `max_frame_rejections`                  | int (≥ 1)                     | `4`                           | [Error handling](#error-handling)                             |

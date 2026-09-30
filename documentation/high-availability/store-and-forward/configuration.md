@@ -72,11 +72,12 @@ Opt in to object-store-durable trim. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys, but Node.js and Java currently ignore them; .NET applies them. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
 
-The per-category defaults are documented in
+The Node.js defaults are documented in
 [Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
-`PROTOCOL_VIOLATION` and `UNKNOWN` are forced `HALT` and not user-overridable.
+`PROTOCOL_VIOLATION` is always terminal; Node.js treats an unknown server
+status as retriable rather than silently dropping the batch.
 
 ## Other relevant keys
 
@@ -96,8 +97,8 @@ canonical entries.
 | `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. |
 | `auto_flush_bytes` | int / `off` | `0` (off) | Byte-size flush trigger. |
 | `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger (Node.js: since last flush or sender creation). |
-| `init_buf_size` | size | `64K` | Initial encode buffer capacity. |
-| `max_buf_size` | size | `100M` | Max encode buffer capacity. |
+| `init_buf_size` | size | `64K` | Initial encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
+| `max_buf_size` | size | `100M` | Max encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
 | `max_name_len` | int | `127` | Local validation cap for table / column names. |
 
 ## Validation

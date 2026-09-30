@@ -37,6 +37,15 @@ standard PostgreSQL driver or ORM.
 
 :::
 
+:::note Example schema
+
+The PGWire examples below assume a pre-existing `trades` table with `ts` as
+its designated timestamp and `symbol` and `price` columns. This differs from
+the [QWP Node.js quick start](/docs/connect/clients/nodejs/#quick-start), which
+auto-creates `trades.timestamp`. To query that table with these examples,
+replace SQL `ts` and JavaScript `.ts` with `timestamp` and `.timestamp`.
+
+:::
 
 ## Connection Parameters
 
@@ -748,7 +757,7 @@ async function latestByQuery() {
         // Get the latest values for each symbol
         const latest = await sql`
       SELECT * FROM trades
-      LATEST ON timestamp PARTITION BY symbol
+      LATEST ON ts PARTITION BY symbol
     `
 
         console.log(`Latest prices for ${latest.length} symbols:`)
