@@ -50,6 +50,8 @@ documents the recommended QWP path. For ILP, see
   default) at `/write/v4` for ingestion and `/read/v1` for queries. If QuestDB
   is not running yet, see the [quick start](/docs/getting-started/quick-start/).
 
+<span id="client-installation"></span>
+
 ## Installation
 
 ```shell
@@ -68,7 +70,17 @@ such as `as const`.
 ## Quick start
 
 Connect with one connect string, write two rows, and try to query the ETH-USD
-row. Ingestion is asynchronous, so an immediate read may not see it yet:
+row. Ingestion is asynchronous, so an immediate read may not see it yet.
+
+:::note Existing `trades` tables
+
+This example assumes `trades` does not exist yet. If it already exists, QWP
+uses its existing designated timestamp column. For the `trades(ts, ...)` schema
+in the [PGWire guide](/docs/connect/compatibility/pgwire/nodejs/),
+replace `SELECT timestamp` with `SELECT ts` in the query below. The sender's
+`at()` calls need no change: they write to the existing designated timestamp.
+
+:::
 
 ```typescript
 import {
@@ -145,8 +157,8 @@ What happens:
    resolves even when that wait times out; see
    [Closing the pooled client](#closing-the-pooled-client).
 
-The table was created automatically by the first row, so its designated
-timestamp column is named `timestamp`. Timestamps come back as `bigint`
+If `trades` did not exist, ingestion creates it automatically with a designated
+timestamp column named `timestamp`. Timestamps come back as `bigint`
 microseconds since the Unix epoch; see
 [Reading result values](#reading-result-values) for every type.
 
@@ -386,8 +398,8 @@ For every key and its default, see the
 ### Programmatic options
 
 Callbacks, custom agents, and other settings a string cannot express go in the
-second argument. The connect string is validated in full first; when both set
-the same option, the typed value wins:
+second argument. When the connect string and typed options set the same option,
+the typed value wins:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -428,6 +440,8 @@ from the connect string. When you supply the object, for example to register
 `onEvent`, set every bound you rely on in it, such as `maxDurationMs`.
 
 :::
+
+<span id="authentication"></span>
 
 ## Authentication and TLS
 
@@ -726,6 +740,8 @@ acknowledgement before returning each sender (see
 
 ## Data ingestion
 
+<span id="basic-insert"></span>
+
 ### General usage pattern
 
 A sender is not safe for concurrent producers: the row in progress is shared
@@ -997,6 +1013,8 @@ with `long arrays are not supported, only double arrays`. Query results return
 arrays as `{ dimensions, values }`; see
 [Reading result values](#reading-result-values).
 
+<span id="decimal-insertion"></span>
+
 ### Decimals
 
 Create decimal columns ahead of time with the precision you need. QWP can
@@ -1041,10 +1059,12 @@ try {
 }
 ```
 
-- `decimalColumnText()` takes a decimal string, scientific notation included
-  (`"1.5e-3"`), and preserves the literal's scale, including trailing zeros.
-  Passing a `number` works, but JavaScript drops trailing zeros when formatting.
-- `decimalColumn(name, unscaled, scale)` takes the unscaled value as a `bigint`
+- <span id="text-literal-easy-to-use"></span> `decimalColumnText()` takes a
+  decimal string, scientific notation included (`"1.5e-3"`), and preserves the
+  literal's scale, including trailing zeros. Passing a `number` works, but
+  JavaScript drops trailing zeros when formatting.
+- <span id="binary-form-high-throughput"></span>
+  `decimalColumn(name, unscaled, scale)` takes the unscaled value as a `bigint`
   or as big-endian two's-complement bytes in an `Int8Array`.
 - `decimal64Column()`, `decimal128Column()`, and `decimal256Column()` take an
   unscaled `bigint` and select the wire width directly.
@@ -1433,10 +1453,10 @@ try {
 ```
 
 With a journal, the sender keeps accepting rows while QuestDB is unreachable,
-until `sf_max_total_bytes` (10 GiB) is full. It retries the connection
-indefinitely once it has connected, and a new sender opened on the same
-directory replays what the previous process left behind, once it can take over
-the directory's lock (see Lock recovery below).
+subject to journal capacity and backpressure as described below. It retries the
+connection indefinitely once it has connected, and a new sender opened on the
+same directory replays what the previous process left behind, once it can take
+over the directory's lock (see Lock recovery below).
 
 - **Layout.** A standalone `Sender` journals into `<sf_dir>/<sender_id>`. A
   pooled client uses one directory per pooled sender:
@@ -1449,9 +1469,18 @@ the directory's lock (see Lock recovery below).
   not a power loss. `periodic` checkpoints in the background every
   `sf_sync_interval_millis` (5 seconds). `append` makes every append durable
   before `flush()` resolves.
-- **Backpressure.** When the journal is full, publishing waits up to
-  `sf_append_deadline_millis` (30 seconds) for acknowledgements to free space,
-  then rejects with `QwpReplayStoreAppendTimeoutError`.
+- **Capacity.** With `sf_dir`, `sf_max_total_bytes` (10 GiB by default) is a
+  journal size target, not a hard disk limit. Transaction-closing batches can
+  reserve extra segments so a full journal does not block the commit needed
+  to release space. Segment reservations can reach roughly twice the target,
+  depending on segment rounding; retained symbol dictionaries and other
+  metadata take additional space. Provision headroom for every sender and
+  monitor actual disk usage. Without `sf_dir`, the key caps the in-memory
+  replay queue instead.
+- **Backpressure.** When an append cannot fit within the journal's capacity
+  allowances, publishing waits up to `sf_append_deadline_millis` (30 seconds)
+  for acknowledgements to free space, then rejects with
+  `QwpReplayStoreAppendTimeoutError`.
 - **Startup.** `lazy_connect=on` lets the pooled client start while QuestDB is
   down, as in the example above. `initial_connect_retry=async` alone is not
   enough for the pooled client, because its query pool still connects at
@@ -2512,6 +2541,8 @@ Node.js runs your code on one thread, but async functions interleave at every
 Callbacks such as `onSenderError` run on the same event loop, so move CPU-heavy
 work out of them.
 
+<span id="configuration-options"></span>
+
 ## Configuration reference
 
 The [connect string reference](/docs/connect/clients/connect-string/) documents
@@ -2536,7 +2567,7 @@ every key. The Node.js client's defaults and deviations:
 | `initial_connect_retry` | `off` | `off`, `on`/`sync`, or `async`. |
 | `sf_dir`, `sender_id` | none, `default` | Store-and-forward journal location. |
 | `sf_durability` | `memory` | `memory`, `periodic`, or `append`. |
-| `sf_max_total_bytes` | `10g` with `sf_dir`, `128m` without | Journal or memory queue cap. |
+| `sf_max_total_bytes` | `10g` with `sf_dir`, `128m` without | [Journal size target](#store-and-forward), not a hard disk limit; memory queue cap without `sf_dir`. |
 | `sf_max_segment_bytes` | `4m` | Journal segment size, which also caps a batch. |
 | `sf_append_deadline_millis` | `30000` | How long a full journal or queue blocks publishing. |
 | `drain_orphans`, `max_background_drainers` | `off`, `4` | Adopt journals left by crashed processes. |

@@ -144,10 +144,22 @@ disk usage staying high under slow ack cadence.
 
 ### `sf_max_total_bytes` — slot capacity (default `128 MiB` memory / `10 GiB` SF)
 
-This is the **hard cap** on resident SF storage — sealed segments plus
-the active segment. When this fills, producer `appendBlocking` calls
-block (with cooperative yield) for up to `sf_append_deadline_millis`
-waiting for ACK-driven trim to free space; on timeout the call throws.
+This controls resident SF storage: sealed segments plus the active segment.
+When capacity is exhausted, producer `appendBlocking` calls block (with
+cooperative yield) for up to `sf_append_deadline_millis` waiting for ACK-driven
+trim to free space; on timeout the call throws.
+
+:::caution Node.js disk-journal capacity
+
+With `sf_dir`, Node.js treats `sf_max_total_bytes` as a target, not a hard disk
+limit. Transaction-closing batches can reserve extra segments to make the
+commit possible when the journal is full. Segment reservations can reach
+roughly twice the target, depending on segment rounding, with retained symbol
+dictionaries and other metadata requiring additional space. Provision
+headroom per sender and monitor actual disk usage; do not use the target as a
+filesystem quota. See [Node.js store-and-forward](/docs/connect/clients/nodejs/#store-and-forward).
+
+:::
 
 Size this against your **worst expected outage** times your ingest
 rate:
@@ -320,7 +332,9 @@ When several senders share a host and a `sf_dir`:
   sender.
 - Consider `drain_orphans=on` if dynamic sender identities mean dead
   instances can leave permanent orphans.
-- Size `sf_max_total_bytes × number_of_senders` against available disk.
+- Size `sf_max_total_bytes × number_of_senders` against available disk. For
+  Node.js, also reserve each sender's transaction and metadata headroom (see
+  [Sizing capacity](#sizing-capacity)).
 - Plan for the worst-case lock-collision recovery: a misconfigured
   fleet that all share `sender_id=default` will leave only one sender
   alive on each host. That is the design — fail loudly rather than

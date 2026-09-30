@@ -27,7 +27,7 @@ mode.
 | `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
-| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
+| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Capacity for producer backpressure. Node.js disk journals can exceed this target for transaction completion and symbol dictionaries; provision [additional disk headroom](/docs/connect/clients/nodejs/#store-and-forward). Without `sf_dir`, this caps the memory replay queue. |
 | `sf_durability` | enum | `memory` | `memory` relies on the page cache; `periodic` checkpoints in the background and requires `sf_dir`. Node.js also supports `append`, which makes each journal append durable before `flush()` resolves. Go and .NET accept only `memory`; other clients reject `append` at build time. `flush` is not supported. |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |

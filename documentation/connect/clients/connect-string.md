@@ -543,10 +543,15 @@ equivalent — same architecture, no durability across restarts.
 - `sf_max_segment_bytes` — per-segment rotation threshold. Must be ≥ the largest
   single flushed frame. Default: `4 MiB` (`4m`). Accepts
   [size suffixes](#size-suffixes).
-- `sf_max_total_bytes` — hard cap on per-slot storage. When the slot
-  reaches the cap, `append()` blocks until ACKs trim space (see
+- `sf_max_total_bytes` controls per-slot capacity for producer backpressure.
+  When capacity is exhausted, `append()` blocks until ACKs trim space (see
   `sf_append_deadline_millis`). Defaults: `10 GiB` (`10g`) in SF mode,
   `128 MiB` (`128m`) in memory mode. Accepts size suffixes.
+  On Node.js with `sf_dir`, this is a journal size target, not a hard disk
+  limit: transaction-closing batches and retained symbol dictionaries can
+  exceed it, and other metadata needs additional space. Provision disk
+  headroom; see the [Node.js capacity guidance](/docs/connect/clients/nodejs/#store-and-forward).
+  Without `sf_dir`, the key caps the in-memory replay queue.
 
 ### Sender restart and replay
 

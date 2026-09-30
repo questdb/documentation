@@ -38,9 +38,10 @@ SF runs in either of two modes selected by the connect string:
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
-where unacked data lives. The Node.js client is the exception: in memory
-mode, a sender without `initial_connect_retry=async` gives up after
-`reconnect_max_duration_millis` (5 minutes by default); see the
+where unacked data lives. The Node.js client is the exception: ordinary
+memory mode gives up after `reconnect_max_duration_millis` (5 minutes by
+default). Background memory mode (`initial_connect_retry=async`, also selected
+by pooled `lazy_connect=on`) and disk-backed SF retry indefinitely. See the
 [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 
 ## What "frame" means here
@@ -151,9 +152,13 @@ When the wire connection breaks — for any reason — the I/O thread enters
 the reconnect loop documented in
 [Client failover concepts](/docs/high-availability/client-failover/concepts/).
 The producer is **not notified**: it keeps publishing into the substrate,
-bounded by `sf_max_total_bytes` (see backpressure below). On the Node.js
-client in memory mode, `flush()` instead waits for the reconnect, up to
-`reconnect_max_duration_millis`.
+subject to available capacity (see [Backpressure](#backpressure)).
+
+On Node.js, only ordinary memory mode waits for reconnect in `flush()`, up to
+`reconnect_max_duration_millis`. Background memory mode, enabled by
+`initial_connect_retry=async` or pooled `lazy_connect=on`, keeps accepting
+batches into the memory replay queue until capacity is exhausted and retries
+indefinitely. See the [three Node.js flushing modes](/docs/connect/clients/nodejs/#flushing).
 
 On every successful (re)connect:
 
@@ -175,11 +180,17 @@ in the `getTotalFramesReplayed` observability counter.
 
 ## Backpressure
 
-The substrate enforces `sf_max_total_bytes` as a hard cap on resident
-storage. When the cap is hit, the producer's `appendBlocking` call
+The substrate uses `sf_max_total_bytes` to apply backpressure on resident
+storage. When capacity is exhausted, the producer's `appendBlocking` call
 busy-spins (with cooperative yield) up to `sf_append_deadline_millis`
 waiting for ACK-driven trim to free space. If the deadline fires, the
 call throws a typed exception.
+
+On Node.js with `sf_dir`, this value is a journal size target rather than a
+hard disk limit. Transaction-closing batches and retained symbol dictionaries
+can exceed it, and other metadata needs additional space. Provision headroom
+for each sender; see [Node.js journal capacity](/docs/connect/clients/nodejs/#store-and-forward).
+Without `sf_dir`, the key caps the in-memory replay queue.
 
 The exception message distinguishes the two scenarios:
 
