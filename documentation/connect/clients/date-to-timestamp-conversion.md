@@ -319,6 +319,8 @@ class Program
 ```
 Learn more about the [QuestDB .NET Client](/docs/connect/clients/dotnet/)
 
+<span id="date-to-timestamp-in-javasscriptnodejs"></span>
+
 ## Date to Timestamp in JavaScript/Node.js
 
 A JavaScript `Date` stores milliseconds since the Unix epoch. The QuestDB

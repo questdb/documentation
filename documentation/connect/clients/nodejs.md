@@ -413,7 +413,11 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
       console.error("rejected batch", error.category, error.serverMessage),
   },
   // Query session defaults
-  egressSession: { queryTimeoutMs: 30_000 },
+  egressSession: {
+    queryTimeoutMs: 30_000,
+    cancelDrainTimeoutMs: 5_000,
+    serverInfoTimeoutMs: 10_000,
+  },
   // Egress-only routing and compression
   egress: { compression: "zstd" },
   // Pool sizes and timeouts
@@ -496,14 +500,21 @@ To route the connection through an HTTP or SOCKS proxy, pass an agent such as
 `Sender`). A custom agent owns certificate verification, so it cannot be
 combined with `tls_verify` or `tls_roots`.
 
-Two deadlines bound connection setup: `connect_timeout` covers DNS and the
-TCP/TLS connection, and `auth_timeout_ms` covers the upgrade and
+Two transport deadlines bound WebSocket setup: `connect_timeout` covers DNS
+and the TCP/TLS connection, and `auth_timeout_ms` covers the upgrade and
 authentication. Both default to 15 seconds, and `auth_timeout_ms` inherits
-`connect_timeout` when only the latter is set. A timeout produces a
-`QwpUpgradeError` whose `timeoutPhase` is `connect` or `authentication`. The
-pooled client reports it, like every failure to open a connection, as the
-`cause` of a `QwpPoolResourceError`; see
-[Connection-level errors](#connection-level-errors).
+`connect_timeout` when only the latter is set. A timeout in either phase
+produces a `QwpUpgradeError` whose `timeoutPhase` is `connect` or
+`authentication`.
+
+After the upgrade, a query connection has a separate 5-second deadline for
+the initial QWP `SERVER_INFO` frame. Configure it with the typed option
+`egressSession.serverInfoTimeoutMs`; raising the transport deadlines does not
+change it. Expiry produces an ordinary `Error` with the message
+`timed out waiting for QWP SERVER_INFO`, not a `QwpUpgradeError`.
+
+The pooled client reports connection setup failures as the `cause` of a
+`QwpPoolResourceError`; see [Connection-level errors](#connection-level-errors).
 
 ### Unsupported authentication paths
 
@@ -578,7 +589,7 @@ try {
         .at(Date.now(), "ms");
     }
   } finally {
-    // Flushes the rows and returns the sender. Does not wait for the ACK.
+    // With default options, flushes and returns without waiting for ACKs.
     await sender.close();
   }
 } finally {
@@ -594,8 +605,10 @@ that hold a sender at the same time.
 
 `close()` on a borrowed sender flushes completed rows, discards an unfinished
 row with a warning, and returns the sender to the pool. It does not close the
-WebSocket and does not wait for QuestDB to acknowledge the rows. To confirm
-delivery before returning the sender, call `flush()` and then
+WebSocket or wait for acknowledgements by default. With `awaitServerAck: true`
+or `awaitDurableAck: true`, the flush performed by `close()` waits for its
+acknowledgement too. To confirm delivery of all previously published rows
+before returning the sender, call `flush()` and then
 `waitForAcknowledged(sender.publishedSequence)`; see
 [Awaiting acknowledgements](#awaiting-acknowledgements).
 
@@ -664,8 +677,17 @@ Starting a second query on a lease while one is still active throws
 | `query_close_timeout_ms` | `5000` | How long returning a lease with an active query waits for the cancellation to drain before discarding the connection. |
 | `lazy_connect` | `off` | Start without connecting. See below. |
 
-The typed equivalents live in the `pool` section of the second argument
+Pool sizes, acquisition and idle timeouts, lifetime, and housekeeping settings
+have typed equivalents in the `pool` section of the second argument
 (`senderPoolMin`, `acquireTimeoutMs`, `housekeepingIntervalMs`, and so on).
+The other two settings use different locations:
+
+- `query_close_timeout_ms` maps to `egressSession.cancelDrainTimeoutMs`, not
+  `pool`.
+- Set `lazy_connect=on` in the connect string. When passing a full
+  `QwpNodeClientOptions` object instead of a string, use top-level
+  `lazyConnect: true`. It is not supported in `pool` or the second argument.
+
 When creating a new pooled connection fails, the borrow rejects with
 `QwpPoolResourceError`, whose `cause` holds the connection error.
 
@@ -766,19 +788,13 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
 try {
   const sender = await db.borrowSender();
   try {
-    try {
-      await sender
-        .table("trades")
-        .symbol("symbol", "ETH-USD")
-        .symbol("side", "buy")
-        .doubleColumn("price", 2615.54)
-        .doubleColumn("amount", 0.25)
-        .at(Date.now(), "ms");
-    } catch (error) {
-      // An invalid value throws a TypeError or RangeError. The row in progress
-      // is discarded; rows completed earlier stay staged.
-      console.error("row rejected:", error);
-    }
+    await sender
+      .table("trades")
+      .symbol("symbol", "ETH-USD")
+      .symbol("side", "buy")
+      .doubleColumn("price", 2615.54)
+      .doubleColumn("amount", 0.25)
+      .at(Date.now(), "ms");
     await sender.flush();
   } finally {
     await sender.close();
@@ -793,12 +809,18 @@ below. Table and column names are validated locally with QuestDB's rules
 (at most 127 UTF-8 bytes by default, see `max_name_len`), and column names are
 case-insensitive: the first spelling used is kept.
 
-When a column method or `at()` rejects a value, the sender discards the whole
-row in progress, including its table, so a half-built row never reaches
-QuestDB. The next row must start with `table()` again; a column method called
-before that throws `table name must be set before adding columns`.
+When local value validation in a column method or `at()` fails, the sender
+discards the whole row in progress, including its table, so a half-built row
+never reaches QuestDB. The next row must start with `table()` again; a column
+method called before that throws `table name must be set before adding columns`.
 `cancelRow()` discards a row in progress without an error, and `reset()` also
 drops every row staged since the last flush.
+
+An awaited `at()` or `atNow()` can also reject because an auto-flush failed
+after the row was completed. This does not mean the row was discarded:
+completed rows can remain staged for a later `flush()` or `close()`, or be
+queued for replay. Do not blindly resubmit a row because its `at()` promise
+rejected. See [Flushing](#flushing) and [Ingestion errors](#ingestion-errors).
 
 ### Column methods
 
@@ -851,12 +873,19 @@ The standalone `Sender` class exposes only `symbol`, `stringColumn`,
 type.
 
 A column's type is fixed by the first value a sender stages for it. Writing a
-different type to the same column later throws
-`column type mismatch for '<name>'`. For an existing table, QuestDB rejects
-an incompatible type or value asynchronously; see
-[Ingestion errors](#ingestion-errors). Compatible conversions are allowed:
-for example, `longColumn("price", 123n)` can write to an existing DOUBLE column.
-This does not change the sender's local type-consistency rule.
+different type to the same column in a later row throws
+`column type mismatch for '<name>'`.
+
+Within one row, duplicate column assignments keep the first value, including
+names that differ only in case. For example,
+`.doubleColumn("price", 1).stringColumn("PRICE", "wrong")` keeps `1` and does
+not raise a type mismatch. Invalid values can still fail local validation.
+
+For an existing table, QuestDB rejects an incompatible type or value
+asynchronously; see [Ingestion errors](#ingestion-errors). Compatible
+conversions are allowed: for example, `longColumn("price", 123n)` can write to
+an existing DOUBLE column. This does not change the sender's local
+type-consistency rule.
 
 ### Null values
 
@@ -1223,7 +1252,7 @@ flush, then write the other rows again.
 up to `close_flush_timeout_millis` (5 seconds by default) for their
 acknowledgement. `0` or a negative value skips the wait. An unfinished row is
 discarded with a warning. On a borrowed sender, `close()` flushes and returns
-the sender to the pool without waiting; see
+the sender to the pool without waiting for acknowledgements by default; see
 [Borrowing a sender](#borrowing-a-sender).
 
 If the acknowledgement does not arrive in time, `close()` on a standalone
@@ -1328,7 +1357,9 @@ wait for every row written so far, call `flush()` and wait for
 To make every `flush()` wait for its acknowledgement, set `awaitServerAck`:
 `connectQwpNodeClient(conf, { sender: { awaitServerAck: true } })`, or
 `{ qwp: { sender: { awaitServerAck: true } } }` for a standalone `Sender`. A
-server rejection then rejects `flush()` itself, with `QwpIngressNackError`.
+server rejection then rejects the waiting `flush()` itself. See
+[Ingestion errors](#ingestion-errors) for the error classes before and after
+a terminal failure.
 
 Acknowledgement is not required for delivery: unacknowledged batches are
 replayed after a reconnect, and a standalone sender waits for them on
@@ -1564,10 +1595,14 @@ wss::addr=db.example.com:9000;token=YOUR_TOKEN;request_durable_ack=on;
 To make every flush wait for durability, add the typed option
 `{ sender: { awaitDurableAck: true } }`. If the server does not support durable
 acknowledgement, connecting fails with `QwpDurableAckUnavailableError`, which
-the pooled client reports as the `cause` of a `QwpPoolResourceError`. A sender
-that connects in the background, with `initial_connect_retry=async` or
-`lazy_connect=on`, does not fail: it keeps retrying and emits
-`durable-ack-unavailable` [connection events](#connection-events).
+the pooled client reports as the `cause` of a `QwpPoolResourceError`.
+
+Background senders with `initial_connect_retry=async` or `lazy_connect=on`
+instead keep retrying and emit `durable-ack-unavailable`
+[connection events](#connection-events). A store-and-forward sender does the
+same when reconnecting after its first successful connection. Monitor these
+events and buffer usage: successful background startup does not confirm that
+the server supports durable acknowledgement.
 
 ### Fire-and-forget UDP
 
@@ -1875,10 +1910,11 @@ A query ends early in four ways:
 - **Deadline.** Set a default with `egressSession: { queryTimeoutMs }`, or per
   query with `timeoutMs`. On expiry, iteration and `completion` reject with
   `QwpEgressQueryTimeoutError` and the client sends a cancel to QuestDB.
-- **Cancel.** `await query.cancel()` asks QuestDB to stop. Iteration and
+- **Cancel.** `await query.cancel()` sends a request to stop; it does not wait
+  for QuestDB to stop. When QuestDB processes the cancel, iteration and
   `completion` reject with `QwpEgressQueryError` whose `status` is `0x0a`
-  (CANCELLED). A query that has already finished, or a DDL or DML statement,
-  completes normally instead.
+  (CANCELLED). A query that finishes before the cancel is processed, or a DDL
+  or DML statement, completes normally instead.
 - **Leaving the loop.** `break`, `return`, or an exception inside `for await`
   cancels the query, and `completion` rejects with
   `QwpEgressQueryAbandonedError`.
@@ -1888,18 +1924,20 @@ A query ends early in four ways:
 
 QuestDB acts on a cancel between result batches, but while a query streams
 without a [credit window](#flow-control), it may not read the cancel until the
-whole result is sent. Without a credit window:
+whole result is sent. Set `initial_credit` in the connect string or
+`initialCredit` per query to improve cancellation responsiveness while
+streaming. For example, start with 1 MiB; the client replenishes it as your
+loop consumes batches. Credit does not interrupt expensive work before the
+next batch or bound cancellation latency.
 
-- `cancel()` can end with `QwpEgressQueryCancelTimeoutError` instead of the
-  `0x0a` rejection: the client waits `query_close_timeout_ms` (5 seconds) for
-  QuestDB to stop, then closes the connection.
+With or without a credit window:
+
+- After an explicit cancel, iteration and `completion` can reject with
+  `QwpEgressQueryCancelTimeoutError` instead of the `0x0a` rejection: the
+  client waits `query_close_timeout_ms` (5 seconds) for QuestDB to stop, then
+  closes the connection.
 - After a deadline or an early exit from the loop, returning the lease can take
   up to twice `query_close_timeout_ms`.
-
-Set a credit window when you cancel queries or use deadlines, with
-`initial_credit` in the connect string or `initialCredit` per query. About
-1 MiB is enough: the client replenishes it as your loop consumes batches, and
-QuestDB then stops within milliseconds.
 
 ```typescript
 import {
@@ -1913,7 +1951,7 @@ try {
   try {
     const query = await lease.query(
       "SELECT symbol, avg(price) FROM trades SAMPLE BY 1m",
-      // The credit window lets QuestDB act on the cancel promptly.
+      // Credit limits streaming ahead, not cancellation latency.
       { timeoutMs: 5_000, initialCredit: 1024 * 1024 },
     );
     for await (const batch of query) {
@@ -2144,13 +2182,16 @@ Retriable rejections of symbol-dictionary catch-up frames are also exempt.
 The six `on_*_error` connect-string keys are accepted but not applied by this
 client.
 
-**After a terminal error**, the sender is permanently failed.
-`waitForAcknowledged()` for the rejected batch rejects with
-`QwpIngressNackError`, and every later `flush()` or `close()` rejects with
-`QwpReplayRejectedError`, whose `status` and message repeat the server's. Close
-the sender and create a new one. A pooled sender is replaced automatically
-after the `close()` that reports the error. What happens to the rejected batch
-depends on the mode:
+**After a terminal server rejection**, the sender is permanently failed. An
+already-pending `waitForAcknowledged()` for the rejected batch can reject with
+`QwpIngressNackError`. Once the terminal failure is latched, new calls to
+`waitForAcknowledged()`, `flush()`, or `close()` reject with
+`QwpReplayRejectedError`, whose `status` and message repeat the server's.
+Error handlers must allow either class depending on timing.
+
+Close the sender and create a new one. A pooled sender is replaced
+automatically after the `close()` that reports the error. What happens to the
+rejected batch depends on the mode:
 
 - **Without store-and-forward**, the failed sender's unacknowledged batches,
   including the rejected one, are discarded with it, and the new sender starts

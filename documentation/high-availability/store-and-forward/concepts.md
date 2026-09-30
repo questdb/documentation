@@ -132,10 +132,12 @@ object store** (S3, Azure Blob, GCS, or NFS).
   watermarks. The client matches the head of the OK queue against these
   watermarks; each fully-covered head entry pops, and `ackedFsn`
   advances to the highest covered wireSeq.
-- The client opt-in is mandatory — the connect fails loudly if the server
-  does not echo `X-QWP-Durable-Ack: enabled` on the upgrade response.
-  This avoids the silent failure mode where the producer waits forever
-  for ack frames that will never arrive.
+- The client requires an `X-QWP-Durable-Ack: enabled` echo on the upgrade
+  response and rejects a connection without it, rather than waiting for ack
+  frames it cannot receive. This is normally terminal. Node.js background
+  senders instead retry and emit `durable-ack-unavailable`; see
+  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement)
+  for the retry modes and monitoring requirements.
 
 Durable-ack mode is the right choice when "data is in the object store"
 is the durability bar, but it has two costs: a longer time-to-trim (so

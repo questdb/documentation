@@ -360,16 +360,24 @@ With `initial_connect_retry=async`:
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
-A sender in async mode does not give up because time passed. What ends it is a
-**terminal** condition — authentication rejection, a durable-ack capability
-mismatch, or the poison-frame detector — or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
+A sender in async mode does not give up because time passed. Terminal
+conditions include authentication rejection, a durable-ack capability
+mismatch, and poison-frame escalation, subject to the Node.js exceptions
+below. Producer calls can also fail when the buffer reaches
+`sf_max_total_bytes` and exhausts `sf_append_deadline_millis` on `append()`.
 
 Node.js differs on authentication recovery: initial rejection is terminal, but
 regular senders with `sf_dir` or background memory replay
 (`initial_connect_retry=async` or `lazy_connect=on`) retry authentication
 rejections after their first successful connection. See
 [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+
+For unsupported durable acknowledgement, Node.js senders with
+`initial_connect_retry=async` or `lazy_connect=on` keep retrying and emit
+`durable-ack-unavailable`, rather than becoming terminal. Store-and-forward
+senders do the same after their first successful connection. Monitor these
+[connection events](/docs/connect/clients/nodejs/#connection-events) and buffer
+usage; see [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 
 ### Reconnect and outage handling
 
@@ -414,7 +422,7 @@ and apply back-pressure to the producer rather than dropping data.
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
 | `401` / `403` auth failure | **terminal**; do not try later endpoints, except during [Node.js background sender recovery](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) ⚠ |
-| durable-ack requested but unsupported | terminal mismatch |
+| durable-ack requested but unsupported | terminal mismatch, except for [Node.js background retries](/docs/connect/clients/nodejs/#durable-acknowledgement) |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |

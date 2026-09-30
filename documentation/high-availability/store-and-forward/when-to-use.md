@@ -102,17 +102,24 @@ GCS, or NFS).
 - WAL-local durability on the primary is sufficient.
 - You want minimum steady-state disk usage.
 - You are running OSS or a build that does not support durable-ack.
-  (The handshake fails loudly if you opt in but the server cannot
-  deliver — see below.)
+  Opting in rejects connection attempts; see [Caveats](#caveats) for the
+  Node.js background-retry exception.
 
 ### Caveats
 
 - **Server support is required.** The client sends
   `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
-  back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
-  uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
-  that never arrive would let the SF disk fill up.
+  back `X-QWP-Durable-Ack: enabled`. Without it, for example on an OSS build
+  or an uninitialised primary, the connection attempt is rejected. This is
+  normally terminal, subject to the Node.js exception below.
+- **Node.js background retries.** Senders with `initial_connect_retry=async`
+  or `lazy_connect=on` keep retrying unsupported durable acknowledgement
+  instead of failing initialization. A store-and-forward sender also retries
+  after its first successful connection. They emit `durable-ack-unavailable`
+  [connection events](/docs/connect/clients/nodejs/#connection-events).
+  Monitor these events and buffer usage: continued buffering can fill the
+  journal or memory queue even though startup succeeded. See
+  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 - **Idle keepalive.** The OSS server only flushes pending durable-ack
   frames during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when

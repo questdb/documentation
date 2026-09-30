@@ -64,7 +64,7 @@ Opt in to object-store-durable trim. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
+| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. A missing `X-QWP-Durable-Ack: enabled` echo is terminal except for [Node.js background retries](/docs/connect/clients/nodejs/#durable-acknowledgement). WebSocket transports only. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -94,9 +94,9 @@ canonical entries.
 | `tls_roots` | path | system trust (Node.js: bundled CAs) | Custom CA trust store. |
 | `tls_roots_password` | string | unset | Trust store password. |
 | `auto_flush` | bool | `on` | Global on/off for auto-flush triggers. |
-| `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. |
+| `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. Node.js: use `0` to disable; `off` is rejected. |
 | `auto_flush_bytes` | int / `off` | `0` (off) | Byte-size flush trigger. |
-| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger (Node.js: since last flush or sender creation). |
+| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger (Node.js: since last flush or sender creation). Node.js: use `0` to disable; `off` is rejected. |
 | `init_buf_size` | size | `64K` | Initial encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
 | `max_buf_size` | size | `100M` | Max encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
 | `max_name_len` | int | `127` | Local validation cap for table / column names. |
