@@ -1802,9 +1802,13 @@ try {
 }
 ```
 
-The callback is awaited before more credit is granted. The batch, its column
-views, and any `Uint8Array` returned from them are valid only until the
-callback returns: copy a byte view with `.slice()`, or call
+Batches are delivered one at a time: when the callback returns a promise, the
+client waits for it before delivering the next batch. With a credit window set
+(`initialCredit`), it also grants credit for a batch only after its callback
+resolves, so a slow callback throttles the server.
+
+The batch, its column views, and any `Uint8Array` returned from them are valid
+only until the callback returns: copy a byte view with `.slice()`, or call
 `batch.materialize()`, to keep data. Column views provide typed getters such as
 `getBoolean`, `getInt`, `getLong`, `getDouble`, `getString`, `getSymbol`,
 `getBinaryView`, and `get` for any type.
