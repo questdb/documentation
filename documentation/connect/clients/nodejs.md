@@ -1119,10 +1119,10 @@ the sender to the pool without waiting; see
 If the acknowledgement does not arrive in time, `close()` on a standalone
 sender rejects with `QwpSenderCloseTimeoutError`. Its `targetSequence` is the
 last published sequence and its `acknowledgedSequence` is how far QuestDB
-acknowledged. Without `sf_dir`, the unacknowledged rows are lost. With `sf_dir`,
-they stay in the journal for the next sender on that directory. A rejection in
-`finally` replaces any error the `try` block threw, so catch it there when that
-matters:
+acknowledged. Without `sf_dir`, the unacknowledged rows may be lost. With
+`sf_dir`, they stay in the journal for the next sender on that directory. A
+rejection in `finally` replaces any error the `try` block threw, so catch it
+there when that matters:
 
 ```typescript
 import { QwpSenderCloseTimeoutError, Sender } from "@questdb/nodejs-client";
@@ -1208,8 +1208,9 @@ Acknowledgement is not required for delivery: unacknowledged batches are
 replayed after a reconnect, and a standalone sender waits for them on
 `close()`. Wait for acknowledgements when your application must know that
 QuestDB accepted the rows, for example before committing a source offset. If
-the process exits before the acknowledgement, rows still in memory are lost;
-use [store-and-forward](#store-and-forward) to keep them across restarts.
+the process exits before the acknowledgement, rows still in memory may be
+lost; use [store-and-forward](#store-and-forward) to keep them across
+restarts.
 
 ### Transactions
 
@@ -1260,7 +1261,7 @@ try {
 
 ### Store-and-forward
 
-In the default memory mode, unacknowledged rows are lost if the process
+In the default memory mode, unacknowledged rows may be lost if the process
 exits. Setting `sf_dir` turns on a disk journal instead: every batch is
 appended to the journal before it is sent, a background drainer sends it in
 order, and acknowledged segments are deleted.
@@ -1364,13 +1365,17 @@ Deduplication recognizes a replayed row only when it carries the same
 designated timestamp, so pass event timestamps to `at()` instead of using
 `atNow()`. See [Deduplication](/docs/concepts/deduplication/) for choosing keys.
 
-:::warning Do not share a journal directory with a Java client
+:::warning Share a journal directory only among Node.js clients
 
-The Node.js client locks journal directories with its own lock files, which the
-Java client does not see. Never point a running Java client and a running
-Node.js client at the same directory. The journal format is shared, so a
-directory written by one can be opened by the other after the first has
-closed it.
+Node.js clients can share an `sf_dir`. Their locks keep each journal to one
+process at a time: a second process that opens a journal in use fails with
+`QwpReplayStoreLockedError`. Clients in other languages, such as Java, use
+operating-system file locks instead, and neither kind of client sees the
+other's locks. Such a client must not use the directory while any Node.js
+client is running on it: either client could open a journal that the other is
+writing, or drain it as an orphan, and corrupt it. Stop every Node.js client on
+the directory first. The journal format is shared, so the other client can then
+open the journals that the Node.js clients left behind.
 
 :::
 
