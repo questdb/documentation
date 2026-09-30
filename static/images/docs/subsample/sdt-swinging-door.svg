@@ -1,0 +1,345 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 420" width="1400" height="865" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img"><title>SDT swinging door animation</title>
+<desc>Animated illustration of the Swinging Door Trending algorithm walking through a 20-point time series. The doors narrow as each sample arrives, and a new anchor is placed whenever the doors would cross. Retained points are 0, 6, 8, 14, and 19 at compdev 0.05.</desc>
+
+<style>
+  .title { font-size: 15px; font-weight: 500; fill: #0CC0DF; }
+  .subtitle { font-size: 12px; fill: #64748b; }
+  .caption { font-size: 12px; fill: #475569; }
+  .caption-strong { font-size: 12px; fill: #1e293b; font-weight: 500; }
+  .axis-label { font-size: 10px; fill: #64748b; }
+  .legend-text { font-size: 11px; fill: #64748b; }
+  .anchor-label-text { font-size: 11px; fill: #D14671; }
+
+  /*
+   * Loop model. 22s total, 20 frames of 5% each.
+   */
+  .anim {
+    animation-duration: 22s;
+    animation-timing-function: steps(1, end);
+    animation-iteration-count: infinite;
+    animation-fill-mode: both;
+  }
+
+  @keyframes sampleShow-0  { 0% { opacity: 1; } }
+  @keyframes sampleShow-1  { 0% { opacity: 0; } 5%   { opacity: 1; } }
+  @keyframes sampleShow-2  { 0% { opacity: 0; } 10%  { opacity: 1; } }
+  @keyframes sampleShow-3  { 0% { opacity: 0; } 15%  { opacity: 1; } }
+  @keyframes sampleShow-4  { 0% { opacity: 0; } 20%  { opacity: 1; } }
+  @keyframes sampleShow-5  { 0% { opacity: 0; } 25%  { opacity: 1; } }
+  @keyframes sampleShow-6  { 0% { opacity: 0; } 30%  { opacity: 1; } }
+  @keyframes sampleShow-7  { 0% { opacity: 0; } 35%  { opacity: 1; } }
+  @keyframes sampleShow-8  { 0% { opacity: 0; } 40%  { opacity: 1; } }
+  @keyframes sampleShow-9  { 0% { opacity: 0; } 45%  { opacity: 1; } }
+  @keyframes sampleShow-10 { 0% { opacity: 0; } 50%  { opacity: 1; } }
+  @keyframes sampleShow-11 { 0% { opacity: 0; } 55%  { opacity: 1; } }
+  @keyframes sampleShow-12 { 0% { opacity: 0; } 60%  { opacity: 1; } }
+  @keyframes sampleShow-13 { 0% { opacity: 0; } 65%  { opacity: 1; } }
+  @keyframes sampleShow-14 { 0% { opacity: 0; } 70%  { opacity: 1; } }
+  @keyframes sampleShow-15 { 0% { opacity: 0; } 75%  { opacity: 1; } }
+  @keyframes sampleShow-16 { 0% { opacity: 0; } 80%  { opacity: 1; } }
+  @keyframes sampleShow-17 { 0% { opacity: 0; } 85%  { opacity: 1; } }
+  @keyframes sampleShow-18 { 0% { opacity: 0; } 90%  { opacity: 1; } }
+  @keyframes sampleShow-19 { 0% { opacity: 0; } 95%  { opacity: 1; } }
+
+  @keyframes doorFrame-1  { 0%, 5%   { opacity: 0; } 5.01%, 10%   { opacity: 1; } 10.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-2  { 0%, 10%  { opacity: 0; } 10.01%, 15%  { opacity: 1; } 15.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-3  { 0%, 15%  { opacity: 0; } 15.01%, 20%  { opacity: 1; } 20.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-4  { 0%, 20%  { opacity: 0; } 20.01%, 25%  { opacity: 1; } 25.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-5  { 0%, 25%  { opacity: 0; } 25.01%, 30%  { opacity: 1; } 30.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-6  { 0%, 30%  { opacity: 0; } 30.01%, 35%  { opacity: 1; } 35.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-7  { 0%, 35%  { opacity: 0; } 35.01%, 40%  { opacity: 1; } 40.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-8  { 0%, 40%  { opacity: 0; } 40.01%, 45%  { opacity: 1; } 45.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-9  { 0%, 45%  { opacity: 0; } 45.01%, 50%  { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-10 { 0%, 50%  { opacity: 0; } 50.01%, 55%  { opacity: 1; } 55.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-11 { 0%, 55%  { opacity: 0; } 55.01%, 60%  { opacity: 1; } 60.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-12 { 0%, 60%  { opacity: 0; } 60.01%, 65%  { opacity: 1; } 65.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-13 { 0%, 65%  { opacity: 0; } 65.01%, 70%  { opacity: 1; } 70.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-14 { 0%, 70%  { opacity: 0; } 70.01%, 75%  { opacity: 1; } 75.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-15 { 0%, 75%  { opacity: 0; } 75.01%, 80%  { opacity: 1; } 80.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-16 { 0%, 80%  { opacity: 0; } 80.01%, 85%  { opacity: 1; } 85.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-17 { 0%, 85%  { opacity: 0; } 85.01%, 90%  { opacity: 1; } 90.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-18 { 0%, 90%  { opacity: 0; } 90.01%, 95%  { opacity: 1; } 95.01%, 100% { opacity: 0; } }
+  @keyframes doorFrame-19 { 0%, 95%  { opacity: 0; } 95.01%, 100% { opacity: 1; } }
+
+  @keyframes anchor-0  { 0%, 35%  { opacity: 1; } 35.01%, 100% { opacity: 0; } }
+  @keyframes anchor-6  { 0%, 35%  { opacity: 0; } 35.01%, 45%  { opacity: 1; } 45.01%, 100% { opacity: 0; } }
+  @keyframes anchor-8  { 0%, 45%  { opacity: 0; } 45.01%, 75%  { opacity: 1; } 75.01%, 100% { opacity: 0; } }
+  @keyframes anchor-14 { 0%, 75%  { opacity: 0; } 75.01%, 100% { opacity: 1; } }
+
+  @keyframes archive-0  { 0% { opacity: 1; } }
+  @keyframes archive-6  { 0%, 35% { opacity: 0; } 35.01%, 100% { opacity: 1; } }
+  @keyframes archive-8  { 0%, 45% { opacity: 0; } 45.01%, 100% { opacity: 1; } }
+  @keyframes archive-14 { 0%, 75% { opacity: 0; } 75.01%, 100% { opacity: 1; } }
+  @keyframes archive-19 { 0%, 95% { opacity: 0; } 95.01%, 100% { opacity: 1; } }
+
+  @keyframes archiveLine-0-6   { 0%, 35% { opacity: 0; } 35.01%, 100% { opacity: 1; } }
+  @keyframes archiveLine-6-8   { 0%, 45% { opacity: 0; } 45.01%, 100% { opacity: 1; } }
+  @keyframes archiveLine-8-14  { 0%, 75% { opacity: 0; } 75.01%, 100% { opacity: 1; } }
+  @keyframes archiveLine-14-19 { 0%, 95% { opacity: 0; } 95.01%, 100% { opacity: 1; } }
+
+  @keyframes flash-7  { 0%, 35% { opacity: 0; } 35.01%, 40% { opacity: 1; } 40.01%, 100% { opacity: 0; } }
+  @keyframes flash-9  { 0%, 45% { opacity: 0; } 45.01%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+  @keyframes flash-15 { 0%, 75% { opacity: 0; } 75.01%, 80% { opacity: 1; } 80.01%, 100% { opacity: 0; } }
+
+  @keyframes captionSeg1 { 0%, 3% { opacity: 0; } 4%, 33% { opacity: 1; } 35%, 100% { opacity: 0; } }
+  @keyframes captionSeg2 { 0%, 35% { opacity: 0; } 36%, 43% { opacity: 1; } 45%, 100% { opacity: 0; } }
+  @keyframes captionSeg3 { 0%, 45% { opacity: 0; } 46%, 73% { opacity: 1; } 75%, 100% { opacity: 0; } }
+  @keyframes captionSeg4 { 0%, 75% { opacity: 0; } 76%, 93% { opacity: 1; } 95%, 100% { opacity: 0; } }
+  @keyframes captionSeg5 { 0%, 95% { opacity: 0; } 96%, 100% { opacity: 1; } }
+
+  .grid { stroke: #e5e7eb; }
+  .axis { stroke: #cbd5e1; }
+  .raw { fill: #888; }
+  .halo { stroke: #ffffff; }
+  .flash-ring { stroke: #0891b2; }
+  .flash-dot { fill: #0891b2; }
+  @media (prefers-color-scheme: dark) {
+    .subtitle, .axis-label, .legend-text { fill: #B4B2A9; }
+    .caption { fill: #D3D1C7; }
+    .caption-strong { fill: #EDEBE3; }
+    .grid { stroke: #2C2C2A; }
+    .axis { stroke: #444441; }
+    .raw { fill: #B4B2A9; }
+    .halo { stroke: #21222C; }
+    .flash-ring { stroke: #81D3F9; }
+    .flash-dot { fill: #81D3F9; }
+  }
+
+  .rm-only { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .anim { animation: none !important; opacity: 0 !important; }
+    .raw-sample { animation: none !important; opacity: 1 !important; }
+    .always-archived { animation: none !important; opacity: 1 !important; }
+    .always-archived .anim { animation: none !important; opacity: 1 !important; }
+    .rm-only { display: inline; }
+    .rm-hide { display: none; }
+  }
+</style>
+
+<text class="title" x="20" y="24">SDT: swinging door compression, step by step</text>
+<text class="subtitle" x="20" y="42">compdev = 0.05 &#8226; 20 samples &#8594; 5 retained &#8226; reconstruction error bounded by 2 &#215; compdev = 0.10</text>
+
+<!-- Grid -->
+<line x1="40" y1="80" x2="640" y2="80" class="grid" stroke-width="1"/>
+<line x1="40" y1="160" x2="640" y2="160" class="grid" stroke-width="1"/>
+<line x1="40" y1="240" x2="640" y2="240" class="grid" stroke-width="1"/>
+<line x1="40" y1="320" x2="640" y2="320" class="axis" stroke-width="1"/>
+<text class="axis-label" x="34" y="84" text-anchor="end">1.0</text>
+<text class="axis-label" x="34" y="324" text-anchor="end">0.0</text>
+
+<!-- Raw samples -->
+<g class="raw">
+  <circle class="anim raw-sample" cx="40"    cy="248"   r="3" style="animation-name: sampleShow-0"/>
+  <circle class="anim raw-sample" cx="71.6"  cy="236"   r="3" style="animation-name: sampleShow-1"/>
+  <circle class="anim raw-sample" cx="103.2" cy="224"   r="3" style="animation-name: sampleShow-2"/>
+  <circle class="anim raw-sample" cx="134.7" cy="212"   r="3" style="animation-name: sampleShow-3"/>
+  <circle class="anim raw-sample" cx="166.3" cy="195.2" r="3" style="animation-name: sampleShow-4"/>
+  <circle class="anim raw-sample" cx="197.9" cy="176"   r="3" style="animation-name: sampleShow-5"/>
+  <circle class="anim raw-sample" cx="229.5" cy="152"   r="3" style="animation-name: sampleShow-6"/>
+  <circle class="anim raw-sample" cx="261.1" cy="116"   r="3" style="animation-name: sampleShow-7"/>
+  <circle class="anim raw-sample" cx="292.6" cy="104"   r="3" style="animation-name: sampleShow-8"/>
+  <circle class="anim raw-sample" cx="324.2" cy="123.2" r="3" style="animation-name: sampleShow-9"/>
+  <circle class="anim raw-sample" cx="355.8" cy="152"   r="3" style="animation-name: sampleShow-10"/>
+  <circle class="anim raw-sample" cx="387.4" cy="188"   r="3" style="animation-name: sampleShow-11"/>
+  <circle class="anim raw-sample" cx="418.9" cy="224"   r="3" style="animation-name: sampleShow-12"/>
+  <circle class="anim raw-sample" cx="450.5" cy="252.8" r="3" style="animation-name: sampleShow-13"/>
+  <circle class="anim raw-sample" cx="482.1" cy="272"   r="3" style="animation-name: sampleShow-14"/>
+  <circle class="anim raw-sample" cx="513.7" cy="260"   r="3" style="animation-name: sampleShow-15"/>
+  <circle class="anim raw-sample" cx="545.3" cy="236"   r="3" style="animation-name: sampleShow-16"/>
+  <circle class="anim raw-sample" cx="576.8" cy="212"   r="3" style="animation-name: sampleShow-17"/>
+  <circle class="anim raw-sample" cx="608.4" cy="188"   r="3" style="animation-name: sampleShow-18"/>
+  <circle class="anim raw-sample" cx="640"   cy="171.2" r="3" style="animation-name: sampleShow-19"/>
+</g>
+
+<!-- Door frames -->
+<g style="animation-name: doorFrame-1" class="anim rm-hide">
+  <polygon points="40,248 118.9,188 118.9,248" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="118.9" y2="188" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="118.9" y2="248" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-2" class="anim rm-hide">
+  <polygon points="40,248 150.5,185 150.5,227" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="150.5" y2="185" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="150.5" y2="227" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-3" class="anim rm-hide">
+  <polygon points="40,248 182.1,176 182.1,212" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="182.1" y2="176" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="182.1" y2="212" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-4" class="anim rm-hide">
+  <polygon points="40,248 213.7,160 213.7,191.9" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="213.7" y2="160" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="213.7" y2="191.9" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-5" class="anim rm-hide">
+  <polygon points="40,248 245.3,144 245.3,170" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="245.3" y2="144" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="245.3" y2="170" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-6" class="anim rm-hide">
+  <polygon points="40,248 276.8,128 276.8,143" fill="#D14671" opacity="0.10"/>
+  <line x1="40" y1="248" x2="276.8" y2="128" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="40" y1="248" x2="276.8" y2="143" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-7" class="anim rm-hide">
+  <polygon points="229.5,152 276.8,80 308.4,92" fill="#D14671" opacity="0.10"/>
+  <line x1="229.5" y1="152" x2="276.8" y2="80" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="229.5" y1="152" x2="308.4" y2="92" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-8" class="anim rm-hide">
+  <polygon points="229.5,152 305.3,80 324.2,80" fill="#D14671" opacity="0.10"/>
+  <line x1="229.5" y1="152" x2="305.3" y2="80" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="229.5" y1="152" x2="324.2" y2="80" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-9" class="anim rm-hide">
+  <polygon points="292.6,104 371.6,122 371.6,182" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="371.6" y2="122" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="371.6" y2="182" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-10" class="anim rm-hide">
+  <polygon points="292.6,104 403.2,167 403.2,209" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="403.2" y2="167" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="403.2" y2="209" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-11" class="anim rm-hide">
+  <polygon points="292.6,104 434.7,212 434.7,239" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="434.7" y2="212" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="434.7" y2="239" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-12" class="anim rm-hide">
+  <polygon points="292.6,104 466.3,252.5 466.3,269" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="466.3" y2="252.5" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="466.3" y2="269" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-13" class="anim rm-hide">
+  <polygon points="292.6,104 497.9,281.8 497.9,299" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="497.9" y2="281.8" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="497.9" y2="299" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-14" class="anim rm-hide">
+  <polygon points="292.6,104 529.5,309.2 520,320" fill="#D14671" opacity="0.10"/>
+  <line x1="292.6" y1="104" x2="529.5" y2="309.2" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="292.6" y1="104" x2="520" y2="320" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-15" class="anim rm-hide">
+  <polygon points="482.1,272 561.1,212 561.1,272" fill="#D14671" opacity="0.10"/>
+  <line x1="482.1" y1="272" x2="561.1" y2="212" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="482.1" y1="272" x2="561.1" y2="272" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-16" class="anim rm-hide">
+  <polygon points="482.1,272 592.6,188 592.6,230" fill="#D14671" opacity="0.10"/>
+  <line x1="482.1" y1="272" x2="592.6" y2="188" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="482.1" y1="272" x2="592.6" y2="230" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-17" class="anim rm-hide">
+  <polygon points="482.1,272 624.2,164 624.2,200" fill="#D14671" opacity="0.10"/>
+  <line x1="482.1" y1="272" x2="624.2" y2="164" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="482.1" y1="272" x2="624.2" y2="200" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-18" class="anim rm-hide">
+  <polygon points="482.1,272 640,152 640,182" fill="#D14671" opacity="0.10"/>
+  <line x1="482.1" y1="272" x2="640" y2="152" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="482.1" y1="272" x2="640" y2="182" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+<g style="animation-name: doorFrame-19" class="anim rm-hide">
+  <polygon points="482.1,272 640,159.2 640,182" fill="#D14671" opacity="0.10"/>
+  <line x1="482.1" y1="272" x2="640" y2="159.2" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+  <line x1="482.1" y1="272" x2="640" y2="182" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.75"/>
+</g>
+
+<!-- Anchor rings -->
+<g class="rm-hide">
+  <g style="animation-name: anchor-0" class="anim">
+    <circle cx="40" cy="248" r="9" fill="none" stroke="#D14671" stroke-width="1.5" opacity="0.5"/>
+    <text x="40" y="232" text-anchor="middle" class="anchor-label-text">anchor</text>
+  </g>
+  <g style="animation-name: anchor-6" class="anim">
+    <circle cx="229.5" cy="152" r="9" fill="none" stroke="#D14671" stroke-width="1.5" opacity="0.5"/>
+    <text x="229.5" y="136" text-anchor="middle" class="anchor-label-text">anchor</text>
+  </g>
+  <g style="animation-name: anchor-8" class="anim">
+    <circle cx="292.6" cy="104" r="9" fill="none" stroke="#D14671" stroke-width="1.5" opacity="0.5"/>
+    <text x="292.6" y="94" text-anchor="middle" class="anchor-label-text">anchor</text>
+  </g>
+  <g style="animation-name: anchor-14" class="anim">
+    <circle cx="482.1" cy="272" r="9" fill="none" stroke="#D14671" stroke-width="1.5" opacity="0.5"/>
+    <text x="482.1" y="292" text-anchor="middle" class="anchor-label-text">anchor</text>
+  </g>
+</g>
+
+<!-- Flash markers -->
+<g class="rm-hide">
+  <g style="animation-name: flash-7" class="anim">
+    <circle cx="261.1" cy="116" r="9" fill="none" class="flash-ring" stroke-width="1.8" opacity="0.7"/>
+    <circle cx="261.1" cy="116" r="5" class="flash-dot" opacity="0.85"/>
+  </g>
+  <g style="animation-name: flash-9" class="anim">
+    <circle cx="324.2" cy="123.2" r="9" fill="none" class="flash-ring" stroke-width="1.8" opacity="0.7"/>
+    <circle cx="324.2" cy="123.2" r="5" class="flash-dot" opacity="0.85"/>
+  </g>
+  <g style="animation-name: flash-15" class="anim">
+    <circle cx="513.7" cy="260" r="9" fill="none" class="flash-ring" stroke-width="1.8" opacity="0.7"/>
+    <circle cx="513.7" cy="260" r="5" class="flash-dot" opacity="0.85"/>
+  </g>
+</g>
+
+<!-- Lines between retained points -->
+<g fill="none" stroke="#D14671" stroke-width="2" class="always-archived">
+  <line class="anim" x1="40"    y1="248"   x2="229.5" y2="152"   style="animation-name: archiveLine-0-6"/>
+  <line class="anim" x1="229.5" y1="152"   x2="292.6" y2="104"   style="animation-name: archiveLine-6-8"/>
+  <line class="anim" x1="292.6" y1="104"   x2="482.1" y2="272"   style="animation-name: archiveLine-8-14"/>
+  <line class="anim" x1="482.1" y1="272"   x2="640"   y2="171.2" style="animation-name: archiveLine-14-19"/>
+</g>
+
+<!-- Retained points -->
+<g stroke-width="1.5" class="always-archived halo">
+  <circle class="anim" cx="40"    cy="248"   r="5" fill="#D14671" style="animation-name: archive-0"/>
+  <circle class="anim" cx="229.5" cy="152"   r="5" fill="#D14671" style="animation-name: archive-6"/>
+  <circle class="anim" cx="292.6" cy="104"   r="5" fill="#D14671" style="animation-name: archive-8"/>
+  <circle class="anim" cx="482.1" cy="272"   r="5" fill="#D14671" style="animation-name: archive-14"/>
+  <circle class="anim" cx="640"   cy="171.2" r="5" fill="#D14671" style="animation-name: archive-19"/>
+</g>
+
+<!-- Captions -->
+<g class="rm-hide">
+  <text x="40" y="360" style="animation-name: captionSeg1" class="anim">
+    <tspan class="caption-strong">Phase 1.</tspan>
+    <tspan class="caption" dx="4">Anchor at point 0. Doors narrow as each sample lands inside the corridor.</tspan>
+  </text>
+  <text x="40" y="360" style="animation-name: captionSeg2" class="anim">
+    <tspan class="caption-strong">Sample 7 closes the doors.</tspan>
+    <tspan class="caption" dx="4">Retain point 6. New anchor at point 6, doors reopen.</tspan>
+  </text>
+  <text x="40" y="360" style="animation-name: captionSeg3" class="anim">
+    <tspan class="caption-strong">Sample 9 closes the doors.</tspan>
+    <tspan class="caption" dx="4">Retain point 8. New anchor at point 8, doors reopen for the descent.</tspan>
+  </text>
+  <text x="40" y="360" style="animation-name: captionSeg4" class="anim">
+    <tspan class="caption-strong">Sample 15 closes the doors.</tspan>
+    <tspan class="caption" dx="4">Retain point 14. New anchor at point 14, doors reopen for the recovery.</tspan>
+  </text>
+  <text x="40" y="360" style="animation-name: captionSeg5" class="anim">
+    <tspan class="caption-strong">End of input.</tspan>
+    <tspan class="caption" dx="4">Point 19 retained as the final sample. Five points retained in total.</tspan>
+  </text>
+</g>
+
+<text x="40" y="360" class="rm-only">
+  <tspan class="caption-strong">Retained set at compdev 0.05:</tspan>
+  <tspan class="caption" dx="4">points 0, 6, 8, 14, 19. Reconstruction error is bounded by 2 &#215; compdev = 0.10.</tspan>
+</text>
+
+<!-- Legend -->
+<g transform="translate(40, 396)">
+  <circle class="raw" cx="6" cy="0" r="3"/>
+  <text x="16" y="4" class="legend-text">sample</text>
+  <circle cx="80" cy="0" r="4" fill="#D14671" class="halo" stroke-width="1.5"/>
+  <text x="92" y="4" class="legend-text">retained</text>
+  <line x1="170" y1="0" x2="190" y2="0" stroke="#D14671" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="196" y="4" class="legend-text">door bounds</text>
+  <circle class="flash-dot" cx="304" cy="0" r="4"/>
+  <text x="316" y="4" class="legend-text">sample closes the doors</text>
+</g>
+
+</svg>
