@@ -5,7 +5,7 @@ description: SNAPSHOT SQL keyword reference documentation.
 ---
 
 This is a *deprecated* syntax to prepare the database for a full backup or a filesystem (disk) snapshot. 
-`SNAPSHOT` SQL syntax has been superceded by [`CHECKPOINT` SQL syntax](/docs/query/sql/checkpoint/)
+`SNAPSHOT` SQL syntax has been superseded by [`CHECKPOINT` SQL syntax](/docs/query/sql/checkpoint/)
 
 _For a detailed guide backup creation and restoration? Check out our
 [Backup and Restore](/docs/operations/backup/) guide!_

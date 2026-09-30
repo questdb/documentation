@@ -571,7 +571,7 @@ On initialisation, if `protocol_version=auto`, the sender will identify the firs
 will stick to this instance and write any subsequent data to it.
 
 In the event that the instance becomes unavailable for writes, the client will retry the other possible endpoints. As long
-as one instance becomes writable before the maximum retry timeout is reached, it will stick to it instead. This unvailability is characterised by failures to connect or locate the instance, or the instance returning an error code due to it being read-only.
+as one instance becomes writable before the maximum retry timeout is reached, it will stick to it instead. This unavailability is characterised by failures to connect or locate the instance, or the instance returning an error code due to it being read-only.
 
 By configuring multiple addresses, you can continue capturing data if your primary instance fails, without having to reconfigure the clients, as they will automatically failover to the new primary once available.
 
