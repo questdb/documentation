@@ -65,8 +65,9 @@ Two distinct counters track frame identity:
 - **FSN** (frame-sequence-number) — a monotonic counter assigned when a
   frame is appended to the substrate. FSN survives reconnects and (in SF
   mode) restarts. It is the substrate's permanent identifier for a frame.
-- **wireSeq** — the per-connection counter the server uses for
-  deduplication, reset to `0` on every successful WebSocket upgrade.
+- **wireSeq** is the per-connection counter used to correlate acknowledgements
+  with sent frames. It resets to `0` on every successful WebSocket upgrade
+  and is not a row-deduplication key.
 
 On every (re)connect the relationship is pinned:
 
@@ -160,8 +161,11 @@ On every successful (re)connect:
 2. `wireSeq` resets to `0`.
 3. The read cursor rewinds to the first un-acked frame on disk (or in
    memory).
-4. Frames stream to the wire in FSN order. The server's dedup window
-   absorbs any frames that landed before the disconnect.
+4. Frames stream to the wire in FSN order. A frame committed before the
+   disconnect but not acknowledged can be inserted again: replay is at least
+   once. Prevent duplicate rows with table-level `DEDUP UPSERT KEYS` covering
+   the designated timestamp and stable source identity, preserving both on
+   retries. See [Deduplication](/docs/concepts/deduplication/).
 5. New frames appended by the producer during replay are picked up
    automatically — the I/O loop watches a volatile `publishedFsn`
    cursor.

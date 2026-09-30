@@ -63,9 +63,18 @@ crashed Node.js sender therefore leaves the slot locked: a new sender takes it
 over automatically only on the same host, once the recorded process ID is no
 longer in use. That often fails in containers, where the application usually
 runs as process ID 1 and a replacement container has a new host name.
-Otherwise, make sure the previous process has exited, then delete
-`.lock.owner`. Node.js and other clients do not see each other's locks, so
-never let them use the same `sf_dir` at the same time. See the
+Otherwise, verify that the previous owner has exited and no process is using
+that slot before removing its stale `<sf_dir>/<slot>/.lock.owner` directory.
+Here `<slot>` is `<sender_id>`, or `<sender_id>-<n>` for a pooled Node.js sender.
+
+If startup still reports `QwpReplayStoreLockedError`, inspect
+`<sf_dir>/.slot-locks/<slot>.lock.owner` too. This short-lived guard can survive
+a crash during lock acquisition or quarantine. Remove only that specific
+owner directory after verifying its owner has exited, never the shared
+`.slot-locks` directory or another slot's locks.
+
+Node.js and other clients do not see each other's locks, so never let them use
+the same `sf_dir` at the same time. See the
 [Node.js client](/docs/connect/clients/nodejs/#store-and-forward).
 
 :::
@@ -108,8 +117,8 @@ when the new one comes up. Solutions:
 
 - Stop the previous process. For clients using OS locks, the kernel releases
   the lock on exit (even after `kill -9`). A killed Node.js sender can leave
-  `.lock.owner` behind: verify the old owner is gone before removing it; see
-  [`.lock` and `.lock.pid`](#lock-and-lockpid).
+  stale owner directories behind: verify the old owner is gone before removing
+  the specific directories described in [`.lock` and `.lock.pid`](#lock-and-lockpid).
 - Use a deployment unit that orders shutdown before startup.
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.

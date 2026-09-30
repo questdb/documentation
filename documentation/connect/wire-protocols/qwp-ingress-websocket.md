@@ -1161,8 +1161,11 @@ Key behaviors:
   The Node.js client is the exception: it applies `zone=` and `target=` to
   ingress too, so `target=replica` in a shared connect string stops its
   ingestion.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+- **Authentication rejection (`401`/`403`) is normally terminal.** After a
+  successful connection, a regular Node.js sender with `sf_dir` or background
+  memory replay (`initial_connect_retry=async` or `lazy_connect=on`) instead
+  retries it indefinitely. Initial authentication rejection remains terminal;
+  see the [authentication recovery exception](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **All other upgrade errors are transient** and feed into the reconnect loop,

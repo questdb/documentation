@@ -108,9 +108,10 @@ Why each line matters:
 
 - `target=replica` is required to avoid binding a primary/standalone server.
   The default `target=any` will accept any role.
-- `failover=on` is the default. It does **not** affect startup; it only governs
-  reconnect+replay after a query connection that was already established later
-  fails during `execute()`.
+- `failover=on` is the default. In the Java reference client it does **not**
+  affect startup; it only governs reconnect+replay after an established query
+  connection fails during `execute()`. Node.js also uses explicit failover
+  settings for initial query retries; see the [mental model](#mental-model).
 
 ---
 
@@ -127,9 +128,22 @@ share a startup model. You must hold all three in mind:
 | Query client initial connect | (no mode; always synchronous) | always blocking |
 | Facade prewarm (how many of each connect at `build()`) | `sender_pool_min`, `query_pool_min` | eager if `min>0`, lazy if `min=0` |
 
-`failover=on` (query default) is **not** a startup setting — it only affects
-query execution after a connection exists. This naming trips people up
+In Java, `failover=on` (query default) is **not** a startup setting: it only
+affects query execution after a connection exists
 ([sharp edge #3](#known-sharp-edges)).
+
+:::note Node.js query startup
+
+Node.js also retries initial query connections when `failover=on` is explicitly
+set, a `failover_*` tuning key is supplied without `failover=off`, or an
+`egressSession.reconnect` options object is supplied. Retries apply only to
+retryable failures and stay within the failover budget. With no explicit policy,
+failover is enabled for established query connections but initial connection
+attempts are not retried. `failover=off` disables the reconnect wrapper; an
+explicit `egressSession.reconnect` value overrides the connect-string policy.
+See [Node.js connection events](/docs/connect/clients/nodejs/#connection-events).
+
+:::
 
 ### Ingest initial-connect modes
 
@@ -283,9 +297,9 @@ here.
 | --- | --- | --- |
 | 1 | `initial_connect_retry` is implicitly promoted to `SYNC` when any `reconnect_*` knob is set — a resilience knob silently makes startup block. | Candidate |
 | 2 | `reconnect_max_duration_millis` is named as if it governs reconnection, but a running sender never consults it — it bounds only the blocking initial connect. | Candidate (naming) |
-| 3 | `failover` sounds like it covers startup but only affects post-connect query `execute()`. Queries have no async/lazy initial connect at all. | Candidate |
+| 3 | In Java, `failover` sounds like it covers startup but only affects post-connect query `execute()`. Java queries have no async/lazy initial connect. For the Node.js exception, see the [mental model](#mental-model). | Candidate |
 | 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`, or use `lazy_connect=true`. | Candidate |
-| 5 | A single endpoint returning `401`/`403` is treated as cluster-wide terminal and aborts the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. | Intended (documented), revisit |
+| 5 | A single endpoint returning `401`/`403` normally aborts the whole endpoint walk, even if other endpoints would accept the credentials. See the [Node.js authentication recovery exception](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide). | Intended (documented), revisit |
 | 6 | Query `serverInfoTimeoutMs` has no config key, so a facade query client cannot tune it. | Candidate |
 | 7 | The simplest API (`fromConfig` + async) has the worst error visibility — terminal async failures surface only on later producer calls or at `close()`. | Candidate |
 | 8 | `SenderProgressHandler` has no builder setter on either surface; it must be installed post-construction via `QwpWebSocketSender.setProgressHandler`. | Candidate |
@@ -351,6 +365,12 @@ A sender in async mode does not give up because time passed. What ends it is a
 mismatch, or the poison-frame detector — or the producer hitting
 `sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
 
+Node.js differs on authentication recovery: initial rejection is terminal, but
+regular senders with `sf_dir` or background memory replay
+(`initial_connect_retry=async` or `lazy_connect=on`) retry authentication
+rejections after their first successful connection. See
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+
 ### Reconnect and outage handling
 
 **A running sender retries a transport outage indefinitely.** There is no
@@ -393,7 +413,7 @@ and apply back-pressure to the producer rather than dropping data.
 | TLS session/certificate failure | transport error; try next endpoint |
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
-| `401` / `403` auth failure | **terminal**; do not try later endpoints ⚠ |
+| `401` / `403` auth failure | **terminal**; do not try later endpoints, except during [Node.js background sender recovery](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) ⚠ |
 | durable-ack requested but unsupported | terminal mismatch |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |

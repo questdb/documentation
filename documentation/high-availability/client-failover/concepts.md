@@ -191,7 +191,7 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are cluster-wide; retrying floods server logs without recovery. |
+| HTTP `401` / `403` on upgrade | Credentials are assumed to be cluster-wide. See the [Node.js sender recovery exception](#authentication-is-cluster-wide). |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
 
 ### Topology — handled inside the round
@@ -237,14 +237,21 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is terminal — the client does not retry
-other hosts. The assumption is that auth credentials are configured
-identically across the cluster, so a credential failure against one node is
-a credential failure against all of them. Retrying would spam every peer's
-audit log without recovering.
+A `401` or `403` on the HTTP upgrade is normally terminal: the client does not
+retry other hosts. Credentials are assumed to be configured identically across
+the cluster, so trying another node would repeat the rejection.
 
-If your deployment has per-host credentials, that is unsupported and outside
-the failover model — split the workload into one connect string per credential.
+The Node.js client makes an exception for a regular ingress sender that has
+already connected successfully and uses `sf_dir` or background memory replay
+(`initial_connect_retry=async` or `lazy_connect=on`). It retries authentication
+rejections indefinitely so buffered data can drain after server-side
+authentication is restored. Initial authentication rejection remains terminal,
+including in these modes. The exception does not apply to query connections,
+ordinary memory-only senders, or orphan drainers. See
+[Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors).
+
+Per-host credentials are outside the failover model. Use a separate connect
+string for each credential.
 
 ## Next steps
 

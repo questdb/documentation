@@ -660,8 +660,9 @@ Node.js client is the exception: in memory mode, it gives up after
   - `on` (aliases `sync`, `true`) — retry synchronously on the user
     thread, up to `reconnect_max_duration_millis`.
   - `async` — return the `Sender` immediately; the I/O thread retries in
-    the background indefinitely, surfacing only genuine terminal failures
-    (auth reject, durable-ack mismatch) via the error inbox.
+    the background indefinitely, surfacing terminal failures via the error
+    inbox. Initial authentication rejection remains terminal; see the Node.js
+    recovery exception below.
 
   **Implicit promotion.** Setting any explicit `reconnect_*` key without
   also choosing an `initial_connect_retry` mode promotes
@@ -679,9 +680,14 @@ Node.js client is the exception: in memory mode, it gives up after
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Auth failures during reconnect (authentication rejected, version mismatch,
-durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal — the loop does not retry them.
+Authentication rejection (HTTP `401` / `403`) normally stops the reconnect
+loop without trying other hosts. The Node.js client makes an exception after
+a regular sender's first successful connection: senders with `sf_dir` or
+background memory replay (`initial_connect_retry=async` or `lazy_connect=on`)
+retry authentication rejections indefinitely. Initial authentication rejection
+remains terminal. This exception does not apply to ordinary memory-only senders
+or orphan drainers. See
+[authentication during failover](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 
 ### Egress failover {#egress-failover}
 

@@ -735,8 +735,9 @@ state, so borrow one sender per producer (see [Concurrency](#concurrency)).
    [standalone `Sender`](#standalone-sender).
 2. Call `table(name)` to start a row.
 3. Add values with the [column methods](#column-methods), such as
-   `symbol(name, value)` and `doubleColumn(name, value)`. To store a NULL, pass
-   `null` or `undefined`, or skip the column (see [Null values](#null-values)).
+   `symbol(name, value)` and `doubleColumn(name, value)`. For a nullable column,
+   pass `null` or `undefined`, or skip the column to store NULL (see
+   [Null values](#null-values) for non-nullable defaults).
 4. Close the row with `at(timestamp, unit)` or `atNow()`, and `await` the
    returned promise. It rejects if an auto-flush triggered by the row fails.
 5. Repeat from step 2, and call `flush()` to send staged rows.
@@ -821,7 +822,8 @@ Names that differ from what you might expect:
 - `floatColumn()` and `intColumn()` write 64-bit DOUBLE and LONG. Use
   `float32Column()` and `int32Column()` for FLOAT and INT.
 - There is no `nullColumn()` or `setNull()`. Pass `null` or `undefined`, or
-  skip the column.
+  skip the column; the stored value depends on the column's
+  [nullability](#null-values).
 - Arrays use `arrayColumn()`. `doubleArray()` is a
   [compiled writer](#compiled-object-row-writers) field, not a sender method.
 - `geohashColumn()` takes raw bits only. Base-32 geohash text is accepted by a
@@ -834,14 +836,25 @@ type.
 
 A column's type is fixed by the first value a sender stages for it. Writing a
 different type to the same column later throws
-`column type mismatch for '<name>'`. If the table already exists with a
-different column type, QuestDB rejects the batch asynchronously; see
-[Ingestion errors](#ingestion-errors).
+`column type mismatch for '<name>'`. For an existing table, QuestDB rejects
+an incompatible type or value asynchronously; see
+[Ingestion errors](#ingestion-errors). Compatible conversions are allowed:
+for example, `longColumn("price", 123n)` can write to an existing DOUBLE column.
+This does not change the sender's local type-consistency rule.
 
 ### Null values
 
-To store NULL, pass `null` or `undefined` to any column method, or leave the
-column out of the row. All three have the same effect:
+Passing `null` or `undefined` to a column method omits the column, just like
+leaving it out of the row. For an existing nullable column, QuestDB stores SQL
+NULL. BOOLEAN, BYTE, and SHORT are not nullable: omitted BOOLEAN values become
+`false`, and omitted BYTE and SHORT values become `0`.
+
+CHAR uses the zero character as its NULL marker. Current QWP query results can
+return that marker as the one-character string `"\u0000"`, rather than JavaScript
+`null`. See the [data types](/docs/query/datatypes/overview/) and
+[type nullability](/docs/query/datatypes/overview/#type-nullability) references.
+
+For example, omitting a value for an existing SYMBOL column stores NULL:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -869,16 +882,17 @@ try {
 - An omitted column is not created on a table that lacks it: a NULL carries no
   type to infer from.
 - The column name is still validated when the value is nullish.
-- Rows that already exist in a batch, or rows added later, get NULL for any
-  column they do not set.
+- Rows that already exist in a batch, or rows added later, use the same
+  NULL or non-nullable default for any column they do not set.
 - INT, LONG, and DATE reserve their minimum values as NULL: writing
   `-2147483648` to INT or `-9223372036854775808n` to LONG or DATE stores NULL.
   IPv4 reserves `0.0.0.0` for NULL too, but `ipv4Column()` rejects it with a
   `RangeError` and discards the row: pass `null` to store an IPv4 NULL.
-- A row where every value is nullish is still sent over WebSocket and stored
-  with NULL in every column. To drop such a row instead, call `cancelRow()`
-  before closing it. Over UDP, `atNow()` rejects such a row while the sender
-  knows no non-null column for the table.
+- A row where every column value is nullish is still sent over WebSocket.
+  Its non-designated columns use the NULL/default rules above; the designated
+  timestamp comes from `at()` or `atNow()`. To drop such a row instead, call
+  `cancelRow()` before closing it. Over UDP, `atNow()` rejects such a row while
+  the sender knows no non-null column for the table.
 
 ### Designated timestamp
 
@@ -1084,7 +1098,7 @@ try {
       timestamp: Date.now(),
     });
 
-    // Arrays, iterables, and async iterables. Absent fields store NULL.
+    // Arrays, iterables, and async iterables. Absent nullable fields store NULL.
     await trades.rows([
       { symbol: "BTC-USD", side: "buy", price: 39269.98, timestamp: Date.now() },
     ]);
@@ -1450,10 +1464,15 @@ the directory's lock (see Lock recovery below).
   its process ID is no longer in use. Otherwise the new sender fails with
   `QwpReplayStoreLockedError`. This is common in containers: the application
   usually runs as process ID 1, which is in use again after a restart, and a
-  replacement container usually has a different host name. Once you are sure
-  the previous process has exited, delete `.lock.owner` from the journal
-  directory (`<sf_dir>/<sender_id>`, or `<sf_dir>/<sender_id>-<n>` for a pooled
-  sender) and start the sender again.
+  replacement container usually has a different host name. Once you have
+  verified that the previous owner has exited and no process is using the slot,
+  remove its stale `<sf_dir>/<slot>/.lock.owner` directory and restart the sender.
+  Here `<slot>` is `<sender_id>`, or `<sender_id>-<n>` for a pooled sender. If
+  startup still reports `QwpReplayStoreLockedError`, also inspect
+  `<sf_dir>/.slot-locks/<slot>.lock.owner`: this short-lived guard can survive a
+  crash during lock acquisition or quarantine. Remove that specific owner
+  directory only after verifying its owner has exited. Never delete the shared
+  `.slot-locks` directory or another slot's locks.
 - **Rejected batches.** A batch that QuestDB rejects terminally, such as one
   with a value of the wrong type for an existing column, stays in the journal.
   Every new sender on that directory, including the pool's replacement for a
@@ -1648,7 +1667,12 @@ Values arrive as these JavaScript types:
 | GEOHASH | `{ bits: bigint, precisionBits: number }` |
 | DECIMAL with a precision of 10 or more | `{ unscaled: bigint, scale: number }`: the value is `unscaled / 10^scale` |
 | DOUBLE[], DOUBLE[][], ... | `{ dimensions: number[], values: number[] }` with values in row-major order |
-| NULL of any type | `null` |
+| NULL in nullable types other than CHAR | `null` |
+
+BOOLEAN, BYTE, and SHORT are non-nullable, so omitted values read back as
+`false`, `0`, and `0`. A CHAR NULL marker can currently read back as the
+one-character string `"\u0000"`, not JavaScript `null`. See
+[Null values](#null-values).
 
 Some column types cannot be returned over QWP. The server rejects such a query
 with status `0x06` and a message such as `unsupported column type INTERVAL`.
@@ -2081,11 +2105,15 @@ The default policy follows the category:
 | `not-writable` | Retriable on another endpoint | The server is a replica or cannot accept writes |
 | `data-loss` | Abandoned | A corrupt store-and-forward journal was set aside |
 
-A retriable rejection is resent. If the same batch keeps being rejected, after
+A retriable rejection is resent. For rejections that count toward the
+poison-frame detector, if the same batch keeps being rejected after
 `max_frame_rejections` (4) attempts spanning at least
 `poison_min_escalation_window_millis` (5 minutes), the sender stops as for a
-terminal error. The six `on_*_error` connect-string keys are accepted but not
-applied by this client.
+terminal error. The `dictionary-gap`, `unknown`, and `not-writable` categories
+are exempt: they reset the poison episode instead of adding a strike.
+Retriable rejections of symbol-dictionary catch-up frames are also exempt.
+The six `on_*_error` connect-string keys are accepted but not applied by this
+client.
 
 **After a terminal error**, the sender is permanently failed.
 `waitForAcknowledged()` for the rejected batch rejects with
@@ -2231,12 +2259,18 @@ try {
 }
 ```
 
-An authentication failure (HTTP 401 or 403) ends the connection attempt for
-the whole endpoint list, because a credential rejected by one node is wrong for
-all of them, and it is not retried. The exception is a store-and-forward sender
-that has connected before: it keeps retrying, so that a rotated credential
-cannot strand its journal. Endpoints in error messages have any embedded
-credentials removed.
+An authentication rejection (HTTP 401 or 403) is terminal before a sender's
+first successful connection and for query connections. It stops the endpoint
+walk because credentials are assumed to be shared across the cluster.
+
+After a successful connection, regular senders with `sf_dir` or background
+memory replay (`initial_connect_retry=async` or `lazy_connect=on`) keep retrying
+authentication rejections indefinitely. This lets buffered data drain once
+server-side authentication is restored. Memory-only senders without those
+settings, and orphan drainers, do not have this exception. See
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+
+Endpoints in error messages have any embedded credentials removed.
 
 ## Failover and high availability
 
@@ -2425,9 +2459,13 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
 await db.close();
 ```
 
-Supplying `egressSession.reconnect`, like setting any `failover*` key, also
-makes opening a query connection retry within the failover budget, instead of
-failing on the first error.
+Supplying an `egressSession.reconnect` options object also makes opening a
+query connection retry within the failover budget when the error is retryable.
+So does
+explicitly setting `failover=on`, or setting a `failover_*` tuning key without
+`failover=off`. By contrast, `failover=off` or `egressSession.reconnect: false`
+disables the reconnect wrapper. As with other session options, an explicit
+`egressSession.reconnect` value replaces the connect-string policy.
 
 | Kind | Meaning |
 |---|---|
@@ -2552,9 +2590,10 @@ Version 5.0.0 keeps the ILP API and adds QWP. Changes that affect existing ILP
 code:
 
 - **Null values.** Passing `null` or `undefined` to a column or symbol method now
-  omits the column, which QuestDB stores as NULL. Earlier versions threw a type
-  error for most such values. Validate data before calling the sender if you
-  relied on the error.
+  omits the column. Existing nullable columns store NULL; BOOLEAN defaults to
+  `false`, and BYTE and SHORT default to `0` (see [Null values](#null-values)).
+  Earlier versions threw a type error for most such values. Validate data
+  before calling the sender if you relied on the error.
 - **Decimal scale.** `decimalColumn()` over ILP rejects a non-integer `scale`
   with a `RangeError`. Earlier versions silently coerced it, writing `2.5` as
   scale 2 and `NaN` as scale 0.
@@ -2595,8 +2634,12 @@ try {
   require `await sender.connect()`. `token=...` selects bearer authentication
   over HTTP. Over TCP, `username` and `token` set the JWK key ID and private
   key.
-- `flush()` sends the buffer as one HTTP request, which QuestDB commits as one
-  transaction, and throws if QuestDB rejects it.
+- Over HTTP, `flush()` sends the buffer as one request and throws if QuestDB
+  rejects it. Data is transactional only for a single-table request. A
+  multi-table request can commit earlier tables before a later table fails,
+  so a failed flush does not mean no data was committed. Schema changes, such
+  as automatically added columns, are not rolled back even for a single-table
+  request. See [HTTP transaction semantics](/docs/connect/compatibility/ilp/overview/#http-transaction-semantics).
 - Decimals need ILP protocol version 3: HTTP negotiates it automatically, and
   TCP needs `protocol_version=3`. Arrays need version 2 or later.
 - Undici is the default HTTP agent. Set `stdlib_http=on` to use the Node.js
