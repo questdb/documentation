@@ -28,7 +28,7 @@ mode.
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
 | `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
-| `sf_durability` | enum | `memory` | `memory` (page-cache durable) and `periodic` (background checkpoint to stable storage) both ship. `periodic` requires `sf_dir`. `flush` and `append` parse but are rejected at build time. The .NET client accepts `memory` only. |
+| `sf_durability` | enum | `memory` | `memory` relies on the page cache; `periodic` checkpoints in the background and requires `sf_dir`. Node.js also supports `append`, which makes each journal append durable before `flush()` resolves. Go and .NET accept only `memory`; other clients reject `append` at build time. `flush` is not supported. |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
 | `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
@@ -48,7 +48,7 @@ and host-walk semantics are documented in
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender without `sf_dir` or `initial_connect_retry=async` applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender with neither `sf_dir` nor `initial_connect_retry=async` applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
@@ -90,12 +90,12 @@ canonical entries.
 | `username` / `password` | string | unset | HTTP Basic auth on the upgrade request. |
 | `token` | string | unset | Bearer token on the upgrade request. |
 | `tls_verify` | enum | `on` | `on` or `unsafe_off`. Applies to `wss::` / TLS connections. |
-| `tls_roots` | path | system trust | Custom CA trust store. |
+| `tls_roots` | path | system trust (Node.js: bundled CAs) | Custom CA trust store. |
 | `tls_roots_password` | string | unset | Trust store password. |
 | `auto_flush` | bool | `on` | Global on/off for auto-flush triggers. |
 | `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. |
 | `auto_flush_bytes` | int / `off` | `0` (off) | Byte-size flush trigger. |
-| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger. |
+| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger (Node.js: since last flush or sender creation). |
 | `init_buf_size` | size | `64K` | Initial encode buffer capacity. |
 | `max_buf_size` | size | `100M` | Max encode buffer capacity. |
 | `max_name_len` | int | `127` | Local validation cap for table / column names. |
@@ -106,8 +106,9 @@ The parser rejects:
 
 - Unknown keys (forward compatibility is via the spec, not silent
   acceptance).
-- `sf_durability` values other than `memory`, `flush`, `append`. `flush`
-  and `append` parse but are rejected at build time today.
+- Unsupported `sf_durability` values. Go and .NET accept only `memory`;
+  Node.js also accepts `periodic` and `append`. Other clients accept
+  `periodic`, but reject `flush` and `append` at build time.
 - `sender_id` containing path separators or empty.
 - `request_durable_ack=on` on non-WebSocket transports.
 

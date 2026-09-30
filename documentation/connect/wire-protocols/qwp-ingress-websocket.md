@@ -1147,7 +1147,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely. |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in memory mode. |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
@@ -1158,6 +1158,9 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
+  The Node.js client is the exception: it applies `zone=` and `target=` to
+  ingress too, so `target=replica` in a shared connect string stops its
+  ingestion.
 - **Authentication errors are terminal** at any host (`401`/`403`). The
   reconnect loop does not continue past them.
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is

@@ -17,6 +17,7 @@ first.
 `addr` and `auth_timeout_ms` apply to every WS / WSS / HTTP / HTTPS client.
 `zone` is accepted everywhere but only takes effect on egress; `target` is an
 egress-only key and is rejected as an unknown key on an ingress connect string.
+The Node.js client is the exception: it applies both keys to ingress too.
 They are documented in full on the
 [connect-string reference](/docs/connect/clients/connect-string#failover-keys);
 the table below summarises the failover-relevant subset.
@@ -47,7 +48,7 @@ for the full list. The failover-relevant keys are:
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender with neither `sf_dir` nor `initial_connect_retry=async` applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Starting backoff sleep at round exhaustion. Doubles up to `reconnect_max_backoff_millis`. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter, the actual sleep lands in `[max, 2·max)` once the base saturates. |
 | `initial_connect_retry` | `off` \| `on` \| `async` | `off` | Whether to apply the same retry loop to the very first connect attempt. See below. |
@@ -61,7 +62,7 @@ network), and retrying for five minutes only hides it.
 | Value | Behaviour |
 |---|---|
 | `off` (default; alias `false`) | First-connect failure is terminal. The producer's call to build the sender throws immediately. |
-| `on` (aliases `sync`, `true`) | First-connect failures are retried on the caller's thread. The constructor blocks until it connects or `reconnect_max_duration_millis` expires — this is the **only** place that key applies. Once the sender is running, reconnection is unbounded. |
+| `on` (aliases `sync`, `true`) | First-connect failures are retried on the caller's thread. The constructor blocks until it connects or `reconnect_max_duration_millis` expires — this is the **only** place that key applies. Once the sender is running, reconnection is unbounded. A Node.js sender in memory mode is the exception; see the `reconnect_max_duration_millis` row above. |
 | `async` | The constructor returns immediately; the background I/O thread drives the reconnect loop. The producer experiences backpressure if it tries to publish before the connection comes up. Intended for unattended producers where the SF directory may already carry segments from a prior process and the server may come up later. |
 
 ## Egress (query)

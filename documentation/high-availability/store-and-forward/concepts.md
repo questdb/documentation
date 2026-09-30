@@ -38,7 +38,10 @@ SF runs in either of two modes selected by the connect string:
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
-where unacked data lives.
+where unacked data lives. The Node.js client is the exception: in memory
+mode, a sender without `initial_connect_retry=async` gives up after
+`reconnect_max_duration_millis` (5 minutes by default); see the
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 
 ## What "frame" means here
 
@@ -143,7 +146,9 @@ When the wire connection breaks — for any reason — the I/O thread enters
 the reconnect loop documented in
 [Client failover concepts](/docs/high-availability/client-failover/concepts/).
 The producer is **not notified**: it keeps publishing into the substrate,
-bounded by `sf_max_total_bytes` (see backpressure below).
+bounded by `sf_max_total_bytes` (see backpressure below). On the Node.js
+client in memory mode, `flush()` instead waits for the reconnect, up to
+`reconnect_max_duration_millis`.
 
 On every successful (re)connect:
 
@@ -190,6 +195,10 @@ fires, a `WARN` is logged and:
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
 - in **memory mode**, the un-acked tail is lost.
+
+On the Node.js client, a standalone sender's `close()` rejects with
+`QwpSenderCloseTimeoutError` instead of logging, and the pooled client's
+`db.close()` reports the timeout to its `onError` callback.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.

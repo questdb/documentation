@@ -227,7 +227,7 @@ WebSocket upgrade request.
   and egress. Bounds the TCP connect phase for each endpoint, so a black-holed
   host in a multi-host `addr` no longer stalls the
   [endpoint walk](#failover-keys) until the OS connect timeout. Unset by
-  default.
+  default in most clients; Node.js defaults to `15000` (15 seconds).
 
 **Mutual TLS (mTLS).** Not supported. The client validates the server's
 certificate against a trust store but cannot present a client certificate;
@@ -248,7 +248,8 @@ Selecting the `wss` schema enables TLS.
   below.
 - `tls_roots` — path to a file of trusted root certificates, used instead
   of the system trust store. If omitted, the client uses the system default
-  trust store. The accepted on-disk formats are client-specific:
+  trust store, except the Node.js client, which uses the CA certificates
+  bundled with Node.js. The accepted on-disk formats are client-specific:
 
   | Client | Formats accepted at `tls_roots` |
   |---|---|
@@ -325,10 +326,12 @@ act independently: whichever threshold trips first sends the batch.
   threshold. Set to `off` to disable. Default where supported: `1000`.
   The Node.js client rejects `off` here; set `0` to disable.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
-  since the first buffered row. The client evaluates the interval on the
-  next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
-  disable. Default where supported: `100` (100 ms). The Node.js client
-  rejects `off` here; set `0` to disable.
+  since the first buffered row in most clients. The client evaluates the
+  interval on the next `at()` / `flush()` call, not on a wall-clock timer.
+  Node.js instead measures from its last flush (or sender creation), so the
+  first row after an idle period may trigger a flush. Set to `off` to disable.
+  Default where supported: `100` (100 ms). The Node.js client rejects `off`
+  here; set `0` to disable.
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Accepts
   [size suffixes](#size-suffixes). **The default differs by client**: Java
@@ -392,7 +395,7 @@ and `t`, and rejects `kb`, `mb`, `gb`, and `tb`.
 ## Multi-host failover {#failover-keys}
 
 *Applies to: ingress and egress. The [Role filter and zone preference](#role-filter-and-zone-preference)
-sub-section is egress only.*
+sub-section is egress only, except on the Node.js client.*
 
 :::note QuestDB Enterprise
 
@@ -429,7 +432,8 @@ backoff.
 Both `target` and `zone` apply to **egress only**. QuestDB is currently a
 single-primary cluster: ingress automatically follows the primary across
 the host list and adapts when the primary moves to another node. Ingress
-silently accepts these keys and ignores them.
+silently accepts these keys and ignores them, except on the Node.js client
+(see below).
 
 :::caution Node.js client
 
@@ -523,18 +527,13 @@ equivalent — same architecture, no durability across restarts.
   The minted names belong to that pool's namespace, so pools sharing one
   `sf_dir` need distinct bases; the slot-in-use error covers both cases
   (another process or pool holds the slot).
-- `sf_durability` — disk durability mode. `memory` (the default) and
-  `periodic` both ship. `periodic` requires `sf_dir` and checkpoints published
-  frames in the background at `sf_sync_interval_millis`. `flush` and `append`
-  are reserved: they parse but are rejected at `build()`.
-
-  Reach for `periodic` when you must survive host loss. `memory` mode is
-  process-crash durable but **not** host-crash durable, because the page cache
-  is lost on power failure.
-
-  The .NET client is the exception: it accepts only `memory` and rejects
-  anything else at parse time. The Node.js client also accepts `append`,
-  which makes every journal append durable before `flush()` resolves.
+- `sf_durability` — disk durability mode. `memory` (the default) relies on the
+  page cache; `periodic` requires `sf_dir` and checkpoints published frames
+  in the background at `sf_sync_interval_millis`. Reach for `periodic` when
+  you must survive host loss: `memory` survives a process crash but not a
+  power failure. Go and .NET accept only `memory`. Node.js also accepts
+  `append`, which makes each journal append durable before `flush()` resolves.
+  Other clients reject `append`; `flush` is not supported.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a
@@ -571,6 +570,18 @@ exit, SIGKILL, host crash, or reboot — instantiate a new sender with the
    segment past it against the server. Replay runs on the I/O thread in
    parallel with the application's new `append()` calls — it does not
    block the application.
+
+:::caution Node.js client
+
+The Node.js client does not use an OS lock. It locks a slot with a
+`.lock.owner` directory, so a crashed Node.js sender can leave the slot
+locked, and a new sender then fails with `QwpReplayStoreLockedError`. Node.js
+and other clients do not see each other's locks: never let them use the same
+`sf_dir` at the same time. See the
+[Node.js client](/docs/connect/clients/nodejs/#store-and-forward) for lock
+recovery.
+
+:::
 
 If `sf_dir` is a relative path, ensure the process resolves it the same
 way after restart (typically: use an absolute path).
@@ -622,7 +633,9 @@ These keys control the cursor-engine reconnect loop used by QWP ingest.
 SF mode and memory-only mode share the same loop. A **running** sender
 retries a transport outage indefinitely with capped exponential backoff —
 there is no wall-clock give-up: the whole point of the buffering
-architecture is that a producer survives an arbitrarily long outage.
+architecture is that a producer survives an arbitrarily long outage. The
+Node.js client is the exception: in memory mode, it gives up after
+`reconnect_max_duration_millis`; see below.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
@@ -886,7 +899,7 @@ description and behaviour notes.
 | `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python, Node.js `5000` | [Ingress reconnect](#reconnect-keys) |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
 | `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
-| `connect_timeout`                       | int (ms, `> 0`)               | unset                         | [Authentication](#auth)                                       |
+| `connect_timeout`                       | int (ms, `> 0`)               | unset (Node.js: `15000`)      | [Authentication](#auth)                                       |
 | `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java, Node.js) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling) |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
@@ -917,7 +930,7 @@ description and behaviour notes.
 | `on_write_error`                        | enum                          | `retriable`                   | [Error handling](#error-handling)                             |
 | `pass`                                  | string                        | unset                         | [Authentication](#auth) (alias of `password`)                 |
 | `password`                              | string                        | unset                         | [Authentication](#auth)                                       |
-| `poison_min_escalation_window_millis`   | int (ms)                      | `5000`                        | [Error handling](#error-handling)                             |
+| `poison_min_escalation_window_millis`   | int (ms)                      | `5000` (Node.js: `300000`)    | [Error handling](#error-handling)                             |
 | `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
 | `query_pool_max`                        | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `query_pool_min`                        | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
@@ -930,12 +943,12 @@ description and behaviour notes.
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
-| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js also accepts `append`) | [Store-and-forward](#sf-keys) |
+| `sf_durability`                         | enum (`memory` / `periodic` / Node.js `append`) | `memory` (Go and .NET: `memory` only) | [Store-and-forward](#sf-keys) |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
-| `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
+| `tls_roots`                             | path                          | system trust store (Node.js: bundled CAs) | [TLS](#tls)                                       |
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |

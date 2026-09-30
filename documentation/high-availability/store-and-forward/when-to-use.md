@@ -57,7 +57,9 @@ Unacked frames are written to mmap'd files under
 Both modes share the same wire behaviour, the same failover loop, and
 the same connect-string keys for everything other than storage. You can
 switch between them without changing application code — only the connect
-string.
+string. On the Node.js client, memory mode also gives up after
+`reconnect_max_duration_millis` of outage, unless `initial_connect_retry=async`
+is set.
 
 ## Comparison at a glance
 

@@ -80,7 +80,8 @@ the host re-advertises a different zone.
 `target=primary` collapses every host's zone tier to `Same` — writers must
 follow the primary regardless of geography. Ingress is currently zone-blind in
 both storage modes, so the `zone=` key is silently accepted on ingress
-connections and only takes effect on egress.
+connections and only takes effect on egress. The Node.js client is the
+exception: it applies `zone=` and `target=` to ingress too.
 
 ### Selection priority
 
@@ -146,6 +147,9 @@ buffer capacity (`sf_max_total_bytes` and disk), not a timer.
 - Maximum backoff: `5 s`
 - Per-outage budget: **none**. `reconnect_max_duration_millis` bounds only the
   blocking sync initial connect, and the running loop never consults it.
+  The Node.js client is the exception: in memory mode, a sender without
+  `initial_connect_retry=async` gives up after `reconnect_max_duration_millis`
+  and fails with `QwpReconnectExhaustedError`.
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
   reconnect storms when many producers share a cluster
 - Inter-host pause within a round: **none** — the client walks the full
@@ -197,7 +201,8 @@ within the same round. No exponential backoff is consumed.
 
 - `421` + `X-QuestDB-Role: PRIMARY_CATCHUP` → `TransientReject`
 - `421` + any other non-empty role, including unrecognised tokens → `TopologyReject`
-- `SERVER_INFO.Role` does not match the requested `target=` (egress only)
+- `SERVER_INFO.Role` does not match the requested `target=` (egress only; the
+  Node.js client also applies it to ingress)
 
 If every host in a round role-rejects, ingress pays one fixed backoff sleep
 (reset to `InitialBackoff`, no doubling) and starts a fresh round; egress

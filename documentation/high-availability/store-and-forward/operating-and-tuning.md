@@ -20,8 +20,9 @@ In SF mode every sender owns one **slot directory**:
 
 ```
 <sf_dir>/<sender_id>/
-├── .lock              # advisory exclusive lock (kernel-released on process exit)
+├── .lock              # OS lock; Node.js retains it for compatibility only
 ├── .lock.pid          # UTF-8 text: holder PID + '\n' (diagnostic only)
+├── .lock.owner/       # Node.js ownership directory; may survive a crash
 ├── .failed            # optional drainer-failure sentinel (UTF-8 reason text)
 ├── .ack-watermark     # optional 16-byte durable-ack high-water mark
 ├── sf-0000000000000001.sfa
@@ -36,10 +37,10 @@ the host.
 
 ### `.lock` and `.lock.pid`
 
-The `.lock` file is held under an advisory exclusive lock for the engine's
-lifetime — POSIX clients use `flock` / `fcntl`, Windows uses
-`LockFileEx`. The lock is released automatically when the file descriptor
-closes, including on hard process exit (kernel cleanup).
+For clients other than Node.js, the `.lock` file is held under an advisory
+exclusive lock for the engine's lifetime — POSIX clients use `flock` /
+`fcntl`, Windows uses `LockFileEx`. Their lock is released automatically when
+the file descriptor closes, including on hard process exit (kernel cleanup).
 
 A second sender pointing at the same slot directory will fail to start
 with an error that names the holder's PID, read from `.lock.pid`. The
@@ -52,6 +53,22 @@ files are harmless — the next acquirer silently overwrites them.
 **Cross-platform interop:** a POSIX client and a Windows client must
 **not** share a slot on a network filesystem. Their lock primitives are
 incompatible.
+
+:::caution Node.js client
+
+The Node.js client does not use an OS lock. It locks a slot by creating a
+`.lock.owner` directory inside it, which records the owner's host name and
+process ID, and keeps `.lock` and `.lock.pid` only for compatibility. A
+crashed Node.js sender therefore leaves the slot locked: a new sender takes it
+over automatically only on the same host, once the recorded process ID is no
+longer in use. That often fails in containers, where the application usually
+runs as process ID 1 and a replacement container has a new host name.
+Otherwise, make sure the previous process has exited, then delete
+`.lock.owner`. Node.js and other clients do not see each other's locks, so
+never let them use the same `sf_dir` at the same time. See the
+[Node.js client](/docs/connect/clients/nodejs/#store-and-forward).
+
+:::
 
 ### `.failed`
 
@@ -89,8 +106,10 @@ and the second start fails loudly.
 A common cause is a redeploy where the old process hasn't fully exited
 when the new one comes up. Solutions:
 
-- Wait for the old process to release the lock (the kernel releases on
-  exit; `kill -9` is sufficient).
+- Stop the previous process. For clients using OS locks, the kernel releases
+  the lock on exit (even after `kill -9`). A killed Node.js sender can leave
+  `.lock.owner` behind: verify the old owner is gone before removing it; see
+  [`.lock` and `.lock.pid`](#lock-and-lockpid).
 - Use a deployment unit that orders shutdown before startup.
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.
@@ -182,7 +201,7 @@ fresh start: no segments, no replay.
 
 | Symptom | Likely cause | Operator action |
 |---|---|---|
-| "Slot held by PID `<n>`" | Two processes claiming the same `sender_id`. | Stop the duplicate. The lock releases on its exit. |
+| "Slot held by PID `<n>`" or `QwpReplayStoreLockedError` (Node.js) | Another process holds the slot, or a Node.js `.lock.owner` is stale after a crash. | Stop the duplicate. OS locks release on exit; for Node.js verify the owner is gone before removing `.lock.owner` (see [`.lock` and `.lock.pid`](#lock-and-lockpid)). |
 | "Gap between segments" | Corruption — a segment was deleted out of band. | Restore from backup or accept data loss; the substrate refuses to start. |
 | "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's frames; rely on server deduplication. |
 | Torn tail count > 0 | The previous process crashed mid-frame-write. | Informational; the CRC + zero-fill design discards the partial frame. |
@@ -196,6 +215,9 @@ fresh start: no segments, no replay.
 | `5000` (default) | Block up to 5 s waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory). |
 | `0` or `-1` | Skip the drain wait. Pending data persists on disk (SF) for the next sender, or is lost (memory). |
 | any other positive value | That timeout in milliseconds. |
+
+On the Node.js client, a standalone sender's `close()` rejects with
+`QwpSenderCloseTimeoutError` on timeout instead of logging a `WARN`.
 
 In every branch `close()`:
 

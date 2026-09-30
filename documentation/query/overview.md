@@ -97,19 +97,24 @@ against the demo instance.
 ## QuestDB client libraries
 
 The official client libraries speak the QuestDB Wire Protocol (QWP), a binary
-protocol that carries both ingestion and query traffic over one connection and
-one configuration string. This is the fastest way to get data out of QuestDB
-from an application.
+protocol for both ingestion and querying, configured with one connection
+string. A client may use separate connections for those operations: the
+[Node.js client](/docs/connect/clients/nodejs/#the-connection-pool), for example,
+maintains separate sender and query pools.
 
 Results stream rather than arriving in one block. The server sends batches as
 it produces them, so an application starts processing the head of a result
 while the tail is still being computed, and a result larger than memory never
 has to be materialized at all.
 
-Connections recover on their own. When a connection drops and replicas are
-available, the client reconnects and retries against another one without the
-application intervening. A query that fails over restarts from the beginning,
-which is transparent if you materialize the whole result.
+Connections can recover from transport failures. With failover enabled, a
+client may reconnect and re-execute an in-flight query, including on the same
+host. Result rows then restart from the beginning. Some clients' materializers
+discard their partial result automatically; if you process batches yourself,
+reset any accumulated state on replay or handle the client's terminal error.
+See [Node.js query failover](/docs/connect/clients/nodejs/#query-failover) for
+an example. Re-execution can also repeat SQL writes; see
+[DDL and DML statements](/docs/connect/clients/nodejs/#ddl-and-dml-statements).
 
 The Rust, C++, and Python clients hand back results as Arrow record batches.
 That is the native memory layout of

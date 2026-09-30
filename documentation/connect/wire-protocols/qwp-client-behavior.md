@@ -76,7 +76,9 @@ Why each line matters:
 It bounds only the **blocking** initial connect (`initial_connect_retry=on` /
 `sync`). Once a sender is running, the reconnect loop never consults it and
 retries a transport outage forever. Setting a large value here does nothing for
-a running producer. See [Reconnect and outage handling](#reconnect-and-outage-handling).
+a running producer. The Node.js client is the exception: a sender with neither
+`sf_dir` nor `initial_connect_retry=async` applies it to every outage. See
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 :::
 
@@ -183,10 +185,10 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
-| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
-| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
+| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** (Node.js memory mode: every outage) |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 | `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
@@ -210,7 +212,7 @@ callers block up to `acquire_timeout_ms` then throw.
 
 There is no "retry forever" setting to look for on the reconnect keys — a
 running sender already does. `reconnect_max_duration_millis` applies only to a
-blocking initial connect; see
+blocking initial connect, except on a Node.js sender in memory mode; see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ---

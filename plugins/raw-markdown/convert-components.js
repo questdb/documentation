@@ -605,18 +605,45 @@ function bumpHeadings(markdown, bumpBy = 1) {
 }
 
 /**
- * Removes import statements from processed markdown
- * Handles both single-line and multi-line imports
+ * Removes MDX import statements without touching imports in fenced examples.
+ * Handles both single-line and multi-line imports outside code fences.
  * @param {string} content - The markdown content
- * @returns {string} Content with imports removed
+ * @returns {string} Content with MDX imports removed
  */
 function removeImports(content) {
-  let processed = content
-  // First handle single-line imports
-  processed = processed.replace(/^import\s+.+\s+from\s+['"].+['"];?\s*$/gm, '')
-  // Then handle multi-line imports (where line breaks exist)
-  processed = processed.replace(/^import\s+[\s\S]*?\s+from\s*\n?\s*['"].+['"];?\s*$/gm, '')
-  return processed
+  const lines = content.split('\n')
+  const output = []
+  let segmentStart = 0
+  let fenceChar = ''
+  let fenceLen = 0
+
+  function appendOutside(end) {
+    if (segmentStart === end) return
+    let segment = lines.slice(segmentStart, end).join('\n')
+    segment = segment.replace(/^import\s+.+\s+from\s+['"].+['"];?\s*$/gm, '')
+    segment = segment.replace(/^import\s+[\s\S]*?\s+from\s*\n?\s*['"].+['"];?\s*$/gm, '')
+    output.push(...segment.split('\n'))
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const fence = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
+    if (!fenceChar) {
+      if (!fence) continue
+      appendOutside(i)
+      fenceChar = fence[1][0]
+      fenceLen = fence[1].length
+    } else if (fence && fence[1][0] === fenceChar &&
+      fence[1].length >= fenceLen && /^\s*$/.test(fence[2])) {
+      fenceChar = ''
+      fenceLen = 0
+      segmentStart = i + 1
+    }
+    output.push(line)
+  }
+
+  if (!fenceChar) appendOutside(lines.length)
+  return output.join('\n')
 }
 
 /**
