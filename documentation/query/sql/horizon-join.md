@@ -11,13 +11,18 @@ HORIZON JOIN is a specialized time-series join designed for **markout analysis**
 metrics evolve at specific time offsets relative to events (e.g., trades,
 orders).
 
-It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that combines
-[ASOF JOIN](/docs/query/sql/asof-join/) matching with a set of forward (or
-backward) time offsets, computing aggregations at each offset in a single pass.
+It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that runs an
+[ASOF JOIN](/docs/query/sql/asof-join/) match at each of a set of forward (or
+backward) time offsets from every left-hand row, in a single pass. Adding
+aggregate functions collapses those matches into one row per offset, or per
+offset and key, which is how markout curves are built.
 
 HORIZON JOIN supports joining against **multiple right-hand-side tables** in a
-single query, enabling aggregation of columns from several time-series sources
-against a common left-hand table and offset grid.
+single query, matching columns from several time-series sources against a
+common left-hand table and offset grid.
+
+To see how it compares with WINDOW JOIN and the other time-series joins, read
+[Which time-series join?](/blog/questdb-time-series-joins-guide/)
 
 ## Syntax
 
@@ -27,7 +32,7 @@ Generate offsets at regular intervals from `FROM` to `TO` (inclusive) with the
 given `STEP`:
 
 ```questdb-sql title="HORIZON JOIN with RANGE"
-SELECT [<keys>,] <aggregations>
+SELECT [<keys>,] [<aggregations>]
 FROM <left_table> AS <left_alias>
 HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
 [HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
@@ -47,7 +52,7 @@ For example, `RANGE FROM -3m TO 3m STEP 1m` generates offsets at -3m, -2m, -1m,
 Specify explicit offsets as interval literals:
 
 ```questdb-sql title="HORIZON JOIN with LIST"
-SELECT [<keys>,] <aggregations>
+SELECT [<keys>,] [<aggregations>]
 FROM <left_table> AS <left_alias>
 HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
 [HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
@@ -88,6 +93,11 @@ QuestDB implicitly groups the results by the non-aggregate SELECT columns
 across all matched rows. Aggregate expressions can reference columns from
 different right-hand tables (e.g., `avg(b.bid + a.ask)`).
 
+Aggregate functions are optional. Without them, the implicit grouping still
+applies, so the result has one row per distinct combination of the selected
+columns, as with `SELECT DISTINCT`. To get one row per left-hand row and
+offset, select the left table's timestamp along with the columns you need.
+
 ## The horizon pseudo-table
 
 The `RANGE` or `LIST` clause defines a virtual table of time offsets, aliased by
@@ -127,8 +137,7 @@ literal.
 
 ## GROUP BY rules
 
-HORIZON JOIN queries always require aggregate functions in the `SELECT` list.
-The `GROUP BY` clause is optional — when omitted, results are implicitly grouped
+The `GROUP BY` clause is optional. When omitted, results are implicitly grouped
 by all non-aggregate `SELECT` columns. When `GROUP BY` is present, it follows
 stricter rules than regular `GROUP BY`:
 

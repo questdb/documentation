@@ -62,6 +62,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [Point-in-time recovery](/docs/operations/point-in-time-recovery/) - The procedure previously spread across the backup and replication setup pages consolidated into a dedicated page, with the commit-time semantics of the recovery target and the verification step spelled out
 - [Kubernetes Operator](/docs/enterprise-kubernetes-operator/configuration/#cold-storage) - Documented native cold storage for Operator 0.3.0: the `spec.coldStorage` block, cold-manager placement during role switches, a manager-move runbook, and the synced v0.3.0 [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
 - [Disaster recovery](/docs/high-availability/disaster-recovery/) - Failure scenarios and the primary migration procedures moved from the setup guide to a dedicated page in the replication section
+- [Azure](/docs/deployment/azure/#buy-through-azure-marketplace) - Documented buying QuestDB Enterprise through Azure Marketplace with a private offer, billed on the existing Azure invoice and still deployed in your own subscription
+- [HORIZON JOIN](/docs/query/sql/horizon-join/) - Corrected the claim that aggregate functions are required. Without them, the result has one row per distinct combination of the selected columns, so select the left table's timestamp to get one row per event and offset. The [WINDOW JOIN](/docs/concepts/deep-dive/sql-extensions/#window-join) summary in the SQL extensions overview now states that it always aggregates, returning one row per left row. The [JOIN](/docs/query/sql/join/#time-series-joins) reference and each time-series join page now link to a [guide to choosing between them](/blog/questdb-time-series-joins-guide/)
 
 ## August 2026
 

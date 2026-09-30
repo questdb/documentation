@@ -16,7 +16,9 @@ sensor calibration for each reading, or enriching events with the latest
 known state.
 
 ASOF JOIN is a variant of the standard [`JOIN`](/docs/query/sql/join/) keyword
-and shares many of its execution traits.
+and shares many of its execution traits. To see how it compares with the other
+time-series joins, read
+[Which time-series join?](/blog/questdb-time-series-joins-guide/)
 
 ## Syntax
 
