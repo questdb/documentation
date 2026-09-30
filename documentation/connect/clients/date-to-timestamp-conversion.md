@@ -322,9 +322,9 @@ Learn more about the [QuestDB .NET Client](/docs/connect/clients/dotnet/)
 ## Date to Timestamp in JavaScript/Node.js
 
 A JavaScript `Date` stores milliseconds since the Unix epoch. The QuestDB
-JavaScript client takes a timestamp as an integer `number` or a `bigint`
-together with a unit: `"ms"`, `"us"` (the default), or `"ns"`. A `Date`
-therefore needs no arithmetic: pass `getTime()` with the `"ms"` unit.
+Node.js client takes a timestamp as an integer `number` or a `bigint` together
+with a unit: `"ms"`, `"us"` (the default), or `"ns"`. A `Date` therefore needs
+no arithmetic: pass `getTime()` with the `"ms"` unit.
 
 ```javascript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -353,7 +353,7 @@ For an explicit microsecond value, convert through `bigint`:
 `BigInt(tradeDate.getTime()) * 1000n`. Nanosecond timestamps, with the `"ns"`
 unit, must be a `bigint`.
 
-Learn more about the [QuestDB JavaScript client](/docs/connect/clients/nodejs/)
+Learn more about the [QuestDB Node.js Client](/docs/connect/clients/nodejs/)
 
 ## Date to Timestamp in Ruby
 

@@ -256,7 +256,7 @@ Selecting the `wss` schema enables TLS.
   | Rust, C, C++, Python | PEM (default), JKS, PKCS#12 |
   | .NET | PKCS#12 / PFX |
   | Go | none — OS trust store only, both keys rejected at parse time |
-  | JavaScript (Node.js) | PEM only; `tls_roots_password` is rejected at parse time |
+  | Node.js | PEM only; `tls_roots_password` is rejected at parse time |
 
 - `tls_roots_password` — password for the `tls_roots` file. Required only for
   a JKS or PKCS#12 trust store; PEM needs no password. Setting it without
@@ -292,9 +292,9 @@ Existing JKS and PKCS#12 trust stores keep working through
 
 The Go client verifies against the operating-system trust store only and
 **rejects both keys at parse time**; to trust a private CA there, install it in
-the host trust store. The JavaScript client on Node.js accepts PEM only and
-rejects `tls_roots_password`: export a JKS or PKCS#12 trust store to PEM
-first. On Rust, C, C++ and Python, `tls_roots_password` switches
+the host trust store. The Node.js client accepts PEM only and rejects
+`tls_roots_password`: export a JKS or PKCS#12 trust store to PEM first. On
+Rust, C, C++ and Python, `tls_roots_password` switches
 the file to a Java keystore and is QWP/WebSocket only: other transports keep
 PEM as the sole format. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
@@ -323,16 +323,16 @@ act independently: whichever threshold trips first sends the batch.
   buffered rows.
 - `auto_flush_rows` — flush when the buffered row count reaches this
   threshold. Set to `off` to disable. Default where supported: `1000`.
-  The JavaScript client rejects `off` here; set `0` to disable.
+  The Node.js client rejects `off` here; set `0` to disable.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
   since the first buffered row. The client evaluates the interval on the
   next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
-  disable. Default where supported: `100` (100 ms). The JavaScript client
+  disable. Default where supported: `100` (100 ms). The Node.js client
   rejects `off` here; set `0` to disable.
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Accepts
   [size suffixes](#size-suffixes). **The default differs by client**: Java
-  and JavaScript ship it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and
+  and Node.js ship it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and
   Rust, C and C++ reject the key outright. A Java application that assumes an 8 MiB byte
   trigger is active will size batches expecting a flush that never fires.
   When set to a positive value, the
@@ -386,7 +386,7 @@ case-insensitive and 1024-based, matching `-Xmx` conventions:
 | `g` or `gb`    | GiB (× 1024³)     | `1g`, `10gb` |
 | `t` or `tb`    | TiB (× 1024⁴)     | `1t`         |
 
-The JavaScript client accepts only the single-letter suffixes `k`, `m`, `g`,
+The Node.js client accepts only the single-letter suffixes `k`, `m`, `g`,
 and `t`, and rejects `kb`, `mb`, `gb`, and `tb`.
 
 ## Multi-host failover {#failover-keys}
@@ -431,13 +431,13 @@ single-primary cluster: ingress automatically follows the primary across
 the host list and adapts when the primary moves to another node. Ingress
 silently accepts these keys and ignores them.
 
-:::caution JavaScript client
+:::caution Node.js client
 
-The JavaScript client applies `target` and `zone` to ingress as well. With
+The Node.js client applies `target` and `zone` to ingress as well. With
 `target=replica` in a shared connect string, its senders accept only replicas
 and cannot ingest. Set the query-side role through the typed `egress` option
 instead; see the
-[JavaScript client page](/docs/connect/clients/nodejs/#multiple-endpoints).
+[Node.js client page](/docs/connect/clients/nodejs/#multiple-endpoints).
 
 :::
 
@@ -518,7 +518,7 @@ equivalent — same architecture, no durability across restarts.
   |---|---|
   | Java (`QuestDB` facade) | `<sf_dir>/<sender_id>-<index>/` |
   | Rust, C, C++ (`QuestDb` / `questdb::pool` / `questdb_db`) | `<sf_dir>/<sender_id>-ingest-<index>/` |
-  | JavaScript (`connectQwpNodeClient`) | `<sf_dir>/<sender_id>-<index>/` |
+  | Node.js (`connectQwpNodeClient`) | `<sf_dir>/<sender_id>-<index>/` |
 
   The minted names belong to that pool's namespace, so pools sharing one
   `sf_dir` need distinct bases; the slot-in-use error covers both cases
@@ -533,7 +533,7 @@ equivalent — same architecture, no durability across restarts.
   is lost on power failure.
 
   The .NET client is the exception: it accepts only `memory` and rejects
-  anything else at parse time. The JavaScript client also accepts `append`,
+  anything else at parse time. The Node.js client also accepts `append`,
   which makes every journal append durable before `flush()` resolves.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
@@ -636,7 +636,7 @@ architecture is that a producer survives an arbitrarily long outage.
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
   Setting this enables `initial_connect_retry=on` implicitly; see below.
-  The JavaScript client differs: a sender with neither `sf_dir` nor
+  The Node.js client differs: a sender with neither `sf_dir` nor
   `initial_connect_retry=async` applies this budget to every outage, and fails
   with `QwpReconnectExhaustedError` when it runs out.
 - `initial_connect_retry` — whether the client retries the initial connect
@@ -659,7 +659,7 @@ architecture is that a producer survives an arbitrarily long outage.
   milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
   (60 s) on Java and .NET, `5000` (5 s) on Rust, C, C++ and Python, which
-  share the same Rust core, and on JavaScript.
+  share the same Rust core, and on Node.js.
 
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
@@ -814,7 +814,7 @@ consumed by the application.
 
 Every client's parser accepts the six `on_*_error` keys below, but only
 clients that implement the policy layer act on them. **In the Java reference
-client and the JavaScript client they are currently accepted no-ops** — setting
+client and the Node.js client they are currently accepted no-ops** — setting
 `on_write_error=retriable_other` parses cleanly and changes nothing. .NET does
 implement them, via `SenderErrorPolicy` and `SenderErrorCategory`. The
 category table and precedence model below describe the target contract.
@@ -877,17 +877,17 @@ description and behaviour notes.
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | Java, JavaScript `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)        |
+| `auto_flush_bytes`                      | size                          | Java, Node.js `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)           |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
 | `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
-| `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python, JavaScript `5000` | [Ingress reconnect](#reconnect-keys) |
+| `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python, Node.js `5000` | [Ingress reconnect](#reconnect-keys) |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
 | `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
 | `connect_timeout`                       | int (ms, `> 0`)               | unset                         | [Authentication](#auth)                                       |
-| `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java, JavaScript) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling) |
+| `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java, Node.js) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling) |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
 | `error_inbox_capacity`                  | int (≥ 16)                    | `256`                         | [Error handling](#error-handling)                             |
@@ -930,7 +930,7 @@ description and behaviour notes.
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
-| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; JavaScript also accepts `append`) | [Store-and-forward](#sf-keys) |
+| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js also accepts `append`) | [Store-and-forward](#sf-keys) |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |

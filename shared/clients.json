@@ -33,9 +33,9 @@
   },
   {
     "href": "/docs/connect/clients/nodejs",
-    "name": "JavaScript",
+    "name": "Node.js",
     "description":
-      "QWP ingestion and streaming SQL for Node.js and browsers.",
+      "Pooled QWP ingestion and streaming SQL for Node.js and TypeScript.",
     "logo": "/images/logos/nodejs-light.svg",
     "protocol": "QWP"
   },
@@ -113,7 +113,7 @@
   },
   {
     "href": "/docs/connect/clients/nodejs",
-    "name": "JavaScript",
+    "name": "Node.js",
     "description":
       "Node.js client for ILP ingestion over HTTP and TCP, alongside QWP.",
     "logo": "/images/logos/nodejs-light.svg",

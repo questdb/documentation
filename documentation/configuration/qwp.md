@@ -6,8 +6,7 @@ description:
 
 QWP is QuestDB's columnar binary protocol for high-throughput data ingestion
 (`/write/v4`) and streaming query results (`/read/v1`) over WebSocket and UDP.
-These properties control protocol limits, query result compression, browser
-connections, and the UDP receiver. WebSocket
+These properties control protocol limits and the UDP receiver. WebSocket
 ingestion and egress share the HTTP server's network settings (port, TLS,
 worker threads); see
 [HTTP server configuration](/docs/configuration/http-server/) for those.
@@ -52,30 +51,6 @@ Forces a server-side zstd compression level for query result batches,
 overriding the level the client requests via `X-QWP-Accept-Encoding`. `0`
 disables the override and honours the client's request. Any other value must
 be in the range `1`-`9`; the server refuses to start otherwise.
-
-## Browser connections
-
-Browser applications, such as those using the
-[JavaScript client](/docs/connect/clients/nodejs/#browser-applications), open
-QWP WebSockets from a web page. Browsers always send an `Origin` header with
-the upgrade, and QuestDB accepts it only when it is same-origin with the
-request's `Host`, including the scheme: an `http://` origin is refused over TLS,
-and an `https://` origin is refused over plain HTTP. This blocks cross-site
-WebSocket hijacking. Upgrades without an `Origin` header, which is how
-non-browser clients connect, are unaffected. Browser QWP connections require a
-QuestDB release newer than 10.0.1.
-
-### qwp.browser.tls.termination.enabled
-
-- **Default**: `false`
-- **Reloadable**: no
-
-Treats plain-HTTP connections as secure for the browser origin check. Enable it
-when a reverse proxy terminates TLS in front of QuestDB: an `https://` origin is
-then accepted, and an `http://` origin is refused. The proxy must forward the
-browser's original `Host` header unchanged, including the port. The setting
-affects the origin check only; it does not mark the `qdb_session` cookie as
-`Secure`.
 
 ## UDP receiver
 

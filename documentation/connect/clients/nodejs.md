@@ -1,28 +1,20 @@
 ---
 slug: /connect/clients/nodejs
-title: JavaScript client for QuestDB
-sidebar_label: JavaScript
+title: Node.js client for QuestDB
+sidebar_label: Node.js
 description:
-  "QuestDB JavaScript client for Node.js and browsers: high-throughput data
-  ingestion and streaming SQL queries over QWP, with pooling, failover, and
-  store-and-forward."
+  "QuestDB Node.js client for high-throughput data ingestion and streaming SQL
+  queries over QWP, with pooling, failover, and store-and-forward."
 ---
 
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
-The QuestDB JavaScript client connects Node.js and browser applications to
-QuestDB over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), the
-QuestDB Wire Protocol: a columnar binary protocol carried over WebSocket. The
-same client ingests data at high throughput and runs SQL queries whose results
-stream back as typed, column-oriented batches.
-
-The client ships as two npm packages built from one code base, with the same
-API for ingestion and queries:
-
-| Package | Runtime | Use it for |
-|---|---|---|
-| `@questdb/nodejs-client` | Node.js | QWP ingestion and queries over WebSocket, QWP ingestion over UDP, persistent store-and-forward, and the legacy ILP transports |
-| `@questdb/browser-client` | Browsers | QWP ingestion and queries over the browser's native WebSocket, with session-cookie authentication. No Node.js dependencies |
+The QuestDB Node.js client, `@questdb/nodejs-client`, connects Node.js
+applications to QuestDB over
+[QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), the QuestDB Wire
+Protocol: a columnar binary protocol carried over WebSocket. The same client
+ingests data at high throughput and runs SQL queries whose results stream back
+as typed, column-oriented batches.
 
 Key capabilities:
 
@@ -36,8 +28,10 @@ Key capabilities:
   (`db.borrowSender()`) and query leases (`db.borrowQuery()`).
 - **Failover**: multi-host endpoint lists, automatic reconnect, and replay of
   unacknowledged rows.
-- **Store-and-forward** (Node.js): a disk journal that keeps accepting rows
-  while QuestDB is unreachable and survives process restarts.
+- **Store-and-forward**: a disk journal that keeps accepting rows while
+  QuestDB is unreachable and survives process restarts.
+- **UDP**: fire-and-forget ingestion for metrics where occasional loss is
+  acceptable.
 
 :::tip Legacy transports
 
@@ -51,32 +45,20 @@ documents the recommended QWP path. For ILP, see
 
 - **`@questdb/nodejs-client` 5.0.0 or newer** for QWP. Earlier versions
   support ILP only.
-- **Node.js 20.18.1 or newer** for `@questdb/nodejs-client`.
-- **A browser with `WebSocket`, `fetch`, `URL`, `TextEncoder`, and
-  `TextDecoder`** for `@questdb/browser-client`.
+- **Node.js 20.18.1 or newer**.
 - **QuestDB 10.0.0 or newer**, which serves QWP on the HTTP port (`9000` by
-  default) at `/write/v4` for ingestion and `/read/v1` for queries.
-  [Browser connections](#browser-applications) need a QuestDB release newer
-  than 10.0.1: earlier servers reject upgrades from browsers. If QuestDB is not
-  running yet, see the [quick start](/docs/getting-started/quick-start/).
+  default) at `/write/v4` for ingestion and `/read/v1` for queries. If QuestDB
+  is not running yet, see the [quick start](/docs/getting-started/quick-start/).
 
 ## Installation
-
-Install the Node.js package:
 
 ```shell
 npm install @questdb/nodejs-client
 ```
 
-For browser applications, install the browser package instead:
-
-```shell
-npm install @questdb/browser-client
-```
-
-Both packages work with `yarn add` and `pnpm add`. Each exports its complete
-API from the package root, ships ES module and CommonJS builds, and bundles
-TypeScript declarations. There are no other supported import paths.
+The package also installs with `yarn add` and `pnpm add`. It exports its
+complete API from the package root, ships ES module and CommonJS builds, and
+bundles TypeScript declarations. There are no other supported import paths.
 
 The examples on this page are TypeScript ES modules with top-level `await`.
 They also run as plain JavaScript once type annotations are removed.
@@ -222,7 +204,7 @@ Do not replace the poll with a fixed sleep: the apply latency varies with load.
 
 ## Connecting
 
-There are three ways to create a client in Node.js:
+Create a client with one of these entry points:
 
 | Entry point | Returns | Use it for |
 |---|---|---|
@@ -367,7 +349,7 @@ A QWP connect string has the form `schema::key=value;key=value;`:
   `password=p;;ssw;;rd` sets the password to `p;ssw;rd`. The trailing `;` is
   optional.
 
-The JavaScript parser differs from some other clients in two places:
+The Node.js client's parser differs from some other clients in two places:
 
 - `auto_flush_rows` and `auto_flush_interval` take `0`, not `off`, to disable
   a trigger. `auto_flush=off` disables auto-flushing entirely.
@@ -740,8 +722,8 @@ drops every row staged since the last flush.
 ### Column methods
 
 These methods are available on pooled senders and on senders from
-`connectQwpNodeSender()` and `connectQwpBrowserSender()`. Each creates the
-listed column type when the column does not exist yet:
+`connectQwpNodeSender()`. Each creates the listed column type when the column
+does not exist yet:
 
 | Method | QuestDB type created | Accepted values |
 |---|---|---|
@@ -1111,7 +1093,7 @@ What `flush()` waits for depends on the ingestion mode:
 |---|---|---|---|
 | Memory (default) | Neither of the others | The batch is written to the WebSocket, or queued for replay | `flush()` and auto-flushing `at()` wait for the reconnect, up to `reconnect_max_duration_millis` (5 minutes) |
 | Background memory | `initial_connect_retry=async`, or `lazy_connect=on` on the pooled client | The batch is added to the in-memory replay queue | Rows keep being accepted until the queue is full |
-| Store-and-forward (Node.js) | `sf_dir` | The batch is appended to the disk journal | Rows keep being accepted until the journal is full |
+| Store-and-forward | `sf_dir` | The batch is appended to the disk journal | Rows keep being accepted until the journal is full |
 
 In every mode, `flush()` does not wait for QuestDB to acknowledge the rows,
 unless you set `awaitServerAck`. Unacknowledged batches are kept and replayed
@@ -1279,9 +1261,9 @@ try {
 ### Store-and-forward
 
 In the default memory mode, unacknowledged rows are lost if the process
-exits. Setting `sf_dir` (Node.js only) turns on a disk journal instead: every
-batch is appended to the journal before it is sent, a background drainer sends
-it in order, and acknowledged segments are deleted.
+exits. Setting `sf_dir` turns on a disk journal instead: every batch is
+appended to the journal before it is sent, a background drainer sends it in
+order, and acknowledged segments are deleted.
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -1445,11 +1427,11 @@ try {
 ```
 
 UDP has no authentication, TLS, acknowledgements, transactions, reconnect, or
-store-and-forward, and it is not available in browsers. The server's UDP
-receiver is disabled by default; enable it with
-[`qwp.udp.enabled`](/docs/configuration/qwp/#udp-receiver). The default port is
-`9007`. `max_datagram_size` (1400 bytes by default) must fit your network path;
-a row that cannot fit a datagram fails with `QwpUdpDatagramTooLargeError`.
+store-and-forward. The server's UDP receiver is disabled by default; enable it
+with [`qwp.udp.enabled`](/docs/configuration/qwp/#udp-receiver). The default
+port is `9007`. `max_datagram_size` (1400 bytes by default) must fit your
+network path; a row that cannot fit a datagram fails with
+`QwpUdpDatagramTooLargeError`.
 `multicast_ttl` sets the multicast time-to-live.
 
 ## Querying
@@ -2032,7 +2014,7 @@ and has no server-side correlation ID beyond `requestId`.
 
 | Error | Raised when |
 |---|---|
-| `QwpUpgradeError` | Connecting to an endpoint failed. `kind` is `authentication` (HTTP 401 or 403), `role-rejected`, `http-rejected`, `version-mismatch`, `capability-mismatch`, `timeout`, `transport`, or `opaque` (browsers, which hide the HTTP status). It also carries `statusCode`, `retryable`, and `url`. |
+| `QwpUpgradeError` | Connecting to an endpoint failed. `kind` is `authentication` (HTTP 401 or 403), `role-rejected`, `http-rejected`, `version-mismatch`, `capability-mismatch`, `timeout`, or `transport`. It also carries `statusCode`, `retryable`, and `url`. |
 | `QwpFailoverError` | Every endpoint in a multi-host list failed. `attempts` holds each endpoint and its error. |
 | `QwpPoolResourceError` | The pool could not open a new connection. `cause` holds the error above. |
 | `QwpPoolAcquireTimeoutError` | Every pooled connection stayed leased past `acquire_timeout_ms`. |
@@ -2082,7 +2064,7 @@ to start without a replica. `zone` prefers endpoints in the same zone.
 
 :::caution `target` in the connect string also filters ingestion
 
-Unlike the Java client, the JavaScript client applies `target` and `zone` from
+Unlike the Java client, the Node.js client applies `target` and `zone` from
 the connect string to ingestion as well as queries. `target=replica` in the
 connect string therefore stops ingestion from reaching the primary. To read
 from replicas and write to the primary with one client, keep `target` out of
@@ -2267,208 +2249,10 @@ Node.js runs your code on one thread, but async functions interleave at every
 Callbacks such as `onSenderError` run on the same event loop, so move CPU-heavy
 work out of them.
 
-## Browser applications
-
-`@questdb/browser-client` brings the same ingestion and query API to browsers,
-through the browser's native WebSocket. Every sender, query, writer, and
-result-batch API above works the same way; the differences are in connecting
-and authentication.
-
-### Connect from the same origin
-
-QuestDB accepts a browser WebSocket upgrade only when its `Origin` is the same
-origin as the request's `Host`, which blocks cross-site WebSocket hijacking.
-Serve your application from QuestDB's origin, or route `/write/v4`, `/read/v1`,
-and `/exec` to QuestDB through a reverse proxy on your application's origin.
-QuestDB answers a cross-origin upgrade with HTTP 400, which the browser reports
-as a failed connection.
-
-If the proxy terminates TLS and forwards plain HTTP to QuestDB, set
-[`qwp.browser.tls.termination.enabled`](/docs/configuration/qwp/#browser-connections)
-on the server, and forward the browser's `Host` header unchanged.
-
-Build endpoint URLs from the page location, using `wss:` on HTTPS pages:
-
-```typescript
-const writeUrl = new URL("/write/v4", window.location.href);
-writeUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-```
-
-### Authenticate with a session cookie
-
-Browsers cannot add an `Authorization` header to a WebSocket upgrade. Instead,
-the client authenticates over REST first, and QuestDB sets an HttpOnly
-`qdb_session` cookie that the browser sends with the upgrade. When QuestDB has
-authentication enabled, put `sessionBootstrap` on the connection options, so
-the bootstrap runs before every connection and reconnection attempt:
-
-```typescript
-import { connectQwpBrowserSender } from "@questdb/browser-client";
-
-// Obtained by your application, for example from your OIDC provider.
-declare const accessToken: string;
-
-const writeUrl = new URL("/write/v4", window.location.href);
-writeUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-
-const sender = await connectQwpBrowserSender({
-  url: writeUrl,
-  sessionBootstrap: {
-    // A QuestDB REST token or an OIDC access token.
-    authentication: { type: "bearer", token: accessToken },
-  },
-});
-await sender.close();
-```
-
-- Basic authentication uses `{ type: "basic", username, password }`.
-- In QuestDB Enterprise, add `serviceAccount: "market_data_writer"` to
-  `sessionBootstrap` to act as that service account instead of the
-  authenticated user.
-- `bootstrapQwpBrowserSession({ url, authentication })` runs the bootstrap once,
-  for example right after login. Its `url` is the `/exec` endpoint.
-- The bootstrap request uses `credentials: "include"`. The default bootstrap URL
-  is `/exec` next to the WebSocket endpoint; set `sessionBootstrap.url` when a
-  proxy exposes it elsewhere.
-- A rejected bootstrap fails with `QwpBrowserSessionBootstrapError`, which
-  carries `statusCode` and `responseBody`.
-- The client never reads the HttpOnly cookie. It does not run an OIDC login
-  flow or refresh tokens: pass a fresh token by creating a new sender or
-  client.
-
-### Ingest from a browser
-
-```typescript
-import { connectQwpBrowserSender } from "@questdb/browser-client";
-
-const writeUrl = new URL("/write/v4", window.location.href);
-writeUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-
-const sender = await connectQwpBrowserSender({ url: writeUrl });
-try {
-  await sender
-    .table("trades")
-    .symbol("symbol", "ETH-USD")
-    .symbol("side", "buy")
-    .doubleColumn("price", 2615.54)
-    .doubleColumn("amount", 0.25)
-    .at(Date.now(), "ms");
-  const sequence = await sender.flushAndGetSequence();
-  await sender.waitForAcknowledged(sequence, 10_000);
-} finally {
-  await sender.close();
-}
-```
-
-`connectQwpBrowserSender(connection, senderOptions, sessionOptions)` takes the
-same sender and session options as the typed Node.js API: `autoFlushRows`,
-`transactional`, `awaitServerAck`, `onSenderError`, `reconnect`, and so on.
-There is no connect string in the browser.
-
-### Query from a browser
-
-```typescript
-import {
-  connectQwpBrowserEgress,
-  QwpEgressQueryError,
-} from "@questdb/browser-client";
-
-const readUrl = new URL("/read/v1", window.location.href);
-readUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-
-const session = await connectQwpBrowserEgress(
-  { url: readUrl, compression: "zstd" },
-  { queryTimeoutMs: 30_000 },
-);
-try {
-  const query = await session.query(
-    "SELECT timestamp, symbol, price FROM trades WHERE symbol = $1 LIMIT 100",
-    {
-      binds: (binds) => binds.setVarchar(0, "ETH-USD"),
-      // Bound read-ahead: browsers buffer WebSocket frames in memory.
-      initialCredit: 1024 * 1024,
-    },
-  );
-  for await (const batch of query) {
-    for (const row of batch.rows()) console.log(row);
-  }
-  await query.completion;
-} catch (error) {
-  if (!(error instanceof QwpEgressQueryError)) throw error;
-  console.error(`query failed: status=${error.status} ${error.message}`);
-} finally {
-  await session.close();
-}
-```
-
-A session from `connectQwpBrowserEgress()` runs one query at a time, like a
-query lease.
-
-### Pooled browser client
-
-`connectQwpBrowserClient()` is the browser counterpart of
-`connectQwpNodeClient()`. The `cluster` URL can be an origin, a reverse-proxy
-base path, or a `/write/v4` or `/read/v1` URL; the client derives both routes
-from it:
-
-```typescript
-import { connectQwpBrowserClient } from "@questdb/browser-client";
-
-const clusterUrl = new URL("/", window.location.href);
-clusterUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-
-const db = await connectQwpBrowserClient({
-  cluster: { url: clusterUrl },
-  egress: { compression: "zstd" },
-  pool: { senderPoolMax: 2, queryPoolMax: 4 },
-});
-try {
-  const sender = await db.borrowSender();
-  try {
-    await sender
-      .table("trades")
-      .symbol("symbol", "BTC-USD")
-      .symbol("side", "sell")
-      .doubleColumn("price", 39269.98)
-      .doubleColumn("amount", 0.001)
-      .at(Date.now(), "ms");
-  } finally {
-    await sender.close();
-  }
-
-  const lease = await db.borrowQuery();
-  try {
-    const query = await lease.query("SELECT count() FROM trades");
-    for await (const batch of query) console.log(batch.get(0, 0));
-    await query.completion;
-  } finally {
-    await lease.close();
-  }
-} finally {
-  await db.close();
-}
-```
-
-`cluster` also takes `failoverUrls` and `sessionBootstrap`, shared by both
-directions. The `ingress` and `egress` sections hold side-specific settings,
-such as `requestDurableAck`, `target`, and `compression`.
-
-### Browser limitations
-
-| Feature | In browsers |
-|---|---|
-| Store-and-forward | Not available. Unacknowledged rows are kept in memory and lost when the page closes. |
-| UDP | Not available. |
-| Connect strings and `QDB_CLIENT_CONF` | Not available. Use the typed options. |
-| Custom headers, TLS options | Not available. The browser owns TLS, and the client negotiates through URL parameters and a WebSocket subprotocol instead of headers. |
-| Upgrade error details | Not available. A failed upgrade is a `QwpUpgradeError` of kind `opaque`, without an HTTP status. Authentication errors surface from the session bootstrap. |
-| `target` and `zone` for ingestion | Not available: browsers cannot see a server's role during the upgrade. They apply to queries only. Do not list replicas for ingestion unless the proxy routes writes to the primary. |
-| Durable acknowledgement | Supported through the `requestDurableAck` connection option. |
-
 ## Configuration reference
 
 The [connect string reference](/docs/connect/clients/connect-string/) documents
-every key. The JavaScript client's defaults and deviations:
+every key. The Node.js client's defaults and deviations:
 
 | Key | Default | Notes |
 |---|---|---|
@@ -2500,11 +2284,10 @@ every key. The JavaScript client's defaults and deviations:
 | `client_id` | `typescript/<version>` | Sent to the server for diagnostics. |
 | Pool keys | see [Pool settings](#pool-settings) | Applied by the pooled client only. |
 
-The API reference covers every type and option:
-[`@questdb/nodejs-client`](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
-and
-[`@questdb/browser-client`](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_browser-client.html).
-The [QWP guide](https://github.com/questdb/nodejs-questdb-client/blob/main/QWP.md)
+The
+[API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
+covers every type and option. The
+[QWP guide](https://github.com/questdb/nodejs-questdb-client/blob/main/QWP.md)
 in the client repository describes the delivery semantics in depth.
 
 ## Migration

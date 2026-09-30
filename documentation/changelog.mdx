@@ -27,11 +27,10 @@ This page tracks significant updates to the QuestDB documentation.
 ### Reference
 
 - Added [`cairo.sql.subsample.max.rows`](/docs/configuration/cairo-engine/#cairosqlsubsamplemaxrows), the input row limit for the `lttb`, `m4`, `minmax`, `uniform`, and `cadence` methods of `SUBSAMPLE`. It does not apply to `sdt`
-- Added [`qwp.browser.tls.termination.enabled`](/docs/configuration/qwp/#qwpbrowsertlsterminationenabled), for browser QWP connections behind a TLS-terminating reverse proxy, and documented the same-origin check QuestDB applies to [browser connections](/docs/configuration/qwp/#browser-connections)
 
 ### Updated
 
-- [JavaScript client](/docs/connect/clients/nodejs/) - Rewrote the Node.js client page for QWP support in `@questdb/nodejs-client` 5.0.0 and the new `@questdb/browser-client` package: pooled ingestion and streaming SQL queries from one connect string, every column type, compiled object-row writers, acknowledgements, transactions, store-and-forward, UDP, failover, error handling, browser session authentication, and migration from ILP and from 4.x. The [connect string reference](/docs/connect/clients/connect-string/) now lists where the JavaScript client's keys and defaults differ
+- [Node.js client](/docs/connect/clients/nodejs/) - Rewrote the page for QWP support in `@questdb/nodejs-client` 5.0.0: pooled ingestion and streaming SQL queries from one connect string, every column type, compiled object-row writers, acknowledgements, transactions, store-and-forward, UDP, failover, error handling, and migration from ILP and from 4.x. The [connect string reference](/docs/connect/clients/connect-string/) now lists where the Node.js client's keys and defaults differ
 - [query_activity()](/docs/query/functions/meta/#query_activity) - Documented the `is_wal`, `memory_used`, and `memory_limit` columns
 - [wal_tables()](/docs/query/functions/meta/#wal_tables) - Documented the `errorTag`, `errorMessage`, and `memoryPressure` columns; `errorTag` reads `OUT OF MEMORY` after a WAL apply memory limit breach
 - [SHOW](/docs/query/sql/show/) - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, gain a trailing `memory_limit` column. Clients that read these results by position need [updating](/docs/security/rbac/#memory-limit-upgrade)
