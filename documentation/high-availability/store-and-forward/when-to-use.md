@@ -57,9 +57,9 @@ Unacked frames are written to mmap'd files under
 Both modes share the same wire behaviour, the same failover loop, and
 the same connect-string keys for everything other than storage. You can
 switch between them without changing application code — only the connect
-string. On the Node.js client, memory mode also gives up after
-`reconnect_max_duration_millis` of outage, unless `initial_connect_retry=async`
-is set.
+string. On the Node.js client, a sender with neither `sf_dir` nor background
+replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) also gives
+up after `reconnect_max_duration_millis` of outage.
 
 ## Comparison at a glance
 
@@ -102,23 +102,25 @@ GCS, or NFS).
 - WAL-local durability on the primary is sufficient.
 - You want minimum steady-state disk usage.
 - You are running OSS or a build that does not support durable-ack.
-  Opting in rejects connection attempts; see [Caveats](#caveats) for the
-  Node.js background-retry exception.
+  Opting in makes those connection attempts fail; see [Caveats](#caveats) for
+  the clients that keep retrying.
 
 ### Caveats
 
 - **Server support is required.** The client sends
   `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
   back `X-QWP-Durable-Ack: enabled`. Without it, for example on an OSS build
-  or an uninitialised primary, the connection attempt is rejected. This is
-  normally terminal, subject to the Node.js exception below.
-- **Node.js background retries.** Senders with `initial_connect_retry=async`
-  or `lazy_connect=on` keep retrying unsupported durable acknowledgement
-  instead of failing initialization. A store-and-forward sender also retries
-  after its first successful connection. They emit `durable-ack-unavailable`
+  or an uninitialised primary, the connection attempt is rejected. In most
+  clients this is terminal. The exceptions follow.
+- **Senders that keep retrying.** The Java client retries after a sender's
+  first successful connection. Node.js senders with
+  `initial_connect_retry=async` or `lazy_connect=on` retry from startup
+  instead of failing initialization, and Node.js store-and-forward senders
+  retry after their first successful connection; they emit
+  `durable-ack-unavailable`
   [connection events](/docs/connect/clients/nodejs/#connection-events).
-  Monitor these events and buffer usage: continued buffering can fill the
-  journal or memory queue even though startup succeeded. See
+  Monitor retrying senders and their buffer usage: continued buffering can
+  fill the journal or memory queue even though startup succeeded. See
   [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 - **Idle keepalive.** The OSS server only flushes pending durable-ack
   frames during inbound recv events. The client sends a WebSocket PING
@@ -179,7 +181,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
-| Cluster-wide ordering | Best-effort | Best-effort | FSN-driven, server-deduplicated |
+| Cluster-wide ordering | Best-effort | Best-effort | FSN-ordered; replay is at least once, so use `DEDUP UPSERT KEYS` |
 
 The transition is application-transparent — `Sender.fromConfig` accepts
 a `ws::` or `wss::` connect string and the public builder API is the

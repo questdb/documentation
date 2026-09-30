@@ -1127,11 +1127,15 @@ The client uses double-buffered microbatches:
 | Byte size            | disabled   |
 | Time since first row | 100 ms     |
 
+The Node.js client measures the interval from its last flush, or from sender
+creation, instead of from the first buffered row.
+
 ### Failover and high availability
 
 Ingress senders use a reconnect loop regardless of whether store-and-forward
-is configured. The two storage modes share identical failover semantics; they
-differ only in where unacknowledged data lives:
+is configured. The two storage modes share the same failover semantics, apart
+from the Node.js memory-mode budget in the table below; they differ only in
+where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
@@ -1147,7 +1151,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in memory mode. |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender with neither `sf_dir` nor background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`). |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
@@ -1161,11 +1165,12 @@ Key behaviors:
   The Node.js client is the exception: it applies `zone=` and `target=` to
   ingress too, so `target=replica` in a shared connect string stops its
   ingestion.
-- **Authentication rejection (`401`/`403`) is normally terminal.** After a
-  successful connection, a regular Node.js sender with `sf_dir` or background
-  memory replay (`initial_connect_retry=async` or `lazy_connect=on`) instead
-  retries it indefinitely. Initial authentication rejection remains terminal;
-  see the [authentication recovery exception](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+- **Authentication rejection (`401`/`403`) never moves to another host.** It
+  is terminal before a sender's first successful connection. After that, the
+  Java client retries it indefinitely, the Node.js client does so for senders
+  with `sf_dir` or background memory replay (`initial_connect_retry=async` or
+  `lazy_connect=on`), and other clients stop; see
+  [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **All other upgrade errors are transient** and feed into the reconnect loop,

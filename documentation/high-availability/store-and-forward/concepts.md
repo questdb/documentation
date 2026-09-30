@@ -19,7 +19,9 @@ arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
 no unacked data: the next sender on the slot recovers it from disk and
-replays it.
+replays it. The one exception is a Node.js sender with neither `sf_dir` nor
+background replay, whose `flush()` waits for the reconnect during an outage;
+see [Reconnect and replay](#reconnect-and-replay).
 
 ## Two modes
 
@@ -38,10 +40,10 @@ SF runs in either of two modes selected by the connect string:
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
-where unacked data lives. The Node.js client is the exception: ordinary
-memory mode gives up after `reconnect_max_duration_millis` (5 minutes by
-default). Background memory mode (`initial_connect_retry=async`, also selected
-by pooled `lazy_connect=on`) and disk-backed SF retry indefinitely. See the
+where unacked data lives. The Node.js client is the exception: a sender with
+neither `sf_dir` nor background replay (`initial_connect_retry=async`, or
+pooled `lazy_connect=on`) gives up after `reconnect_max_duration_millis`
+(5 minutes by default), while its other senders retry indefinitely. See the
 [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 
 ## What "frame" means here
@@ -134,10 +136,14 @@ object store** (S3, Azure Blob, GCS, or NFS).
   advances to the highest covered wireSeq.
 - The client requires an `X-QWP-Durable-Ack: enabled` echo on the upgrade
   response and rejects a connection without it, rather than waiting for ack
-  frames it cannot receive. This is normally terminal. Node.js background
-  senders instead retry and emit `durable-ack-unavailable`; see
-  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement)
-  for the retry modes and monitoring requirements.
+  frames it cannot receive. In most clients the rejection is terminal. The
+  Java client retries it after a sender's first successful connection, so a
+  capability change on the cluster cannot stop the producer. Node.js background senders
+  (`initial_connect_retry=async`, or pooled `lazy_connect=on`) retry it from
+  startup, and Node.js store-and-forward senders after their first
+  connection, emitting `durable-ack-unavailable` events; see
+  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
+  A retrying sender keeps buffering, so monitor it.
 
 Durable-ack mode is the right choice when "data is in the object store"
 is the durability bar, but it has two costs: a longer time-to-trim (so
@@ -156,8 +162,9 @@ the reconnect loop documented in
 The producer is **not notified**: it keeps publishing into the substrate,
 subject to available capacity (see [Backpressure](#backpressure)).
 
-On Node.js, only ordinary memory mode waits for reconnect in `flush()`, up to
-`reconnect_max_duration_millis`. Background memory mode, enabled by
+On Node.js, only a sender with neither `sf_dir` nor background replay waits
+for the reconnect in `flush()`, up to `reconnect_max_duration_millis`.
+Background memory mode, enabled by
 `initial_connect_retry=async` or pooled `lazy_connect=on`, keeps accepting
 batches into the memory replay queue until capacity is exhausted and retries
 indefinitely. See the [three Node.js flushing modes](/docs/connect/clients/nodejs/#flushing).
@@ -218,8 +225,10 @@ fires, a `WARN` is logged and:
 - in **memory mode**, the un-acked tail is lost.
 
 On the Node.js client, a standalone sender's `close()` rejects with
-`QwpSenderCloseTimeoutError` instead of logging, and the pooled client's
-`db.close()` reports the timeout to its `onError` callback.
+`QwpSenderCloseTimeoutError` instead of logging. The pooled client's
+`db.close()` resolves, and usually reports the timeout to
+`ingressSession.onError` as a non-terminal `QwpIngressAckTimeoutError`; that
+report is best-effort.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
@@ -331,24 +340,35 @@ shared `sf_dir`, blindly draining unknown slots may be surprising.
 
 Not every server response is an OK. A rejected batch is **not** silently
 dropped and trimmed: the client either retries it or reports a terminal error.
-The defaults below apply to the Node.js QWP client; consult the
+There is no drop policy. The table lists the built-in default policy of each
+category in the Java reference client and the Node.js client; see the
 [connect-string error policies](/docs/connect/clients/connect-string/#error-handling)
-for the shared vocabulary and per-client override support.
+for the shared vocabulary and which clients let you override the defaults.
 
-| Category | Node.js default | Meaning |
+| Category | Default policy | Meaning |
 |---|---|---|
 | `SCHEMA_MISMATCH` | `terminal` | The schema does not match. The sender stops; in SF mode, the rejected bytes remain in the journal for inspection. |
-| `WRITE_ERROR` | `retriable` | A write failed (for example, a temporary storage problem); reconnect and replay. |
 | `PARSE_ERROR` | `terminal` | Malformed payload; replaying identical bytes cannot help. |
-| `INTERNAL_ERROR` | `retriable` | Retry after an unexpected server-side failure. |
-| `SECURITY_ERROR` | `terminal` | Authentication or authorization failed. |
+| `SECURITY_ERROR` | `terminal` | Authorization failed, for example an ACL denial on a writable node. |
 | `PROTOCOL_VIOLATION` | `terminal` (forced) | Protocol failure; stop and report it. |
+| `WRITE_ERROR` | `retriable` | A write failed, for example under temporary storage pressure; reconnect and replay. |
+| `INTERNAL_ERROR` | `retriable` | Retry after an unexpected server-side failure. |
+| `DICTIONARY_GAP` | `retriable` | The connection is missing symbol dictionary entries; resend them and replay. |
+| `NOT_WRITABLE` | `retriable_other` | The node cannot accept writes, for example a replica; replay on another endpoint. |
+| `UNKNOWN` | `retriable` (forced) | A status the client does not know, for example from a newer server; retry rather than stop. |
 
-The Node.js client delivers asynchronous rejections to `onSenderError`; its
-default handler logs them. Other clients may use a bounded error inbox that
-drops the oldest notification on overflow. Check the client-specific error
-handling before relying on a policy override: the Node.js `on_*_error` keys
-are currently accepted but do not change these defaults.
+A batch that keeps being rejected without progress escalates to a terminal
+error through the poison-frame detector (`max_frame_rejections`). The Java and
+Node.js clients also report a client-side `DATA_LOSS` category, with the
+`abandoned` policy, when they set aside a corrupt store-and-forward journal.
+
+Rejections are delivered asynchronously through a bounded error inbox
+(`error_inbox_capacity`, default `256`) that drops the oldest notification on
+overflow, to the application's error handler, such as `onSenderError` on
+Node.js. The default handler logs every rejection, because a silent handler
+would hide data loss. The Node.js client reports categories as lowercase,
+hyphenated `error.category` strings, such as `schema-mismatch`, and accepts
+the `on_*_error` keys without applying them.
 
 ## Next steps
 

@@ -48,7 +48,7 @@ and host-walk semantics are documented in
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender with neither `sf_dir` nor `initial_connect_retry=async` applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender with neither `sf_dir` nor background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
@@ -64,7 +64,7 @@ Opt in to object-store-durable trim. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. A missing `X-QWP-Durable-Ack: enabled` echo is terminal except for [Node.js background retries](/docs/connect/clients/nodejs/#durable-acknowledgement). WebSocket transports only. |
+| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. A missing `X-QWP-Durable-Ack: enabled` echo is terminal in most clients; Java and some Node.js senders keep retrying (see [Concepts](/docs/high-availability/store-and-forward/concepts/#trim-how-unacked-data-is-reclaimed)). WebSocket transports only. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -72,12 +72,13 @@ Opt in to object-store-durable trim. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys, but Node.js and Java currently ignore them; .NET applies them. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys. Go and .NET apply them; Java, Node.js, Rust, C, C++, and Python currently ignore them. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
 
-The Node.js defaults are documented in
+The per-category defaults are documented in
 [Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
-`PROTOCOL_VIOLATION` is always terminal; Node.js treats an unknown server
-status as retriable rather than silently dropping the batch.
+`PROTOCOL_VIOLATION` is always terminal and `UNKNOWN` always retriable, so a
+status from a newer server leads to a retry rather than a silently dropped
+batch.
 
 ## Other relevant keys
 

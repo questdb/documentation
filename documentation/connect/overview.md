@@ -31,8 +31,8 @@ Pick the path that matches your environment.
 The first-party libraries for **Java, Python, Go, Rust, Node.js, C & C++, and
 .NET** are the recommended way to talk to QuestDB. They speak the
 **QuestDB Wire Protocol (QWP)** and unify ingest and query under one
-client configuration. The client may use separate connections for ingestion
-and queries, as the Node.js library does.
+client configuration. Ingestion and queries run over separate WebSocket
+connections, which the clients' pools manage for you.
 
 ### QWP support
 
@@ -54,13 +54,15 @@ Highlights:
 - **Binary on the wire** — roughly half the size of ILP or HTTP.
 - **Streaming both directions** — sustained 800 MiB/s ingress, up to
   2.5 GiB/s egress on a single connection.
-- **Automatic failover** — ingress and egress fail over without application
-  intervention.
+- **Automatic failover** — ingress and egress reconnect and fail over without
+  application intervention. A query that fails over restarts from its first
+  row, so code that accumulates rows must reset them; see each client's page.
 - **Store-and-forward** — survives server outages, including full server
   destruction. Sub-200 ns offload latency.
 - **One configuration** — a single
   [connect string](/docs/connect/clients/connect-string/) drives every
-  option, portable across all languages.
+  option, with the same keys in every language. A few defaults and behaviors
+  differ per client, as the connect string reference notes.
 - **Schema-flexible** — automatic table creation and on-the-fly column
   additions.
 
@@ -107,8 +109,8 @@ covering the WebSocket variants for ingress and egress. Read these if you are
 embedding QuestDB connectivity into an existing framework.
 
 QWP also has a UDP transport for fire-and-forget metrics, supported by the
-Java, Rust, C, C++ and Node.js clients via the `udp` connect-string schema. It
-is configured through the [`qwp.udp.*` server
+Java, Python, Rust, C, C++ and Node.js clients via the `udp` connect-string
+schema. It is configured through the [`qwp.udp.*` server
 settings](/docs/configuration/qwp/#udp-receiver) and is disabled by default;
 there is no separate byte-level specification page for it.
 

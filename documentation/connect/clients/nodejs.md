@@ -18,20 +18,28 @@ as typed, column-oriented batches.
 
 Key capabilities:
 
-- **Ingestion**: a fluent row API and compiled, type-checked object-row
-  writers, with automatic table creation, schema evolution, batching, and
-  acknowledgement tracking.
-- **Querying**: SQL with typed bind parameters, results streamed as columnar
-  batches, DDL and DML execution, cancellation, deadlines, and flow control.
-- **One pooled client**: `connectQwpNodeClient()` configures ingestion and
-  queries from one `ws::` connect string, then hands out pooled senders
-  (`db.borrowSender()`) and query leases (`db.borrowQuery()`).
-- **Failover**: multi-host endpoint lists, automatic reconnect, and replay of
-  unacknowledged rows.
-- **Store-and-forward**: a disk journal that keeps accepting rows while
-  QuestDB is unreachable and survives process restarts.
-- **UDP**: fire-and-forget ingestion for metrics where occasional loss is
-  acceptable.
+- **[Ingestion](#data-ingestion)**: a fluent row API and compiled,
+  type-checked object-row writers, with automatic table creation, schema
+  evolution, batching, and acknowledgement tracking.
+- **[Querying](#querying)**: SQL with typed bind parameters, results streamed
+  as columnar batches, DDL and DML execution, cancellation, deadlines, and flow
+  control.
+- **[One pooled client](#the-connection-pool)**: `connectQwpNodeClient()`
+  configures ingestion and queries from one `ws::` connect string, then hands
+  out pooled senders (`db.borrowSender()`) and query leases
+  (`db.borrowQuery()`).
+- **[Failover](#failover-and-high-availability)**: multi-host endpoint lists,
+  automatic reconnect, and replay of unacknowledged rows. Replay is at least
+  once: pair it with table [deduplication](/docs/concepts/deduplication/) for
+  exactly-once ingestion.
+- **[Store-and-forward](#store-and-forward)**: a disk journal that keeps
+  accepting rows while QuestDB is unreachable and survives process restarts.
+- **[UDP](#fire-and-forget-udp)**: fire-and-forget ingestion for metrics where
+  occasional loss is acceptable.
+- **[Error handling](#error-handling)**: typed errors, asynchronous rejection
+  callbacks, and connection events. The Node.js client differs from the other
+  QWP clients in a few places; see
+  [Differences from other clients](#differences-from-other-clients).
 
 :::tip Legacy transports
 
@@ -77,8 +85,9 @@ row. Ingestion is asynchronous, so an immediate read may not see it yet.
 This example assumes `trades` does not exist yet. If it already exists, QWP
 uses its existing designated timestamp column. For the `trades(ts, ...)` schema
 in the [PGWire guide](/docs/connect/compatibility/pgwire/nodejs/),
-replace `SELECT timestamp` with `SELECT ts` in the query below. The sender's
-`at()` calls need no change: they write to the existing designated timestamp.
+replace the `timestamp` column with `ts` in every `trades` query on this page.
+The sender's `at()` calls need no change: they write to the existing
+designated timestamp.
 
 :::
 
@@ -152,9 +161,8 @@ What happens:
    query handle that is an async iterable of result batches. `batch.rows()`
    yields one array per row. `query.completion` resolves when the server
    finishes the query.
-4. `db.close()` closes the pools. Idle senders publish any remaining rows and
-   wait up to five seconds for QuestDB to acknowledge them. `db.close()`
-   resolves even when that wait times out; see
+4. `db.close()` closes the pools, and resolves even if QuestDB has not
+   acknowledged every row; see
    [Closing the pooled client](#closing-the-pooled-client).
 
 If `trades` did not exist, ingestion creates it automatically with a designated
@@ -274,7 +282,7 @@ The `QwpClient` handle has five members:
 | `borrowQuery()` | `Promise<QwpQueryLease>` | Lease an exclusive query connection. Its `close()` returns it to the pool. |
 | `connect()` | `Promise<QwpClient>` | Open the pool minimums. Called for you by `connectQwpNodeClient()`. Safe to retry after a failure. |
 | `metrics` | `QwpClientMetrics` | Pool counters (`total`, `available`, `leased`, `creating`, `waiting`) for senders and queries. |
-| `close()` | `Promise<void>` | Reject new borrows, cancel active queries, close the query connections and idle senders, and wait up to 5 seconds for borrowed senders to be returned. Resolves even if rows are not acknowledged; see [Closing the pooled client](#closing-the-pooled-client). Idempotent. |
+| `close()` | `Promise<void>` | Close both pools. Resolves even if rows are not acknowledged; see [Closing the pooled client](#closing-the-pooled-client). Idempotent. |
 
 Share one `QwpClient` across your application and close it at shutdown. See
 [The connection pool](#the-connection-pool) for pool sizing and lease rules.
@@ -377,8 +385,11 @@ A QWP connect string has the form `schema::key=value;key=value;`:
   comma-separated (`addr=a:9000,b:9000`) or by repeating the key. Enclose IPv6
   addresses in brackets: `addr=[::1]:9000`.
 - **Keys** are lowercase and case-sensitive. An unrecognized key fails with
-  `unknown configuration key: <key>`. Legacy ILP keys such as `retry_timeout`
-  or `init_buf_size` fail with a hint that names the QWP replacement.
+  `unknown configuration key: <key>`. Legacy ILP keys fail with a hint:
+  `retry_timeout` and `tls_ca` name their QWP replacements
+  (`reconnect_max_duration_millis` and `tls_roots`), and keys with no QWP
+  equivalent, such as `init_buf_size`, say that they apply only to the legacy
+  transports.
 - **Values** end at `;`. Double a semicolon to include it in a value:
   `password=p;;ssw;;rd` sets the password to `p;ssw;rd`. The trailing `;` is
   optional.
@@ -437,13 +448,29 @@ where `qwp` has the sections `webSocket`, `session` (the equivalent of
 :::caution A typed `reconnect` object replaces the connect-string keys
 
 `ingressSession.reconnect` (or `qwp.session.reconnect` on a `Sender`) replaces
-the whole reconnect policy parsed from `reconnect_*` keys, and
+the whole reconnect policy parsed from the `reconnect_*`,
+`max_frame_rejections`, and `poison_min_escalation_window_millis` keys, and
 `egressSession.reconnect` replaces the policy parsed from `failover*` keys.
 Fields you leave out of the object take the built-in defaults, not the values
 from the connect string. When you supply the object, for example to register
-`onEvent`, set every bound you rely on in it, such as `maxDurationMs`.
+`onEvent`, set every bound you rely on in it.
 
 :::
+
+The object's fields and the connect-string keys they replace:
+
+| Field | Ingestion key, default | Query key, default |
+|---|---|---|
+| `maxAttempts` | None, `0` (unlimited) | `failover_max_attempts`, `8` |
+| `initialBackoffMs` | `reconnect_initial_backoff_millis`, `100` | `failover_backoff_initial_ms`, `50` |
+| `maxBackoffMs` | `reconnect_max_backoff_millis`, `5000` | `failover_backoff_max_ms`, `1000` |
+| `maxDurationMs` | `reconnect_max_duration_millis`, `300000` | `failover_max_duration_ms`, `30000` |
+| `maxFrameRejections` | `max_frame_rejections`, `4` | Not used |
+| `poisonMinEscalationWindowMs` | `poison_min_escalation_window_millis`, `300000` | Not used |
+| `onEvent` | None | None |
+
+`egressSession: { reconnect: false }` is the typed equivalent of
+`failover=off`.
 
 <span id="authentication"></span>
 
@@ -521,42 +548,23 @@ The pooled client reports connection setup failures as the `cause` of a
 | Path | Status | Workaround |
 |---|---|---|
 | OIDC token acquisition or refresh | Not supported. The client does not talk to an identity provider and has no callback to refresh a token. | Obtain an access token from your identity provider, pass it as `token=...`, and create a new client before the token expires. See [OpenID Connect](/docs/security/oidc/). |
-| Token rotation mid-session | Not supported. The credential is read once, when the client is created, and reused for every reconnect. | Close the client and create a new one with the new token. |
+| Token rotation mid-session | Not supported. The credential is read once, when the client is created, and reused for every reconnect. QuestDB rejects an expired token when the client next opens a connection: queries and memory-mode senders then fail, while senders with `sf_dir` or background replay keep retrying and buffering (see [Connection-level errors](#connection-level-errors)). | Close the client and create a new one with the new token before the old one expires. |
 | Mutual TLS (client certificates) | Not supported. QuestDB does not negotiate client certificates. | Use token or basic authentication over `wss`. |
 | ILP JWK authentication | Not available for QWP. `auth`, `jwk`, `token_x`, and `token_y` are rejected on `ws`/`wss`. | Use token or basic authentication. |
 
 ### Production example: TLS, token, and multiple hosts
 
-A typical Enterprise deployment combines `wss`, a token, and several hosts:
+A typical Enterprise deployment combines `wss`, a token, and several hosts in
+one connect string:
 
-```typescript
-import { connectQwpNodeClient } from "@questdb/nodejs-client";
-
-const token = process.env.QDB_TOKEN;
-if (!token) throw new Error("QDB_TOKEN is not set");
-
-const db = await connectQwpNodeClient(
-  "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;" +
-    `token=${token};` +
-    "tls_roots=/etc/ssl/questdb-ca.pem;" +
-    // Start, and ingest, even while no replica is reachable.
-    "query_pool_min=0;",
-  {
-    // Queries run on replicas only, with no fallback to the primary (see
-    // "Multiple endpoints"). Set target here: in the connect string it also
-    // applies to ingestion.
-    egress: { target: "replica" },
-  },
-);
-try {
-  // borrow senders and query leases
-} finally {
-  await db.close();
-}
+```text
+wss::addr=db-a.example.com:9000,db-b.example.com:9000;token=YOUR_TOKEN;
 ```
 
-With `query_pool_min=0`, the client starts while no replica is reachable, and
-a query borrowed during that time rejects with `QwpPoolResourceError`.
+Add `tls_roots=/path/to/ca.pem;` when the servers use a private CA. See
+[Multiple endpoints](#multiple-endpoints) for routing queries to replicas, and
+the [full example](#full-example-ingestion-and-querying-with-failover) for a
+complete program with this configuration.
 
 ## The connection pool
 
@@ -601,24 +609,10 @@ A long-running producer can keep its borrow for its whole lifetime and call
 `flush()` between batches. Size `sender_pool_max` to the number of producers
 that hold a sender at the same time.
 
-:::note Pooled sender close semantics
-
-`close()` on a borrowed sender flushes completed rows, discards an unfinished
-row with a warning, and returns the sender to the pool. It does not close the
-WebSocket or wait for acknowledgements by default. With `awaitServerAck: true`
-or `awaitDurableAck: true`, the flush performed by `close()` waits for its
-acknowledgement too. To confirm delivery of all previously published rows
-before returning the sender, call `flush()` and then
-`waitForAcknowledged(sender.publishedSequence)`; see
-[Awaiting acknowledgements](#awaiting-acknowledgements).
-
-When a borrowed sender's `close()` fails, the pool discards that sender and
-opens a new one for the next borrow. Because QuestDB reports rejected batches
-asynchronously, a sender can fail after its `close()` already succeeded: the
-error then surfaces on the `flush()` or `close()` of the next borrower, and the
-pool replaces the sender after that. See [Ingestion errors](#ingestion-errors).
-
-:::
+`close()` on a borrowed sender flushes its completed rows and returns it to
+the pool without waiting for acknowledgements. See
+[Closing a sender](#closing-a-sender) for how to wait for them, and for what
+happens when a close fails.
 
 ### Borrowing a query lease
 
@@ -672,7 +666,7 @@ Starting a second query on a lease while one is still active throws
 | `query_pool_max` | `4` | Maximum query connections, which also caps concurrent queries. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits when the pool is at its maximum, before rejecting with `QwpPoolAcquireTimeoutError`. |
 | `idle_timeout_ms` | `60000` | Idle time before an excess connection is closed. `0` keeps idle connections. |
-| `max_lifetime_ms` | `1800000` | Age at which an idle connection is recycled. `0` disables recycling. |
+| `max_lifetime_ms` | `1800000` | Age at which an idle connection above the pool minimum is closed. Connections kept open by `sender_pool_min` and `query_pool_min` are never recycled, so this does not rotate a pool that is at its minimum. `0` disables it. |
 | `housekeeper_interval_ms` | `5000` | How often the housekeeper checks for idle and over-age connections. Minimum `100`. |
 | `query_close_timeout_ms` | `5000` | How long returning a lease with an active query waits for the cancellation to drain before discarding the connection. |
 | `lazy_connect` | `off` | Start without connecting. See below. |
@@ -750,12 +744,13 @@ the client closes before QuestDB becomes reachable; see
   senders to be returned. A sender still borrowed after that stays open, and
   its owner must `close()` it.
 
-`db.close()` resolves even when an acknowledgement does not arrive in time. It
-reports the timeout to `ingressSession.onError` as a non-terminal
-`QwpIngressAckTimeoutError`, which is logged as a warning by default. Without
-`sf_dir`, the unacknowledged rows are then lost. With `sf_dir`, they stay in
-the journal, and the next sender on the same directory replays them. To know
-that QuestDB accepted every row before shutting down, wait for the
+`db.close()` resolves even when an acknowledgement does not arrive in time.
+Without `sf_dir`, the unacknowledged rows are then lost. With `sf_dir`, they
+stay in the journal, and the next sender on the same directory replays them.
+The client usually reports the timeout to `ingressSession.onError` as a
+non-terminal `QwpIngressAckTimeoutError`, logged as a warning by default, but
+the report is best-effort: do not rely on it to detect unacknowledged rows. To
+know that QuestDB accepted every row before shutting down, wait for the
 acknowledgement before returning each sender (see
 [Awaiting acknowledgements](#awaiting-acknowledgements)), or use
 [store-and-forward](#store-and-forward).
@@ -778,7 +773,7 @@ state, so borrow one sender per producer (see [Concurrency](#concurrency)).
    [Null values](#null-values) for non-nullable defaults).
 4. Close the row with `at(timestamp, unit)` or `atNow()`, and `await` the
    returned promise. It rejects if an auto-flush triggered by the row fails.
-5. Repeat from step 2, and call `flush()` to send staged rows.
+5. Repeat from step 2, and call `flush()` to publish staged rows.
 6. `close()` the sender when done.
 
 ```typescript
@@ -803,6 +798,16 @@ try {
   await db.close();
 }
 ```
+
+`flush()` resolving means the rows were published, not that QuestDB accepted
+them. QuestDB reports a rejected batch, such as one with a value of the wrong
+type for an existing column, after `flush()` has resolved: to the
+`onSenderError` callback, which only logs it by default, and as a rejection of
+`waitForAcknowledged()`. When your code must know that QuestDB accepted the
+rows, wait for the acknowledgement after flushing, with
+`await sender.waitForAcknowledged(sender.publishedSequence)`. See
+[Awaiting acknowledgements](#awaiting-acknowledgements) and
+[Ingestion errors](#ingestion-errors).
 
 Tables and columns are created automatically, with the column types listed
 below. Table and column names are validated locally with QuestDB's rules
@@ -866,6 +871,19 @@ Names that differ from what you might expect:
   [compiled writer](#compiled-object-row-writers) field, not a sender method.
 - `geohashColumn()` takes raw bits only. Base-32 geohash text is accepted by a
   compiled writer's `geohash()` field.
+
+:::caution SYMBOL is for bounded sets of values
+
+Use SYMBOL for values from a bounded set, such as tickers, sides, or venues.
+Each sender keeps every distinct SYMBOL value it has sent, across all tables
+and columns, in a dictionary that holds at most 2,000,000 values and is not
+cleared while the sender lives. Once it is full, every later `at()`, `flush()`,
+and `close()` on that sender fails with an `Error`, and the sender's staged
+rows are lost. Store unique or high-cardinality values, such as trade or order
+IDs, as VARCHAR with `stringColumn()`, or as UUID with `uuidColumn()`. See
+[Symbol](/docs/concepts/symbol/).
+
+:::
 
 The standalone `Sender` class exposes only `symbol`, `stringColumn`,
 `booleanColumn`, `floatColumn`, `intColumn`, `timestampColumn`, `arrayColumn`,
@@ -986,7 +1004,9 @@ try {
 ```
 
 `at(value, unit)` accepts an integer `number` or a `bigint` with unit `"us"`
-(the default), `"ms"`, or `"ns"`. Nanoseconds require a `bigint`, because epoch
+(the default), `"ms"`, or `"ns"`. `Date.now()` returns milliseconds, so always
+pass `"ms"` with it: without a unit, the value is read as microseconds and the
+row lands in January 1970. Nanoseconds require a `bigint`, because epoch
 nanoseconds exceed the safe integer range. When the table does not exist yet,
 `"ns"` creates a `TIMESTAMP_NS` designated timestamp and the other units create
 a microsecond `TIMESTAMP`. An auto-created designated timestamp column is named
@@ -1183,7 +1203,7 @@ Schema fields:
 | `float32()` | FLOAT | `number` |
 | `float64()`, `double()` | DOUBLE | `number` |
 | `timestamp(unit)` | TIMESTAMP or TIMESTAMP_NS | `number` or `bigint`; `"ns"` requires `bigint` |
-| `designatedTimestamp(unit)` | designated TIMESTAMP | As `timestamp(unit)`, required in every row. At most one per schema |
+| `designatedTimestamp(unit)` | Designated TIMESTAMP, or TIMESTAMP_NS with `"ns"` | As `timestamp(unit)`, required in every row. At most one per schema. The field's key names the row property only: the value always goes to the table's designated timestamp, which is named `timestamp` when QWP creates the table |
 | `date()` | DATE | Epoch milliseconds |
 | `binary()` | BINARY | `Uint8Array` |
 | `uuid()` | UUID | Canonical UUID `string`, 16 big-endian bytes, or `{ low, high }` |
@@ -1236,32 +1256,37 @@ then rejects with `QwpMemoryReplayAppendTimeoutError`. Tune the cap with
 `sf_max_total_bytes` and the wait with `sf_append_deadline_millis`; without
 `sf_dir` they size the memory queue. Watch `sender.metrics.ingress`
 (`memoryReplayUsedBytes`, `totalMemoryReplayBackpressureStalls`) to detect
-backpressure before it blocks.
+backpressure before it blocks. `metrics` is available on pooled senders and on
+senders from `connectQwpNodeSender()`, not on the standalone `Sender` class.
 
 **Oversized rows.** When the sender connects, QuestDB advertises the largest
 batch it accepts: about 2 MiB on a default server, set by
-`http.recv.buffer.size`. With `sf_dir`, a batch must also fit in
-`sf_max_segment_bytes`. A row too large to fit in one batch fails the
+`http.recv.buffer.size`. A batch must also fit in `sf_max_segment_bytes`,
+which defaults to 4 MiB with `sf_dir` and applies without `sf_dir` only when
+you set it. A row too large to fit in one batch fails the
 `flush()`, or the `at()` whose auto-flush sends it, with
 `QwpBatchTooLargeError` before anything is sent. The staged rows are kept, so
 every later flush fails the same way, and `close()` discards them and rejects
 with the same error. Call `reset()` to drop every row staged since the last
 flush, then write the other rows again.
 
-**Closing.** `close()` on a standalone sender publishes completed rows and waits
-up to `close_flush_timeout_millis` (5 seconds by default) for their
-acknowledgement. `0` or a negative value skips the wait. An unfinished row is
-discarded with a warning. On a borrowed sender, `close()` flushes and returns
-the sender to the pool without waiting for acknowledgements by default; see
-[Borrowing a sender](#borrowing-a-sender).
+### Closing a sender
 
-If the acknowledgement does not arrive in time, `close()` on a standalone
-sender rejects with `QwpSenderCloseTimeoutError`. Its `targetSequence` is the
-last published sequence and its `acknowledgedSequence` is how far QuestDB
-acknowledged. Without `sf_dir`, the unacknowledged rows may be lost. With
-`sf_dir`, they stay in the journal for the next sender on that directory. A
-rejection in `finally` replaces any error the `try` block threw, so catch it
-there when that matters:
+`close()` publishes the sender's completed rows and discards an unfinished row
+with a warning. The rest depends on how you created the sender. With
+transactions on, see also [Transactions](#transactions).
+
+#### Standalone sender
+
+`close()` waits up to `close_flush_timeout_millis` (5 seconds by default) for
+QuestDB to acknowledge every published row, then closes the connection. `0` or
+a negative value skips the wait. If the acknowledgement does not arrive in
+time, `close()` rejects with `QwpSenderCloseTimeoutError`. Its
+`targetSequence` is the last sequence `close()` waited for, and its
+`acknowledgedSequence` is how far QuestDB acknowledged. Without `sf_dir`, the
+unacknowledged rows may be lost. With `sf_dir`, they stay in the journal for
+the next sender on that directory. A rejection in `finally` replaces any error
+the `try` block threw, so catch it there when that matters:
 
 ```typescript
 import { QwpSenderCloseTimeoutError, Sender } from "@questdb/nodejs-client";
@@ -1288,6 +1313,23 @@ try {
   }
 }
 ```
+
+#### Borrowed sender
+
+`close()` returns the sender to the pool without closing its connection and,
+by default, without waiting for acknowledgements. With `awaitServerAck: true`
+or `awaitDurableAck: true`, the flush performed by `close()` waits for its
+acknowledgement too. To confirm delivery of every row the sender published
+before returning it, call `flush()` and then
+`waitForAcknowledged(sender.publishedSequence)`; see
+[Awaiting acknowledgements](#awaiting-acknowledgements).
+
+When a borrowed sender's `close()` fails, the pool discards the sender and
+opens a new one for the next borrow. Because QuestDB reports rejected batches
+asynchronously, a sender can fail after its `close()` already succeeded: the
+error then surfaces on the next borrower's auto-flushing `at()`, `flush()`, or
+`close()`, and the pool replaces the sender after that. See
+[Ingestion errors](#ingestion-errors).
 
 ### Awaiting acknowledgements
 
@@ -1436,11 +1478,13 @@ order, and acknowledged segments are deleted.
 Before ingesting, create a deduplicated table while QuestDB is reachable.
 Use both the event timestamp and a stable, source-assigned trade ID as upsert
 keys: distinct trades can share a millisecond timestamp, symbol, and side.
+Store the trade ID as VARCHAR, not SYMBOL: every trade has its own ID, and
+SYMBOL is for [bounded sets of values](#column-methods).
 
 ```questdb-sql
 CREATE TABLE trades_sf (
   timestamp TIMESTAMP,
-  trade_id SYMBOL,
+  trade_id VARCHAR,
   symbol SYMBOL,
   side SYMBOL,
   price DOUBLE,
@@ -1467,7 +1511,7 @@ try {
   try {
     await sender
       .table("trades_sf")
-      .symbol("trade_id", event.tradeId)
+      .stringColumn("trade_id", event.tradeId)
       .symbol("symbol", "ETH-USD")
       .symbol("side", "buy")
       .doubleColumn("price", 2615.54)
@@ -1494,12 +1538,18 @@ over the directory's lock (see Lock recovery below).
   `<sf_dir>/<sender_id>-0`, `<sf_dir>/<sender_id>-1`, and so on. `sender_id`
   defaults to `default` and may contain letters, digits, `_`, and `-`. Give
   every process its own `sender_id`; a second live process on the same
-  directory fails with `QwpReplayStoreLockedError`.
-- **Durability.** `sf_durability=memory` (the connect-string default) relies on
-  the operating system to write the journal, which survives a process crash but
-  not a power loss. `periodic` checkpoints in the background every
-  `sf_sync_interval_millis` (5 seconds). `append` makes every append durable
-  before `flush()` resolves.
+  directory fails with `QwpReplayStoreLockedError`. A pooled client also
+  drains any of its own `<sender_id>-<n>` journals that no pooled sender
+  holds, such as those left by a larger pool before a restart, without
+  `drain_orphans`.
+- **Durability.** `sf_durability` sets how the journal reaches the disk. It is
+  unrelated to memory mode, which means running without `sf_dir`. `memory`
+  (the connect-string default) relies on the operating system to write the
+  journal, which survives a process crash but not a power loss. `periodic`
+  checkpoints in the background every `sf_sync_interval_millis` (5 seconds).
+  `append` makes every append durable before `flush()` resolves, which adds a
+  disk sync to every flush: on a producer that flushes often, prefer `periodic`
+  or larger batches.
 - **Capacity.** With `sf_dir`, `sf_max_total_bytes` (10 GiB by default) is a
   journal size target, not a hard disk limit. Transaction-closing batches can
   reserve extra segments so a full journal does not block the commit needed
@@ -1539,8 +1589,8 @@ over the directory's lock (see Lock recovery below).
   failed pooled sender, sends it again and fails the same way. See
   [Ingestion errors](#ingestion-errors) for recovery.
 - **Orphans.** With `drain_orphans=on`, a sender also adopts and drains
-  journals left under the same `sf_dir` by processes that crashed, up to
-  `max_background_drainers` (4) at a time.
+  journals with other `sender_id` values left under the same `sf_dir` by
+  processes that crashed, up to `max_background_drainers` (4) at a time.
 
 A frame appended to the journal but not acknowledged before a crash is sent
 again, so delivery is at least once:
@@ -1706,8 +1756,13 @@ A `QwpResultBatch` has:
   code (compare it with the exported `QWP_COLUMN_TYPE` constants).
 - `rows()`: a generator that yields one array of values per row.
 - `get(rowIndex, columnIndex)`: one value.
+- `batchSequence`: the batch's position in the result, starting at `0n`.
 
 Batch objects stay valid after iteration moves on, so you can keep them.
+
+With the default `failover=on`, a lost connection can make the client run the
+query again from its first batch. If your loop accumulates rows, reset them
+when `batch.batchSequence === 0n`; see [Query failover](#query-failover).
 
 ### Reading result values
 
@@ -1727,7 +1782,7 @@ Values arrive as these JavaScript types:
 | BINARY | `Uint8Array` |
 | IPv4 | `number`, as a signed 32-bit integer: `192.168.0.1` arrives as `-1062731775`. Use `value >>> 0` for the unsigned address |
 | UUID | `{ low: bigint, high: bigint }`, the unsigned low and high 64-bit halves |
-| LONG256 | `{ words: [bigint, bigint, bigint, bigint] }`, least significant word first |
+| LONG256 | `{ words: [bigint, bigint, bigint, bigint] }`, least significant word first. Each word is a signed 64-bit value: `BigInt.asUintN(64, word)` gives its unsigned value |
 | GEOHASH | `{ bits: bigint, precisionBits: number }` |
 | DECIMAL with a precision of 10 or more | `{ unscaled: bigint, scale: number }`: the value is `unscaled / 10^scale` |
 | DOUBLE[], DOUBLE[][], ... | `{ dimensions: number[], values: number[] }` with values in row-major order |
@@ -1750,7 +1805,9 @@ Convert the column in SQL instead:
 - An untyped `NULL` literal, as in `SELECT NULL`: give it a type, for example
   `NULL::double`.
 
-Converting common types:
+`JSON.stringify()` throws on `bigint`, which LONG, TIMESTAMP, DATE, UUID,
+LONG256, and DECIMAL values contain, so convert rows before serializing them,
+as `toJson()` does below. Converting common types:
 
 ```typescript
 // TIMESTAMP (bigint microseconds) to Date. Drops sub-millisecond precision.
@@ -1773,9 +1830,14 @@ function uuidToString({ low, high }: { low: bigint; high: bigint }): string {
 const ipv4ToString = (value: number) =>
   [24, 16, 8, 0].map((shift) => ((value >>> 0) >>> shift) & 0xff).join(".");
 
+// Any row or value to JSON, with bigint values as decimal strings
+const toJson = (value: unknown) =>
+  JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+
 console.log(toDate(1723000000000000n).toISOString());
 console.log(uuidToString({ low: 13485158461794337056n, high: 11465204444048149893n }));
 console.log(ipv4ToString(-1062731775));
+console.log(toJson([1723000000000000n, "ETH-USD", 2615.54]));
 ```
 
 ### Bind parameters
@@ -1842,6 +1904,12 @@ There is no setter for BINARY, IPv4, or arrays. Bind IPv4 as a string and cast
 it in SQL (`WHERE ip = $1::ipv4` with `setVarchar`), and pass array values as
 SQL literals.
 
+Decimal and geohash setters take the scale or precision before the value, the
+reverse of the matching column methods: `setDecimal64(index, scale, unscaled)`
+but `decimal64Column(name, unscaled, scale)`, and
+`setGeohash(index, precisionBits, value)` but
+`geohashColumn(name, bits, precisionBits)`.
+
 ### DDL and DML statements
 
 `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `INSERT`, and `UPDATE` go through the
@@ -1855,8 +1923,10 @@ including DDL and DML. QuestDB may have applied an `INSERT` before its
 `exec-done` response was lost, so replay can insert it again. A transport
 error does not prove the statement failed. Use a separate client with
 `failover=off` for non-idempotent statements, as below, and verify an
-uncertain outcome before retrying manually. Alternatively, make the SQL
-idempotent; see [Query failover](#query-failover).
+uncertain outcome before retrying manually. Alternatively, make the statement
+idempotent so that a second run changes nothing, for example
+`CREATE TABLE IF NOT EXISTS`, or an `INSERT` of rows with stable key values
+into a table with [deduplication](/docs/concepts/deduplication/).
 
 :::
 
@@ -1880,8 +1950,9 @@ try {
     for (const sql of statements) {
       const statement = await lease.query(sql);
       const completion = await statement.completion;
-      if (completion.kind === "exec-done") {
-        console.log(`${sql.slice(0, 20)}...: ${completion.rowsAffected} rows`);
+      // rowsAffected counts rows only for INSERT; see the table below.
+      if (completion.kind === "exec-done" && sql.startsWith("INSERT")) {
+        console.log(`inserted ${completion.rowsAffected} rows`);
       }
     }
   } catch (error) {
@@ -1898,7 +1969,13 @@ try {
 | `completion.kind` | Returned for | Fields |
 |---|---|---|
 | `"result-end"` | Queries that return rows | `totalRows` (`bigint`) |
-| `"exec-done"` | DDL and DML | `rowsAffected` (`bigint`, `0` for DDL), `operationType` (QuestDB's numeric statement type) |
+| `"exec-done"` | DDL and DML | `rowsAffected` (`bigint`, rows written by an `INSERT`), `operationType` (QuestDB's numeric statement type) |
+
+Only `INSERT` reports a row count in `rowsAffected`. For an `UPDATE` on a WAL
+table, the default, it currently holds a transaction number rather than the
+number of rows changed, so do not use it to check whether an `UPDATE` matched
+any rows. DDL reports `0`, except `TRUNCATE`, which currently reports
+`18446744073709551615n`.
 
 Statements run in order on one lease, because each is awaited before the next
 starts, so a `CREATE TABLE` is complete before the `INSERT` that follows it.
@@ -1909,35 +1986,34 @@ A query ends early in four ways:
 
 - **Deadline.** Set a default with `egressSession: { queryTimeoutMs }`, or per
   query with `timeoutMs`. On expiry, iteration and `completion` reject with
-  `QwpEgressQueryTimeoutError` and the client sends a cancel to QuestDB.
-- **Cancel.** `await query.cancel()` sends a request to stop; it does not wait
-  for QuestDB to stop. When QuestDB processes the cancel, iteration and
-  `completion` reject with `QwpEgressQueryError` whose `status` is `0x0a`
-  (CANCELLED). A query that finishes before the cancel is processed, or a DDL
-  or DML statement, completes normally instead.
+  `QwpEgressQueryTimeoutError`, and the client cancels the query in the
+  background.
 - **Leaving the loop.** `break`, `return`, or an exception inside `for await`
-  cancels the query, and `completion` rejects with
-  `QwpEgressQueryAbandonedError`.
+  cancels the query in the background, and `completion` rejects with
+  `QwpEgressQueryAbandonedError`. Use it to stop reading a result at once.
+- **Cancel.** `await query.cancel()` asks QuestDB to stop and returns without
+  waiting for it. Keep consuming the result afterwards: QuestDB acts on the
+  cancel only while the result is moving, and iteration and `completion` then
+  reject with `QwpEgressQueryError` whose `status` is `0x0a`
+  (`QWP_STATUS.CANCELLED`). If you stop consuming and only await `completion`,
+  it rejects with `QwpEgressQueryCancelTimeoutError` after
+  `query_close_timeout_ms` (5 seconds), and the client closes the connection.
+  A query that finishes before QuestDB processes the cancel, or a DDL or DML
+  statement, completes normally instead.
 - **Waiting without cancelling.** `await query.awaitCompletion(timeoutMs)`
   resolves `false` when the wait times out and leaves the query running.
   `query.isDone()` reports whether the query has ended.
 
-QuestDB acts on a cancel between result batches, but while a query streams
-without a [credit window](#flow-control), it may not read the cancel until the
-whole result is sent. Set `initial_credit` in the connect string or
-`initialCredit` per query to improve cancellation responsiveness while
-streaming. For example, start with 1 MiB; the client replenishes it as your
-loop consumes batches. Credit does not interrupt expensive work before the
-next batch or bound cancellation latency.
-
-With or without a credit window:
-
-- After an explicit cancel, iteration and `completion` can reject with
-  `QwpEgressQueryCancelTimeoutError` instead of the `0x0a` rejection: the
-  client waits `query_close_timeout_ms` (5 seconds) for QuestDB to stop, then
-  closes the connection.
-- After a deadline or an early exit from the loop, returning the lease can take
-  up to twice `query_close_timeout_ms`.
+QuestDB checks for a cancel between result batches, while it is sending. Set a
+[credit window](#flow-control), with `initial_credit` in the connect string or
+`initialCredit` per query, so that QuestDB pauses when your loop falls behind
+and stops at the next batch after a cancel, a deadline, or an early exit.
+Start with 1 MiB; the client replenishes it as your loop consumes batches.
+Without a credit window, QuestDB streams as fast as the network allows: it may
+send the whole result before it reads a cancel, so a cancelled query can
+complete normally, and returning the lease after an early exit waits while the
+rest of the result streams. A credit window does not interrupt expensive work
+before the next batch is ready.
 
 ```typescript
 import {
@@ -1951,7 +2027,7 @@ try {
   try {
     const query = await lease.query(
       "SELECT symbol, avg(price) FROM trades SAMPLE BY 1m",
-      // Credit limits streaming ahead, not cancellation latency.
+      // With credit, QuestDB stops at the next batch after the deadline.
       { timeoutMs: 5_000, initialCredit: 1024 * 1024 },
     );
     for await (const batch of query) {
@@ -1975,7 +2051,7 @@ cancellation, and another `query()` on the same lease throws
 `close()` and borrow a new one for the next query. `close()` waits up to
 `query_close_timeout_ms` (5 seconds) for QuestDB to confirm the cancellation.
 If it does not, `close()` discards the connection, which can take as long
-again.
+again, so returning the lease can take up to twice `query_close_timeout_ms`.
 
 ### Flow control
 
@@ -2009,8 +2085,9 @@ try {
 
 With `autoCredit: false`, call `query.grantCredit(bytes)` yourself. To cap the
 rows in each batch, set `max_batch_rows` (1 to 1,048,576). A credit window
-also lets QuestDB act on a cancel or a deadline promptly; see
-[Cancellation and timeouts](#cancellation-and-timeouts).
+also lets QuestDB stop at the next batch after a cancel, a deadline, or an
+early exit; see [Cancellation and timeouts](#cancellation-and-timeouts) for
+what your loop must do after `cancel()`.
 
 ### Zero-copy result views
 
@@ -2147,7 +2224,7 @@ When `onSenderError` is not set, rejections are logged: retriable ones at
 client's protocol handling, and an exception thrown by a callback is contained.
 A standalone sender's `close()` can also reject, with
 `QwpSenderCloseTimeoutError`, when its rows are not acknowledged in time; see
-[Flushing](#flushing).
+[Closing a sender](#closing-a-sender).
 
 `QwpSenderError` fields:
 
@@ -2296,19 +2373,25 @@ The pooled client wraps every failure to open a connection, from
 `connectQwpNodeClient()`, `db.connect()`, `borrowSender()`, or
 `borrowQuery()`, in a `QwpPoolResourceError`. Unwrap its `cause` before
 checking for a specific error. When `addr` lists several hosts, the cause is a
-`QwpFailoverError` whose `attempts` hold the error of each endpoint:
+`QwpFailoverError` whose `attempts` hold the error of each endpoint. When
+initial-connect retry is on, for example with a `failover_*` or `reconnect_*`
+key or a typed `reconnect` object, the cause is a `QwpReconnectExhaustedError`
+instead, and its own `cause` holds the last attempt's error:
 
 ```typescript
 import {
   connectQwpNodeClient,
   QwpFailoverError,
   QwpPoolResourceError,
+  QwpReconnectExhaustedError,
   QwpUpgradeError,
 } from "@questdb/nodejs-client";
 
 // The errors behind a failed connection, one per endpoint tried.
 function connectionErrors(error: unknown): unknown[] {
-  const cause = error instanceof QwpPoolResourceError ? error.cause : error;
+  let cause = error instanceof QwpPoolResourceError ? error.cause : error;
+  // With initial-connect retry on, the last attempt's error is wrapped.
+  if (cause instanceof QwpReconnectExhaustedError) cause = cause.cause;
   return cause instanceof QwpFailoverError
     ? cause.attempts.map((attempt) => attempt.error)
     : [cause];
@@ -2336,11 +2419,26 @@ walk because credentials are assumed to be shared across the cluster.
 After a successful connection, regular senders with `sf_dir` or background
 memory replay (`initial_connect_retry=async` or `lazy_connect=on`) keep retrying
 authentication rejections indefinitely. This lets buffered data drain once
-server-side authentication is restored. Memory-only senders without those
+server-side authentication is restored. Memory-mode senders without those
 settings, and orphan drainers, do not have this exception. See
-[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide)
+for how other clients behave.
 
 Endpoints in error messages have any embedded credentials removed.
+
+### Logging
+
+The client writes its own messages to the console by default, at the `error`,
+`warn`, and `info` levels. To route a sender's messages, such as warnings about
+rows discarded on close, through your logger, pass a `(level, message)`
+function: `{ sender: { log } }` as the second argument of
+`connectQwpNodeClient()`, or `{ log }` for `Sender.fromConfig()`. The function
+also receives `debug` messages, one per staged row, so filter by level.
+
+Rejected batches and session errors go to `ingressSession.onSenderError` and
+`ingressSession.onError`. Their defaults log to the console, so replace both to
+route them through your logger. Some messages from other parts of the client,
+such as store-and-forward recovery, always go to the console.
 
 ## Failover and high availability
 
@@ -2367,14 +2465,33 @@ queries.
 Ingestion always needs the primary: replicas refuse writes, and the sender
 walks the list until it finds the current primary. Queries can use any node.
 `target` selects which roles queries accept: `any` (the default), `primary`, or
-`replica`. It is a strict filter, not a preference: with `replica`, queries
-never fall back to the primary, and they fail when no replica is reachable,
-including against a single open source server. Because the pooled client opens
-a query connection at startup, `connectQwpNodeClient()` then rejects too, with
-a `QwpPoolResourceError` whose `cause` is a `QwpRoleMismatchError`, or a
+`replica`. Set it with the typed `egress` option, as below: in the connect
+string, `target` also filters ingestion (see the caution that follows). It is a
+strict filter, not a preference: with `replica`, queries never fall back to the
+primary, and they fail when no replica is reachable, including against a single
+open source server. Because the pooled client opens a query connection at
+startup, `connectQwpNodeClient()` then rejects too, with a
+`QwpPoolResourceError` whose `cause` is a `QwpRoleMismatchError`, or a
 `QwpFailoverError` holding one per endpoint when `addr` lists several hosts.
-Set `query_pool_min=0` to start without a replica. `zone` prefers endpoints in
-the same zone.
+With query failover retrying the initial connection, that error is wrapped in a
+`QwpReconnectExhaustedError`. To start without a replica, also set
+`query_pool_min=0`; queries borrowed before a replica is reachable then reject
+with `QwpPoolResourceError`:
+
+```typescript
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
+
+// Queries run on replicas only. Ingestion still follows the primary.
+const db = await connectQwpNodeClient(
+  "wss::addr=db-a.example.com:9000,db-b.example.com:9000;token=YOUR_TOKEN;" +
+    // Start, and ingest, even while no replica is reachable.
+    "query_pool_min=0;",
+  { egress: { target: "replica" } },
+);
+await db.close();
+```
+
+`zone` prefers endpoints in the same zone.
 
 :::caution `target` in the connect string also filters ingestion
 
@@ -2396,20 +2513,27 @@ jitter, then resends every unacknowledged batch:
 |---|---|---|
 | `reconnect_initial_backoff_millis` | `100` | First retry delay. |
 | `reconnect_max_backoff_millis` | `5000` | Longest delay between retries. |
-| `reconnect_max_duration_millis` | `300000` (5 minutes) | Budget for one outage in memory mode. `0` removes the limit. |
+| `reconnect_max_duration_millis` | `300000` (5 minutes) | Budget for one outage in memory mode, without `sf_dir` or background replay. `0` removes the limit. |
 | `initial_connect_retry` | `off` | Whether the first connection retries: `off` fails fast, `on` (or `sync`) retries within the budget, `async` connects in the background. |
 
 Whether the sender gives up depends on the mode (see [Flushing](#flushing)):
 
-- **Memory mode** retries for up to `reconnect_max_duration_millis` per outage.
-  When the budget runs out, the sender fails permanently with
-  `QwpReconnectExhaustedError`, and its unsent rows are lost.
-- **Background memory mode** (`initial_connect_retry=async`) and
-  **store-and-forward** (`sf_dir`) retry indefinitely.
+- **Memory mode**, without `sf_dir` or background replay, retries for up to
+  `reconnect_max_duration_millis` per outage. When the budget runs out, the
+  sender fails permanently with `QwpReconnectExhaustedError`, and its unsent
+  rows are lost. The Java reference client retries indefinitely in this mode
+  instead.
+- **Background memory mode** (`initial_connect_retry=async`, or
+  `lazy_connect=on` on the pooled client) and **store-and-forward**
+  (`sf_dir`) retry indefinitely.
 
-Setting any `reconnect_*` key also makes the first connection retry within the
-budget, as if `initial_connect_retry=on`. Set `initial_connect_retry=off`
-explicitly to keep a fail-fast start.
+Setting any `reconnect_*` key also makes a sender's first connection retry
+within the budget, as if `initial_connect_retry=on`. Set
+`initial_connect_retry=off` explicitly to keep a fail-fast start. The keys do
+not apply to query connections: the pooled client still opens its query pool
+at startup, so `connectQwpNodeClient()` fails fast while QuestDB is down unless
+you also set `query_pool_min=0` or enable query retries (see
+[Connection events](#connection-events)).
 
 Replay after a reconnect is at least once: a batch that QuestDB committed just
 before the connection dropped is sent again.
@@ -2549,7 +2673,9 @@ disables the reconnect wrapper. As with other session options, an explicit
 | `primary-unavailable` | An orphan drainer, which recovers a journal left by another sender (see [Store-and-forward](#store-and-forward)), found no endpoint that currently accepts writes. It keeps retrying. Regular senders do not emit it. |
 
 `reconnected` and `failed-over` are mutually exclusive: code that tracks the
-current node must handle both.
+current node must handle both. A query that reconnects runs again from its
+first batch; see [Query failover](#query-failover) for resetting accumulated
+rows.
 
 No event marks a terminal failure. When a sender stops retrying, because its
 reconnect budget ran out or the error cannot be retried,
@@ -2604,12 +2730,13 @@ every key. The Node.js client's defaults and deviations:
 | `request_durable_ack` | `off` | Enterprise. |
 | `max_name_len` | `127` | Maximum table and column name length, in UTF-8 bytes. |
 | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis` | `100`, `5000` | Ingestion reconnect backoff. |
-| `reconnect_max_duration_millis` | `300000` | Ingestion budget per outage in memory mode. `0` removes it. |
+| `reconnect_max_duration_millis` | `300000` | Ingestion budget per outage in memory mode, without `sf_dir` or background replay. `0` removes it. |
+| `max_frame_rejections`, `poison_min_escalation_window_millis` | `4`, `300000` | Poison-frame detector: rejections of one batch, and the minimum time they must span, before the sender stops. |
 | `initial_connect_retry` | `off` | `off`, `on`/`sync`, or `async`. |
 | `sf_dir`, `sender_id` | none, `default` | Store-and-forward journal location. |
 | `sf_durability` | `memory` | `memory`, `periodic`, or `append`. |
 | `sf_max_total_bytes` | `10g` with `sf_dir`, `128m` without | [Journal size target](#store-and-forward), not a hard disk limit; memory queue cap without `sf_dir`. |
-| `sf_max_segment_bytes` | `4m` | Journal segment size, which also caps a batch. |
+| `sf_max_segment_bytes` | `4m` with `sf_dir`, none without | Journal segment size, which also caps a batch. |
 | `sf_append_deadline_millis` | `30000` | How long a full journal or queue blocks publishing. |
 | `drain_orphans`, `max_background_drainers` | `off`, `4` | Adopt journals left by crashed processes. |
 | `target`, `zone` | `any`, none | Endpoint role and zone preference. Apply to ingestion too. |
@@ -2617,6 +2744,7 @@ every key. The Node.js client's defaults and deviations:
 | `compression`, `compression_level` | `raw`, `1` | Query result compression. |
 | `initial_credit`, `buffer_pool_size`, `max_batch_rows` | `0`, `4`, server default | Query flow control. |
 | `client_id` | `typescript/<version>` | Sent to the server for diagnostics. |
+| `error_inbox_capacity`, `connection_listener_inbox_capacity` | `256`, `64` | Queues for rejection callbacks and connection events. |
 | Pool keys | see [Pool settings](#pool-settings) | Applied by the pooled client only. |
 
 The
@@ -2624,6 +2752,26 @@ The
 covers every type and option. The
 [QWP guide](https://github.com/questdb/nodejs-questdb-client/blob/main/QWP.md)
 in the client repository describes the delivery semantics in depth.
+
+### Differences from other clients
+
+The Node.js client differs from the Java reference client, and from the shared
+[connect string reference](/docs/connect/clients/connect-string/), in these
+places:
+
+| Area | Node.js behavior |
+|---|---|
+| Outage budget | A sender without `sf_dir` or background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) gives up after `reconnect_max_duration_millis` and fails with `QwpReconnectExhaustedError`. See [Ingestion reconnect](#ingestion-reconnect). |
+| `target` and `zone` | Also apply to ingestion. Set a query-only role with the typed `egress.target` option. See [Multiple endpoints](#multiple-endpoints). |
+| Authentication rejected after a first connection | Senders with `sf_dir` or background replay keep retrying. Other senders and query connections fail. See [Connection-level errors](#connection-level-errors). |
+| Durable acknowledgement unavailable | Background senders keep retrying from startup, and store-and-forward senders after their first connection, emitting `durable-ack-unavailable`. See [Durable acknowledgement](#durable-acknowledgement). |
+| `sf_durability` | Also accepts `append`. |
+| `sf_max_total_bytes` with `sf_dir` | A journal size target that can be exceeded, not a hard limit. See [Store-and-forward](#store-and-forward). |
+| Journal lock | A `.lock.owner` directory that can outlive a crashed process and that other clients' operating-system locks do not see. See [Store-and-forward](#store-and-forward). |
+| `max_lifetime_ms` | Closes idle connections above the pool minimum only. Connections at the minimum are not recycled. |
+| Connect string parsing | `0`, not `off`, disables `auto_flush_rows` and `auto_flush_interval`, and the interval runs from the last flush. Size values take single-letter suffixes only. `tls_roots` must be PEM. `init_buf_size` and `max_buf_size` are rejected. |
+| Defaults | `connect_timeout` is `15000`, `poison_min_escalation_window_millis` is `300000`, and `close_flush_timeout_millis` is `5000`. |
+| `on_*_error` keys | Accepted but not applied. |
 
 ## Migration
 
@@ -2651,8 +2799,11 @@ connect string and calling `connect()`:
 | Column types | ILP types | More types, subject to [column-method](#column-methods) and [array](#arrays) support |
 
 Legacy keys such as `retry_timeout`, `request_timeout`, `init_buf_size`,
-`max_buf_size`, `protocol_version`, and `tls_ca` are rejected on `ws`/`wss`,
-with a hint naming the replacement. To keep ILP-sized batches, set
+`max_buf_size`, `protocol_version`, and `tls_ca` are rejected on `ws`/`wss`
+with a hint. It names the replacement where there is one
+(`retry_timeout` becomes `reconnect_max_duration_millis`, and `tls_ca` becomes
+`tls_roots`), and otherwise says that the key applies only to ILP or that QWP
+negotiates the setting itself. To keep ILP-sized batches, set
 `auto_flush_rows` and `auto_flush_interval` explicitly. Migrate one sender at a
 time: ILP and QWP senders can run side by side.
 
@@ -2731,7 +2882,7 @@ from [Store-and-forward](#store-and-forward)):
 ```questdb-sql
 CREATE TABLE IF NOT EXISTS trades_sf (
   timestamp TIMESTAMP,
-  trade_id SYMBOL,
+  trade_id VARCHAR,
   symbol SYMBOL,
   side SYMBOL,
   price DOUBLE,
@@ -2749,6 +2900,7 @@ import {
   connectQwpNodeClient,
   QwpEgressQueryError,
   QwpIngressAckTimeoutError,
+  QwpPoolResourceError,
   QWP_RECONNECT_EVENT_KIND,
   type QwpReconnectEvent,
   type QwpSenderError,
@@ -2766,9 +2918,11 @@ function logConnection(event: QwpReconnectEvent) {
 const db = await connectQwpNodeClient(
   "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;" +
     `token=${token};` +
-    // query_pool_min=0: start, and ingest, even while no replica is reachable.
+    // append: every flush waits for a disk sync; see "Store-and-forward".
     "sf_dir=/var/lib/my-service/qdb-sf;sender_id=trade-service;" +
-    "sf_durability=append;sender_pool_max=4;query_pool_min=0;query_pool_max=8;",
+    "sf_durability=append;sender_pool_max=4;" +
+    // query_pool_min=0: start, and ingest, even while no replica is reachable.
+    "query_pool_min=0;query_pool_max=8;",
   {
     // Queries run on replicas only, never on the primary; ingestion always
     // follows the primary.
@@ -2817,7 +2971,7 @@ try {
     for (const event of events) {
       await sender
         .table("trades_sf")
-        .symbol("trade_id", event.tradeId)
+        .stringColumn("trade_id", event.tradeId)
         .symbol("symbol", event.symbol)
         .symbol("side", "buy")
         .doubleColumn("price", event.price)
@@ -2830,31 +2984,40 @@ try {
     if (!(error instanceof QwpIngressAckTimeoutError)) throw error;
     console.warn("ACK timed out; rows remain in sf_dir for replay after close");
   } finally {
-    await sender.close();
+    // After a terminal rejection, close() rejects with the same failure.
+    // Log it so that it does not replace the error thrown above.
+    await sender.close().catch((error) => console.error("close failed:", error));
   }
 
-  // Querying: rows may not be visible yet, see "Read-after-write". While no
-  // replica is reachable, borrowQuery() rejects with QwpPoolResourceError.
-  const lease = await db.borrowQuery();
+  // Querying: rows may not be visible yet, see "Read-after-write".
   try {
-    const query = await lease.query(
-      "SELECT timestamp, trade_id, symbol, price FROM trades_sf " +
-        "WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 10",
-      { binds: (binds) => binds.setVarchar(0, "ETH-USD") },
-    );
-    const recentPrices: (readonly unknown[])[] = [];
-    for await (const batch of query) {
-      // A failover re-executes the query from sequence 0: drop the partial result.
-      if (batch.batchSequence === 0n) recentPrices.length = 0;
-      for (const row of batch.rows()) recentPrices.push(row);
+    const lease = await db.borrowQuery();
+    try {
+      const query = await lease.query(
+        "SELECT timestamp, trade_id, symbol, price FROM trades_sf " +
+          "WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 10",
+        { binds: (binds) => binds.setVarchar(0, "ETH-USD") },
+      );
+      const recentPrices: (readonly unknown[])[] = [];
+      for await (const batch of query) {
+        // A failover restarts the result at sequence 0: drop partial rows.
+        if (batch.batchSequence === 0n) recentPrices.length = 0;
+        for (const row of batch.rows()) recentPrices.push(row);
+      }
+      await query.completion;
+      console.log(recentPrices);
+    } finally {
+      await lease.close();
     }
-    await query.completion;
-    console.log(recentPrices);
   } catch (error) {
-    if (!(error instanceof QwpEgressQueryError)) throw error;
-    console.error(`query failed: status=${error.status} ${error.message}`);
-  } finally {
-    await lease.close();
+    if (error instanceof QwpPoolResourceError) {
+      // No replica was reachable within the failover budget.
+      console.warn("no replica available for queries:", error.cause);
+    } else if (error instanceof QwpEgressQueryError) {
+      console.error(`query failed: status=${error.status} ${error.message}`);
+    } else {
+      throw error;
+    }
   }
 } finally {
   await db.close();

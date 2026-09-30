@@ -121,7 +121,10 @@ The `target=` key controls which server role the client is willing to bind to:
 up to its predecessor's WAL — the client treats it as transient and retries
 the same host (with a fresh round, no exponential backoff) until it becomes a
 full `PRIMARY`. On an ingress sender this retry has no deadline; the producer
-is bounded by buffer capacity rather than by elapsed time.
+is bounded by buffer capacity rather than by elapsed time. The exception is a
+Node.js sender with neither `sf_dir` nor background replay
+(`initial_connect_retry=async`, or pooled `lazy_connect=on`), which stops after
+`reconnect_max_duration_millis`.
 
 A `421 Misdirected Request` response **without** an `X-QuestDB-Role` header
 is treated as a generic transport error, not a role reject — the client walks
@@ -139,17 +142,20 @@ very different goals.
 
 The ingress reconnect loop sits inside the store-and-forward I/O thread. It
 runs continuously in the background, retrying through outages while the
-producer keeps appending to the local buffer. There is no wall-clock give-up:
-the loop retries an outage of any length, and what bounds your tolerance is
-buffer capacity (`sf_max_total_bytes` and disk), not a timer.
+producer keeps appending to the local buffer. There is no wall-clock give-up,
+except in one Node.js mode described below: the loop retries an outage of any
+length, and what bounds your tolerance is buffer capacity
+(`sf_max_total_bytes` and disk), not a timer.
 
 - Initial backoff: `100 ms`
 - Maximum backoff: `5 s`
 - Per-outage budget: **none**. `reconnect_max_duration_millis` bounds only the
   blocking sync initial connect, and the running loop never consults it.
-  The Node.js client is the exception: in memory mode, a sender without
-  `initial_connect_retry=async` gives up after `reconnect_max_duration_millis`
-  and fails with `QwpReconnectExhaustedError`.
+  The exception is a Node.js sender with neither `sf_dir` nor background
+  replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`), which
+  gives up after `reconnect_max_duration_millis` and fails with
+  `QwpReconnectExhaustedError`; see the
+  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
   reconnect storms when many producers share a cluster
 - Inter-host pause within a round: **none** — the client walks the full
@@ -191,7 +197,7 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are assumed to be cluster-wide. See the [Node.js sender recovery exception](#authentication-is-cluster-wide). |
+| HTTP `401` / `403` on upgrade | Credentials are assumed to be cluster-wide. Some clients retry after a sender's first successful connection; see [Authentication is cluster-wide](#authentication-is-cluster-wide). |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
 
 ### Topology — handled inside the round
@@ -218,7 +224,9 @@ and walks to the next host.
 
 When a round exhausts with transient errors, the client sleeps for the
 backoff interval and starts the next round. On the ingress sender the rounds
-continue indefinitely; on the egress query client they are bounded by
+continue indefinitely, apart from the Node.js exception described under
+[Ingress (writes)](#ingress-writes); on the egress query client they are
+bounded by
 `failover_max_attempts` and `failover_max_duration_ms`, which apply per
 `execute()`.
 
@@ -237,18 +245,24 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is normally terminal: the client does not
-retry other hosts. Credentials are assumed to be configured identically across
-the cluster, so trying another node would repeat the rejection.
+A `401` or `403` on the HTTP upgrade does not send the client to another host:
+credentials are assumed to be configured identically across the cluster, so
+another node would repeat the rejection. Whether the rejection is terminal
+depends on the client and on when it arrives:
 
-The Node.js client makes an exception for a regular ingress sender that has
-already connected successfully and uses `sf_dir` or background memory replay
-(`initial_connect_retry=async` or `lazy_connect=on`). It retries authentication
-rejections indefinitely so buffered data can drain after server-side
-authentication is restored. Initial authentication rejection remains terminal,
-including in these modes. The exception does not apply to query connections,
-ordinary memory-only senders, or orphan drainers. See
-[Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors).
+| Client | Before a sender's first successful connection | After it |
+|---|---|---|
+| Java | Terminal | Retried indefinitely |
+| Node.js | Terminal | Retried indefinitely by senders with `sf_dir` or background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`). Terminal for other senders |
+| Rust, C, C++, Python, Go, .NET | Terminal | Terminal |
+
+Query connections and orphan drainers treat the rejection as terminal in every
+client. A sender that retries keeps buffering until authentication succeeds
+again, bounded by its buffer capacity, so a credential change on the cluster
+does not stop the producer. Watch its connection events rather than waiting
+for an error. See
+[Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors)
+for the Node.js rules.
 
 Per-host credentials are outside the failover model. Use a separate connect
 string for each credential.

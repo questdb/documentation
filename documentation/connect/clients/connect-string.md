@@ -641,8 +641,9 @@ SF mode and memory-only mode share the same loop. A **running** sender
 retries a transport outage indefinitely with capped exponential backoff —
 there is no wall-clock give-up: the whole point of the buffering
 architecture is that a producer survives an arbitrarily long outage. The
-Node.js client is the exception: in memory mode, it gives up after
-`reconnect_max_duration_millis`; see below.
+exception is a Node.js sender with neither `sf_dir` nor background replay
+(`initial_connect_retry=async`, or pooled `lazy_connect=on`), which gives up
+after `reconnect_max_duration_millis`; see below.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
@@ -656,9 +657,11 @@ Node.js client is the exception: in memory mode, it gives up after
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
   Setting this enables `initial_connect_retry=on` implicitly; see below.
-  The Node.js client differs: a sender with neither `sf_dir` nor
-  `initial_connect_retry=async` applies this budget to every outage, and fails
-  with `QwpReconnectExhaustedError` when it runs out.
+  The Node.js client differs: a sender with neither `sf_dir` nor background
+  replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) applies
+  this budget to every outage, and fails with `QwpReconnectExhaustedError`
+  when it runs out. See the
+  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -666,8 +669,8 @@ Node.js client is the exception: in memory mode, it gives up after
     thread, up to `reconnect_max_duration_millis`.
   - `async` — return the `Sender` immediately; the I/O thread retries in
     the background indefinitely, surfacing terminal failures via the error
-    inbox. Initial authentication rejection remains terminal; see the Node.js
-    recovery exception below.
+    inbox. An authentication rejection before the first successful connection
+    is terminal; see the authentication note below.
 
   **Implicit promotion.** Setting any explicit `reconnect_*` key without
   also choosing an `initial_connect_retry` mode promotes
@@ -685,13 +688,13 @@ Node.js client is the exception: in memory mode, it gives up after
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Authentication rejection (HTTP `401` / `403`) normally stops the reconnect
-loop without trying other hosts. The Node.js client makes an exception after
-a regular sender's first successful connection: senders with `sf_dir` or
-background memory replay (`initial_connect_retry=async` or `lazy_connect=on`)
-retry authentication rejections indefinitely. Initial authentication rejection
-remains terminal. This exception does not apply to ordinary memory-only senders
-or orphan drainers. See
+Authentication rejection (HTTP `401` / `403`) never moves the loop to another
+host. Before a sender's first successful connection it is terminal in every
+client. After that, clients differ: the Java client retries it indefinitely,
+the Node.js client does so for senders with `sf_dir` or background replay
+(`initial_connect_retry=async`, or pooled `lazy_connect=on`), and the Rust, C,
+C++, Python, Go, and .NET clients stop. Query connections and orphan drainers
+always stop. See
 [authentication during failover](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 
 ### Egress failover {#egress-failover}
@@ -754,7 +757,8 @@ keys so that the Sender and the `QwpQueryClient` can share a single
 connect string without an "unknown configuration key" error — the Sender
 does not interpret the values. Range, enum, and type checks happen on the
 egress side; the Sender silently accepts even a value the
-`QwpQueryClient` parser would reject.
+`QwpQueryClient` parser would reject. The Node.js `Sender` accepts these keys
+too, but logs a warning that it ignores them.
 
 - `compression` — result-batch compression the client advertises. Options:
   `raw` (default — no compression; the client omits the accept-encoding
@@ -800,8 +804,9 @@ per-language names.
 `QuestDBClient.Connect`, `connectQwpNodeClient`).*
 
 Every client now leads with a pooled facade, so these keys are a first-contact
-concern. The `Sender` and query-client parsers accept and ignore them; the
-facade reads them off the string. Each has an equivalent builder setter, and an
+concern. The `Sender` and query-client parsers accept and ignore them (the
+Node.js `Sender` logs a warning that it ignores them); the facade reads them
+off the string. Each has an equivalent builder setter, and an
 explicit setter always wins over the string.
 
 - `sender_pool_min` — senders kept open even when idle. `0` lets the pool close
@@ -817,7 +822,8 @@ explicit setter always wins over the string.
   forever. Default: `60000`.
 - `max_lifetime_ms` — maximum age of a connection; the housekeeper closes and
   reopens older ones once idle. `0` means no age limit. Default: `1800000`
-  (30 min).
+  (30 min). The Node.js client only closes idle connections above the pool
+  minimum, and does not recycle the minimum connections.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
 - `lazy_connect` — when `on`, the pool defers opening its first connection
@@ -839,10 +845,10 @@ consumed by the application.
 :::caution Accepted, but not applied by every client
 
 Every client's parser accepts the six `on_*_error` keys below, but only
-clients that implement the policy layer act on them. **In the Java reference
-client and the Node.js client they are currently accepted no-ops** — setting
-`on_write_error=retriable_other` parses cleanly and changes nothing. .NET does
-implement them, via `SenderErrorPolicy` and `SenderErrorCategory`. The
+clients that implement the policy layer act on them. The Go and .NET clients
+apply them. **In the Java reference client and the Node.js, Rust, C, C++, and
+Python clients they are currently accepted no-ops**, so setting
+`on_write_error=retriable_other` parses cleanly and changes nothing. The
 category table and precedence model below describe the target contract.
 
 :::

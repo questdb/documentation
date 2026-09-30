@@ -15,9 +15,10 @@ first.
 ## Common keys
 
 `addr` and `auth_timeout_ms` apply to every WS / WSS / HTTP / HTTPS client.
-`zone` is accepted everywhere but only takes effect on egress; `target` is an
-egress-only key and is rejected as an unknown key on an ingress connect string.
-The Node.js client is the exception: it applies both keys to ingress too.
+`zone` and `target` are accepted everywhere but only take effect on egress:
+ingress parsers accept and ignore them, so one connect string can serve both
+directions. The Node.js client is the exception: it applies both keys to
+ingress too.
 They are documented in full on the
 [connect-string reference](/docs/connect/clients/connect-string#failover-keys);
 the table below summarises the failover-relevant subset.
@@ -26,8 +27,8 @@ the table below summarises the failover-relevant subset.
 |---|---|---|---|
 | `addr` | `host:port[,host:port…]` | required | Comma-separated peer list. The two syntactic forms (`addr=h1,h2` and repeated `addr=h1;addr=h2`) accumulate. Empty entries are rejected. |
 | `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress, except by the [Node.js client](/docs/connect/clients/nodejs/#multiple-endpoints), which also ranks ingress endpoints by zone. |
-| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Rejected as an unknown key on an ingress connect string. The [Node.js client](/docs/connect/clients/nodejs/#multiple-endpoints) instead applies it to ingress too, so set its query-side role through the typed `egress` option. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
-| `auth_timeout_ms` | int (ms) | `15000` | Upper bound on the HTTP-upgrade response read per host. Does **not** cover TCP connect or TLS handshake. The Node.js client bounds DNS and TCP/TLS separately with `connect_timeout` (15 s by default); other clients may use the OS default. Lower it for faster upgrade failure detection; tune the connect timeout separately. |
+| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Accepted and ignored on an ingress connect string. The [Node.js client](/docs/connect/clients/nodejs/#multiple-endpoints) instead applies it to ingress too, so set its query-side role through the typed `egress` option. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
+| `auth_timeout_ms` | int (ms) | `15000` | Upper bound on the HTTP-upgrade response read per host. Does **not** cover TCP connect or TLS handshake. The Node.js client bounds DNS and TCP/TLS separately with `connect_timeout` (15 s by default); other clients may use the OS default. On Node.js, `auth_timeout_ms` defaults to `connect_timeout` when only that key is set. Lower it for faster upgrade failure detection; tune the connect timeout separately. |
 
 `addr` syntax — both of these are equivalent and produce the same three-peer
 list:
@@ -48,7 +49,7 @@ for the full list. The failover-relevant keys are:
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender with neither `sf_dir` nor `initial_connect_retry=async` applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender with neither `sf_dir` nor background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Starting backoff sleep at round exhaustion. Doubles up to `reconnect_max_backoff_millis`. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter, the actual sleep lands in `[max, 2·max)` once the base saturates. |
 | `initial_connect_retry` | `off` \| `on` \| `async` | `off` | Whether to apply the same retry loop to the very first connect attempt. See below. |
@@ -62,7 +63,7 @@ network), and retrying for five minutes only hides it.
 | Value | Behaviour |
 |---|---|
 | `off` (default; alias `false`) | First-connect failure is terminal. The producer's call to build the sender throws immediately. |
-| `on` (aliases `sync`, `true`) | First-connect failures are retried on the caller's thread. The constructor blocks until it connects or `reconnect_max_duration_millis` expires — this is the **only** place that key applies. Once the sender is running, reconnection is unbounded. A Node.js sender in memory mode is the exception; see the `reconnect_max_duration_millis` row above. |
+| `on` (aliases `sync`, `true`) | First-connect failures are retried on the caller's thread. The constructor blocks until it connects or `reconnect_max_duration_millis` expires — this is the **only** place that key applies. Once the sender is running, reconnection is unbounded, except for the Node.js senders described in the `reconnect_max_duration_millis` row above. |
 | `async` | The constructor returns immediately; the background I/O thread drives the reconnect loop. The producer experiences backpressure if it tries to publish before the connection comes up. Intended for unattended producers where the SF directory may already carry segments from a prior process and the server may come up later. |
 
 ## Egress (query)
