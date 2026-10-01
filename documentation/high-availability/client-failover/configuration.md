@@ -19,7 +19,7 @@ first.
 ingress parsers accept and ignore them, so one connect string can serve both
 directions. The Node.js client is the exception: it applies both keys to
 ingress too; its other deviations are listed under
-[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
+[Differences from other clients](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 They are documented in full on the
 [connect-string reference](/docs/connect/clients/connect-string#failover-keys);
 the table below summarises the failover-relevant subset.
@@ -27,8 +27,8 @@ the table below summarises the failover-relevant subset.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `addr` | `host:port[,host:port…]` | required | Comma-separated peer list. The two syntactic forms (`addr=h1,h2` and repeated `addr=h1;addr=h2`) accumulate. Empty entries are rejected. |
-| `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress, except by the [Node.js client](/docs/connect/clients/nodejs/#multiple-endpoints), which also ranks ingress endpoints by zone. |
-| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only** (the Node.js client also applies it to ingress). Which server role the query client accepts. Other clients accept and ignore it on an ingress connect string. On the [Node.js client](/docs/connect/clients/nodejs/#multiple-endpoints), set the query-side role through the typed `egress` option instead. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
+| `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress, except by the [Node.js client](/docs/connect/clients/nodejs-operations/#multiple-endpoints), which also ranks ingress endpoints by zone. |
+| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only** (the Node.js client also applies it to ingress). Which server role the query client accepts. Other clients accept and ignore it on an ingress connect string. On the [Node.js client](/docs/connect/clients/nodejs-operations/#multiple-endpoints), set the query-side role through the typed `egress` option instead. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
 | `auth_timeout_ms` | int (ms) | `15000` | Upper bound on the HTTP-upgrade response read per host. Does **not** cover TCP connect or TLS handshake. `connect_timeout` bounds the TCP connect separately: most clients leave it unset by default and then use the OS timeout, while Node.js defaults it to 15 s and also bounds DNS and TLS with it. On Node.js, `auth_timeout_ms` defaults to `connect_timeout` when only that key is set. Lower `auth_timeout_ms` for faster upgrade failure detection; tune the connect timeout separately. |
 
 `addr` syntax — both of these are equivalent and produce the same three-peer
@@ -50,7 +50,7 @@ for the full list. The failover-relevant keys are:
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Starting backoff sleep at round exhaustion. Doubles up to `reconnect_max_backoff_millis`. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter, the actual sleep lands in `[max, 2·max)` once the base saturates. |
 | `initial_connect_retry` | `off` \| `on` \| `async` | `off` | Whether to apply the same retry loop to the very first connect attempt. See below. |

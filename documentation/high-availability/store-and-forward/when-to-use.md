@@ -60,7 +60,7 @@ switch between them without changing application code — only the connect
 string. On the Node.js client, a sender in default memory mode, without
 `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, also gives up
 after `reconnect_max_duration_millis` of outage; see
-[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
+[Differences from other clients](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 
 ## Comparison at a glance
 
@@ -114,12 +114,12 @@ GCS, or NFS).
   or an uninitialised primary, the connection attempt is rejected. In most
   clients this is terminal. The exceptions follow.
 - **Senders that keep retrying.** The Java client retries after a sender's
-  first successful connection. Node.js senders in background memory mode
-  (`initial_connect_retry=async` or `lazy_connect=on`) retry from startup
-  instead of failing initialization, and Node.js store-and-forward senders
-  retry after their first successful connection; they emit
-  `durable-ack-unavailable`
-  [connection events](/docs/connect/clients/nodejs/#connection-events).
+  first successful connection. Node.js senders with a background start
+  (`initial_connect_retry=async` or `lazy_connect=on`) retry from startup,
+  even with `sf_dir`. With `sf_dir` and a foreground start, the first
+  connection fails but later mismatches are retried after a successful
+  connection. Retrying Node.js senders emit `durable-ack-unavailable`
+  [connection events](/docs/connect/clients/nodejs-operations/#connection-events).
   Monitor retrying senders and their buffer usage: continued buffering can
   fill the journal or memory queue even though startup succeeded. See
   [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).

@@ -20,8 +20,8 @@ configures both without edits. The Node.js client is the exception for
 `target` and `zone`, which it also applies to ingress; see
 [Role filter and zone preference](#role-filter-and-zone-preference). The
 *Applies to:* tag on each section below marks which direction a key affects.
-The [Node.js client page](/docs/connect/clients/nodejs/#differences-from-other-clients)
-lists every key where that client differs from this reference.
+The [Node.js client page](/docs/connect/clients/nodejs-operations/#differences-from-other-clients)
+lists its behavioral differences from this reference.
 
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 `tcps`), see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
@@ -454,7 +454,7 @@ The Node.js client applies `target` and `zone` to ingress as well. With
 `target=replica` in a shared connect string, its senders accept only replicas
 and cannot ingest. Set the query-side role through the typed `egress` option
 instead; see the
-[Node.js client page](/docs/connect/clients/nodejs/#multiple-endpoints).
+[Node.js client page](/docs/connect/clients/nodejs-operations/#multiple-endpoints).
 
 :::
 
@@ -487,15 +487,15 @@ server-side HA separately.
 Related: [Reconnect and failover](#reconnect-keys),
 [Store-and-forward](#sf-keys).
 
-:::warning Enable DEDUP on tables ingested through failover
+:::warning Use DEDUP for exactly-once outcomes with failover
 
 On unplanned failover — when the primary dies before issuing a durable
 ACK — the client replays unacknowledged frames against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
-replays can produce duplicate rows. Tables ingested through a multi-host
-failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
-row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
-for the full at-least-once / exactly-once model.
+replays can produce duplicate rows. If your application requires exactly-once
+outcomes, declare `DEDUP UPSERT KEYS(...)` covering row identity. Applications
+that tolerate occasional duplicates can skip DEDUP. See
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the full model.
 
 :::
 
@@ -520,9 +520,9 @@ equivalent — same architecture, no durability across restarts.
   - Taken verbatim. Absolute paths recommended for production; relative
     paths resolve against the process working directory.
   - The client does **not** expand shell-style syntax such as `~`.
-  - Create `sf_dir` before opening the sender unless you use Node.js, which
-    creates the slot and any missing parent directories recursively. Other
-    clients may create only the leaf slot directory.
+  - Java, Rust, C, C++, and Python create `sf_dir` and its slot, but require
+    any parent directories of `sf_dir` to exist first. Go, .NET, and Node.js
+    create missing parent directories recursively as well as the slot.
 - `sender_id` — slot identity. The slot lives at `<sf_dir>/<sender_id>/`,
   used verbatim as the directory name. Allowed characters: letters,
   digits, `_`, `-`. No path separators, no `.`, no spaces. Two senders
@@ -672,7 +672,7 @@ exception is a Node.js sender in default memory mode, which gives up after
   `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies this
   budget to every outage, and fails with `QwpReconnectExhaustedError` when it
   runs out. See the
-  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
+  [Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect).
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -754,7 +754,10 @@ transport-level OK ACK alone cannot close.
 - `durable_ack_keepalive_interval_millis` — interval at which the client
   emits keepalive PINGs while waiting for durable-ack frames. Required
   because the server only flushes pending durable acks on inbound recv
-  events. Default: `200` (ms). Set to `0` or a negative value to disable.
+  events. Default: `200` (ms). Set to `0` or a negative value to disable
+  in clients that support it. In Node.js, explicitly setting this key also
+  requests durable ACK (even at `0`), and negative values are rejected;
+  see [Node.js differences](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 
 See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
 wire protocol for the underlying mechanism.

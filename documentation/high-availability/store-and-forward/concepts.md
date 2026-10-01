@@ -45,8 +45,8 @@ memory mode in two. A sender in default memory mode gives up after
 `reconnect_max_duration_millis` (5 minutes by default), while a sender in
 background memory mode (`initial_connect_retry=async` or `lazy_connect=on`)
 retries indefinitely, as SF mode does. See the
-[Node.js ingestion modes](/docs/connect/clients/nodejs/#flushing) and
-[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
+[Node.js ingestion modes](/docs/connect/clients/nodejs/#ingestion-modes) and
+[Differences from other clients](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 
 ## What "frame" means here
 
@@ -140,10 +140,11 @@ object store** (S3, Azure Blob, GCS, or NFS).
   frames it cannot receive. In most clients the rejection is terminal. The
   Java client retries it after a sender's first successful connection, so a
   capability change on the cluster cannot stop the producer. Node.js senders
-  in background memory mode (`initial_connect_retry=async` or
-  `lazy_connect=on`) retry it from startup, and Node.js store-and-forward
-  senders after their first
-  connection, emitting `durable-ack-unavailable` events; see
+  with a background start (`initial_connect_retry=async` or
+  `lazy_connect=on`) retry from startup and emit `durable-ack-unavailable`,
+  with or without `sf_dir`. A Node.js sender with `sf_dir` and a foreground
+  start fails on the first connection but retries after a successful
+  connection; see
   [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
   A retrying sender keeps buffering, so monitor it.
 
@@ -168,7 +169,7 @@ On Node.js, only a sender in default memory mode waits for the reconnect in
 `flush()`, up to `reconnect_max_duration_millis`. Background memory mode,
 enabled by `initial_connect_retry=async` or `lazy_connect=on`, keeps accepting
 batches into the memory replay queue until capacity is exhausted and retries
-indefinitely. See the [three Node.js ingestion modes](/docs/connect/clients/nodejs/#flushing).
+indefinitely. See the [three Node.js ingestion modes](/docs/connect/clients/nodejs/#ingestion-modes).
 
 On every successful (re)connect:
 

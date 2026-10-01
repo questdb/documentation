@@ -83,7 +83,7 @@ both storage modes, so the `zone=` key is silently accepted on ingress
 connections and only takes effect on egress. The Node.js client is the
 exception: it applies `zone=` and `target=` to ingress too. Its other
 deviations are listed under
-[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
+[Differences from other clients](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 
 ### Selection priority
 
@@ -155,7 +155,7 @@ length, and what bounds your tolerance is buffer capacity
   `initial_connect_retry=async`, or `lazy_connect=on`, which gives up after
   `reconnect_max_duration_millis` and fails with
   `QwpReconnectExhaustedError`; see the
-  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
+  [Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect).
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
   reconnect storms when many producers share a cluster
 - Inter-host pause within a round: **none** — the client walks the full
@@ -264,7 +264,7 @@ its buffer capacity, so a credential change on the cluster does not stop the
 producer. Monitor such a sender: the Java client reports each rejection to the
 sender's error handler as a retriable `SECURITY_ERROR`, and the Node.js client
 emits an `attempt-failed` connection event for each failed attempt. See
-[Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors)
+[Node.js connection errors](/docs/connect/clients/nodejs-operations/#connection-level-errors)
 for the Node.js rules.
 
 Per-host credentials are outside the failover model. Use a separate connect

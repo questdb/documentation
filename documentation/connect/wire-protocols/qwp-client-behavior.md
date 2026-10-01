@@ -141,7 +141,7 @@ retryable failures and stay within the failover budget. With no explicit policy,
 failover is enabled for established query connections but initial connection
 attempts are not retried. `failover=off` disables the reconnect wrapper; an
 explicit `egressSession.reconnect` value overrides the connect-string policy.
-See [Node.js connection events](/docs/connect/clients/nodejs/#connection-events).
+See [Node.js connection events](/docs/connect/clients/nodejs-operations/#connection-events).
 
 :::
 
@@ -374,11 +374,12 @@ The Node.js client retries authentication rejections after the first
 connection only in senders with `sf_dir` or in background memory mode
 (`initial_connect_retry=async` or `lazy_connect=on`); see
 [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
-For unsupported durable acknowledgement, its senders in background memory
-mode keep retrying from startup
-and emit `durable-ack-unavailable`, and store-and-forward senders do the same
-after their first successful connection. Monitor these
-[connection events](/docs/connect/clients/nodejs/#connection-events) and buffer
+For unsupported durable acknowledgement, Node.js senders with a background
+start (`initial_connect_retry=async` or `lazy_connect=on`) keep retrying from
+startup and emit `durable-ack-unavailable`, even with `sf_dir`. With a
+foreground start and `sf_dir`, the first connection fails but later mismatches
+are retried after a successful connection. Monitor these
+[connection events](/docs/connect/clients/nodejs-operations/#connection-events) and buffer
 usage; see [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 
 ### Reconnect and outage handling
@@ -410,8 +411,8 @@ This is the behaviour of the Java reference client and the .NET client. Other
 clients are aligned to it, except a Node.js sender in default memory mode,
 without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, which
 gives up after `reconnect_max_duration_millis`; see the
-[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect) and its
-[other differences](/docs/connect/clients/nodejs/#differences-from-other-clients).
+[Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect) and its
+[other differences](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
 If you
 are implementing a new client, the contract
 is: retry transport failures forever, surface only genuine terminal conditions,
@@ -429,7 +430,7 @@ and apply back-pressure to the producer rather than dropping data.
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
 | `401` / `403` auth failure | never try later endpoints; **terminal** before the first successful connection, then client-specific: [Java and some Node.js senders retry](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) ⚠ |
-| durable-ack requested but unsupported | terminal mismatch, except that Java senders retry after their first successful connection, and Node.js senders retry from startup in background memory mode, or after their first connection with `sf_dir` ([details](/docs/connect/clients/nodejs/#durable-acknowledgement)) |
+| durable-ack requested but unsupported | terminal mismatch, except that Java senders retry after their first successful connection. Node.js senders retry from startup with a background start (with or without `sf_dir`); with foreground startup and `sf_dir`, they retry only after a first successful connection ([details](/docs/connect/clients/nodejs/#durable-acknowledgement)) |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |
