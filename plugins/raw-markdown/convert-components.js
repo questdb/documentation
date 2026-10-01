@@ -627,9 +627,11 @@ function removeImports(content) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const fence = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
+    // Ignore a CRLF line ending, so fences in CRLF files are still recognized.
+    const fence = line.replace(/\r$/, '').match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
     if (!fenceChar) {
-      if (!fence) continue
+      // CommonMark: a backtick fence's info string cannot contain a backtick.
+      if (!fence || (fence[1][0] === '`' && fence[2].includes('`'))) continue
       appendOutside(i)
       fenceChar = fence[1][0]
       fenceLen = fence[1].length

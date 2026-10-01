@@ -66,6 +66,11 @@ Highlights:
 - **Schema-flexible** — automatic table creation and on-the-fly column
   additions.
 
+The throughput and latency figures are peaks. Actual rates depend on the
+client, the hardware, and the row shape: a Node.js process, for example,
+encodes rows on a single CPU core. Measure with your own client and data
+before sizing an ingestion tier.
+
 Pick a language:
 
 <Clients showProtocol="QWP" />

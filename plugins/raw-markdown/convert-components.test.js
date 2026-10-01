@@ -31,6 +31,29 @@ test('removes MDX imports but keeps TypeScript imports in fenced examples', () =
   assert.match(result, /~~~ts\nimport \{ client \} from "@questdb\/nodejs-client";\n~~~/)
 })
 
+test('recognizes fences in files with CRLF line endings', () => {
+  const markdown = [
+    'import Widget from "@site/src/components/Widget"',
+    '```typescript',
+    'import { Sender } from "@questdb/nodejs-client";',
+    '```',
+  ].join('\r\n')
+
+  const result = removeImports(markdown)
+  assert.doesNotMatch(result, /@site\/src\/components\/Widget/)
+  assert.match(result, /import \{ Sender \} from "@questdb\/nodejs-client";/)
+})
+
+test('does not open a fence on backticks whose info string has a backtick', () => {
+  const markdown = [
+    '```not `a fence`',
+    'import Widget from "@site/src/components/Widget"',
+  ].join('\n')
+
+  const result = removeImports(markdown)
+  assert.doesNotMatch(result, /@site\/src\/components\/Widget/)
+})
+
 test('preserves imports from the Node.js Quick start while removing its MDX import', () => {
   const file = path.join(__dirname, '../../documentation/connect/clients/nodejs.md')
   const { content } = matter(fs.readFileSync(file, 'utf8'))

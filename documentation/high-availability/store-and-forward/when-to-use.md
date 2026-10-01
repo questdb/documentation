@@ -57,9 +57,10 @@ Unacked frames are written to mmap'd files under
 Both modes share the same wire behaviour, the same failover loop, and
 the same connect-string keys for everything other than storage. You can
 switch between them without changing application code — only the connect
-string. On the Node.js client, a sender with neither `sf_dir` nor background
-replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) also gives
-up after `reconnect_max_duration_millis` of outage.
+string. On the Node.js client, a sender in default memory mode, without
+`sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, also gives up
+after `reconnect_max_duration_millis` of outage; see
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ## Comparison at a glance
 
@@ -113,8 +114,8 @@ GCS, or NFS).
   or an uninitialised primary, the connection attempt is rejected. In most
   clients this is terminal. The exceptions follow.
 - **Senders that keep retrying.** The Java client retries after a sender's
-  first successful connection. Node.js senders with
-  `initial_connect_retry=async` or `lazy_connect=on` retry from startup
+  first successful connection. Node.js senders in background memory mode
+  (`initial_connect_retry=async` or `lazy_connect=on`) retry from startup
   instead of failing initialization, and Node.js store-and-forward senders
   retry after their first successful connection; they emit
   `durable-ack-unavailable`

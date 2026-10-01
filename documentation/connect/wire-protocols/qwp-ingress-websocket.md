@@ -1134,8 +1134,8 @@ creation, instead of from the first buffered row.
 
 Ingress senders use a reconnect loop regardless of whether store-and-forward
 is configured. The two storage modes share the same failover semantics, apart
-from the Node.js memory-mode budget in the table below; they differ only in
-where unacknowledged data lives:
+from the Node.js default-memory-mode budget in the table below; they differ
+only in where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
@@ -1151,7 +1151,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender with neither `sf_dir` nor background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`). |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on` ([details](/docs/connect/clients/nodejs/#differences-from-other-clients)). |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
@@ -1168,7 +1168,7 @@ Key behaviors:
 - **Authentication rejection (`401`/`403`) never moves to another host.** It
   is terminal before a sender's first successful connection. After that, the
   Java client retries it indefinitely, the Node.js client does so for senders
-  with `sf_dir` or background memory replay (`initial_connect_retry=async` or
+  with `sf_dir` or in background memory mode (`initial_connect_retry=async` or
   `lazy_connect=on`), and other clients stop; see
   [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is

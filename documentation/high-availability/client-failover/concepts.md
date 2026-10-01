@@ -81,7 +81,9 @@ the host re-advertises a different zone.
 follow the primary regardless of geography. Ingress is currently zone-blind in
 both storage modes, so the `zone=` key is silently accepted on ingress
 connections and only takes effect on egress. The Node.js client is the
-exception: it applies `zone=` and `target=` to ingress too.
+exception: it applies `zone=` and `target=` to ingress too. Its other
+deviations are listed under
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ### Selection priority
 
@@ -121,10 +123,8 @@ The `target=` key controls which server role the client is willing to bind to:
 up to its predecessor's WAL — the client treats it as transient and retries
 the same host (with a fresh round, no exponential backoff) until it becomes a
 full `PRIMARY`. On an ingress sender this retry has no deadline; the producer
-is bounded by buffer capacity rather than by elapsed time. The exception is a
-Node.js sender with neither `sf_dir` nor background replay
-(`initial_connect_retry=async`, or pooled `lazy_connect=on`), which stops after
-`reconnect_max_duration_millis`.
+is bounded by buffer capacity rather than by elapsed time, except for the
+Node.js sender described under [Ingress (writes)](#ingress-writes).
 
 A `421 Misdirected Request` response **without** an `X-QuestDB-Role` header
 is treated as a generic transport error, not a role reject — the client walks
@@ -151,9 +151,9 @@ length, and what bounds your tolerance is buffer capacity
 - Maximum backoff: `5 s`
 - Per-outage budget: **none**. `reconnect_max_duration_millis` bounds only the
   blocking sync initial connect, and the running loop never consults it.
-  The exception is a Node.js sender with neither `sf_dir` nor background
-  replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`), which
-  gives up after `reconnect_max_duration_millis` and fails with
+  The exception is a Node.js sender in default memory mode, without `sf_dir`,
+  `initial_connect_retry=async`, or `lazy_connect=on`, which gives up after
+  `reconnect_max_duration_millis` and fails with
   `QwpReconnectExhaustedError`; see the
   [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
@@ -253,14 +253,17 @@ depends on the client and on when it arrives:
 | Client | Before a sender's first successful connection | After it |
 |---|---|---|
 | Java | Terminal | Retried indefinitely |
-| Node.js | Terminal | Retried indefinitely by senders with `sf_dir` or background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`). Terminal for other senders |
+| Node.js | Terminal | Retried indefinitely by senders with `sf_dir` or in background memory mode (`initial_connect_retry=async` or `lazy_connect=on`). Terminal for other senders |
 | Rust, C, C++, Python, Go, .NET | Terminal | Terminal |
 
 Query connections and orphan drainers treat the rejection as terminal in every
-client. A sender that retries keeps buffering until authentication succeeds
-again, bounded by its buffer capacity, so a credential change on the cluster
-does not stop the producer. Watch its connection events rather than waiting
-for an error. See
+client, except that a Java orphan drainer whose token comes from a token
+provider retries for a bounded time before quarantining the slot. A sender
+that retries keeps buffering until authentication succeeds again, bounded by
+its buffer capacity, so a credential change on the cluster does not stop the
+producer. Monitor such a sender: the Java client reports each rejection to the
+sender's error handler as a retriable `SECURITY_ERROR`, and the Node.js client
+emits an `attempt-failed` connection event for each failed attempt. See
 [Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors)
 for the Node.js rules.
 

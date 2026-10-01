@@ -62,9 +62,9 @@ keeps `.lock` and `.lock.pid` only for compatibility. After a crash, a new
 Node.js sender takes the slot over automatically only on the same host, once
 the recorded process ID is no longer in use. In containers that usually fails,
 because the application runs as process ID 1 and a replacement container has a
-new host name, and the new sender reports `QwpReplayStoreLockedError`. The
-[Node.js client](/docs/connect/clients/nodejs/#store-and-forward) describes how
-to remove a stale lock safely.
+new host name, and the new sender reports `QwpReplayStoreLockedError`.
+[Node.js lock recovery](#nodejs-lock-recovery) describes how to remove a stale
+lock safely.
 
 Node.js and other clients do not see each other's locks, so never let them use
 the same `sf_dir` at the same time.
@@ -110,14 +110,41 @@ when the new one comes up. Solutions:
 - Stop the previous process. For clients using OS locks, the kernel releases
   the lock on exit (even after `kill -9`). A killed Node.js sender can leave
   a stale `.lock.owner` directory behind: verify that the old owner is gone
-  before removing it, as the
-  [Node.js client](/docs/connect/clients/nodejs/#store-and-forward) describes.
+  before removing it, as described under
+  [Node.js lock recovery](#nodejs-lock-recovery).
 - Use a deployment unit that orders shutdown before startup.
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.
 
 `drain_orphans=on` does **not** override the lock — a busy orphan slot
 is skipped, not stolen.
+
+### Node.js lock recovery {#nodejs-lock-recovery}
+
+A Node.js sender that crashed, or ran in a container that was replaced, can
+leave its `.lock.owner` directory behind, and a new sender on the slot then
+fails with `QwpReplayStoreLockedError`. To recover:
+
+1. Verify that the previous owner has exited and that no process is using the
+   slot. The `.lock.owner` directory records the owner's host name and process
+   ID.
+2. Remove the stale `<sf_dir>/<slot>/.lock.owner` directory, where `<slot>` is
+   `<sender_id>`, or `<sender_id>-<n>` for a pooled sender, and start the
+   client again.
+3. If startup still reports `QwpReplayStoreLockedError`, also inspect
+   `<sf_dir>/.slot-locks/<slot>.lock.owner`. This short-lived guard can
+   survive a crash during lock acquisition or quarantine. Remove that specific
+   owner directory only after verifying that its owner has exited.
+
+Never delete the shared `.slot-locks` directory or another slot's locks.
+
+Automate this cleanup only where the deployment guarantees that the previous
+owner has exited before a new one starts, for example a single replica that
+uses the Kubernetes `Recreate` update strategy and a `ReadWriteOnce` volume. A
+startup step can then remove the stale owner directories of the client's own
+slots before it creates the client. Anywhere two processes can overlap,
+recover manually. See also the
+[Node.js client](/docs/connect/clients/nodejs/#sf-lock-recovery).
 
 ## Sizing capacity
 
@@ -150,7 +177,7 @@ commit possible when the journal is full. Segment reservations can reach
 roughly twice the target, depending on segment rounding, with retained symbol
 dictionaries and other metadata requiring additional space. Provision
 headroom per sender and monitor actual disk usage; do not use the target as a
-filesystem quota. See [Node.js store-and-forward](/docs/connect/clients/nodejs/#store-and-forward).
+filesystem quota. See [Node.js journal capacity](/docs/connect/clients/nodejs/#sf-capacity).
 
 :::
 
@@ -216,7 +243,7 @@ fresh start: no segments, no replay.
 
 | Symptom | Likely cause | Operator action |
 |---|---|---|
-| "Slot held by PID `<n>`" or `QwpReplayStoreLockedError` (Node.js) | Another process holds the slot, or a Node.js `.lock.owner` is stale after a crash. | Stop the duplicate. OS locks release on exit; for Node.js verify the owner is gone before removing `.lock.owner` (see the [Node.js client](/docs/connect/clients/nodejs/#store-and-forward)). |
+| "Slot held by PID `<n>`" or `QwpReplayStoreLockedError` (Node.js) | Another process holds the slot, or a Node.js `.lock.owner` is stale after a crash. | Stop the duplicate. OS locks release on exit; for Node.js verify the owner is gone before removing `.lock.owner` (see [Node.js lock recovery](#nodejs-lock-recovery)). |
 | "Gap between segments" | Corruption — a segment was deleted out of band. | Restore from backup or accept data loss; the substrate refuses to start. |
 | "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's frames, which inserts duplicate rows unless the table has `DEDUP UPSERT KEYS`. |
 | Torn tail count > 0 | The previous process crashed mid-frame-write. | Informational; the CRC + zero-fill design discards the partial frame. |
@@ -227,7 +254,7 @@ fresh start: no segments, no replay.
 
 | Value | Behaviour |
 |---|---|
-| client default: `60000` on Java and .NET, `5000` on Rust, C, C++, Python, and Node.js | Block up to that long waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory). |
+| client default: `60000` on Java and .NET, `5000` on Rust, C, C++, Python, Go, and Node.js | Block up to that long waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory). |
 | `0` or `-1` | Skip the drain wait. Pending data persists on disk (SF) for the next sender, or is lost (memory). |
 | any other positive value | That timeout in milliseconds. |
 

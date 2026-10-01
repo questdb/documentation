@@ -19,9 +19,9 @@ arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
 no unacked data: the next sender on the slot recovers it from disk and
-replays it. The one exception is a Node.js sender with neither `sf_dir` nor
-background replay, whose `flush()` waits for the reconnect during an outage;
-see [Reconnect and replay](#reconnect-and-replay).
+replays it. The one exception is a Node.js sender in default memory mode,
+whose `flush()` waits for the reconnect during an outage; see
+[Reconnect and replay](#reconnect-and-replay).
 
 ## Two modes
 
@@ -35,16 +35,18 @@ SF runs in either of two modes selected by the connect string:
 | Unacked data if the sender crashes | Lost | Recovered and replayed on restart |
 | Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
 | Tolerates transient network blips | Yes | Yes |
-| Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
+| Tolerates multi-minute server outages | Bounded by RAM cap (Node.js default memory mode: also by `reconnect_max_duration_millis`) | Bounded by disk cap |
 | Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
-where unacked data lives. The Node.js client is the exception: a sender with
-neither `sf_dir` nor background replay (`initial_connect_retry=async`, or
-pooled `lazy_connect=on`) gives up after `reconnect_max_duration_millis`
-(5 minutes by default), while its other senders retry indefinitely. See the
-[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
+where unacked data lives. The Node.js client is the exception: it splits
+memory mode in two. A sender in default memory mode gives up after
+`reconnect_max_duration_millis` (5 minutes by default), while a sender in
+background memory mode (`initial_connect_retry=async` or `lazy_connect=on`)
+retries indefinitely, as SF mode does. See the
+[Node.js ingestion modes](/docs/connect/clients/nodejs/#flushing) and
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ## What "frame" means here
 
@@ -94,8 +96,7 @@ Two consequences:
   committed, so replay is **at least once** and can insert duplicate rows.
   `wireSeq` is transport bookkeeping, not a deduplication key. For
   idempotent ingestion, use stable source IDs and timestamps with table-level
-  `DEDUP UPSERT KEYS`, as in the [Node.js store-and-forward
-  example](/docs/connect/clients/nodejs/#store-and-forward).
+  `DEDUP UPSERT KEYS`; see [Deduplication](/docs/concepts/deduplication/).
 
 ## Trim: how unacked data is reclaimed
 
@@ -138,9 +139,10 @@ object store** (S3, Azure Blob, GCS, or NFS).
   response and rejects a connection without it, rather than waiting for ack
   frames it cannot receive. In most clients the rejection is terminal. The
   Java client retries it after a sender's first successful connection, so a
-  capability change on the cluster cannot stop the producer. Node.js background senders
-  (`initial_connect_retry=async`, or pooled `lazy_connect=on`) retry it from
-  startup, and Node.js store-and-forward senders after their first
+  capability change on the cluster cannot stop the producer. Node.js senders
+  in background memory mode (`initial_connect_retry=async` or
+  `lazy_connect=on`) retry it from startup, and Node.js store-and-forward
+  senders after their first
   connection, emitting `durable-ack-unavailable` events; see
   [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
   A retrying sender keeps buffering, so monitor it.
@@ -162,12 +164,11 @@ the reconnect loop documented in
 The producer is **not notified**: it keeps publishing into the substrate,
 subject to available capacity (see [Backpressure](#backpressure)).
 
-On Node.js, only a sender with neither `sf_dir` nor background replay waits
-for the reconnect in `flush()`, up to `reconnect_max_duration_millis`.
-Background memory mode, enabled by
-`initial_connect_retry=async` or pooled `lazy_connect=on`, keeps accepting
+On Node.js, only a sender in default memory mode waits for the reconnect in
+`flush()`, up to `reconnect_max_duration_millis`. Background memory mode,
+enabled by `initial_connect_retry=async` or `lazy_connect=on`, keeps accepting
 batches into the memory replay queue until capacity is exhausted and retries
-indefinitely. See the [three Node.js flushing modes](/docs/connect/clients/nodejs/#flushing).
+indefinitely. See the [three Node.js ingestion modes](/docs/connect/clients/nodejs/#flushing).
 
 On every successful (re)connect:
 
@@ -198,7 +199,7 @@ call throws a typed exception.
 On Node.js with `sf_dir`, this value is a journal size target rather than a
 hard disk limit. Transaction-closing batches and retained symbol dictionaries
 can exceed it, and other metadata needs additional space. Provision headroom
-for each sender; see [Node.js journal capacity](/docs/connect/clients/nodejs/#store-and-forward).
+for each sender; see [Node.js journal capacity](/docs/connect/clients/nodejs/#sf-capacity).
 Without `sf_dir`, the key caps the in-memory replay queue.
 
 The exception message distinguishes the two scenarios:
@@ -217,8 +218,8 @@ The exception message distinguishes the two scenarios:
 `close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
-C, C++, Python and Node.js. If the wait succeeds, all data is acked. If the timeout
-fires, a `WARN` is logged and:
+C, C++, Python, Go and Node.js. If the wait succeeds, all data is acked. If the
+timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
@@ -354,21 +355,24 @@ for the shared vocabulary and which clients let you override the defaults.
 | `WRITE_ERROR` | `retriable` | A write failed, for example under temporary storage pressure; reconnect and replay. |
 | `INTERNAL_ERROR` | `retriable` | Retry after an unexpected server-side failure. |
 | `DICTIONARY_GAP` | `retriable` | The connection is missing symbol dictionary entries; resend them and replay. |
-| `NOT_WRITABLE` | `retriable_other` | The node cannot accept writes, for example a replica; replay on another endpoint. |
+| `NOT_WRITABLE` | `retriable_other` | The node cannot accept writes, for example a replica; replay on another endpoint. Reserved: current servers close the connection instead, and the client reconnects. |
 | `UNKNOWN` | `retriable` (forced) | A status the client does not know, for example from a newer server; retry rather than stop. |
 
 A batch that keeps being rejected without progress escalates to a terminal
 error through the poison-frame detector (`max_frame_rejections`). The Java and
 Node.js clients also report a client-side `DATA_LOSS` category, with the
 `abandoned` policy, when they set aside a corrupt store-and-forward journal.
+The Node.js client also defines `cancelled` and `limit-exceeded` categories,
+both retriable; current servers send those statuses only to query
+connections.
 
 Rejections are delivered asynchronously through a bounded error inbox
 (`error_inbox_capacity`, default `256`) that drops the oldest notification on
 overflow, to the application's error handler, such as `onSenderError` on
 Node.js. The default handler logs every rejection, because a silent handler
-would hide data loss. The Node.js client reports categories as lowercase,
-hyphenated `error.category` strings, such as `schema-mismatch`, and accepts
-the `on_*_error` keys without applying them.
+would hide data loss. The Node.js client reports categories and policies as
+lowercase, hyphenated strings, such as `schema-mismatch` and
+`retriable-other`, and accepts the `on_*_error` keys without applying them.
 
 ## Next steps
 

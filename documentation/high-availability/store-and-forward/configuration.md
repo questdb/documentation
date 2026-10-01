@@ -27,7 +27,7 @@ mode.
 | `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
-| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Capacity for producer backpressure. Node.js disk journals can exceed this target for transaction completion and symbol dictionaries; provision [additional disk headroom](/docs/connect/clients/nodejs/#store-and-forward). Without `sf_dir`, this caps the memory replay queue. |
+| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Capacity for producer backpressure. Node.js disk journals can exceed this target for transaction completion and symbol dictionaries; provision [additional disk headroom](/docs/connect/clients/nodejs/#sf-capacity). Without `sf_dir`, this caps the memory replay queue. |
 | `sf_durability` | enum | `memory` | `memory` relies on the page cache; `periodic` checkpoints in the background and requires `sf_dir`. Node.js also supports `append`, which makes each journal append durable before `flush()` resolves. Go and .NET accept only `memory`; other clients reject `append` at build time. `flush` is not supported. |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
@@ -48,11 +48,11 @@ and host-walk semantics are documented in
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender with neither `sf_dir` nor background replay (`initial_connect_retry=async`, or pooled `lazy_connect=on`) applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
-| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++, Python and Node.js | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
+| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++, Python, Go and Node.js | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 
 Cross-reference:
 [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys).
@@ -72,13 +72,14 @@ Opt in to object-store-durable trim. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys. Go and .NET apply them; Java, Node.js, Rust, C, C++, and Python currently ignore them. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys. Go and .NET apply them; Java, Node.js, Rust, C, C++, and Python currently ignore them. The two that apply them accept different values: .NET takes only `halt`/`terminal` and `retry`/`retriable` and rejects `auto` and `retriable_other`. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
 
 The per-category defaults are documented in
 [Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
-`PROTOCOL_VIOLATION` is always terminal and `UNKNOWN` always retriable, so a
-status from a newer server leads to a retry rather than a silently dropped
-batch.
+`PROTOCOL_VIOLATION` is always terminal and `UNKNOWN` defaults to retriable,
+so a status from a newer server leads to a retry rather than a silently
+dropped batch. The `on_*_error` keys cannot change either; only the .NET
+client's programmatic resolver can change `UNKNOWN`.
 
 ## Other relevant keys
 

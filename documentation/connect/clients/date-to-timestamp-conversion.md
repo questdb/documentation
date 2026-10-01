@@ -331,17 +331,17 @@ no arithmetic: pass `getTime()` with the `"ms"` unit.
 ```javascript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const tradeDate = new Date("2024-08-05T00:00:00Z");
+const settlementDate = new Date("2024-08-05T00:00:00Z");
 
 const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
 try {
   const sender = await db.borrowSender();
   try {
     await sender
-      .table("trades")
+      .table("settlements")
       .symbol("symbol", "ETH-USD")
-      .timestampColumn("trade_date", tradeDate.getTime(), "ms")
-      .doubleColumn("price", 2615.54)
+      .timestampColumn("settlement_date", settlementDate.getTime(), "ms")
+      .doubleColumn("amount", 0.5)
       .at(Date.now(), "ms");
   } finally {
     await sender.close();
@@ -352,8 +352,8 @@ try {
 ```
 
 For an explicit microsecond value, convert through `bigint`:
-`BigInt(tradeDate.getTime()) * 1000n`. Nanosecond timestamps, with the `"ns"`
-unit, must be a `bigint`.
+`BigInt(settlementDate.getTime()) * 1000n`. Nanosecond timestamps, with the
+`"ns"` unit, must be a `bigint`.
 
 Learn more about the [QuestDB Node.js Client](/docs/connect/clients/nodejs/)
 

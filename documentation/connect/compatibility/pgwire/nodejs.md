@@ -790,9 +790,8 @@ latestByQuery()
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard JavaScript PostgreSQL clients for querying
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
-We recommend the `pg` client for querying.
-For data ingestion, consider the QuestDB [Node.js client](/docs/connect/clients/nodejs/), which also streams
-query results over QWP.
+Among PGWire drivers, we recommend the `pg` client for querying. For data ingestion, and for streaming query
+results without a PostgreSQL driver, use the QuestDB [Node.js client](/docs/connect/clients/nodejs/), which speaks QWP.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
 `SAMPLE BY` and `LATEST ON` for efficient queries.

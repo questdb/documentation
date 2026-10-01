@@ -215,7 +215,8 @@ apply latency varies with load.
 This applies to every client, not just Java. See the equivalent poll in the
 [Python](/docs/connect/clients/python/),
 [Rust](/docs/connect/clients/rust/) and
-[Go](/docs/connect/clients/go/) quick starts.
+[Go](/docs/connect/clients/go/) quick starts, and in the Node.js client's
+[Read-after-write](/docs/connect/clients/nodejs/#read-after-write) section.
 
 The `QuestDB` handle is a facade over two distinct kinds of client: a
 [`Sender`](#data-ingestion) for ingestion (`db.borrowSender()`) and a
@@ -1325,8 +1326,10 @@ What is and isn't carried on `onError`:
 ### Connection-level errors
 
 - **Authentication failure**: `401`/`403` HTTP response before the WebSocket
-  upgrade completes. Terminal across all endpoints. The borrow that
-  triggered the connect rethrows `LineSenderException`.
+  upgrade completes. Terminal across all endpoints for the query client and
+  for a sender's first connection: the borrow that triggered the connect
+  rethrows `LineSenderException`. A sender that has connected once retries
+  instead; see [Which failures are retried](#which-failures-are-retried).
 - **Malformed frames**: `QwpDecodeException` or WebSocket close with a
   terminal code.
 - **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
@@ -1427,8 +1430,12 @@ client and gives you a fresh one on your next query.
 
 ### Which failures are retried
 
-- **Authentication failures** (a bad token or wrong credentials) stop
-  immediately on every host — retrying cannot help.
+- **Authentication failures** (a bad token or wrong credentials) stop the
+  query client, and a sender's first connection, immediately on every host. A
+  sender that has connected once retries them indefinitely, keeping its data
+  buffered, and reports each rejection to its error handler as a `RETRIABLE`
+  `SECURITY_ERROR`; see
+  [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 - **Network and availability failures** (connection refused, TLS errors, a
   `5xx` from the server, a mid-query drop) are treated as temporary and fed into
   the reconnect and failover loops.

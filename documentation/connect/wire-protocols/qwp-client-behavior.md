@@ -76,9 +76,8 @@ Why each line matters:
 It bounds only the **blocking** initial connect (`initial_connect_retry=on` /
 `sync`). Once a sender is running, the reconnect loop never consults it and
 retries a transport outage forever. Setting a large value here does nothing for
-a running producer. The exception is a Node.js sender with neither `sf_dir`
-nor background replay (`initial_connect_retry=async`, or pooled
-`lazy_connect=on`), which applies it to every outage. See
+a running producer. The exception is a Node.js sender in default memory
+mode, which applies it to every outage. See
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 :::
@@ -203,14 +202,14 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
-| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** (a Node.js sender without `sf_dir` or background replay: every outage) |
+| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** (Node.js default memory mode: every outage) |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
-| `connect_timeout` | unset (Node.js: `15000`) — per-endpoint TCP connect bound, must be `> 0` |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Go/Node.js) |
+| `connect_timeout` | unset (Node.js: `15000`, also bounding DNS and TLS) — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
-| `poison_min_escalation_window_millis` | `5000` (Node.js: `300000`) |
+| `poison_min_escalation_window_millis` | `5000` (Node.js: `300000`; Go: not supported, its window is `reconnect_max_duration_millis`) |
 
 ### Query client
 
@@ -227,9 +226,8 @@ callers block up to `acquire_timeout_ms` then throw.
 
 There is no "retry forever" setting to look for on the reconnect keys — a
 running sender already does. `reconnect_max_duration_millis` applies only to a
-blocking initial connect, except on a Node.js sender with neither `sf_dir`
-nor background replay; see
-[Reconnect and outage handling](#reconnect-and-outage-handling).
+blocking initial connect, except on a Node.js sender in default memory mode;
+see [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ---
 
@@ -373,11 +371,11 @@ fail when the buffer reaches `sf_max_total_bytes` and exhausts
 `sf_append_deadline_millis` on `append()`.
 
 The Node.js client retries authentication rejections after the first
-connection only in senders with `sf_dir` or background memory replay
+connection only in senders with `sf_dir` or in background memory mode
 (`initial_connect_retry=async` or `lazy_connect=on`); see
 [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
-For unsupported durable acknowledgement, its senders with
-`initial_connect_retry=async` or `lazy_connect=on` keep retrying from startup
+For unsupported durable acknowledgement, its senders in background memory
+mode keep retrying from startup
 and emit `durable-ack-unavailable`, and store-and-forward senders do the same
 after their first successful connection. Monitor these
 [connection events](/docs/connect/clients/nodejs/#connection-events) and buffer
@@ -409,10 +407,12 @@ has outlasted your configuration.
 :::note Alignment
 
 This is the behaviour of the Java reference client and the .NET client. Other
-clients are aligned to it, except a Node.js sender with neither `sf_dir` nor
-background replay (`initial_connect_retry=async`, or pooled
-`lazy_connect=on`), which gives up after `reconnect_max_duration_millis`; see
-the [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). If you
+clients are aligned to it, except a Node.js sender in default memory mode,
+without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, which
+gives up after `reconnect_max_duration_millis`; see the
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect) and its
+[other differences](/docs/connect/clients/nodejs/#differences-from-other-clients).
+If you
 are implementing a new client, the contract
 is: retry transport failures forever, surface only genuine terminal conditions,
 and apply back-pressure to the producer rather than dropping data.
@@ -429,7 +429,7 @@ and apply back-pressure to the producer rather than dropping data.
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
 | `401` / `403` auth failure | never try later endpoints; **terminal** before the first successful connection, then client-specific: [Java and some Node.js senders retry](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) ⚠ |
-| durable-ack requested but unsupported | terminal mismatch, except that Java senders retry after their first successful connection, and Node.js senders retry in background modes, or after their first connection with `sf_dir` ([details](/docs/connect/clients/nodejs/#durable-acknowledgement)) |
+| durable-ack requested but unsupported | terminal mismatch, except that Java senders retry after their first successful connection, and Node.js senders retry from startup in background memory mode, or after their first connection with `sf_dir` ([details](/docs/connect/clients/nodejs/#durable-acknowledgement)) |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |

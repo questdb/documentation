@@ -7,10 +7,19 @@ description:
   exactly-once outcomes.
 ---
 
-QuestDB clients deliver data **at-least-once**: every row your application
-publishes is guaranteed to reach the server, but under failure it may arrive
-more than once. Storing each row exactly once is the application's
-responsibility, and QuestDB provides the mechanisms to make it routine.
+QuestDB clients deliver data **at-least-once**: a sender keeps every row your
+application publishes until the server acknowledges it, and resends it after a
+failure, so under failure a row may arrive more than once. Storing each row
+exactly once is the application's responsibility, and QuestDB provides the
+mechanisms to make it routine.
+
+The guarantee holds while the sender runs. Without
+[store-and-forward](/docs/high-availability/store-and-forward/concepts/),
+unacknowledged rows live in memory and are lost if the process exits, or the
+sender closes, before the server acknowledges them. A Node.js sender in
+default memory mode also gives up after `reconnect_max_duration_millis` of
+outage; see the
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 
 This page explains where duplicates come from and how to suppress them.
 
@@ -19,7 +28,7 @@ This page explains where duplicates come from and how to suppress them.
 | Property | Meaning | Where it comes from |
 |----------|---------|---------------------|
 | **At-most-once** | Each row reaches the server zero or one times. Rows can be lost. | A "fire and forget" client that does not retransmit on failure. |
-| **At-least-once** | Each row reaches the server one or more times. No row is lost; duplicates are possible. | A client that retransmits unacknowledged data after a transport error. **This is the QuestDB client default.** |
+| **At-least-once** | Each row reaches the server one or more times. No row is lost; duplicates are possible. | A client that retransmits unacknowledged data after a transport error. **QuestDB clients provide this while the sender runs**, and across restarts with store-and-forward. |
 | **Exactly-once** | Each row is stored exactly once. | At-least-once delivery plus server-side deduplication on a key covering row identity. |
 
 QuestDB's clients retransmit unacknowledged batches after transport errors,
