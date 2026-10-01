@@ -132,9 +132,21 @@ wss::addr=questdb.example.com:443;username=admin;password=secret;
 
 ### Production with a custom trust store
 
+For Node.js and clients that accept PEM roots, use a PEM file without a password:
+
+```text
+wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/questdb/ca.pem;
 ```
-wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/questdb/ca-roots;tls_roots_password=changeit;
+
+For clients that accept password-protected JKS or PKCS#12 stores, supply the
+password as well:
+
+```text
+wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/questdb/ca-roots.p12;tls_roots_password=changeit;
 ```
+
+Node.js rejects `tls_roots_password` and accepts only PEM roots; Go accepts
+neither key and uses the OS trust store. See [TLS](#tls) for formats by client.
 
 ### Ingest with store-and-forward across multiple nodes
 

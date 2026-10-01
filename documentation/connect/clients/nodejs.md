@@ -407,6 +407,10 @@ try {
 }
 ```
 
+If this client closes before an ACK, the journal keeps the unacknowledged row.
+After QuestDB is reachable again, reopen the same `sf_dir` and `sender_id` to
+replay it before checking query visibility; see [Read-after-write](#read-after-write).
+
 `sf_durability=memory` (the default) survives a process crash, not a power
 failure; `periodic` checkpoints and `append` syncs each append. The sender's
 first connection is foreground by default; adding `sf_dir` alone does not
@@ -540,14 +544,27 @@ outcome before retrying, or make the statement idempotent.
 
 An ACK confirms commitment to the WAL, **not** query visibility: WAL apply
 is asynchronous. Create the table before writing, then poll for a stable event
-ID with a deadline. For the `trades_sf` table above, after publishing
-`trade-12345`:
+ID with a deadline. If the store-and-forward example above closed before its
+batch was acknowledged, run this example **after QuestDB is reachable again**.
+It reopens the same journal slot, waits for the pending frames to be
+acknowledged, and only then polls for `trade-12345`. A query-only client without
+that journal would not replay the row.
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;failover=off;");
+const db = await connectQwpNodeClient(
+  "ws::addr=localhost:9000;sf_dir=./questdb-sf;sender_id=trades;" +
+    "sf_max_segment_bytes=1m;failover=off;",
+);
 try {
+  const sender = await db.borrowSender();
+  try {
+    await sender.waitForAcknowledged(sender.publishedSequence, 10_000);
+  } finally {
+    await sender.close();
+  }
+
   const lease = await db.borrowQuery();
   try {
     const deadline = Date.now() + 10_000;
@@ -680,6 +697,38 @@ connect string also filters ingestion**, so use the typed query-only option
 `{ egress: { target: "replica" } }` instead. `target=replica` is strict, not
 "prefer replica and fall back to primary". If no replica is up at startup,
 set `query_pool_min=0` to defer the query connection.
+
+For a query-only client with only replica endpoints, set `sender_pool_min=0`:
+otherwise the default pool prewarms a sender and startup fails because no
+primary can accept its write connection. Set the replica filter in the typed
+query options so it applies only to queries. If you later borrow a sender,
+include a primary endpoint in `addr`.
+
+```typescript
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
+
+const db = await connectQwpNodeClient(
+  "wss::addr=db-a.example.com:9000,db-b.example.com:9000;" +
+    "token=YOUR_TOKEN;sender_pool_min=0;",
+  { egress: { target: "replica" } },
+);
+try {
+  const lease = await db.borrowQuery();
+  try {
+    const query = await lease.query(
+      "SELECT timestamp, symbol FROM trades LIMIT 10",
+    );
+    for await (const batch of query) {
+      for (const row of batch.rows()) console.log(row);
+    }
+    await query.completion;
+  } finally {
+    await lease.close();
+  }
+} finally {
+  await db.close();
+}
+```
 
 ### Ingestion reconnect
 

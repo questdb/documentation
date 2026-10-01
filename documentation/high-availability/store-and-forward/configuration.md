@@ -65,7 +65,7 @@ Opt in to object-store-durable trim. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. A missing `X-QWP-Durable-Ack: enabled` echo is terminal in most clients; Java and some Node.js senders keep retrying (see [Concepts](/docs/high-availability/store-and-forward/concepts/#trim-how-unacked-data-is-reclaimed)). WebSocket transports only. |
-| `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
+| `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING while durable confirmations are pending and the producer is idle. `0` disables the PING; some clients also accept negative values. Node.js rejects negative values, and explicitly setting even `0` requests durable ACK, so an unsupported server may reject the connection. See [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement). |
 
 ## Error-handling keys
 
