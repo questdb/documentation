@@ -66,12 +66,13 @@ existing ILP code to QWP, see [From ILP to QWP](#from-ilp-to-qwp). The
 ## Installation
 
 ```shell
-npm install @questdb/nodejs-client
+npm install @questdb/nodejs-client@^5
 ```
 
-The package also installs with `yarn add` and `pnpm add`. It exports its
-complete API from the package root, ships ES module and CommonJS builds, and
-bundles TypeScript declarations. There are no other supported import paths.
+Use `yarn add @questdb/nodejs-client@^5` or
+`pnpm add @questdb/nodejs-client@^5` with the other package managers. The
+package exports its complete API from the package root, ships ES module and
+CommonJS builds, and bundles TypeScript declarations. There are no other supported import paths.
 
 The examples on this page are TypeScript ES modules with top-level `await`.
 To run the [quick start](#quick-start) as TypeScript, save its code as
@@ -91,7 +92,8 @@ TypeScript assertions such as `as const`.
 ## Quick start
 
 Connect with one connect string, create a table, write two rows, wait until
-QuestDB acknowledges them, and query them back.
+QuestDB acknowledges them, and run a query. QuestDB applies acknowledged rows
+asynchronously, so the first query may return no rows.
 
 ```typescript
 import {
@@ -536,8 +538,10 @@ try {
         .doubleColumn("amount", 0.1)
         .at(Date.now(), "ms");
     }
+    await sender.flush();
+    await sender.waitForAcknowledged(sender.publishedSequence);
   } finally {
-    // Flushes and returns the sender to the pool. Does not wait for ACKs.
+    // Returns the sender to the pool; any pending rows are flushed.
     await sender.close();
   }
 } finally {
@@ -550,8 +554,9 @@ A long-running producer can keep its borrow for its whole lifetime and call
 that hold a sender at the same time.
 
 `close()` on a borrowed sender flushes its completed rows and returns it to
-the pool. It does not wait for acknowledgements, but in the default memory
-mode its flush waits for the reconnect during an outage. See
+the pool. The example above waits for the acknowledgement *before* returning
+the sender: `close()` itself does not wait for acknowledgements, although in
+default memory mode its flush waits for the reconnect during an outage. See
 [Closing a borrowed sender](#closing-a-borrowed-sender) for how long that can
 take, how to wait for acknowledgements, and what happens when a close fails.
 
@@ -682,7 +687,10 @@ buffer rows in memory until QuestDB is reachable. The query pool stays empty
 until the first query.
 
 ```typescript
-import { connectQwpNodeClient } from "@questdb/nodejs-client";
+import {
+  connectQwpNodeClient,
+  QwpIngressAckTimeoutError,
+} from "@questdb/nodejs-client";
 
 // Resolves immediately, even if QuestDB is not running yet.
 const db = await connectQwpNodeClient(
@@ -698,6 +706,18 @@ try {
       .doubleColumn("price", 2615.54)
       .doubleColumn("amount", 0.5)
       .at(Date.now(), "ms");
+    await sender.flush();
+    const sequence = sender.publishedSequence;
+    // Keep the process running until QuestDB comes back and acknowledges it.
+    for (;;) {
+      try {
+        await sender.waitForAcknowledged(sequence, 10_000);
+        break;
+      } catch (error) {
+        if (!(error instanceof QwpIngressAckTimeoutError)) throw error;
+        console.info("still waiting for QuestDB; do not restage the row");
+      }
+    }
   } finally {
     await sender.close();
   }
@@ -706,9 +726,10 @@ try {
 }
 ```
 
-Rows buffered while QuestDB is down exist only in memory. They are lost if the
-client closes before QuestDB becomes reachable, as `db.close()` does at the end
-of this example; see [Closing the pooled client](#closing-the-pooled-client).
+Rows buffered while QuestDB is down exist only in memory. This example keeps
+the client running until the row is acknowledged; if the process exits first,
+the unacknowledged row may be lost. See
+[Closing the pooled client](#closing-the-pooled-client).
 To keep them across a shutdown or restart, add a
 [store-and-forward](#store-and-forward) journal with `sf_dir`. Replay from the
 journal is at least once, so write to a deduplicated table as described there.
@@ -1161,9 +1182,9 @@ try {
 ```
 
 - <span id="text-literal-easy-to-use"></span> `decimalColumnText()` takes a
-  decimal string, scientific notation included (`"1.5e-3"`), and preserves the
-  literal's scale, including trailing zeros. Passing a `number` works, but
-  JavaScript drops trailing zeros when formatting.
+  plain decimal string (such as `"0.0750"`) and preserves the literal's scale,
+  including trailing zeros. Scientific notation is accepted for a `number`,
+  not a string; JavaScript drops trailing zeros when formatting numbers.
 - <span id="binary-form-high-throughput"></span>
   `decimalColumn(name, unscaled, scale)` takes the unscaled value as a `bigint`
   or as big-endian two's-complement bytes in an `Int8Array`.
@@ -1703,7 +1724,8 @@ import {
 const db = await connectQwpNodeClient(
   "ws::addr=localhost:9000;" +
     "sf_dir=/var/lib/my-service/qdb-sf;sender_id=ingest-a;" +
-    "sf_durability=append;lazy_connect=on;",
+    // Offline batches must fit the default server limit (about 2 MiB).
+    "sf_durability=append;sf_max_segment_bytes=1m;lazy_connect=on;",
 ).catch((error: unknown) => {
   // Another process holds the journal, or a crash left a stale lock.
   if (
@@ -2012,7 +2034,10 @@ Batch objects stay valid after iteration moves on, so you can keep them.
 
 With the default `failover=on`, a lost connection can make the client run the
 query again from its first batch. If your loop accumulates rows, reset them
-when `batch.batchSequence === 0n`; see [Query failover](#query-failover).
+when `batch.batchSequence === 0n`. A replay that returns **no batches** has no
+sequence to detect, so also clear accumulated state on `onReplayReset` (on a
+client with only one active query), or use `failover=off` and retry the whole
+query. See [Query failover](#query-failover).
 
 ### Reading result values
 
@@ -2254,7 +2279,18 @@ leave the poll running indefinitely:
 import { randomUUID } from "node:crypto";
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+let visible = false;
+const db = await connectQwpNodeClient(
+  "ws::addr=localhost:9000;query_pool_max=1;",
+  // There is only one active query. Clear its state even if replay returns no rows.
+  {
+    egressSession: {
+      onReplayReset: () => {
+        visible = false;
+      },
+    },
+  },
+);
 try {
   const lease = await db.borrowQuery();
   try {
@@ -2274,12 +2310,12 @@ try {
         .symbol("symbol", "ETH-USD")
         .at(Date.now(), "ms");
       await sender.flush();
+      await sender.waitForAcknowledged(sender.publishedSequence);
     } finally {
       await sender.close();
     }
 
     const deadline = Date.now() + 10_000;
-    let visible = false;
     while (!visible) {
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0) throw new Error("trade not visible in time");
@@ -2311,8 +2347,12 @@ try {
 ```
 
 Because the table already exists, an SQL error fails the loop at once instead
-of being retried; the loop retries only while the row is not yet visible. Do
-not replace the poll with a fixed sleep: the apply latency varies with load.
+of being retried; the loop retries only while the row is not yet visible. The
+single-query pool lets `onReplayReset` reset `visible` even when a replay
+returns no batches. For concurrent queries, use separate clients for this
+pattern, or set `failover=off` and retry the entire poll after a connection
+error. Do not replace the poll with a fixed sleep: apply latency varies with
+load.
 
 ### Cancellation and timeouts
 
@@ -2480,12 +2520,13 @@ what your loop must do after `cancel()`.
 
 `query()` materializes every value into JavaScript arrays. For hot paths,
 `queryViews()` hands a reusable view of each batch to a callback, and reads
-values straight from the received bytes:
+values straight from the received bytes. This single-pass sum disables query
+failover so a transport error rejects instead of leaving a partial sum:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;failover=off;");
 try {
   const lease = await db.borrowQuery();
   try {
@@ -2493,8 +2534,6 @@ try {
     const query = await lease.queryViews(
       "SELECT timestamp, symbol, price, amount FROM trades",
       (batch) => {
-        // A failover replays from batch 0; discard the failed attempt's sum.
-        if (batch.batchSequence === 0n) notional = 0;
         const price = batch.column(2);
         const amount = batch.column(3);
         for (let row = 0; row < batch.rowCount; row++) {
@@ -2502,8 +2541,6 @@ try {
             notional += price.getDouble(row) * amount.getDouble(row);
           }
         }
-        // Row-major access reuses one row object for every row.
-        batch.forEachRow((r) => void r.getSymbol(1));
       },
     );
     await query.completion;
@@ -2515,6 +2552,11 @@ try {
   await db.close();
 }
 ```
+
+For row-major work instead, `batch.forEachRow()` reuses one row object; read
+values inside its callback only when they contribute to your result. For an
+accumulator that supports automatic query replay, see
+[Query failover](#query-failover).
 
 Batches are delivered one at a time: when the callback returns a promise, the
 client waits for it before delivering the next batch. With a credit window set
@@ -3025,10 +3067,12 @@ the query restarts; otherwise it sees the first part of the result twice.
 
 :::
 
-Detect the restart inside the loop. Every batch has a `batchSequence` that
-starts at `0n`, and a re-executed query starts again at `0n`. The check works
-for each query on its own, so it also covers concurrent queries on separate
-leases:
+Every batch has a `batchSequence` starting at `0n`, including the first batch
+after a replay. Clear accumulated rows on that batch. A replay may return
+**zero rows and no batches**, though, leaving prior rows in your accumulator.
+`egressSession.onReplayReset` also clears it when that happens. Since this
+callback is shared across the pool and request IDs are per connection, the
+example limits the pool to one active query:
 
 ```typescript
 import {
@@ -3036,8 +3080,16 @@ import {
   QwpReconnectExhaustedError,
 } from "@questdb/nodejs-client";
 
+const rows: (readonly unknown[])[] = [];
 const db = await connectQwpNodeClient(
-  "ws::addr=db-a.example.com:9000,db-b.example.com:9000;",
+  "ws::addr=db-a.example.com:9000,db-b.example.com:9000;query_pool_max=1;",
+  {
+    egressSession: {
+      onReplayReset: () => {
+        rows.length = 0;
+      },
+    },
+  },
 );
 try {
   const lease = await db.borrowQuery();
@@ -3046,7 +3098,6 @@ try {
       // The deadline covers the whole query, including a re-execution.
       timeoutMs: 30_000,
     });
-    const rows: (readonly unknown[])[] = [];
     for await (const batch of query) {
       // Sequence 0 starts the result, both initially and after a failover.
       if (batch.batchSequence === 0n) rows.length = 0;
@@ -3080,13 +3131,15 @@ of these instead:
 - Treat `batchSequence === 0n` after rows have left as an error, and abort the
   downstream response instead of sending duplicates.
 
-To be notified of a restart, set `egressSession.onReplayReset` in the second
-argument of `connectQwpNodeClient()`. It runs before the first replayed batch
-is delivered, and its event has `requestId`, `endpoint`, `previousEndpoint`,
-`serverInfo`, and `cause`. The `requestId` matches `query.requestId`, but
-request IDs are numbered per connection and every lease of a pooled client
-shares the callback, so the event cannot tell concurrent queries apart. Use it
-for logging, and the sequence check above to reset results.
+`egressSession.onReplayReset` runs before a query is replayed, including when
+that replay returns no batches. Its event has `requestId`, `endpoint`,
+`previousEndpoint`, `serverInfo`, and `cause`. The `requestId` matches
+`query.requestId`, but request IDs are numbered per connection and every lease
+of a pooled client shares the callback: it cannot identify which of several
+concurrent queries restarted. Use a dedicated, single-query client when the
+callback resets result state, as above. For concurrent results that cannot be
+isolated, set `failover=off` and retry the whole query after a transport error;
+`batchSequence === 0n` alone cannot detect a zero-batch replay.
 
 ### Typed reconnect policy
 
@@ -3432,6 +3485,9 @@ import {
 const token = process.env.QDB_TOKEN;
 if (!token) throw new Error("QDB_TOKEN is not set");
 
+// This example runs one query at a time so its replay callback can clear it.
+const recentPrices: (readonly unknown[])[] = [];
+
 // Replace with your alerting.
 function alertOperator(message: string) {
   console.error("ALERT:", message);
@@ -3449,9 +3505,11 @@ const db = await connectQwpNodeClient(
     `token=${token};` +
     // append: every flush waits for a disk sync; see "Store-and-forward".
     "sf_dir=/var/lib/my-service/qdb-sf;sender_id=trade-service;" +
-    "sf_durability=append;sender_pool_max=4;" +
-    // query_pool_min=0: start, and ingest, even while no replica is reachable.
-    "query_pool_min=0;query_pool_max=8;",
+    // Limit offline batches below the default server's 2 MiB limit.
+    "sf_durability=append;sf_max_segment_bytes=1m;sender_pool_max=4;" +
+    // Query pool stays cold while replicas are down; one active query so the
+    // replay callback below can reset its state even if replay has no batches.
+    "query_pool_min=0;query_pool_max=1;",
   {
     // Queries run on replicas only, never on the primary; ingestion always
     // follows the primary.
@@ -3481,8 +3539,10 @@ const db = await connectQwpNodeClient(
         maxDurationMs: 30_000,
         onEvent: logConnection,
       },
-      onReplayReset: (event) =>
-        console.warn("query restarts on", String(event.endpoint)),
+      onReplayReset: (event) => {
+        recentPrices.length = 0;
+        console.warn("query restarts on", String(event.endpoint));
+      },
     },
   },
 );
@@ -3540,9 +3600,9 @@ try {
           "WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 10",
         { binds: (binds) => binds.setVarchar(0, "ETH-USD") },
       );
-      const recentPrices: (readonly unknown[])[] = [];
       for await (const batch of query) {
-        // A failover restarts the result at sequence 0: drop partial rows.
+        // A nonempty replay starts at sequence 0; the callback handles
+        // empty ones.
         if (batch.batchSequence === 0n) recentPrices.length = 0;
         for (const row of batch.rows()) recentPrices.push(row);
       }

@@ -121,12 +121,13 @@ If two distinct events can share `(ts, symbol, side)` and both should be
 preserved, widen `UPSERT KEYS` to include a column that distinguishes them
 — for example a `trade_id` or `seq` column.
 
-:::warning DEDUP is required on tables behind multi-host failover
+:::warning Use DEDUP behind multi-host failover when duplicates matter
 
 When the client fails over from one primary to another, unacknowledged
 batches are replayed against the new primary. Without `DEDUP UPSERT KEYS`
-covering row identity, those replays produce duplicate rows in the target
-table.
+covering row identity, those replays can produce duplicate rows in the target
+table. Enable DEDUP for exactly-once outcomes; applications that tolerate
+occasional duplicates can skip it.
 
 :::
 

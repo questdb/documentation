@@ -102,9 +102,11 @@ string. Ingestion and queries run over separate WebSocket connections, which
 the clients' pools manage for you.
 
 Results stream rather than arriving in one block. The server sends batches as
-it produces them, so an application starts processing the head of a result
-while the tail is still being computed, and a result larger than memory never
-has to be materialized at all.
+it produces them, so an application can process the head of a result while
+the tail is still being computed without materializing the whole result.
+Clients may buffer batches ahead of the consumer: for large Node.js results,
+set a [byte-credit window](/docs/connect/clients/nodejs/#flow-control) to
+bound client-side buffering (the default is unbounded).
 
 Connections can recover from transport failures. With failover enabled, a
 client may reconnect and re-execute an in-flight query, including on the same
