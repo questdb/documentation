@@ -14,6 +14,7 @@ documentation.
 
 ```questdb-sql
 CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] view_name AS ( query )
+    [ WITH AUDIT ] [ OWNED BY owner_name ]
 ```
 
 ## Parameters
@@ -24,6 +25,10 @@ CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] view_name AS ( query )
 | `OR REPLACE` | Replaces existing view or creates new one |
 | `view_name` | Name of the view (case-insensitive, Unicode supported) |
 | `query` | SELECT statement defining the view |
+| `WITH AUDIT` | Enterprise only. Records every read of the view. See [WITH AUDIT](#with-audit-enterprise) |
+| `OWNED BY` | Enterprise only. Assigns the view's owner. See [OWNED BY](#owned-by-enterprise) |
+
+`WITH AUDIT` and `OWNED BY` may appear in either order.
 
 ## Examples
 
@@ -227,6 +232,27 @@ CREATE VIEW trades_summary AS (
 OWNED BY 'analysts';
 ```
 
+## WITH AUDIT (Enterprise)
+
+`WITH AUDIT` makes the view an [audited view](/docs/security/audited-views/):
+every read of it records a row in `sys.view_audit`, with the principal, the
+time, and the resolved values of the variables the view declares `AUDITED`.
+
+```questdb-sql title="Create an audited view"
+CREATE VIEW trades_by_symbol AS (
+  DECLARE OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price, amount
+  FROM trades
+  WHERE symbol IN @symbols
+) WITH AUDIT;
+```
+
+Creating a view `WITH AUDIT` requires the `AUDIT VIEW` permission in addition
+to `CREATE VIEW`. The view stays audited through `ALTER VIEW` and
+`CREATE OR REPLACE VIEW`, which do not accept `WITH AUDIT` for an existing
+view, and which also require `AUDIT VIEW` over an audited one. To audit an
+existing view, drop it and create it again.
+
 ## See also
 
 - [Views concept](/docs/concepts/views/)
@@ -234,3 +260,4 @@ OWNED BY 'analysts';
 - [DROP VIEW](/docs/query/sql/drop-view/)
 - [COMPILE VIEW](/docs/query/sql/compile-view/)
 - [DECLARE](/docs/query/sql/declare/)
+- [Audited views](/docs/security/audited-views/)

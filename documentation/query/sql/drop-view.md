@@ -97,6 +97,10 @@ GRANT DROP VIEW ON view1, view2 TO username;
 When a user creates a view, they are automatically granted all permissions
 including `DROP VIEW` on that view.
 
+Dropping an [audited view](/docs/security/audited-views/) also requires the
+database-level `AUDIT VIEW` permission, because dropping is the only way a view
+stops being audited.
+
 ## See also
 
 - [Views concept](/docs/concepts/views/)

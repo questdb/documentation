@@ -688,6 +688,7 @@ module.exports = {
           type: "doc",
           label: "Overview",
         },
+        "configuration/audited-views",
         "configuration/cairo-engine",
         "configuration/cold-storage",
         "configuration/copy-settings",
@@ -722,6 +723,11 @@ module.exports = {
           id: "security/rbac",
           type: "doc",
           label: "Role-Based Access Control (RBAC)",
+        },
+        {
+          id: "security/audited-views",
+          type: "doc",
+          label: "Audited views",
         },
         {
           id: "security/oidc",
