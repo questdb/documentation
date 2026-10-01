@@ -13,9 +13,10 @@ orders).
 
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that runs an
 [ASOF JOIN](/docs/query/sql/asof-join/) match at each of a set of forward (or
-backward) time offsets from every left-hand row, in a single pass. Adding
-aggregate functions collapses those matches into one row per offset, or per
-offset and key, which is how markout curves are built.
+backward) time offsets from every left-hand row, in a single pass. Without
+aggregate functions, the query returns one row per left-hand row and offset.
+Adding aggregate functions collapses those matches into one row per offset, or
+per offset and key, which is how markout curves are built.
 
 HORIZON JOIN supports joining against **multiple right-hand-side tables** in a
 single query, matching columns from several time-series sources against a
@@ -88,15 +89,17 @@ With multiple right-hand tables, QuestDB matches each table, at each offset,
 independently. If a right-hand table has no match for a given row/offset
 combination, its columns resolve to `NULL`.
 
-QuestDB implicitly groups the results by the non-aggregate SELECT columns
-(horizon offset, left-hand table keys, etc.), and applies aggregate functions
-across all matched rows. Aggregate expressions can reference columns from
-different right-hand tables (e.g., `avg(b.bid + a.ask)`).
+Aggregate functions are optional, and the shape of the result depends on
+whether the `SELECT` list has them:
 
-Aggregate functions are optional. Without them, the implicit grouping still
-applies, so the result has one row per distinct combination of the selected
-columns, as with `SELECT DISTINCT`. To get one row per left-hand row and
-offset, select the left table's timestamp along with the columns you need.
+- **Without aggregate functions**, the query returns every match: one row per
+  left-hand row and offset. See
+  [Queries without aggregate functions](#queries-without-aggregate-functions).
+- **With aggregate functions**, QuestDB implicitly groups the results by the
+  non-aggregate `SELECT` columns (horizon offset, left-hand table keys, etc.),
+  and applies the aggregate functions across all matched rows. Aggregate
+  expressions can reference columns from different right-hand tables (e.g.,
+  `avg(b.bid + a.ask)`).
 
 ## The horizon pseudo-table
 
@@ -135,11 +138,98 @@ values in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric value
 (e.g., `1_800_000_000_000` for 30 minutes in nanoseconds), not the interval
 literal.
 
+## Queries without aggregate functions
+
+A HORIZON JOIN with no aggregate function in its `SELECT` list, no `GROUP BY`
+and no `DISTINCT` returns one row per left-hand row and offset. A left-hand
+table of N rows and a horizon of M offsets produce N × M rows:
+
+- Left-hand rows that are exact duplicates each keep their own rows.
+- A row/offset combination with no match in a right-hand table is still
+  returned, with `NULL` in that table's columns.
+
+```questdb-sql title="Mid-price at each horizon for every trade" demo
+SELECT
+    t.timestamp,
+    t.symbol,
+    t.price,
+    h.offset / 1_000_000_000 AS horizon_sec,
+    (m.best_bid + m.best_ask) / 2 AS mid
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (0, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1m..$now';
+```
+
+Each trade in the interval produces four rows, one per offset.
+
+Aggregating these rows in an outer query gives the same result as writing the
+aggregate functions in the HORIZON JOIN itself.
+
+### Row order and designated timestamp
+
+Rows are returned in left-hand row order and, within each left-hand row, in
+ascending offset order.
+
+When the query selects the left-hand table's designated timestamp, that column
+is the designated timestamp of the result. An `ORDER BY` on it needs no sort,
+and an outer query can use the result as the input of
+[SAMPLE BY](/docs/query/sql/sample-by/) or as the left-hand side of a
+time-series join such as [ASOF JOIN](/docs/query/sql/asof-join/):
+
+```questdb-sql title="30-second markout per symbol in 5-minute buckets" demo
+SELECT timestamp, symbol, avg(mid - price) AS avg_markout
+FROM (
+    SELECT
+        t.timestamp,
+        t.symbol,
+        t.price,
+        (m.best_bid + m.best_ask) / 2 AS mid
+    FROM fx_trades AS t
+    HORIZON JOIN market_data AS m ON (symbol)
+    LIST (30s) AS h
+    WHERE t.timestamp IN '$now-1h..$now'
+)
+SAMPLE BY 5m;
+```
+
+The rows are not in `h.timestamp` order, and `h.timestamp` is never the
+designated timestamp of the result. To read the rows by horizon timestamp, add
+an explicit `ORDER BY`. An outer `SAMPLE BY` needs the left-hand timestamp in
+the `SELECT` list of the HORIZON JOIN.
+
+### Removing duplicates
+
+To get one row per distinct combination of the selected columns, use
+`SELECT DISTINCT` or an explicit `GROUP BY` that lists every selected column:
+
+```questdb-sql title="Distinct symbol and offset combinations" demo
+SELECT DISTINCT t.symbol, h.offset
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (0, 5s) AS h
+WHERE t.timestamp IN '$now-1h..$now';
+```
+
+:::note
+
+Before QuestDB 10.0.2, a HORIZON JOIN without aggregate functions grouped its
+result by every selected column, as `SELECT DISTINCT` does, and the result had
+no designated timestamp. Such a query returns more rows after the upgrade
+whenever several left-hand rows produce identical output rows. This also
+applies to views over such queries, because a view runs its stored SQL. Add
+`DISTINCT` or an explicit `GROUP BY` to keep the previous result.
+
+:::
+
 ## GROUP BY rules
 
-The `GROUP BY` clause is optional. When omitted, results are implicitly grouped
-by all non-aggregate `SELECT` columns. When `GROUP BY` is present, it follows
-stricter rules than regular `GROUP BY`:
+The `GROUP BY` clause is optional. When it is omitted and the `SELECT` list has
+aggregate functions, results are implicitly grouped by all non-aggregate
+`SELECT` columns. When it is omitted and there are no aggregate functions,
+nothing is grouped: see
+[Queries without aggregate functions](#queries-without-aggregate-functions).
+When `GROUP BY` is present, it follows stricter rules than regular `GROUP BY`:
 
 - Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
   expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`) or
@@ -344,6 +434,13 @@ Look for these indicators in the plan:
   expressions for better performance
 - **Async Multi Horizon Join**: Parallel execution with multiple right-hand
   tables (shown with `tables: N` indicating the number of right-hand tables)
+- **Async Horizon Join Projection**: Parallel execution of a HORIZON JOIN
+  without aggregate functions
+- **Async JIT Horizon Join Projection**: The same, with a
+  Just-In-Time-compiled `WHERE` filter
+
+A HORIZON JOIN without aggregate functions that runs on a single thread shows
+as **Horizon Join Projection**.
 
 ## Current limitations
 
@@ -354,8 +451,10 @@ Look for these indicators in the plan:
 - **No window functions**: Window functions cannot be used in HORIZON JOIN
   queries. Wrap the HORIZON JOIN in a subquery and apply window functions in the
   outer query.
-- **No SAMPLE BY**: `SAMPLE BY` cannot be used with HORIZON JOIN. Use `GROUP BY`
-  with a time-bucketing expression instead.
+- **No SAMPLE BY**: `SAMPLE BY` cannot be used in the same query as HORIZON
+  JOIN. Use `GROUP BY` with a time-bucketing expression instead, or apply
+  `SAMPLE BY` in an outer query over a HORIZON JOIN
+  [without aggregate functions](#row-order-and-designated-timestamp).
 - **WHERE filters left-hand table only**: The `WHERE` clause can only reference
   columns from the left-hand table. References to any right-hand table columns
   or horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
