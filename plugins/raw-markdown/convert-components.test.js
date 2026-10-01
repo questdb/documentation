@@ -60,5 +60,5 @@ test('preserves imports from the Node.js Quick start while removing its MDX impo
   const result = removeImports(content)
 
   assert.doesNotMatch(result, /^import SfDedupWarning from /m)
-  assert.match(result, /```typescript\nimport \{\n  connectQwpNodeClient,\n  QwpEgressQueryError,\n\} from "@questdb\/nodejs-client";/)
+  assert.match(result, /```typescript\nimport \{ connectQwpNodeClient \} from "@questdb\/nodejs-client";/)
 })

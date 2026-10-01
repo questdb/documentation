@@ -112,7 +112,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/connect/clients/nodejs-operations#ilp-transports-legacy",
+    "href": "/docs/connect/clients/nodejs#ilp-transports-legacy",
     "name": "Node.js",
     "description":
       "Node.js client for ILP ingestion over HTTP and TCP, alongside QWP.",

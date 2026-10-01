@@ -121,7 +121,7 @@ SQL writes such as `INSERT`. Each client describes its failover behavior:
 [Rust](/docs/connect/clients/rust/#failover-and-errors),
 [C and C++](/docs/connect/clients/c-and-cpp/#querying-data),
 [.NET](/docs/connect/clients/dotnet/#failover), and
-[Node.js](/docs/connect/clients/nodejs-operations/#query-failover).
+[Node.js](/docs/connect/clients/nodejs/#query-failover).
 
 The Rust, C++, and Python clients hand back results as Arrow record batches.
 That is the native memory layout of

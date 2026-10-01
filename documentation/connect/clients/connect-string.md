@@ -20,7 +20,7 @@ configures both without edits. The Node.js client is the exception for
 `target` and `zone`, which it also applies to ingress; see
 [Role filter and zone preference](#role-filter-and-zone-preference). The
 *Applies to:* tag on each section below marks which direction a key affects.
-The [Node.js client page](/docs/connect/clients/nodejs-operations/#differences-from-other-clients)
+The [Node.js client page](/docs/connect/clients/nodejs/#differences-from-other-clients)
 lists its behavioral differences from this reference.
 
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
@@ -454,7 +454,7 @@ The Node.js client applies `target` and `zone` to ingress as well. With
 `target=replica` in a shared connect string, its senders accept only replicas
 and cannot ingest. Set the query-side role through the typed `egress` option
 instead; see the
-[Node.js client page](/docs/connect/clients/nodejs-operations/#multiple-endpoints).
+[Node.js client page](/docs/connect/clients/nodejs/#multiple-endpoints).
 
 :::
 
@@ -672,7 +672,7 @@ exception is a Node.js sender in default memory mode, which gives up after
   `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies this
   budget to every outage, and fails with `QwpReconnectExhaustedError` when it
   runs out. See the
-  [Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect).
+  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -757,7 +757,7 @@ transport-level OK ACK alone cannot close.
   events. Default: `200` (ms). Set to `0` or a negative value to disable
   in clients that support it. In Node.js, explicitly setting this key also
   requests durable ACK (even at `0`), and negative values are rejected;
-  see [Node.js differences](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
+  see [Node.js differences](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
 wire protocol for the underlying mechanism.

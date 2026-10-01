@@ -19,7 +19,7 @@ unacknowledged rows live in memory and are lost if the process exits, or the
 sender closes, before the server acknowledges them. A Node.js sender in
 default memory mode also gives up after `reconnect_max_duration_millis` of
 outage; see the
-[Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect).
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 
 This page explains where duplicates come from and how to suppress them.
 

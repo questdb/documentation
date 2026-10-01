@@ -46,7 +46,7 @@ memory mode in two. A sender in default memory mode gives up after
 background memory mode (`initial_connect_retry=async` or `lazy_connect=on`)
 retries indefinitely, as SF mode does. See the
 [Node.js ingestion modes](/docs/connect/clients/nodejs/#ingestion-modes) and
-[Differences from other clients](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ## What "frame" means here
 

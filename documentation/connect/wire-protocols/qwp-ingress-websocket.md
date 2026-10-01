@@ -1151,7 +1151,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on` ([details](/docs/connect/clients/nodejs-operations/#differences-from-other-clients)). |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on` ([details](/docs/connect/clients/nodejs/#differences-from-other-clients)). |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |

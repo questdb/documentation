@@ -79,11 +79,6 @@ module.exports = {
               label: "Node.js",
             },
             {
-              id: "connect/clients/nodejs-operations",
-              type: "doc",
-              label: "Node.js operations and reference",
-            },
-            {
               id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",

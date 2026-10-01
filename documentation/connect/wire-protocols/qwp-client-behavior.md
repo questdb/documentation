@@ -141,7 +141,7 @@ retryable failures and stay within the failover budget. With no explicit policy,
 failover is enabled for established query connections but initial connection
 attempts are not retried. `failover=off` disables the reconnect wrapper; an
 explicit `egressSession.reconnect` value overrides the connect-string policy.
-See [Node.js connection events](/docs/connect/clients/nodejs-operations/#connection-events).
+See [Node.js connection events](/docs/connect/clients/nodejs/#connection-events).
 
 :::
 
@@ -379,7 +379,7 @@ start (`initial_connect_retry=async` or `lazy_connect=on`) keep retrying from
 startup and emit `durable-ack-unavailable`, even with `sf_dir`. With a
 foreground start and `sf_dir`, the first connection fails but later mismatches
 are retried after a successful connection. Monitor these
-[connection events](/docs/connect/clients/nodejs-operations/#connection-events) and buffer
+[connection events](/docs/connect/clients/nodejs/#connection-events) and buffer
 usage; see [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 
 ### Reconnect and outage handling
@@ -411,8 +411,8 @@ This is the behaviour of the Java reference client and the .NET client. Other
 clients are aligned to it, except a Node.js sender in default memory mode,
 without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, which
 gives up after `reconnect_max_duration_millis`; see the
-[Node.js client](/docs/connect/clients/nodejs-operations/#ingestion-reconnect) and its
-[other differences](/docs/connect/clients/nodejs-operations/#differences-from-other-clients).
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect) and its
+[other differences](/docs/connect/clients/nodejs/#differences-from-other-clients).
 If you
 are implementing a new client, the contract
 is: retry transport failures forever, surface only genuine terminal conditions,
