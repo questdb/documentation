@@ -13,13 +13,15 @@ orders).
 
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that runs an
 [ASOF JOIN](/docs/query/sql/asof-join/) match at each of a set of forward (or
-backward) time offsets from every left-hand row, in a single pass. Adding
-aggregate functions collapses those matches into one row per offset, or per
-offset and key, which is how markout curves are built.
+backward) time offsets from every left-hand row, in a single pass. Without
+aggregate functions, the query returns one row per left-hand row and offset.
+Adding aggregate functions collapses those matches into one row per offset, or
+per offset and key, which is how markout curves are built.
 
 HORIZON JOIN supports joining against **multiple right-hand-side tables** in a
 single query, matching columns from several time-series sources against a
-common left-hand table and offset grid.
+common left-hand table and offset grid. Each right-hand table can carry its own
+[filter](#filtering-right-hand-tables), which applies before the ASOF match.
 
 To see how it compares with WINDOW JOIN and the other time-series joins, read
 [Which time-series join?](/blog/questdb-time-series-joins-guide/)
@@ -34,10 +36,10 @@ given `STEP`:
 ```questdb-sql title="HORIZON JOIN with RANGE"
 SELECT [<keys>,] [<aggregations>]
 FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
-[HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
+HORIZON JOIN <right_side_1> AS <alias_1> [ON (<on_condition_1>)]
+[HORIZON JOIN <right_side_2> AS <alias_2> [ON (<on_condition_2>)]]
 ...
-HORIZON JOIN <right_table_N> AS <alias_N> [ON (<join_keys_N>)]
+HORIZON JOIN <right_side_N> AS <alias_N> [ON (<on_condition_N>)]
 RANGE FROM <from_expr> TO <to_expr> STEP <step_expr> AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -54,10 +56,10 @@ Specify explicit offsets as interval literals:
 ```questdb-sql title="HORIZON JOIN with LIST"
 SELECT [<keys>,] [<aggregations>]
 FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
-[HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
+HORIZON JOIN <right_side_1> AS <alias_1> [ON (<on_condition_1>)]
+[HORIZON JOIN <right_side_2> AS <alias_2> [ON (<on_condition_2>)]]
 ...
-HORIZON JOIN <right_table_N> AS <alias_N> [ON (<join_keys_N>)]
+HORIZON JOIN <right_side_N> AS <alias_N> [ON (<on_condition_N>)]
 LIST (<offset_expr>, ...) AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -67,6 +69,19 @@ LIST (<offset_expr>, ...) AS <horizon_alias>
 For example, `LIST (-1m, -5s, -1s, 0, 1s, 5s, 1m)` generates offsets at those
 specific points. Offsets must be monotonically increasing. Unitless `0` is
 allowed as shorthand for zero offset.
+
+### Right-hand side and ON condition
+
+In both forms:
+
+- `<right_side>` is a table, or a table with a filter: `(<table> WHERE
+  <filter>)`, or a `SELECT` of that table's columns with a `WHERE` clause. See
+  [Filtering right-hand tables](#filtering-right-hand-tables).
+- `<on_condition>` holds the join keys, such as `symbol` or
+  `t.symbol = m.symbol AND t.ecn = m.ecn`. It can also hold predicates on that
+  right-hand table alone, joined with `AND`, such as
+  `t.symbol = m.symbol AND m.ecn = 'LMAX'`. The shorthand form, `ON (symbol)`,
+  can't be combined with other predicates.
 
 When using multiple HORIZON JOINs, only the **last** HORIZON JOIN in the chain
 carries the `RANGE`/`LIST` and `AS` clauses. Preceding HORIZON JOINs omit them.
@@ -83,20 +98,24 @@ For each row in the left-hand table and each offset in the horizon:
    timestamp
 3. When join keys are provided (via `ON`), consider only the right-hand rows
    matching the keys
+4. When the right-hand table has a [filter](#filtering-right-hand-tables),
+   consider only the right-hand rows that pass it
 
 With multiple right-hand tables, QuestDB matches each table, at each offset,
 independently. If a right-hand table has no match for a given row/offset
 combination, its columns resolve to `NULL`.
 
-QuestDB implicitly groups the results by the non-aggregate SELECT columns
-(horizon offset, left-hand table keys, etc.), and applies aggregate functions
-across all matched rows. Aggregate expressions can reference columns from
-different right-hand tables (e.g., `avg(b.bid + a.ask)`).
+Aggregate functions are optional, and the shape of the result depends on
+whether the `SELECT` list has them:
 
-Aggregate functions are optional. Without them, the implicit grouping still
-applies, so the result has one row per distinct combination of the selected
-columns, as with `SELECT DISTINCT`. To get one row per left-hand row and
-offset, select the left table's timestamp along with the columns you need.
+- **Without aggregate functions**, the query returns every match: one row per
+  left-hand row and offset. See
+  [Queries without aggregate functions](#queries-without-aggregate-functions).
+- **With aggregate functions**, QuestDB implicitly groups the results by the
+  non-aggregate `SELECT` columns (horizon offset, left-hand table keys, etc.),
+  and applies the aggregate functions across all matched rows. Aggregate
+  expressions can reference columns from different right-hand tables (e.g.,
+  `avg(b.bid + a.ask)`).
 
 ## The horizon pseudo-table
 
@@ -135,11 +154,216 @@ values in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric value
 (e.g., `1_800_000_000_000` for 30 minutes in nanoseconds), not the interval
 literal.
 
+## Queries without aggregate functions
+
+A HORIZON JOIN with no aggregate function in its `SELECT` list, no `GROUP BY`
+and no `DISTINCT` returns one row per left-hand row and offset. A left-hand
+table of N rows and a horizon of M offsets produce N × M rows:
+
+- Left-hand rows that are exact duplicates each keep their own rows.
+- A row/offset combination with no match in a right-hand table is still
+  returned, with `NULL` in that table's columns.
+
+```questdb-sql title="Mid-price at each horizon for every trade" demo
+SELECT
+    t.timestamp,
+    t.symbol,
+    t.price,
+    h.offset / 1_000_000_000 AS horizon_sec,
+    (m.best_bid + m.best_ask) / 2 AS mid
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (0, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1m..$now';
+```
+
+Each trade in the interval produces four rows, one per offset.
+
+Aggregating these rows in an outer query gives the same result as writing the
+aggregate functions in the HORIZON JOIN itself. When you don't need the
+individual rows, write the aggregate functions in the HORIZON JOIN: there, the
+aggregation runs on the worker threads, while an outer query aggregates on the
+thread that reads the rows.
+
+### Row order and designated timestamp
+
+Rows are returned in left-hand row order and, within each left-hand row, in
+ascending offset order.
+
+When the query selects the left-hand table's designated timestamp, that column
+is the designated timestamp of the result. An `ORDER BY` on it needs no sort,
+and an outer query can use the result as the input of
+[SAMPLE BY](/docs/query/sql/sample-by/) or as the left-hand side of a
+time-series join such as [ASOF JOIN](/docs/query/sql/asof-join/):
+
+```questdb-sql title="30-second markout per symbol in 5-minute buckets" demo
+SELECT timestamp, symbol, avg(mid - price) AS avg_markout
+FROM (
+    SELECT
+        t.timestamp,
+        t.symbol,
+        t.price,
+        (m.best_bid + m.best_ask) / 2 AS mid
+    FROM fx_trades AS t
+    HORIZON JOIN market_data AS m ON (symbol)
+    LIST (30s) AS h
+    WHERE t.timestamp IN '$now-1h..$now'
+)
+SAMPLE BY 5m;
+```
+
+The rows are not in `h.timestamp` order, and `h.timestamp` is never the
+designated timestamp of the result. To read the rows by horizon timestamp, add
+an explicit `ORDER BY`. An outer `SAMPLE BY` needs the left-hand timestamp in
+the `SELECT` list of the HORIZON JOIN.
+
+### Removing duplicates
+
+To get one row per distinct combination of the selected columns, use
+`SELECT DISTINCT` or an explicit `GROUP BY` that lists every selected column:
+
+```questdb-sql title="Distinct symbol and offset combinations" demo
+SELECT DISTINCT t.symbol, h.offset
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (0, 5s) AS h
+WHERE t.timestamp IN '$now-1h..$now';
+```
+
+### Upgrading from earlier versions
+
+:::warning Breaking change in QuestDB 10.0.2
+
+Before QuestDB 10.0.2, a HORIZON JOIN without aggregate functions grouped its
+result by every selected column, as `SELECT DISTINCT` does, and the result had
+no designated timestamp.
+
+:::
+
+After the upgrade:
+
+- **Queries** return more rows whenever several left-hand rows produce
+  identical output rows. Add `DISTINCT` or an explicit `GROUP BY` to keep the
+  previous result.
+- **[Views](/docs/concepts/views/)** over such queries return the new rows,
+  because a view runs its stored SQL.
+- **[Materialized views](/docs/concepts/materialized-views/)** over such
+  queries keep the grouped rows they stored before the upgrade, and later
+  refreshes add ungrouped rows. Run
+  [`REFRESH MATERIALIZED VIEW <name> FULL`](/docs/query/sql/refresh-mat-view/)
+  to rebuild the view with the new result, or recreate the view with `DISTINCT`
+  or an explicit `GROUP BY` in its query to keep the previous result.
+- **`INSERT INTO ... SELECT` without a column list** fails when the query
+  selects the left-hand designated timestamp at a different position than the
+  target table's designated timestamp, with an error such as
+  `designated timestamp of existing table (0) does not match designated
+  timestamp in select query (2)`. List the target columns explicitly, as in
+  `INSERT INTO target (ts, symbol, price) SELECT ...`.
+
+## Filtering right-hand tables
+
+A filter on a right-hand table restricts the rows that the ASOF match
+considers. QuestDB applies it **before** matching: at each offset, a left-hand
+row matches the latest right-hand row at or before the horizon timestamp that
+passes the filter, even when newer rows fail it. When no row passes, that
+table's columns are `NULL`.
+
+Write the filter in the `ON` clause, combined with the join keys using `AND`:
+
+```questdb-sql title="Markout against LMAX quotes only" demo
+SELECT
+    h.offset / 1_000_000_000 AS horizon_sec,
+    t.symbol,
+    avg((c.bid_price + c.ask_price) / 2 - t.price) AS avg_markout
+FROM fx_trades AS t
+HORIZON JOIN core_price AS c ON (t.symbol = c.symbol AND c.ecn = 'LMAX')
+LIST (0, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1h..$now'
+ORDER BY t.symbol, horizon_sec;
+```
+
+Every trade is measured against the LMAX quote, wherever it executed. To match
+each trade against the quotes of its own ECN instead, make the ECN a join key:
+`ON (t.symbol = c.symbol AND t.ecn = c.ecn)`.
+
+Or write the filter in a subquery on the right-hand table:
+
+```questdb-sql title="Mid-price around trades, excluding event-driven quotes" demo
+SELECT
+    h.offset / 1_000_000_000 AS horizon_sec,
+    t.symbol,
+    avg((c.bid_price + c.ask_price) / 2) AS avg_mid
+FROM fx_trades AS t
+HORIZON JOIN (core_price WHERE reason = 'normal') AS c ON (symbol)
+RANGE FROM -5s TO 5s STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
+ORDER BY t.symbol, horizon_sec;
+```
+
+The two forms give the same result, and a query can use both. A filter:
+
+- can use the right-hand table's columns, constants and bind variables, with
+  comparisons, `IN` lists, regular expressions and functions
+- works with or without join keys, and with or without aggregate functions
+- applies only to its own table when the query has several right-hand tables
+
+A designated timestamp interval in the subquery, such as
+`(core_price WHERE timestamp IN '$now-30m..$now' AND ecn = 'EBS')`, also limits
+the right-hand rows to that interval, and QuestDB scans only that interval.
+
+A right-hand filter differs from the `WHERE` clause, which filters the
+left-hand rows and can't reference right-hand columns. To drop output rows
+based on the values that the match returned, filter in an outer query.
+
+An `ON` predicate that references no columns, such as `1 = 0` or a bind
+variable, applies to the right-hand table of that `ON` clause: a true value has
+no effect, and a false value leaves every left-hand row without a match in that
+table.
+
+### Filter restrictions
+
+- Besides the join keys, an `ON` clause can only hold predicates on its own
+  right-hand table. A predicate on left-hand columns (`t.quantity > 0`), on both
+  sides (`t.price > c.bid_price`), on the horizon pseudo-table
+  (`h.offset > 0`) or on another right-hand table fails with
+  `unsupported HORIZON join expression`. Filter left-hand rows in the `WHERE`
+  clause instead.
+- A subquery in the `ON` clause, such as `c.ecn IN (SELECT ...)`, fails with
+  `query is not allowed here`. Move it into the right-hand subquery:
+  `(core_price WHERE ecn IN (SELECT ...))`.
+- A right-hand subquery can select a subset of the table's columns, in any
+  order. Columns it doesn't select are not available to the rest of the query.
+  It can't rename columns, compute new ones, or use `LIMIT`, `DISTINCT`,
+  aggregation or joins. Such a subquery fails with
+  `right-hand side of HORIZON JOIN can only be a table with an optional filter`.
+  The same error is returned for a false constant in the `ON` clause when the
+  right-hand side is a subquery or a CTE.
+
+The filter runs row by row during the ASOF lookup, without
+[JIT compilation](/docs/concepts/deep-dive/jit-compiler/) or symbol indexes. A
+filter that few rows pass can make each lookup scan far back through the
+right-hand table. In [`EXPLAIN`](/docs/query/sql/explain/) output, the filter
+appears as `slave filter` under the HORIZON JOIN node.
+
+:::warning Breaking change in QuestDB 10.0.2
+
+Before QuestDB 10.0.2, HORIZON JOIN ignored every `ON` predicate other than the
+join keys, so right-hand rows that failed it still matched. Queries with such
+predicates now return different results. Predicates of the shapes listed in
+[Filter restrictions](#filter-restrictions) were ignored as well, and now fail.
+A filter in a right-hand subquery was rejected unless it was a designated
+timestamp interval.
+
+:::
+
 ## GROUP BY rules
 
-The `GROUP BY` clause is optional. When omitted, results are implicitly grouped
-by all non-aggregate `SELECT` columns. When `GROUP BY` is present, it follows
-stricter rules than regular `GROUP BY`:
+The `GROUP BY` clause is optional. When it is omitted and the `SELECT` list has
+aggregate functions, results are implicitly grouped by all non-aggregate
+`SELECT` columns. When it is omitted and there are no aggregate functions,
+nothing is grouped: see
+[Queries without aggregate functions](#queries-without-aggregate-functions).
+When `GROUP BY` is present, it follows stricter rules than regular `GROUP BY`:
 
 - Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
   expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`) or
@@ -344,6 +568,16 @@ Look for these indicators in the plan:
   expressions for better performance
 - **Async Multi Horizon Join**: Parallel execution with multiple right-hand
   tables (shown with `tables: N` indicating the number of right-hand tables)
+- **Async Horizon Join Projection**: Parallel execution of a HORIZON JOIN
+  without aggregate functions, with one or more right-hand tables
+- **Async JIT Horizon Join Projection**: The same, with a
+  Just-In-Time-compiled `WHERE` filter
+
+A HORIZON JOIN without aggregate functions matches in parallel only while the
+number of offsets times the number of right-hand tables is at most 100. Above
+that, it matches on a single thread and shows as **Horizon Join Projection**,
+while its `WHERE` filter still runs in parallel, as an `Async Filter` or
+`Async JIT Filter` node below it.
 
 ## Current limitations
 
@@ -354,15 +588,23 @@ Look for these indicators in the plan:
 - **No window functions**: Window functions cannot be used in HORIZON JOIN
   queries. Wrap the HORIZON JOIN in a subquery and apply window functions in the
   outer query.
-- **No SAMPLE BY**: `SAMPLE BY` cannot be used with HORIZON JOIN. Use `GROUP BY`
-  with a time-bucketing expression instead.
+- **No SAMPLE BY**: `SAMPLE BY` cannot be used in the same query as HORIZON
+  JOIN. Use `GROUP BY` with a time-bucketing expression instead, or apply
+  `SAMPLE BY` in an outer query over a HORIZON JOIN
+  [without aggregate functions](#row-order-and-designated-timestamp).
 - **WHERE filters left-hand table only**: The `WHERE` clause can only reference
   columns from the left-hand table. References to any right-hand table columns
   or horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
+  To filter a right-hand table before matching, use a
+  [right-hand filter](#filtering-right-hand-tables).
+- **ORDER BY selected columns only**: `ORDER BY` can only reference columns in
+  the `SELECT` list. Other columns fail with
+  `ORDER BY expressions must appear in select list`.
 - **All tables must have a designated timestamp**: The left-hand and all
   right-hand tables must each have a designated timestamp column.
 - **Right-hand side must be a table**: Each right-hand side of HORIZON JOIN must
-  be a table with an optional filter, more complex subqueries aren't supported.
+  be a table with an optional filter. More complex subqueries aren't supported,
+  see [Filter restrictions](#filter-restrictions).
 - **Left-hand side queries are restricted as well**. On the left hand side, the
   query that works best is a table with an optional filter. Some other query
   types are also supported, but they degrade the query plan to single-threaded

@@ -622,8 +622,9 @@ need additional filtering on the two tables, the `ON` clause can also be used.
 
 HORIZON JOIN is a specialized time-series join for markout analysis and event
 impact studies. For each left row, it runs an ASOF JOIN match at a set of time
-offsets in a single pass. Combined with aggregate functions, it produces one
-result per offset, such as an average markout curve.
+offsets in a single pass. Without aggregate functions, it returns one row per
+left row and offset. Combined with aggregate functions, it produces one result
+per offset, such as an average markout curve.
 
 It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
 
