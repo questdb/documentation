@@ -16,8 +16,10 @@ deviates, the affected key section and client page call it out.
 One `ws::` / `wss::` connect string serves both the ingress sender and the
 egress query client. Each direction reads the keys relevant to it and
 ignores keys meant only for the other direction, so the same string
-configures both without edits. The *Applies to:* tag on each section below
-marks which direction a key affects.
+configures both without edits. The Node.js client is the exception for
+`target` and `zone`, which it also applies to ingress; see
+[Role filter and zone preference](#role-filter-and-zone-preference). The
+*Applies to:* tag on each section below marks which direction a key affects.
 
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 `tcps`), see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
@@ -144,6 +146,11 @@ wss::addr=node-a:9000,node-b:9000;sf_dir=/var/lib/myapp/qdb-sf;sender_id=ingest-
 wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ```
 
+Senders in other clients ignore `target`, so they can share this string. On the
+Node.js pooled client, `target=replica` in the connect string stops ingestion;
+set the role with the typed `egress` option instead, as described under
+[Role filter and zone preference](#role-filter-and-zone-preference).
+
 ### Tolerate a slow or restarting server at startup
 
 ```
@@ -169,7 +176,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
-| Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
+| Query only replicas (offload primary)             | egress    | `target=replica`                       | Node.js: use the typed `egress.target` option, because the key also filters ingress         |
 | Zone-aware routing with DR last-resort            | egress    | `zone=<id>`                            | `target`                                                                                    |
 | Tune ingest batching                              | ingress   | —                                      | Clients with auto-flush: `auto_flush_rows`, `auto_flush_interval`, `auto_flush_bytes`       |
 | Disable auto-flush (manual `flush()` only)        | ingress   | `auto_flush=off`                       | —                                                                                           |
