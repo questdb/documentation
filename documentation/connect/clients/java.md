@@ -1242,18 +1242,24 @@ regardless of how the sender was created:
 
 | Field | Accessor | Description |
 |-------|----------|-------------|
-| Category | `getCategory()` | `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`, `SECURITY_ERROR`, `WRITE_ERROR`, `PROTOCOL_VIOLATION`, or `UNKNOWN` |
-| Policy | `getAppliedPolicy()` | `DROP_AND_CONTINUE` (batch dropped, sender continues) or `HALT` (next API call throws `LineSenderServerException`) |
+| Category | `getCategory()` | `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`, `SECURITY_ERROR`, `WRITE_ERROR`, `NOT_WRITABLE`, `DICTIONARY_GAP`, `PROTOCOL_VIOLATION`, `DATA_LOSS`, or `UNKNOWN` |
+| Policy | `getAppliedPolicy()` | `RETRIABLE` (the client reconnects and resends the batch), `RETRIABLE_OTHER` (resends it to another endpoint), `TERMINAL` (the sender stops; the next API call throws `LineSenderServerException`), or `ABANDONED` (only with `DATA_LOSS`: store-and-forward data that can never be sent was set aside) |
 | Server message | `getServerMessage()` | Human-readable error text from the server (may be null) |
 | Table name | `getTableName()` | The rejected table (null for multi-table batches) |
 | FSN range | `getFromFsn()` / `getToFsn()` | Frame sequence number span identifying the rejected batch |
 | Message sequence | `getMessageSequence()` | Server's per-frame sequence number (`-1` if not available) |
 | Status byte | `getServerStatusByte()` | Raw QWP status code (`-1` if not available) |
+| Quarantined path | `getQuarantinedPath()` | For `DATA_LOSS`, where the set-aside data was preserved (null otherwise) |
+
+There is no drop policy: a rejected batch is resent, stops the sender, or, for
+`DATA_LOSS` only, is set aside. See
+[Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames)
+for the default policy of each category.
 
 The error handler runs on a dedicated dispatcher thread, never on the I/O
 or producer thread.
 
-When a sender owned by `QuestDB` enters a terminal `HALT` state, the next
+When a sender owned by `QuestDB` stops with a `TERMINAL` error, the next
 producer-thread call throws `LineSenderServerException`. The pool detects
 the failure on close/return and replaces the failed sender with a fresh one on
 the next borrow.

@@ -312,8 +312,9 @@ A conformant client exposes at minimum:
   by category. Background `SCHEMA_MISMATCH` is usually a schema-drift
   symptom worth alerting on.
 
-The default error handler logs every received `SenderError` —
-`ERROR`-level for HALT, `WARN`-level for DROP. Replace it only if you
+The default error handler logs every received `SenderError`:
+`ERROR`-level for terminal and abandoned errors, `WARN`-level for retriable
+ones. Replace it only if you
 are also routing the errors somewhere else (Sentry, structured logs):
 silence is forbidden by the contract.
 
