@@ -32,6 +32,14 @@
     "protocol": "QWP"
   },
   {
+    "href": "/docs/connect/clients/nodejs",
+    "name": "Node.js",
+    "description":
+      "Pooled QWP ingestion and streaming SQL for Node.js and TypeScript.",
+    "logo": "/images/logos/nodejs-light.svg",
+    "protocol": "QWP"
+  },
+  {
     "href": "/docs/connect/clients/dotnet",
     "name": ".NET",
     "description":
@@ -104,10 +112,10 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/connect/clients/nodejs",
+    "href": "/docs/connect/clients/nodejs#ilp-transports-legacy",
     "name": "Node.js",
     "description":
-      "JavaScript runtime client. Ingests over ILP; QWP support is planned.",
+      "Node.js client for ILP ingestion over HTTP and TCP, alongside QWP.",
     "logo": "/images/logos/nodejs-light.svg",
     "protocol": "ILP"
   },

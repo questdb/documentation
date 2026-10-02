@@ -29,13 +29,23 @@ for performance. Our recommendation is to use the `pg` client for most use cases
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
-querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/connect/clients/nodejs/) for data
-ingestion using ILP.
+For data ingestion, we recommend QuestDB's first-party clients instead of
+PGWire. QuestDB provides an official
+[Node.js client](/docs/connect/clients/nodejs/) with high-throughput ingestion
+and streaming SQL queries over QWP. PGWire remains a good fit when you need a
+standard PostgreSQL driver or ORM.
 
 :::
 
+:::note Example schema
+
+The PGWire examples below assume a pre-existing `trades` table with `ts` as
+its designated timestamp and `symbol` and `price` columns. This differs from
+the [QWP Node.js quick start](/docs/connect/clients/nodejs/#quick-start), which
+auto-creates `trades.timestamp`. To query that table with these examples,
+replace SQL `ts` and JavaScript `.ts` with `timestamp` and `.timestamp`.
+
+:::
 
 ## Connection Parameters
 
@@ -747,7 +757,7 @@ async function latestByQuery() {
         // Get the latest values for each symbol
         const latest = await sql`
       SELECT * FROM trades
-      LATEST ON timestamp PARTITION BY symbol
+      LATEST ON ts PARTITION BY symbol
     `
 
         console.log(`Latest prices for ${latest.length} symbols:`)
@@ -780,9 +790,8 @@ latestByQuery()
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard JavaScript PostgreSQL clients for querying
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
-We recommend the `pg` client for querying.
-For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
-throughput.
+Among PGWire drivers, we recommend the `pg` client for querying. For data ingestion, and for streaming query
+results without a PostgreSQL driver, use the QuestDB [Node.js client](/docs/connect/clients/nodejs/), which speaks QWP.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
 `SAMPLE BY` and `LATEST ON` for efficient queries.

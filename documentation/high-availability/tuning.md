@@ -22,7 +22,7 @@ restart.
 
 | Setting | Node | Default | What it does |
 |---------|------|---------|-------------|
-| `replication.primary.throttle.window.duration` | Primary | `10000` (10s) | Maximum time before an incomplete WAL segment is flushed |
+| `replication.primary.throttle.window.duration` | Primary | `1000` (1s) | Maximum time before an incomplete WAL segment is flushed |
 | `replication.replica.poll.interval` | Replica | `1000` (1s) | How often the replica checks for new data |
 | `cairo.wal.segment.rollover.size` | Primary | `2097152` (2 MiB) | Max WAL segment size before rollover |
 
@@ -59,7 +59,7 @@ replication.replica.poll.interval=100
 
 No configuration needed. The defaults are:
 
-- `replication.primary.throttle.window.duration=10000` (10s)
+- `replication.primary.throttle.window.duration=1000` (1s)
 - `replication.replica.poll.interval=1000` (1s)
 - `cairo.wal.segment.rollover.size=2097152` (2 MiB)
 
@@ -124,8 +124,8 @@ write ops typically cost ~\$5/million and read ops ~\$0.40/million.
 |---|---|
 | 50ms / 50ms | ~$280 |
 | 100ms / 100ms | ~$140 |
-| 1s / 1s | ~$14 |
-| 10s / 1s (default) | ~$2 |
+| 1s / 1s (default) | ~$14 |
+| 10s / 1s | ~$2 |
 
 Multiply by the number of tables being actively written to. With 10 tables at
 100ms intervals, that's ~$1,400/month in API charges alone. With NFS, that same
@@ -212,7 +212,7 @@ Tiering requires files over 128 KiB.
 ### Throttle window
 
 ```ini
-replication.primary.throttle.window.duration=10000  # 10 seconds (default)
+replication.primary.throttle.window.duration=1000  # 1 second (default)
 ```
 
 Maximum time before uploading an incomplete segment. If a segment hasn't reached
@@ -223,8 +223,8 @@ segments fill up before upload, reducing redundant uploads (write amplification)
 |-------|----------|
 | `50` (50ms) | Ultra-low latency. Best with NFS transport. |
 | `100` (100ms) | Low latency. Good balance for NFS transport. |
-| `1000` (1s) | Low latency for object store transport. |
-| `10000` (10s) | Default. Balanced. |
+| `1000` (1s) | Default. Low latency for object store transport. |
+| `10000` (10s) | 10 second delay OK. Fewer uploads. |
 | `60000` (60s) | 1 minute delay OK. Fewer uploads. |
 | `300000` (5 min) | Cost-sensitive. Batches more data. |
 

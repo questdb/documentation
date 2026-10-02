@@ -33,8 +33,8 @@ For data ingestion, see
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/query/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP query support to JavaScript, Rust, .NET, or runtimes that the existing
-clients don't cover).
+QWP query support to Ruby, PHP, or runtimes that the existing clients don't
+cover).
 
 Compared with the row-oriented HTTP `/exec` JSON endpoint, QWP egress trades
 a denser binary encoding for higher throughput and lower CPU on both ends:

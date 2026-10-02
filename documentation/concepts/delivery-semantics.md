@@ -2,15 +2,25 @@
 title: Delivery semantics
 sidebar_label: Delivery semantics
 description:
-  How QuestDB clients deliver data (at-least-once), where duplicate rows can
-  arise, and how to combine designated timestamps with deduplication for
-  exactly-once outcomes.
+  How QuestDB QWP/WebSocket senders replay unacknowledged writes, where
+  duplicates arise, and how to use deduplication for exactly-once outcomes.
 ---
 
-QuestDB clients deliver data **at-least-once**: every row your application
-publishes is guaranteed to reach the server, but under failure it may arrive
-more than once. Storing each row exactly once is the application's
-responsibility, and QuestDB provides the mechanisms to make it routine.
+QuestDB QWP/WebSocket senders retry **published, unacknowledged batches**
+while they retain them. This gives at-least-once delivery under transport
+failures, but a row may be stored more than once. QWP/UDP is fire-and-forget:
+it has no acknowledgement or retry, so rows can be lost. Storing each row
+exactly once is the application's responsibility, and QuestDB provides the
+mechanisms to make it routine.
+
+Without [store-and-forward](/docs/high-availability/store-and-forward/concepts/),
+unacknowledged rows live in memory and are lost if the process exits, or the
+sender closes, before the server acknowledges them. A Node.js sender in
+default memory mode also gives up after `reconnect_max_duration_millis` of
+outage; see the
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
+Server rejections and exhausted buffer capacity can also stop delivery; handle
+those errors rather than assuming every attempted write will arrive.
 
 This page explains where duplicates come from and how to suppress them.
 
@@ -18,14 +28,14 @@ This page explains where duplicates come from and how to suppress them.
 
 | Property | Meaning | Where it comes from |
 |----------|---------|---------------------|
-| **At-most-once** | Each row reaches the server zero or one times. Rows can be lost. | A "fire and forget" client that does not retransmit on failure. |
-| **At-least-once** | Each row reaches the server one or more times. No row is lost; duplicates are possible. | A client that retransmits unacknowledged data after a transport error. **This is the QuestDB client default.** |
+| **At-most-once** | Each row reaches the server zero or one times. Rows can be lost. | Fire-and-forget delivery without ACKs or retries, such as QWP/UDP. |
+| **At-least-once** | Each row reaches the server one or more times. Duplicates are possible. | QWP/WebSocket senders retry published batches while they retain them; disk-backed store-and-forward extends replay across process restarts. |
 | **Exactly-once** | Each row is stored exactly once. | At-least-once delivery plus server-side deduplication on a key covering row identity. |
 
-QuestDB's clients retransmit unacknowledged batches after transport errors,
-host failovers, and process restarts. The trade-off is deliberate: losing
-data silently is the worse failure mode. The cost is that the application
-must tolerate or suppress duplicates.
+QWP/WebSocket senders retransmit unacknowledged batches after transport errors
+and host failovers, and across process restarts with store-and-forward. The
+trade-off is deliberate: losing data silently is the worse failure mode. The
+cost is that the application must tolerate or suppress duplicates.
 
 ## Where duplicates come from
 
@@ -38,7 +48,7 @@ the server confirms a batch, the client reconnects and re-sends. If the
 server had already committed the batch but the acknowledgement was lost in
 flight, the second send produces duplicates.
 
-This path applies to every QuestDB client deployment.
+This path applies to QWP/WebSocket senders, not QWP/UDP.
 
 ### Multi-host failover replay
 
@@ -112,12 +122,13 @@ If two distinct events can share `(ts, symbol, side)` and both should be
 preserved, widen `UPSERT KEYS` to include a column that distinguishes them
 — for example a `trade_id` or `seq` column.
 
-:::warning DEDUP is required on tables behind multi-host failover
+:::warning Use DEDUP behind multi-host failover when duplicates matter
 
 When the client fails over from one primary to another, unacknowledged
 batches are replayed against the new primary. Without `DEDUP UPSERT KEYS`
-covering row identity, those replays produce duplicate rows in the target
-table.
+covering row identity, those replays can produce duplicate rows in the target
+table. Enable DEDUP for exactly-once outcomes; applications that tolerate
+occasional duplicates can skip it.
 
 :::
 

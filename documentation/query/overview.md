@@ -97,19 +97,31 @@ against the demo instance.
 ## QuestDB client libraries
 
 The official client libraries speak the QuestDB Wire Protocol (QWP), a binary
-protocol that carries both ingestion and query traffic over one connection and
-one configuration string. This is the fastest way to get data out of QuestDB
-from an application.
+protocol for both ingestion and querying, configured with one connection
+string. Ingestion and queries run over separate WebSocket connections, which
+the clients' pools manage for you.
 
 Results stream rather than arriving in one block. The server sends batches as
-it produces them, so an application starts processing the head of a result
-while the tail is still being computed, and a result larger than memory never
-has to be materialized at all.
+it produces them, so an application can process the head of a result while
+the tail is still being computed without materializing the whole result.
+Clients may buffer batches ahead of the consumer: for large Node.js results,
+set a [byte-credit window](/docs/connect/clients/nodejs/#flow-control) to
+bound client-side buffering (the default is unbounded).
 
-Connections recover on their own. When a connection drops and replicas are
-available, the client reconnects and retries against another one without the
-application intervening. A query that fails over restarts from the beginning,
-which is transparent if you materialize the whole result.
+Connections can recover from transport failures. With failover enabled, a
+client may reconnect and re-execute an in-flight query, including on the same
+host, and the result then restarts from its first row. Helpers that collect a
+whole result, such as Python's `to_pandas()`, discard the partial result for
+you. If you process batches yourself, reset any accumulated state when the
+result restarts, or handle the client's error. Re-execution can also repeat
+SQL writes such as `INSERT`. Each client describes its failover behavior:
+[Java](/docs/connect/clients/java/#query-failover),
+[Python](/docs/connect/clients/python/#reader-failover),
+[Go](/docs/connect/clients/go/#query-failover),
+[Rust](/docs/connect/clients/rust/#failover-and-errors),
+[C and C++](/docs/connect/clients/c-and-cpp/#querying-data),
+[.NET](/docs/connect/clients/dotnet/#failover), and
+[Node.js](/docs/connect/clients/nodejs/#query-failover).
 
 The Rust, C++, and Python clients hand back results as Arrow record batches.
 That is the native memory layout of
@@ -117,8 +129,15 @@ That is the native memory layout of
 [Polars](/docs/integrations/data-processing/polars/), and DuckDB, so a query
 becomes a DataFrame with no row-by-row conversion in between.
 
-See the [Connect overview](/docs/connect/overview/) for the per-language
-guides and which clients ship QWP today.
+To get started, see the querying section of your client:
+[Java](/docs/connect/clients/java/#querying-with-query-and-completion),
+[Python](/docs/connect/clients/python/#querying),
+[Go](/docs/connect/clients/go/#querying-and-sql-execution),
+[Rust](/docs/connect/clients/rust/#querying),
+[C and C++](/docs/connect/clients/c-and-cpp/#querying-data),
+[.NET](/docs/connect/clients/dotnet/#querying-and-sql-execution), or
+[Node.js](/docs/connect/clients/nodejs/#querying). The
+[Connect overview](/docs/connect/overview/) compares the clients.
 
 ## PostgreSQL
 

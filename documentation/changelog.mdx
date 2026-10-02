@@ -8,6 +8,14 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### Updated
+
+- [Node.js client](/docs/connect/clients/nodejs/) - Rewrote the page for QWP support in `@questdb/nodejs-client` 5.0.0: pooled ingestion and streaming SQL queries from one connect string, every column type, compiled object-row writers, acknowledgements, transactions, store-and-forward, UDP, failover, error handling, and migration from ILP and from 4.x. The [connect string reference](/docs/connect/clients/connect-string/) and the high-availability and wire-protocol pages now note where the Node.js client's keys, defaults, and behavior differ
+- [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) - Corrected the replay semantics for every client: replay is at least once and can insert duplicate rows unless the table uses `DEDUP UPSERT KEYS`. The error policy table now shows the real defaults, which include no drop policy, and the [Java](/docs/connect/clients/java/#ingestion-errors) and [.NET](/docs/connect/clients/dotnet/#how-errors-surface) client pages now document their retriable, terminal, and abandoned policies. [Client failover](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) now lists which clients retry authentication rejections after a sender's first connection
+- [Replication tuning](/docs/high-availability/tuning/) - Corrected the default of `replication.primary.throttle.window.duration` to 1 second, its value since QuestDB Enterprise 3.3.1, in the tuning guide and the [replication configuration reference](/docs/configuration/database-replication/#replicationprimarythrottlewindowduration)
+
 ## September 2026
 
 ### QuestDB Enterprise Releases

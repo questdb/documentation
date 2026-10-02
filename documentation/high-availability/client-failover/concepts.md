@@ -57,7 +57,7 @@ host.
 | `Unknown` | The host has not been tried in this round, or its classification was reset. |
 | `TransientReject` | The server returned `421` with `X-QuestDB-Role: PRIMARY_CATCHUP` — it is a primary that is still catching up after promotion. Expected to recover. |
 | `TransportError` | TCP/TLS handshake failed, an HTTP upgrade returned a transient error code, or an established connection broke mid-stream. |
-| `TopologyReject` | The server returned `421` with any role other than `PRIMARY_CATCHUP` (`PRIMARY`, `REPLICA`, `STANDALONE`, or an unrecognised token), or — on egress — a successfully-upgraded host whose `SERVER_INFO` role does not satisfy the requested `target=` filter. The host will not become usable without a topology change. |
+| `TopologyReject` | The server returned `421` with any role other than `PRIMARY_CATCHUP` (`PRIMARY`, `REPLICA`, `STANDALONE`, or an unrecognised token), or a successfully-upgraded host whose `SERVER_INFO` role does not satisfy the requested `target=` filter (egress only; the Node.js client also applies it to ingress). The host will not become usable without a topology change. |
 
 A lower state in the table above is preferred when the client picks the next
 host to try.
@@ -80,7 +80,10 @@ the host re-advertises a different zone.
 `target=primary` collapses every host's zone tier to `Same` — writers must
 follow the primary regardless of geography. Ingress is currently zone-blind in
 both storage modes, so the `zone=` key is silently accepted on ingress
-connections and only takes effect on egress.
+connections and only takes effect on egress. The Node.js client is the
+exception: it applies `zone=` and `target=` to ingress too. Its other
+deviations are listed under
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ### Selection priority
 
@@ -120,7 +123,8 @@ The `target=` key controls which server role the client is willing to bind to:
 up to its predecessor's WAL — the client treats it as transient and retries
 the same host (with a fresh round, no exponential backoff) until it becomes a
 full `PRIMARY`. On an ingress sender this retry has no deadline; the producer
-is bounded by buffer capacity rather than by elapsed time.
+is bounded by buffer capacity rather than by elapsed time, except for the
+Node.js sender described under [Ingress (writes)](#ingress-writes).
 
 A `421 Misdirected Request` response **without** an `X-QuestDB-Role` header
 is treated as a generic transport error, not a role reject — the client walks
@@ -138,16 +142,23 @@ very different goals.
 
 The ingress reconnect loop sits inside the store-and-forward I/O thread. It
 runs continuously in the background, retrying through outages while the
-producer keeps appending to the local buffer. There is no wall-clock give-up:
-the loop retries an outage of any length, and what bounds your tolerance is
-buffer capacity (`sf_max_total_bytes` and disk), not a timer.
+producer keeps appending to the local buffer. There is no wall-clock give-up,
+except in one Node.js mode described below: the loop retries an outage of any
+length, and what bounds your tolerance is buffer capacity
+(`sf_max_total_bytes` and disk), not a timer.
 
 - Initial backoff: `100 ms`
 - Maximum backoff: `5 s`
 - Per-outage budget: **none**. `reconnect_max_duration_millis` bounds only the
   blocking sync initial connect, and the running loop never consults it.
+  The exception is a Node.js sender in default memory mode, without `sf_dir`,
+  `initial_connect_retry=async`, or `lazy_connect=on`, which gives up after
+  `reconnect_max_duration_millis` and fails with
+  `QwpReconnectExhaustedError`; see the
+  [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
-  reconnect storms when many producers share a cluster
+  reconnect storms when many producers share a cluster. The Node.js client
+  uses full jitter, `[0, base)`, instead
 - Inter-host pause within a round: **none** — the client walks the full
   address list as fast as `auth_timeout_ms` allows, paying one backoff
   sleep at round exhaustion
@@ -187,8 +198,8 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are cluster-wide; retrying floods server logs without recovery. |
-| Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
+| HTTP `401` / `403` on upgrade | Credentials are assumed to be cluster-wide. Some clients retry after a sender's first successful connection; see [Authentication is cluster-wide](#authentication-is-cluster-wide). |
+| Server rejection with a terminal policy: by default `SCHEMA_MISMATCH`, `PARSE_ERROR`, `SECURITY_ERROR`, and `PROTOCOL_VIOLATION`, or a batch that keeps being rejected | Replaying the same bytes reproduces the rejection. Retriable categories, such as `WRITE_ERROR`, are resent instead; see [Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames). |
 
 ### Topology — handled inside the round
 
@@ -197,7 +208,8 @@ within the same round. No exponential backoff is consumed.
 
 - `421` + `X-QuestDB-Role: PRIMARY_CATCHUP` → `TransientReject`
 - `421` + any other non-empty role, including unrecognised tokens → `TopologyReject`
-- `SERVER_INFO.Role` does not match the requested `target=` (egress only)
+- `SERVER_INFO.Role` does not match the requested `target=` (egress only; the
+  Node.js client also applies it to ingress)
 
 If every host in a round role-rejects, ingress pays one fixed backoff sleep
 (reset to `InitialBackoff`, no doubling) and starts a fresh round; egress
@@ -213,7 +225,9 @@ and walks to the next host.
 
 When a round exhausts with transient errors, the client sleeps for the
 backoff interval and starts the next round. On the ingress sender the rounds
-continue indefinitely; on the egress query client they are bounded by
+continue indefinitely, apart from the Node.js exception described under
+[Ingress (writes)](#ingress-writes); on the egress query client they are
+bounded by
 `failover_max_attempts` and `failover_max_duration_ms`, which apply per
 `execute()`.
 
@@ -232,14 +246,30 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is terminal — the client does not retry
-other hosts. The assumption is that auth credentials are configured
-identically across the cluster, so a credential failure against one node is
-a credential failure against all of them. Retrying would spam every peer's
-audit log without recovering.
+A `401` or `403` on the HTTP upgrade does not send the client to another host:
+credentials are assumed to be configured identically across the cluster, so
+another node would repeat the rejection. Whether the rejection is terminal
+depends on the client and on when it arrives:
 
-If your deployment has per-host credentials, that is unsupported and outside
-the failover model — split the workload into one connect string per credential.
+| Client | Before a sender's first successful connection | After it |
+|---|---|---|
+| Java | Terminal | Retried indefinitely |
+| Node.js | Terminal | Retried indefinitely by senders with `sf_dir` or in background memory mode (`initial_connect_retry=async` or `lazy_connect=on`). Terminal for other senders |
+| Rust, C, C++, Python, Go, .NET | Terminal | Terminal |
+
+Query connections and orphan drainers treat the rejection as terminal in every
+client, except that a Java orphan drainer whose token comes from a token
+provider retries for a bounded time before quarantining the slot. A sender
+that retries keeps buffering until authentication succeeds again, bounded by
+its buffer capacity, so a credential change on the cluster does not stop the
+producer. Monitor such a sender: the Java client reports each rejection to the
+sender's error handler as a retriable `SECURITY_ERROR`, and the Node.js client
+emits an `attempt-failed` connection event for each failed attempt. See
+[Node.js connection errors](/docs/connect/clients/nodejs/#connection-level-errors)
+for the Node.js rules.
+
+Per-host credentials are outside the failover model. Use a separate connect
+string for each credential.
 
 ## Next steps
 

@@ -27,8 +27,8 @@ mode.
 | `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
-| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
-| `sf_durability` | enum | `memory` | `memory` (page-cache durable) and `periodic` (background checkpoint to stable storage) both ship. `periodic` requires `sf_dir`. `flush` and `append` parse but are rejected at build time. The .NET client accepts `memory` only. |
+| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Capacity for producer backpressure. Node.js disk journals can exceed this target for transaction completion and symbol dictionaries; provision [additional disk headroom](/docs/connect/clients/nodejs/#sf-capacity). Without `sf_dir`, this caps the memory replay queue. |
+| `sf_durability` | enum | `memory` | `memory` relies on the page cache; `periodic` checkpoints in the background and requires `sf_dir`. Node.js also supports `append`, which makes each journal append durable before `flush()` resolves. Go and .NET accept only `memory`; other clients reject `append` at build time. `flush` is not supported. |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
 | `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
@@ -48,11 +48,11 @@ and host-walk semantics are documented in
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
-| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
+| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`; the Node.js client uses full jitter, `[0, max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
-| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++ and Python | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
+| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++, Python, Go and Node.js | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 
 Cross-reference:
 [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys).
@@ -64,19 +64,22 @@ Opt in to object-store-durable trim. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
-| `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
+| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. A missing `X-QWP-Durable-Ack: enabled` echo is terminal in most clients; Java and some Node.js senders keep retrying (see [Concepts](/docs/high-availability/store-and-forward/concepts/#trim-how-unacked-data-is-reclaimed)). WebSocket transports only. |
+| `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING while durable confirmations are pending and the producer is idle. `0` disables the PING; some clients also accept negative values. Node.js rejects negative values, and explicitly setting even `0` requests durable ACK, so an unsupported server may reject the connection. See [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement). |
 
 ## Error-handling keys
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | All clients accept these keys. Go and .NET apply them; Java, Node.js, Rust, C, C++, and Python currently ignore them. The two that apply them accept different values: .NET takes only `halt`/`terminal` and `retry`/`retriable` and rejects `auto` and `retriable_other`. There is no `DROP_AND_CONTINUE` policy. See [Error handling](/docs/connect/clients/connect-string/#error-handling). |
 
 The per-category defaults are documented in
 [Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
-`PROTOCOL_VIOLATION` and `UNKNOWN` are forced `HALT` and not user-overridable.
+`PROTOCOL_VIOLATION` is always terminal and `UNKNOWN` defaults to retriable,
+so a status from a newer server leads to a retry rather than a silently
+dropped batch. The `on_*_error` keys cannot change either; only the .NET
+client's programmatic resolver can change `UNKNOWN`.
 
 ## Other relevant keys
 
@@ -90,14 +93,14 @@ canonical entries.
 | `username` / `password` | string | unset | HTTP Basic auth on the upgrade request. |
 | `token` | string | unset | Bearer token on the upgrade request. |
 | `tls_verify` | enum | `on` | `on` or `unsafe_off`. Applies to `wss::` / TLS connections. |
-| `tls_roots` | path | system trust | Custom CA trust store. |
+| `tls_roots` | path | system trust (Node.js: bundled CAs) | Custom CA trust store. |
 | `tls_roots_password` | string | unset | Trust store password. |
 | `auto_flush` | bool | `on` | Global on/off for auto-flush triggers. |
-| `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. |
+| `auto_flush_rows` | int / `off` | `1000` | Row-count flush trigger. Node.js: use `0` to disable; `off` is rejected. |
 | `auto_flush_bytes` | int / `off` | `0` (off) | Byte-size flush trigger. |
-| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger. |
-| `init_buf_size` | size | `64K` | Initial encode buffer capacity. |
-| `max_buf_size` | size | `100M` | Max encode buffer capacity. |
+| `auto_flush_interval` | int (ms) / `off` | `100` | Time-since-first-row flush trigger (Node.js: since last flush or sender creation). Node.js: use `0` to disable; `off` is rejected. |
+| `init_buf_size` | size | `64K` | Initial encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
+| `max_buf_size` | size | `100M` | Max encode buffer capacity; not supported by the Node.js QWP `ws`/`wss` client. |
 | `max_name_len` | int | `127` | Local validation cap for table / column names. |
 
 ## Validation
@@ -106,8 +109,9 @@ The parser rejects:
 
 - Unknown keys (forward compatibility is via the spec, not silent
   acceptance).
-- `sf_durability` values other than `memory`, `flush`, `append`. `flush`
-  and `append` parse but are rejected at build time today.
+- Unsupported `sf_durability` values. Go and .NET accept only `memory`;
+  Node.js also accepts `periodic` and `append`. Other clients accept
+  `periodic`, but reject `flush` and `append` at build time.
 - `sender_id` containing path separators or empty.
 - `request_durable_ack=on` on non-WebSocket transports.
 

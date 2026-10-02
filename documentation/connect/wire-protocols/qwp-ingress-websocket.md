@@ -31,8 +31,8 @@ clients, see [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-we
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/connect/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP to JavaScript, Rust, Ruby, .NET, or an embedded runtime that the existing
-clients don't cover).
+QWP to Ruby, PHP, or an embedded runtime that the existing clients don't
+cover).
 
 Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
 QWP trades a denser binary encoding for higher throughput and lower CPU on
@@ -1127,11 +1127,15 @@ The client uses double-buffered microbatches:
 | Byte size            | disabled   |
 | Time since first row | 100 ms     |
 
+The Node.js client measures the interval from its last flush, or from sender
+creation, instead of from the first buffered row.
+
 ### Failover and high availability
 
 Ingress senders use a reconnect loop regardless of whether store-and-forward
-is configured. The two storage modes share identical failover semantics; they
-differ only in where unacknowledged data lives:
+is configured. The two storage modes share the same failover semantics, apart
+from the Node.js default-memory-mode budget in the table below; they differ
+only in where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
@@ -1147,7 +1151,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely. |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely, except on a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on` ([details](/docs/connect/clients/nodejs/#differences-from-other-clients)). |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
@@ -1158,8 +1162,15 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+  The Node.js client is the exception: it applies `zone=` and `target=` to
+  ingress too, so `target=replica` in a shared connect string stops its
+  ingestion.
+- **Authentication rejection (`401`/`403`) never moves to another host.** It
+  is terminal before a sender's first successful connection. After that, the
+  Java client retries it indefinitely, the Node.js client does so for senders
+  with `sf_dir` or in background memory mode (`initial_connect_retry=async` or
+  `lazy_connect=on`), and other clients stop; see
+  [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **All other upgrade errors are transient** and feed into the reconnect loop,

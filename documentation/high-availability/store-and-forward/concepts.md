@@ -19,7 +19,9 @@ arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
 no unacked data: the next sender on the slot recovers it from disk and
-replays it.
+replays it. The one exception is a Node.js sender in default memory mode,
+whose `flush()` waits for the reconnect during an outage; see
+[Reconnect and replay](#reconnect-and-replay).
 
 ## Two modes
 
@@ -33,12 +35,18 @@ SF runs in either of two modes selected by the connect string:
 | Unacked data if the sender crashes | Lost | Recovered and replayed on restart |
 | Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
 | Tolerates transient network blips | Yes | Yes |
-| Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
+| Tolerates multi-minute server outages | Bounded by RAM cap (Node.js default memory mode: also by `reconnect_max_duration_millis`) | Bounded by disk cap |
 | Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
-where unacked data lives.
+where unacked data lives. The Node.js client is the exception: it splits
+memory mode in two. A sender in default memory mode gives up after
+`reconnect_max_duration_millis` (5 minutes by default), while a sender in
+background memory mode (`initial_connect_retry=async` or `lazy_connect=on`)
+retries indefinitely, as SF mode does. See the
+[Node.js ingestion modes](/docs/connect/clients/nodejs/#ingestion-modes) and
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ## What "frame" means here
 
@@ -62,8 +70,9 @@ Two distinct counters track frame identity:
 - **FSN** (frame-sequence-number) — a monotonic counter assigned when a
   frame is appended to the substrate. FSN survives reconnects and (in SF
   mode) restarts. It is the substrate's permanent identifier for a frame.
-- **wireSeq** — the per-connection counter the server uses for
-  deduplication, reset to `0` on every successful WebSocket upgrade.
+- **wireSeq** is the per-connection counter used to correlate acknowledgements
+  with sent frames. It resets to `0` on every successful WebSocket upgrade
+  and is not a row-deduplication key.
 
 On every (re)connect the relationship is pinned:
 
@@ -82,9 +91,12 @@ Two consequences:
 - Frames **must** be sent in strict order. The wire format does not
   serialise `wireSeq` — the server assigns it implicitly from receive
   order. Reordering breaks the FSN mapping.
-- After a reconnect, the server sees the **same payloads** at new
-  `wireSeq` values. Server-side dedup keys off `messageSequence` inside
-  the payload, not `wireSeq`, so replay does not produce double-writes.
+- After a reconnect, the server may see the **same payloads** at new
+  `wireSeq` values. An acknowledgement can be lost after a batch was
+  committed, so replay is **at least once** and can insert duplicate rows.
+  `wireSeq` is transport bookkeeping, not a deduplication key. For
+  idempotent ingestion, use stable source IDs and timestamps with table-level
+  `DEDUP UPSERT KEYS`; see [Deduplication](/docs/concepts/deduplication/).
 
 ## Trim: how unacked data is reclaimed
 
@@ -123,10 +135,18 @@ object store** (S3, Azure Blob, GCS, or NFS).
   watermarks. The client matches the head of the OK queue against these
   watermarks; each fully-covered head entry pops, and `ackedFsn`
   advances to the highest covered wireSeq.
-- The client opt-in is mandatory — the connect fails loudly if the server
-  does not echo `X-QWP-Durable-Ack: enabled` on the upgrade response.
-  This avoids the silent failure mode where the producer waits forever
-  for ack frames that will never arrive.
+- The client requires an `X-QWP-Durable-Ack: enabled` echo on the upgrade
+  response and rejects a connection without it, rather than waiting for ack
+  frames it cannot receive. In most clients the rejection is terminal. The
+  Java client retries it after a sender's first successful connection, so a
+  capability change on the cluster cannot stop the producer. Node.js senders
+  with a background start (`initial_connect_retry=async` or
+  `lazy_connect=on`) retry from startup and emit `durable-ack-unavailable`,
+  with or without `sf_dir`. A Node.js sender with `sf_dir` and a foreground
+  start fails on the first connection but retries after a successful
+  connection; see
+  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
+  A retrying sender keeps buffering, so monitor it.
 
 Durable-ack mode is the right choice when "data is in the object store"
 is the durability bar, but it has two costs: a longer time-to-trim (so
@@ -143,7 +163,13 @@ When the wire connection breaks — for any reason — the I/O thread enters
 the reconnect loop documented in
 [Client failover concepts](/docs/high-availability/client-failover/concepts/).
 The producer is **not notified**: it keeps publishing into the substrate,
-bounded by `sf_max_total_bytes` (see backpressure below).
+subject to available capacity (see [Backpressure](#backpressure)).
+
+On Node.js, only a sender in default memory mode waits for the reconnect in
+`flush()`, up to `reconnect_max_duration_millis`. Background memory mode,
+enabled by `initial_connect_retry=async` or `lazy_connect=on`, keeps accepting
+batches into the memory replay queue until capacity is exhausted and retries
+indefinitely. See the [three Node.js ingestion modes](/docs/connect/clients/nodejs/#ingestion-modes).
 
 On every successful (re)connect:
 
@@ -151,8 +177,11 @@ On every successful (re)connect:
 2. `wireSeq` resets to `0`.
 3. The read cursor rewinds to the first un-acked frame on disk (or in
    memory).
-4. Frames stream to the wire in FSN order. The server's dedup window
-   absorbs any frames that landed before the disconnect.
+4. Frames stream to the wire in FSN order. A frame committed before the
+   disconnect but not acknowledged can be inserted again: replay is at least
+   once. Prevent duplicate rows with table-level `DEDUP UPSERT KEYS` covering
+   the designated timestamp and stable source identity, preserving both on
+   retries. See [Deduplication](/docs/concepts/deduplication/).
 5. New frames appended by the producer during replay are picked up
    automatically — the I/O loop watches a volatile `publishedFsn`
    cursor.
@@ -162,11 +191,17 @@ in the `getTotalFramesReplayed` observability counter.
 
 ## Backpressure
 
-The substrate enforces `sf_max_total_bytes` as a hard cap on resident
-storage. When the cap is hit, the producer's `appendBlocking` call
+The substrate uses `sf_max_total_bytes` to apply backpressure on resident
+storage. When capacity is exhausted, the producer's `appendBlocking` call
 busy-spins (with cooperative yield) up to `sf_append_deadline_millis`
 waiting for ACK-driven trim to free space. If the deadline fires, the
 call throws a typed exception.
+
+On Node.js with `sf_dir`, this value is a journal size target rather than a
+hard disk limit. Transaction-closing batches and retained symbol dictionaries
+can exceed it, and other metadata needs additional space. Provision headroom
+for each sender; see [Node.js journal capacity](/docs/connect/clients/nodejs/#sf-capacity).
+Without `sf_dir`, the key caps the in-memory replay queue.
 
 The exception message distinguishes the two scenarios:
 
@@ -184,12 +219,18 @@ The exception message distinguishes the two scenarios:
 `close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
-C, C++ and Python. If the wait succeeds, all data is acked. If the timeout
-fires, a `WARN` is logged and:
+C, C++, Python, Go and Node.js. If the wait succeeds, all data is acked. If the
+timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
 - in **memory mode**, the un-acked tail is lost.
+
+On the Node.js client, a standalone sender's `close()` rejects with
+`QwpSenderCloseTimeoutError` instead of logging. The pooled client's
+`db.close()` resolves, and usually reports the timeout to
+`ingressSession.onError` as a non-terminal `QwpIngressAckTimeoutError`; that
+report is best-effort.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
@@ -297,27 +338,55 @@ until an operator intervenes.
 The orphan flow is opt-in because in a multi-tenant deployment with
 shared `sf_dir`, blindly draining unknown slots may be surprising.
 
+:::caution Node.js client
+
+A Node.js drainer adopts a slot only if it can take the slot's `.lock.owner`
+lock. It can reclaim a crashed owner's lock only on the same host, and only
+when the recorded process ID is no longer in use, so it skips a slot whose
+owner ran in a replaced container or in a container restarted in place. Those
+rows stay on disk until the stale lock is removed; see
+[Node.js lock recovery](/docs/high-availability/store-and-forward/operating-and-tuning/#nodejs-lock-recovery).
+A pooled Node.js client also replays slots of its own `sender_id` without
+`drain_orphans=on`; the key adds the other `sender_id`s.
+
+:::
+
 ## Error frames
 
-Not every server response is an OK. Server errors fall into six
-categories, each with a default policy:
+Not every server response is an OK. A rejected batch is **not** silently
+dropped and trimmed: the client either retries it or reports a terminal error.
+There is no drop policy. The table lists the built-in default policy of each
+category in the Java reference client and the Node.js client; see the
+[connect-string error policies](/docs/connect/clients/connect-string/#error-handling)
+for the shared vocabulary and which clients let you override the defaults.
 
-| Category | Default | Meaning |
+| Category | Default policy | Meaning |
 |---|---|---|
-| `SCHEMA_MISMATCH` | `DROP_AND_CONTINUE` | The batch's schema doesn't match the server. Replay won't help — the substrate logs and advances trim past the rejected span. |
-| `WRITE_ERROR` | `DROP_AND_CONTINUE` | Per-batch write failure (e.g. table is not currently accepting writes). |
-| `PARSE_ERROR` | `HALT` | Almost certainly a client bug. The substrate preserves on-disk frames for postmortem. |
-| `INTERNAL_ERROR` | `HALT` | Catch-all server fault. |
-| `SECURITY_ERROR` | `HALT` | Cluster-wide auth / authorization failure. |
-| `PROTOCOL_VIOLATION` | `HALT` (forced) | Connection is gone after a terminal WebSocket close code; no choice. |
+| `SCHEMA_MISMATCH` | `terminal` | The schema does not match. The sender stops; in SF mode, the rejected bytes remain in the journal for inspection. |
+| `PARSE_ERROR` | `terminal` | Malformed payload; replaying identical bytes cannot help. |
+| `SECURITY_ERROR` | `terminal` | Authorization failed, for example an ACL denial on a writable node. |
+| `PROTOCOL_VIOLATION` | `terminal` (forced) | Protocol failure; stop and report it. |
+| `WRITE_ERROR` | `retriable` | A write failed, for example under temporary storage pressure; reconnect and replay. |
+| `INTERNAL_ERROR` | `retriable` | Retry after an unexpected server-side failure. |
+| `DICTIONARY_GAP` | `retriable` | The connection is missing symbol dictionary entries; resend them and replay. |
+| `NOT_WRITABLE` | `retriable_other` | The node cannot accept writes, for example a replica; replay on another endpoint. Reserved: current servers close the connection instead, and the client reconnects. |
+| `UNKNOWN` | `retriable` (forced) | A status the client does not know, for example from a newer server; retry rather than stop. |
 
-Errors are also delivered to an **error inbox** — a bounded queue
-consumed by a daemon dispatcher that invokes your registered handler.
-Overflow drops the oldest entry rather than the newest (watermarks are
-monotonic; the latest entry is the most informative). The default
-handler logs every received error: silence is forbidden by the contract,
-because a buggy or no-op handler would hide data loss
-indistinguishably from a healthy connection.
+A batch that keeps being rejected without progress escalates to a terminal
+error through the poison-frame detector (`max_frame_rejections`). The Java and
+Node.js clients also report a client-side `DATA_LOSS` category, with the
+`abandoned` policy, when they set aside a corrupt store-and-forward journal.
+The Node.js client also defines `cancelled` and `limit-exceeded` categories,
+both retriable; current servers send those statuses only to query
+connections.
+
+Rejections are delivered asynchronously through a bounded error inbox
+(`error_inbox_capacity`, default `256`) that drops the oldest notification on
+overflow, to the application's error handler, such as `onSenderError` on
+Node.js. The default handler logs every rejection, because a silent handler
+would hide data loss. The Node.js client reports categories and policies as
+lowercase, hyphenated strings, such as `schema-mismatch` and
+`retriable-other`, and accepts the `on_*_error` keys without applying them.
 
 ## Next steps
 
