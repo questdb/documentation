@@ -57,7 +57,7 @@ host.
 | `Unknown` | The host has not been tried in this round, or its classification was reset. |
 | `TransientReject` | The server returned `421` with `X-QuestDB-Role: PRIMARY_CATCHUP` — it is a primary that is still catching up after promotion. Expected to recover. |
 | `TransportError` | TCP/TLS handshake failed, an HTTP upgrade returned a transient error code, or an established connection broke mid-stream. |
-| `TopologyReject` | The server returned `421` with any role other than `PRIMARY_CATCHUP` (`PRIMARY`, `REPLICA`, `STANDALONE`, or an unrecognised token), or — on egress — a successfully-upgraded host whose `SERVER_INFO` role does not satisfy the requested `target=` filter. The host will not become usable without a topology change. |
+| `TopologyReject` | The server returned `421` with any role other than `PRIMARY_CATCHUP` (`PRIMARY`, `REPLICA`, `STANDALONE`, or an unrecognised token), or a successfully-upgraded host whose `SERVER_INFO` role does not satisfy the requested `target=` filter (egress only; the Node.js client also applies it to ingress). The host will not become usable without a topology change. |
 
 A lower state in the table above is preferred when the client picks the next
 host to try.

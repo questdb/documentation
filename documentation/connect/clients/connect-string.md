@@ -844,8 +844,8 @@ per-language names.
 Every client now leads with a pooled facade, so these keys are a first-contact
 concern. The `Sender` and query-client parsers accept and ignore them; the
 facade reads them off the string. The Node.js `Sender` logs a warning for the
-pool keys it ignores, and applies `lazy_connect`, which starts it in
-background memory mode. Each has an equivalent builder setter, and an
+pool keys it ignores, and applies `lazy_connect`, which gives it a
+[background start](/docs/connect/clients/nodejs/#ingestion-modes). Each has an equivalent builder setter, and an
 explicit setter always wins over the string.
 
 - `sender_pool_min` — senders kept open even when idle. `0` lets the pool close

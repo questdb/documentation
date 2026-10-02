@@ -121,9 +121,12 @@ is skipped, not stolen.
 
 ### Node.js lock recovery {#nodejs-lock-recovery}
 
-A Node.js sender that crashed, or ran in a container that was replaced, can
-leave its `.lock.owner` directory behind, and a new sender on the slot then
-fails with `QwpReplayStoreLockedError`. To recover:
+A Node.js sender can leave its `.lock.owner` directory behind when it crashes.
+On the same host, the next sender reclaims the lock automatically once the
+recorded process has exited. It cannot reclaim a lock recorded on another
+host, such as a container replaced under a new host name, or one whose process
+ID now belongs to another running process; a new sender on the slot then fails
+with `QwpReplayStoreLockedError`. To recover:
 
 1. Verify that the previous owner has exited and that no process is using the
    slot. The `.lock.owner` directory records the owner's host name and process

@@ -33,9 +33,10 @@ and remove TypeScript annotations.
 
 ## Quick start
 
-Create a table, publish a row, wait for QuestDB's acknowledgement, and query
-it. Acknowledged rows are applied asynchronously, so the query may initially
-return no rows; see [Read-after-write](#read-after-write).
+Create a table, publish a row, wait for QuestDB's acknowledgement, then poll
+until the row is visible. An acknowledgement means QuestDB has committed the
+row, but queries see it only after it is applied, which happens
+asynchronously; see [Read-after-write](#read-after-write).
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -52,6 +53,7 @@ try {
     );
     await ddl.completion;
 
+    const eventTime = Date.now(); // milliseconds; also used to find the row
     const sender = await db.borrowSender();
     try {
       await sender
@@ -60,20 +62,36 @@ try {
         .symbol("side", "buy")
         .doubleColumn("price", 2615.54)
         .doubleColumn("amount", 0.5)
-        .at(Date.now(), "ms");
+        .at(eventTime, "ms");
       await sender.flush();
-      await sender.waitForAcknowledged(sender.publishedSequence);
+      await sender.waitForAcknowledged(sender.publishedSequence, 10_000);
     } finally {
       await sender.close(); // return it to the pool
     }
 
-    const query = await lease.query(
-      "SELECT timestamp, symbol, price FROM trades LIMIT 10",
-    );
-    for await (const batch of query) {
-      for (const row of batch.rows()) console.log(row);
+    // Poll until the acknowledged row is visible, for up to 10 seconds.
+    const deadline = Date.now() + 10_000;
+    let found = false;
+    while (!found && Date.now() < deadline) {
+      const query = await lease.query(
+        "SELECT timestamp, symbol, side, price, amount FROM trades " +
+          "WHERE timestamp = $1",
+        {
+          binds: (binds) =>
+            binds.setTimestampMicros(0, BigInt(eventTime) * 1000n),
+        },
+      );
+      for await (const batch of query) {
+        for (const row of batch.rows()) {
+          // [timestamp in microseconds, symbol, side, price, amount]
+          console.log(row);
+          found = true;
+        }
+      }
+      await query.completion;
+      if (!found) await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    await query.completion;
+    if (!found) throw new Error("row not visible after 10 seconds");
   } finally {
     await lease.close();
   }
@@ -180,37 +198,62 @@ borrows, and close the client on shutdown.
 
 ### Startup and outage modes {#ingestion-modes}
 
-Two independent choices decide what a sender does while QuestDB is
-unreachable:
+To start while QuestDB is down and keep accepting rows during an outage, add
+`lazy_connect=on;sf_max_segment_bytes=1m;` to the connect string. To also
+keep unacknowledged rows across process restarts, add
+`sf_dir=/var/lib/myapp/qdb-sf;sender_id=trades;`. These keys select one of
+three modes:
 
-- **Startup.** A *foreground start*, the default, connects senders inside
-  `connectQwpNodeClient()`, which rejects if QuestDB is down. A *background
-  start* connects senders in the background: `initial_connect_retry=async`
-  selects it, and `lazy_connect=on` selects it and also sets
-  `query_pool_min=0`, rejecting a positive value. `connectQwpNodeClient()`
-  returns while QuestDB is down only with `query_pool_min=0`: with
-  `initial_connect_retry=async` alone, the default query connection still
-  has to connect at startup. A query borrowed before QuestDB is reachable
-  fails. A standalone `Sender` gets a background start from either key. With
-  a background start, also set `sf_max_segment_bytes=1m`; see
-  [Batch size limits](#batch-size-limits).
+| Mode | Keys | QuestDB down at startup | During an outage |
+|---|---|---|---|
+| Default memory | None | `connectQwpNodeClient()` rejects | `flush()`, and `at()` when it triggers an auto-flush, wait for the reconnect for up to `reconnect_max_duration_millis` (5 minutes by default). Then the sender fails with `QwpReconnectExhaustedError` and its unacknowledged rows are lost |
+| Background memory | `lazy_connect=on` | Starts; rows queue in memory | Rows queue in memory, up to `sf_max_total_bytes` (128 MiB by default); retries continue indefinitely |
+| Store-and-forward | `sf_dir`, usually with `lazy_connect=on` | With `lazy_connect=on`, starts and journals rows; without it, rejects | Rows go to the disk journal and survive a process restart; retries continue indefinitely |
+
+:::caution Default memory mode blocks producers
+
+Auto-flush runs on the first `at()` call 100 ms or more after the last flush,
+so in default memory mode a producer blocks almost as soon as an outage
+starts. The blocked call throws if QuestDB is still unreachable after
+`reconnect_max_duration_millis` (5 minutes by default). If a producer must
+not block on QuestDB, for example an HTTP request handler, use a background
+start: its calls block only when the replay queue is full; see
+[Backpressure](#backpressure).
+
+:::
+
+How the keys combine:
+
+- **Foreground and background start.** By default, senders get a
+  *foreground start*: `connectQwpNodeClient()` connects them and rejects if
+  QuestDB is down. `lazy_connect=on` gives them a *background start* instead
+  and sets `query_pool_min=0`; combining it with a positive
+  `query_pool_min` is a configuration error. `initial_connect_retry=async`
+  also gives senders a background start, but `connectQwpNodeClient()` still
+  opens one query connection at startup and rejects while QuestDB is down,
+  unless you also set `query_pool_min=0`. A query borrowed before QuestDB is
+  reachable fails. A standalone `Sender` gets a background start from either
+  key.
+- **Batch size.** With a background start, set `sf_max_segment_bytes=1m`,
+  with or without `sf_dir`; see [Batch size limits](#batch-size-limits).
 - **Storage.** Without `sf_dir`, unacknowledged rows live in memory and are
   lost if the process exits. With `sf_dir`, they are journaled to disk and
   replayed after a restart; see [Store-and-forward](#store-and-forward).
-
-| Mode | Enabled by | QuestDB down at startup | During an outage |
-|---|---|---|---|
-| Default memory | Neither `sf_dir` nor a background start | Startup rejects | `flush()`, and `at()` when it triggers an auto-flush, wait for the reconnect for up to `reconnect_max_duration_millis` (5 minutes by default). Then the sender fails with `QwpReconnectExhaustedError` and its unacknowledged rows are lost |
-| Background memory | A background start without `sf_dir` | Starts if `query_pool_min=0`, as with `lazy_connect=on`; rows queue in memory | Rows queue in memory, up to `sf_max_total_bytes` (128 MiB by default); retries continue indefinitely |
-| Store-and-forward | `sf_dir`, with either startup | Foreground: startup rejects. Background: starts if `query_pool_min=0` | Rows go to the disk journal; retries continue indefinitely, from startup with a background start or after the first successful connection otherwise |
-
-A foreground start fails fast. `initial_connect_retry=on`, or any
-`reconnect_*` key, makes senders retry their first connection for up to
-`reconnect_max_duration_millis` before rejecting. These keys do not apply to
-query connections, so with the default `query_pool_min=1`,
-`connectQwpNodeClient()` still rejects almost at once: also set
-`query_pool_min=0` to wait for the senders. A locked journal fails startup
-even with a background start.
+  `sf_dir` alone keeps a foreground start: startup rejects while QuestDB is
+  down, and outages after the first successful connection are retried
+  indefinitely.
+- **Tables.** An ingester that starts while QuestDB is down cannot create
+  its tables first. Create tables that need DEDUP beforehand; see
+  [Store-and-forward](#store-and-forward).
+- **First-connection retry.** `initial_connect_retry=on`, or any
+  `reconnect_*` key unless `initial_connect_retry=off` is set, makes senders
+  retry their first connection for up to `reconnect_max_duration_millis`
+  instead of failing at once. The sender stays in default memory mode. These
+  keys do not apply to query connections, so with the default
+  `query_pool_min=1`, `connectQwpNodeClient()` still rejects almost at once:
+  also set `query_pool_min=0`.
+- **Locked journal.** A journal locked by another process fails startup,
+  even with a background start; see [Lock recovery](#sf-lock-recovery).
 
 ### Closing the pooled client
 
@@ -276,7 +319,9 @@ without the unit the row lands in 1970. Nanoseconds require a `bigint`.
 `atNow()` asks QuestDB to assign arrival time, which changes on replay. Use
 the event's timestamp for deduplication. For a newly created table, `"ns"`
 creates a TIMESTAMP_NS designated timestamp; the other units create
-TIMESTAMP. The default designated column name is `timestamp`.
+TIMESTAMP. The default designated column name is `timestamp`. On an existing
+table, `at()` writes the table's designated timestamp column, whatever its
+name.
 
 ### Null values
 
@@ -291,17 +336,57 @@ the last flush.
 
 ### Decimals
 
-Use `decimalColumnText(name, "0.0750")` to preserve the input scale, including
-trailing zeros. Both strings and numbers accept exponents such as
-`"1.5e-3"`; a JavaScript number cannot retain trailing zeros. Binary methods
-`decimal64Column(name, unscaled, scale)`, `decimal128Column()`, and
-`decimal256Column()` take an unscaled `bigint`. Pre-create a table if you need
-a specific precision: QWP auto-creation chooses the maximum precision for the
-wire width. The server currently cannot return DECIMAL with precision 9 or
-less over QWP; cast it to a wider precision when querying.
+Pre-create a table if you need a specific precision: QWP auto-creation
+chooses the maximum precision for the wire width.
+
+```questdb-sql
+CREATE TABLE IF NOT EXISTS trade_fees (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  settled_price DECIMAL(18, 2),
+  commission DECIMAL(18, 4)
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
 
 <span id="text-literal-easy-to-use"></span>
+
+`decimalColumnText(name, value)` sends a decimal as text and preserves its
+scale, including trailing zeros. Both strings and numbers accept exponents
+such as `"1.5e-3"`; a JavaScript number cannot retain trailing zeros.
+
 <span id="binary-form-high-throughput"></span>
+
+The binary methods `decimal64Column(name, unscaled, scale)`,
+`decimal128Column()`, and `decimal256Column()` take the unscaled value as a
+`bigint`, followed by the scale:
+
+```typescript
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
+
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+try {
+  const sender = await db.borrowSender();
+  try {
+    await sender
+      .table("trade_fees")
+      .symbol("symbol", "ETH-USD")
+      .decimalColumnText("settled_price", "2615.50") // keeps the trailing zero
+      .decimal64Column("commission", -750n, 4) // -0.0750
+      .at(Date.now(), "ms");
+    await sender.flush();
+  } finally {
+    await sender.close();
+  }
+} finally {
+  await db.close();
+}
+```
+
+Bind parameters take the scale **before** the unscaled value, the reverse of
+`decimal64Column()`: `binds.setDecimal64(0, 2, 261550n)` binds `2615.50`; see
+[Bind parameters](#bind-parameters). Query results return a DECIMAL as
+`{ unscaled, scale }`. The server currently cannot return DECIMAL with
+precision 9 or less over QWP; cast it to a wider precision when querying.
 
 ### Arrays
 
@@ -381,7 +466,7 @@ QuestDB advertises its maximum batch size on connection (about 2 MiB on a
 default server). The client splits a larger batch into several frames at row
 boundaries. A single row larger than the limit fails with
 `QwpBatchTooLargeError`: call `reset()` and shrink that row, for example a
-large VARCHAR or BINARY value. A sender with a background start cannot know
+large VARCHAR or BINARY value. A sender with a [background start](#ingestion-modes) cannot know
 the limit before its first connection, so a frame built while QuestDB is
 down can exceed it. That frame is then never delivered: it is retried
 indefinitely and blocks every later batch. With a background start, with or
@@ -393,12 +478,21 @@ After `flush()`, wait for the cumulative watermark:
 `await sender.waitForAcknowledged(sender.publishedSequence, 10_000)`.
 
 `publishedSequence` includes batches sent by auto-flush; `acknowledgedSequence`
-is the last accepted one. `waitForAcknowledged()` rejects on timeout or server
-rejection. A timeout alone does not mean the batch was rejected: it may still
-be in flight. **Do not use the return value of `flushAndGetSequence()` as the
-watermark for all your rows**: it returns `-1n` if an earlier auto-flush
-already published them. To make each flush wait, use typed
-`sender: { awaitServerAck: true }`.
+is the last accepted one. `waitForAcknowledged()` rejects on a server
+rejection, or with `QwpIngressAckTimeoutError` on timeout; without a timeout
+argument, it waits up to `ackTimeoutMs` (15 seconds by default). A timeout
+alone does not mean the batch was rejected: it may still be in flight. **Do
+not use the return value of `flushAndGetSequence()` as the watermark for all
+your rows**: it returns `-1n` if an earlier auto-flush already published them.
+
+To make each `flush()` wait for the acknowledgement, pass typed
+`sender: { awaitServerAck: true }` as the second argument of
+`connectQwpNodeClient()`; see [Programmatic options](#programmatic-options).
+Each such flush waits up to `ackTimeoutMs`, then rejects with a plain `Error`
+whose message starts with `timed out waiting for QWP ACK`. As with
+`waitForAcknowledged()`, QuestDB may still acknowledge the batch later. Set the
+deadline with typed `ingressSession: { ackTimeoutMs }`; it has no
+connect-string key.
 
 #### Committing source offsets
 
@@ -453,7 +547,9 @@ try {
 ```
 
 Request [durable acknowledgement](#durable-acknowledgement) if the offset must
-also survive a primary failure.
+also survive a primary failure. The watermark then advances only after the
+upload to object storage, so allow for the upload interval in your
+`waitForAcknowledged()` timeout.
 
 ### Transactions
 
@@ -495,10 +591,19 @@ try {
 
 Set `sf_dir` to journal batches across process restarts. To start while
 QuestDB is down, add a background start (`lazy_connect=on`), as below; see
-[Startup and outage modes](#ingestion-modes). Create a deduplicated table
-**before** ingestion if duplicates are unacceptable: a missing table is
-auto-created without DEDUP. Keep event IDs and timestamps stable across
-retries.
+[Startup and outage modes](#ingestion-modes). Keep event IDs and timestamps
+stable across retries.
+
+If duplicates are unacceptable, create a deduplicated table **before** the
+first ingester runs, for example as a deployment or migration step. An
+ingester that starts while QuestDB is down cannot create the table itself
+first: when QuestDB comes back, the sender replays its journal in the
+background, QuestDB auto-creates a missing table without DEDUP, and a later
+`CREATE TABLE IF NOT EXISTS` does nothing. To add DEDUP to an existing table,
+use [`ALTER TABLE ... DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/),
+for example
+`ALTER TABLE trades_sf DEDUP ENABLE UPSERT KEYS(timestamp, trade_id);`. It
+does not remove duplicates that were written earlier.
 
 <SfDedupWarning />
 
@@ -606,10 +711,14 @@ queue.
 #### Lock recovery {#sf-lock-recovery}
 
 Node.js uses a `.lock.owner` directory in each journal slot, not an OS file
-lock. A crashed process can leave one behind. If opening the journal fails
-with `QwpReplayStoreLockedError` (wrapped in `QwpPoolResourceError` when
-pooled), verify that no other process owns the slot **before** removing a
-stale lock. See the
+lock, and a crashed process can leave one behind. On the same host, the next
+sender reclaims it automatically once the recorded process has exited, so a
+restarted process recovers its slots without intervention. The client cannot
+reclaim a lock recorded on another host, such as a container replaced under a
+new host name, or one whose process ID now belongs to another running
+process: opening the journal then fails with `QwpReplayStoreLockedError`
+(wrapped in `QwpPoolResourceError` when pooled). Verify that no other process
+owns the slot **before** removing such a lock; see the
 [Node.js lock-recovery runbook](/docs/high-availability/store-and-forward/operating-and-tuning/#nodejs-lock-recovery).
 Do not let Node.js and another client's OS-lock-based sender use the same
 `sf_dir` concurrently.
@@ -618,7 +727,13 @@ Do not let Node.js and another client's OS-lock-based sender use the same
 
 On QuestDB Enterprise with replication, `request_durable_ack=on` makes the
 acknowledgement watermark wait until the WAL has been uploaded to object
-storage. `sender: { awaitDurableAck: true }` also makes each `flush()` wait:
+storage. Typed `sender: { awaitDurableAck: true }` also makes each `flush()`
+wait for the upload, for up to `durableAckTimeoutMs` (by default
+`ackTimeoutMs`, 15 seconds). Under light load, the primary uploads WAL data
+only when
+[`replication.primary.throttle.window.duration`](/docs/high-availability/tuning/#throttle-window)
+expires: 10 seconds by default, and 60 seconds in the network-efficiency
+profile. Set the deadline well above it:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -627,7 +742,7 @@ const token = process.env.QDB_TOKEN;
 if (!token) throw new Error("QDB_TOKEN is not set");
 const db = await connectQwpNodeClient(
   `wss::addr=db.example.com:9000;token=${token};request_durable_ack=on;`,
-  { sender: { awaitDurableAck: true } },
+  { sender: { awaitDurableAck: true, durableAckTimeoutMs: 120_000 } },
 );
 try {
   const sender = await db.borrowSender();
@@ -637,7 +752,7 @@ try {
       .symbol("symbol", "ETH-USD")
       .doubleColumn("price", 2615.54)
       .at(Date.now(), "ms");
-    await sender.flush(); // resolves once the batch is in object storage
+    await sender.flush(); // waits up to 2 minutes for the upload
   } finally {
     await sender.close();
   }
@@ -646,13 +761,23 @@ try {
 }
 ```
 
-If the server lacks support, a foreground start fails with
-`QwpDurableAckUnavailableError` (wrapped in `QwpPoolResourceError` when
-pooled). A sender with a background start retries from startup and emits
-`durable-ack-unavailable` connection events **even with `sf_dir`**. With
-`sf_dir` and a foreground start, only later mismatches, after a successful
-connection, are retried. Monitor these events and journal capacity: a
-successful background start does not prove durable ACK is available.
+When the deadline passes, `flush()` rejects with a plain `Error` whose message
+starts with `timed out waiting for QWP durable ACK`. QuestDB has already
+acknowledged the batch, so it is committed to the WAL on the primary: the
+timeout means only that the upload was not confirmed in time.
+
+If the server does not support durable ACK:
+
+- A sender with a foreground start fails with
+  `QwpDurableAckUnavailableError` (wrapped in `QwpPoolResourceError` when
+  pooled).
+- A sender with a background start retries from startup and emits
+  `durable-ack-unavailable` connection events, **even with `sf_dir`**.
+- A sender with `sf_dir` and a foreground start fails at its first
+  connection, but after a successful connection it retries later mismatches.
+
+Monitor these events and journal capacity: a successful background start
+does not prove durable ACK is available.
 
 ### Fire-and-forget UDP
 
@@ -986,12 +1111,15 @@ for large results; `compression_level=3` is accepted only with `zstd` or
 
 ## Error handling
 
-Handle the failure at the stage where it occurs:
+Handle the failure at the stage where it occurs. Every error class and
+constant named on this page is exported from `@questdb/nodejs-client`, so you
+can import it for `instanceof` checks:
 
 | Failure | Action |
 |---|---|
 | Local value validation | Fix the value; the row in progress was discarded. Test `QwpBatchTooLargeError` before `RangeError` because it extends `RangeError`. |
 | `QwpMemoryReplayAppendTimeoutError` / `QwpReplayStoreAppendTimeoutError` | The batch stays staged. Slow down and retry the flush, not the rows. |
+| ACK timeout: `QwpIngressAckTimeoutError` from `waitForAcknowledged()`, or a plain `Error` from a `flush()` that waits for an acknowledgement | Not a rejection: QuestDB may still acknowledge the batch. Do not write the rows again; wait again, or raise `ackTimeoutMs` or `durableAckTimeoutMs`. See [Awaiting acknowledgements](#awaiting-acknowledgements). |
 | Server rejection | See [Ingestion errors](#ingestion-errors); a terminal rejection fails the sender. |
 | `QwpEgressQueryError` | Check `status`: fix SQL or bind values for `PARSE_ERROR`; retry on a new lease for `CANCELLED`, such as a query cancelled by a server shutdown. The lease remains usable after a SQL error. |
 | `QwpEgressSessionClosedError` | The query connection was lost with failover off. Close the lease and retry the whole query. |
@@ -1018,6 +1146,12 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
         toFsn: error.toFsn,
       });
     },
+    onError: (event) => {
+      // terminal: true means the sender has stopped; other events are warnings.
+      if (event.terminal) {
+        console.error("QuestDB ingestion stopped:", event.error.message);
+      }
+    },
   },
 });
 await db.close();
@@ -1025,17 +1159,22 @@ await db.close();
 
 Each error has `category`, `appliedPolicy`, `serverStatusByte`,
 `serverMessage`, `messageSequence`, the rejected frame range `fromFsn` to
-`toFsn`, `tableName` when the server reports one, and `detectedAtMs`.
+`toFsn`, `tableName` when the server reports one, `detectedAtMs`, and, when
+abandoned store-and-forward data was preserved on disk, `quarantinedPath`.
 Categories and policies are lowercase, hyphenated strings
 (`QWP_SENDER_ERROR_CATEGORY`, `QWP_SENDER_ERROR_POLICY`). The handler also
 runs for retriable rejections, which the client resends: only `terminal` (the
-sender stops) and `abandoned` (journal data set aside) mean the rows are not
+sender stops) and `abandoned` (journal data set aside; see
+[Quarantined journal slots](#quarantined-journal-slots)) mean the rows are not
 being delivered. The default policy of each category is listed under
 [Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
 Without a callback, the client logs rejections. `waitForAcknowledged()`
 rejects for a rejected batch. Branch on category, not the unstable message
-text, and redact messages before sending them to external trackers. Terminal
-session errors also reach `ingressSession.onError` with `terminal: true`.
+text, and redact messages before sending them to external trackers.
+`ingressSession.onError` receives an event with `error`, `terminal`,
+`timestampMs`, and, for a server rejection, `senderError`. It also reports
+non-terminal problems, such as ACK timeouts; `terminal: true` means the sender
+has stopped.
 
 #### Recovering from a terminal rejection
 
@@ -1060,6 +1199,33 @@ journal:
 3. Start the client again with the same `sf_dir` and `sender_id`. After a
    server-side fix, it replays the whole journal, including the rejected
    batch. After a move, it starts with an empty slot.
+
+#### Quarantined journal slots
+
+Store-and-forward does not delete rows that it cannot deliver. It sets them
+aside and reports them to `onSenderError` with category `data-loss` and
+policy `abandoned`:
+
+- **Corrupt journal.** When a sender opens a slot whose journal is
+  structurally corrupt, the client renames the slot directory to
+  `<slot>.unreplayable-N`, adds a `.failed` file, and continues with an empty
+  slot. The error's `quarantinedPath` names the renamed directory. The client
+  never replays it; keep it for inspection.
+- **Undeliverable slot.** A background drainer replays journal slots that no
+  running sender holds, including this client's own `<sender_id>-<n>` slots.
+  When it cannot deliver a slot, for example because QuestDB terminally
+  rejects the oldest batch or rejects authentication, it adds a `.failed`
+  file to the slot and stops retrying it. The rows stay in the slot.
+
+To replay an undeliverable slot, fix the cause, then remove its marker with
+`retryQwpNodeOrphanSlot()`. A running client replays the slot on its next
+scan, within 30 seconds:
+
+```typescript
+import { retryQwpNodeOrphanSlot } from "@questdb/nodejs-client";
+
+await retryQwpNodeOrphanSlot("/var/lib/myapp/qdb-sf/trades-1");
+```
 
 ### Query errors
 
@@ -1192,12 +1358,10 @@ A query that fails over restarts from its first row; see
 Senders resend unacknowledged batches after a disconnect. A sender in default
 memory mode gives up after `reconnect_max_duration_millis` (5 minutes by
 default): it fails with `QwpReconnectExhaustedError` and its unacknowledged
-rows are lost. Background memory mode or `sf_dir` retries indefinitely,
-subject to queue or journal capacity. For the first connection, see
-[Startup and outage modes](#ingestion-modes). Setting a `reconnect_*` key
-implicitly requests bounded first-connection retry for senders unless you
-explicitly set `initial_connect_retry=off`; `connectQwpNodeClient()` waits
-for that retry only with `query_pool_min=0`.
+rows are lost. Background memory mode and store-and-forward retry
+indefinitely, subject to queue or journal capacity. Startup behavior and the
+`reconnect_*` keys are covered in
+[Startup and outage modes](#ingestion-modes).
 
 ### Query failover
 
@@ -1247,15 +1411,20 @@ outages. When failover gives up, the query fails with
 
 ### Typed reconnect policy
 
-Typed `ingressSession.reconnect` and `egressSession.reconnect` **replace**
-their respective connect-string policies; set every limit you rely on in
-the typed object. Ingestion `reconnect_*` keys trigger first-connection
-retry, but a typed ingestion `reconnect` object does not. A query's first
-connection retries only if `failover=on` is explicit, a `failover_*` key is
-set without `failover=off`, or a typed query `reconnect` object is provided.
-A typed `egressSession.reconnect` object also turns query failover back on
-when the connect string says `failover=off`, so do not add one, even just for
-`onEvent`, to a client that must not re-execute SQL.
+Typed `ingressSession.reconnect` and `egressSession.reconnect` objects
+**replace** their connect-string policies, so set every limit you rely on in
+the typed object.
+
+- **Ingestion.** `reconnect_*` keys trigger first-connection retry; a typed
+  ingestion `reconnect` object does not.
+- **Queries.** The first query connection is retried only if one of these is
+  set:
+  - `failover=on`, explicitly;
+  - a `failover_*` key, without `failover=off`;
+  - a typed `egressSession.reconnect` object.
+- **Failover off.** A typed `egressSession.reconnect` object turns query
+  failover back on even when the connect string says `failover=off`. Do not
+  add one, even just for `onEvent`, to a client that must not re-execute SQL.
 
 ### Connection events
 
@@ -1289,7 +1458,8 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
 await db.close();
 ```
 
-No event marks a terminal failure: use `ingressSession.onError` with
+No event marks a terminal failure: use
+[`ingressSession.onError`](#ingestion-errors) with
 `terminal: true` for that. An `egressSession.reconnect` object added for
 `onEvent` re-enables query failover on a `failover=off` client; see
 [Typed reconnect policy](#typed-reconnect-policy). Connect-string
@@ -1339,7 +1509,7 @@ the
 
 | Area | Node.js behavior |
 |---|---|
-| Startup/outage | `lazy_connect=on` or `initial_connect_retry=async` starts senders in the background, but `connectQwpNodeClient()` starts while QuestDB is down only with `query_pool_min=0`, which `lazy_connect=on` sets. First-connection retry from `initial_connect_retry=on` or a `reconnect_*` key covers senders only. Default memory mode gives up after 5 minutes per outage; SF and background memory modes retry indefinitely. See [Startup and outage modes](#ingestion-modes). |
+| Startup/outage | `connectQwpNodeClient()` also opens a query connection, so it starts while QuestDB is down only with `query_pool_min=0`, which `lazy_connect=on` sets. A sender in default memory mode gives up after `reconnect_max_duration_millis` per outage. See [Startup and outage modes](#ingestion-modes). |
 | Authentication | After a sender's first successful connection, `401`/`403` is retried indefinitely by senders with `sf_dir` or a background start; other senders and queries treat it as terminal. |
 | Query startup | First-connect retry requires explicit `failover=on`, a `failover_*` key (without `failover=off`), or typed `egressSession.reconnect`. |
 | `target`, `zone` | Also apply to ingestion when set in the connect string; use typed `egress.target` for queries only. |

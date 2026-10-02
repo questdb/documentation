@@ -65,7 +65,7 @@ network), and retrying for five minutes only hides it.
 |---|---|
 | `off` (default; alias `false`) | First-connect failure is terminal. The producer's call to build the sender throws immediately. |
 | `on` (aliases `sync`, `true`) | First-connect failures are retried on the caller's thread. The constructor blocks until it connects or `reconnect_max_duration_millis` expires — this is the **only** place that key applies. Once the sender is running, reconnection is unbounded, except for the Node.js senders described in the `reconnect_max_duration_millis` row above. |
-| `async` | The constructor returns immediately; the background I/O thread drives the reconnect loop. The producer experiences backpressure if it tries to publish before the connection comes up. Intended for unattended producers where the SF directory may already carry segments from a prior process and the server may come up later. |
+| `async` | The constructor returns immediately; the background I/O thread drives the reconnect loop. The producer experiences backpressure if it tries to publish before the connection comes up. Intended for unattended producers where the SF directory may already carry segments from a prior process and the server may come up later. On Node.js, `connectQwpNodeClient()` also opens a query connection at startup, so it returns while the server is down only with `query_pool_min=0`, which `lazy_connect=on` sets; see [startup and outage modes](/docs/connect/clients/nodejs/#ingestion-modes). |
 
 ## Egress (query)
 
