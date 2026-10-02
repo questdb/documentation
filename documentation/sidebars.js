@@ -947,6 +947,7 @@ module.exports = {
             "integrations/other/cube",
             "integrations/other/ignition",
             "integrations/other/airbyte",
+            "integrations/other/adbcbridge",
           ],
         },
       ],
