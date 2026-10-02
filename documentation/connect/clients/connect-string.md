@@ -171,10 +171,21 @@ set the role with the typed `egress` option instead, as described under
 ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
+Setting any explicit `reconnect_*` key implicitly turns on
+`initial_connect_retry`, so the sender retries its *first* connect for up to
+2 minutes. A running sender retries later outages indefinitely. See
 [Ingress reconnect](#reconnect-keys).
+
+:::caution Node.js client
+
+On the Node.js client, the retry covers senders only.
+`connectQwpNodeClient()` also opens a query connection, which still gives up
+almost at once, so add `query_pool_min=0`, or use `lazy_connect=on` to start
+without waiting. In default memory mode, the budget also ends every later
+outage after 2 minutes. See
+[Node.js startup and outage modes](/docs/connect/clients/nodejs/#ingestion-modes).
+
+:::
 
 ## Recipes {#recipes}
 
@@ -857,7 +868,12 @@ explicit setter always wins over the string.
 - `lazy_connect` — when `on`, the pool defers opening its first connection
   until the first borrow, so construction succeeds against a server that is
   down. This is the supported way to tolerate a server that starts after your
-  application. Default: `off`.
+  application. Default: `off`. The Node.js client instead starts its senders
+  connecting in the background (`initial_connect_retry=async`) and sets
+  `query_pool_min=0`, rejecting a positive value. Those senders also retry an
+  outage indefinitely rather than giving up after
+  `reconnect_max_duration_millis`; see
+  [Node.js startup and outage modes](/docs/connect/clients/nodejs/#ingestion-modes).
 
 ## Error handling {#error-handling}
 

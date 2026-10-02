@@ -183,13 +183,17 @@ borrows, and close the client on shutdown.
 Two independent choices decide what a sender does while QuestDB is
 unreachable:
 
-- **Startup.** A *foreground start*, the default, connects inside
+- **Startup.** A *foreground start*, the default, connects senders inside
   `connectQwpNodeClient()`, which rejects if QuestDB is down. A *background
-  start* (`lazy_connect=on`) returns immediately and connects senders in the
-  background. `lazy_connect=on` sets `query_pool_min` to 0 and rejects a
-  positive value, and a query borrowed before QuestDB is reachable fails. A
-  standalone `Sender` gets a background start with
-  `initial_connect_retry=async`.
+  start* connects senders in the background: `initial_connect_retry=async`
+  selects it, and `lazy_connect=on` selects it and also sets
+  `query_pool_min=0`, rejecting a positive value. `connectQwpNodeClient()`
+  returns while QuestDB is down only with `query_pool_min=0`: with
+  `initial_connect_retry=async` alone, the default query connection still
+  has to connect at startup. A query borrowed before QuestDB is reachable
+  fails. A standalone `Sender` gets a background start from either key. With
+  a background start, also set `sf_max_segment_bytes=1m`; see
+  [Batch size limits](#batch-size-limits).
 - **Storage.** Without `sf_dir`, unacknowledged rows live in memory and are
   lost if the process exits. With `sf_dir`, they are journaled to disk and
   replayed after a restart; see [Store-and-forward](#store-and-forward).
@@ -197,13 +201,16 @@ unreachable:
 | Mode | Enabled by | QuestDB down at startup | During an outage |
 |---|---|---|---|
 | Default memory | Neither `sf_dir` nor a background start | Startup rejects | `flush()`, and `at()` when it triggers an auto-flush, wait for the reconnect for up to `reconnect_max_duration_millis` (5 minutes by default). Then the sender fails with `QwpReconnectExhaustedError` and its unacknowledged rows are lost |
-| Background memory | A background start without `sf_dir` | Starts; rows queue in memory | Rows queue in memory, up to `sf_max_total_bytes` (128 MiB by default); retries continue indefinitely |
-| Store-and-forward | `sf_dir`, with either startup | Foreground: startup rejects. Background: starts | Rows go to the disk journal; retries continue indefinitely, from startup with a background start or after the first successful connection otherwise |
+| Background memory | A background start without `sf_dir` | Starts if `query_pool_min=0`, as with `lazy_connect=on`; rows queue in memory | Rows queue in memory, up to `sf_max_total_bytes` (128 MiB by default); retries continue indefinitely |
+| Store-and-forward | `sf_dir`, with either startup | Foreground: startup rejects. Background: starts if `query_pool_min=0` | Rows go to the disk journal; retries continue indefinitely, from startup with a background start or after the first successful connection otherwise |
 
-A foreground start fails fast unless `initial_connect_retry=on` or any
-`reconnect_*` key is set; then it retries the first connection for up to
-`reconnect_max_duration_millis` before rejecting. A locked journal fails
-startup even with a background start.
+A foreground start fails fast. `initial_connect_retry=on`, or any
+`reconnect_*` key, makes senders retry their first connection for up to
+`reconnect_max_duration_millis` before rejecting. These keys do not apply to
+query connections, so with the default `query_pool_min=1`,
+`connectQwpNodeClient()` still rejects almost at once: also set
+`query_pool_min=0` to wait for the senders. A locked journal fails startup
+even with a background start.
 
 ### Closing the pooled client
 
@@ -374,10 +381,11 @@ QuestDB advertises its maximum batch size on connection (about 2 MiB on a
 default server). The client splits a larger batch into several frames at row
 boundaries. A single row larger than the limit fails with
 `QwpBatchTooLargeError`: call `reset()` and shrink that row, for example a
-large VARCHAR or BINARY value. A sender that starts offline cannot yet know
-the server limit. With `sf_dir` and `lazy_connect=on`, set
-`sf_max_segment_bytes=1m`: it also caps each journaled frame at 1 MiB, so an
-oversized frame cannot block journal replay.
+large VARCHAR or BINARY value. A sender with a background start cannot know
+the limit before its first connection, so a frame built while QuestDB is
+down can exceed it. That frame is then never delivered: it is retried
+indefinitely and blocks every later batch. With a background start, with or
+without `sf_dir`, set `sf_max_segment_bytes=1m` to cap each frame at 1 MiB.
 
 ### Awaiting acknowledgements
 
@@ -453,31 +461,33 @@ Set `transaction=on` to defer server commits of auto-flushed batches until
 `flush()` (or `commit()` on a pooled sender). Transactions are atomic per
 table, not across tables, and QuestDB can commit early when the table exceeds
 [`qwp.max.uncommitted.rows`](/docs/configuration/qwp/#qwpmaxuncommittedrows).
-Closing a standalone sender without `flush()` rolls back the open transaction;
-returning a pooled sender with `close()` flushes and commits instead.
+
+Only a standalone sender can roll back: closing it without `flush()` discards
+the open transaction. A pooled sender has no rollback. Returning it with
+`close()` flushes and commits the open transaction, including batches that
+auto-flush already sent; `reset()` drops only rows that have not been sent.
+If your code throws partway through a batch, a pooled sender therefore
+commits the rows written before the error. When a failed batch must leave no
+rows, use a standalone sender:
 
 ```typescript
-import { connectQwpNodeClient } from "@questdb/nodejs-client";
+import { Sender } from "@questdb/nodejs-client";
 
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;transaction=on;");
+const sender = await Sender.fromConfig("ws::addr=localhost:9000;transaction=on;");
 try {
-  const sender = await db.borrowSender();
-  try {
-    for (const [side, price] of [["buy", 2615.54], ["sell", 2615.62]] as const) {
-      await sender
-        .table("trades")
-        .symbol("symbol", "ETH-USD")
-        .symbol("side", side)
-        .doubleColumn("price", price)
-        .doubleColumn("amount", 0.5)
-        .at(Date.now(), "ms");
-    }
-    await sender.commit(); // both rows become visible together
-  } finally {
-    await sender.close();
+  await sender.connect();
+  for (const [side, price] of [["buy", 2615.54], ["sell", 2615.62]] as const) {
+    await sender
+      .table("trades")
+      .symbol("symbol", "ETH-USD")
+      .symbol("side", side)
+      .floatColumn("price", price) // DOUBLE: the Sender has no doubleColumn()
+      .floatColumn("amount", 0.5)
+      .at(Date.now(), "ms");
   }
+  await sender.flush(); // commits: both rows become visible together
 } finally {
-  await db.close();
+  await sender.close(); // rolls back the transaction if flush() was not reached
 }
 ```
 
@@ -932,7 +942,8 @@ them.
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+// failover=off: a re-run after a lost connection would count batches twice.
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;failover=off;");
 try {
   const lease = await db.borrowQuery();
   try {
@@ -960,7 +971,11 @@ try {
 }
 ```
 
-See the [client API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
+The callback adds to a running total, so the example turns failover off: with
+failover on, a lost connection re-runs the query and its batches are added
+again. If the query fails with `QwpEgressSessionClosedError`, run it again
+from an empty total; see [Query failover](#query-failover). See the
+[client API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
 for the typed column getters.
 
 ### Compression
@@ -1180,8 +1195,9 @@ default): it fails with `QwpReconnectExhaustedError` and its unacknowledged
 rows are lost. Background memory mode or `sf_dir` retries indefinitely,
 subject to queue or journal capacity. For the first connection, see
 [Startup and outage modes](#ingestion-modes). Setting a `reconnect_*` key
-implicitly requests bounded first-connection retry unless you explicitly set
-`initial_connect_retry=off`.
+implicitly requests bounded first-connection retry for senders unless you
+explicitly set `initial_connect_retry=off`; `connectQwpNodeClient()` waits
+for that retry only with `query_pool_min=0`.
 
 ### Query failover
 
@@ -1323,7 +1339,7 @@ the
 
 | Area | Node.js behavior |
 |---|---|
-| Startup/outage | `lazy_connect=on` starts senders in the background; default memory mode gives up after 5 minutes per outage; SF and background memory modes retry indefinitely. See [Startup and outage modes](#ingestion-modes). |
+| Startup/outage | `lazy_connect=on` or `initial_connect_retry=async` starts senders in the background, but `connectQwpNodeClient()` starts while QuestDB is down only with `query_pool_min=0`, which `lazy_connect=on` sets. First-connection retry from `initial_connect_retry=on` or a `reconnect_*` key covers senders only. Default memory mode gives up after 5 minutes per outage; SF and background memory modes retry indefinitely. See [Startup and outage modes](#ingestion-modes). |
 | Authentication | After a sender's first successful connection, `401`/`403` is retried indefinitely by senders with `sf_dir` or a background start; other senders and queries treat it as terminal. |
 | Query startup | First-connect retry requires explicit `failover=on`, a `failover_*` key (without `failover=off`), or typed `egressSession.reconnect`. |
 | `target`, `zone` | Also apply to ingestion when set in the connect string; use typed `egress.target` for queries only. |
