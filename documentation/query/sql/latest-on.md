@@ -2,28 +2,36 @@
 title: LATEST ON keyword
 sidebar_label: LATEST ON
 description:
-  Reference documentation for using LATEST ON keywords with examples for
-  illustration.
+  LATEST ON ... PARTITION BY returns the most recent row per key, such as the
+  latest price per symbol. Syntax, supported column types, and examples.
 ---
 
-Retrieves the latest entry by timestamp for a given key or combination of keys,
-for scenarios where multiple time series are stored in the same table.
+Returns the latest row per group: the most recent entry by timestamp for each
+key or combination of keys. Use it when many time series share one table, for
+example to get the latest price per symbol or the latest balance per account.
 
 ## Syntax
 
 ```questdb-sql
-SELECT columnName [, columnName ...]
-FROM tableName
-LATEST ON timestampColumn PARTITION BY columnName [, columnName ...];
+[SELECT { * | columnName [, columnName ...] } FROM] { tableName | (subQuery) }
+[WHERE condition]
+LATEST ON timestampColumn PARTITION BY partitionColumn [, partitionColumn ...];
 ```
 
 where:
 
-- `columnName` used in the `LATEST ON` part of the clause is a `TIMESTAMP`
-  column.
-- `columnName` list used in the `PARTITION BY` part of the clause is a list of
-  columns of one of the following types: `SYMBOL`, `STRING`, `BOOLEAN`, `SHORT`,
-  `INT`, `LONG`, `LONG256`, `CHAR`, `DECIMAL`.
+- `timestampColumn` is a `TIMESTAMP` or `TIMESTAMP_NS` column. When querying a
+  table directly, it must be the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/).
+- `partitionColumn` is one or more columns that identify each time series.
+- `SELECT * FROM` can be omitted, for example
+  `trades LATEST ON timestamp PARTITION BY symbol;`.
+
+### Supported PARTITION BY column types
+
+`PARTITION BY` in `LATEST ON` accepts columns of any type except `BINARY`,
+`ARRAY`, and `DECIMAL`. Using one of these types fails with an
+`invalid type ... are supported in LATEST ON` error.
 
 ## Description
 
@@ -39,10 +47,10 @@ timestamp.
 The query syntax has an impact on the [execution order](#execution-order) of the
 `LATEST ON` clause and the `WHERE` clause.
 
-To illustrate how `LATEST ON` is intended to be used, consider the `trades` table
-[in the QuestDB demo instance](https://demo.questdb.io/). This table has a
-`symbol` column as `SYMBOL` type which specifies the traded instrument. We can
-find the most recent trade for each symbol with the following query:
+To illustrate how `LATEST ON` is intended to be used, consider the `fx_trades`
+table [in the QuestDB demo instance](https://demo.questdb.io/). This table has a
+`symbol` column as `SYMBOL` type which specifies the traded currency pair. We
+can find the most recent trade for each symbol with the following query:
 
 ```questdb-sql demo title="Latest trade per symbol"
 SELECT symbol, timestamp, price
@@ -50,12 +58,12 @@ FROM fx_trades
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-The above query returns the latest value within each time series stored in the
-table. Those time series are determined based on the values in the column(s)
-specified in the `LATEST ON` clause. In our example those time series are
-represented by different symbols. Then the column used in the `LATEST ON`
-part of the clause stands for the designated timestamp column for the table.
-This allows the database to find the latest value within each time series.
+The query returns one row per distinct value of the `PARTITION BY` column(s),
+here one row per symbol. The `LATEST ON` column is the timestamp used to decide
+which row is the most recent.
+
+Rows with `NULL` in a `PARTITION BY` column form their own group, and the
+latest of them is returned like any other key.
 
 ## Examples
 
@@ -84,10 +92,10 @@ This provides us with a table with the following content:
 
 | cust_id | balance_ccy | balance | ts                          |
 | ------- | ----------- | ------- | --------------------------- |
-| 1       | USD         | 600.5   | 2020-04-21T16:01:22.104234Z |
-| 2       | USD         | 950     | 2020-04-21T16:03:43.504432Z |
-| 2       | EUR         | 780.2   | 2020-04-21T16:08:34.404665Z |
-| 1       | USD         | 1500    | 2020-04-21T16:11:22.704665Z |
+| 1       | USD         | 600.5   | 2020-04-21T16:03:43.504432Z |
+| 2       | USD         | 950     | 2020-04-21T16:08:34.404665Z |
+| 2       | EUR         | 780.2   | 2020-04-21T16:11:22.704665Z |
+| 1       | USD         | 1500    | 2020-04-21T16:11:32.904234Z |
 | 1       | EUR         | 650.5   | 2020-04-22T16:11:32.904234Z |
 | 2       | USD         | 900.75  | 2020-04-22T16:12:43.504432Z |
 | 2       | EUR         | 880.2   | 2020-04-22T16:18:34.404665Z |
@@ -95,8 +103,8 @@ This provides us with a table with the following content:
 
 ### Single column
 
-When a single `symbol` column is specified in `LATEST ON` queries, the query
-will end after all distinct symbol values are found.
+When `PARTITION BY` has a single `SYMBOL` column, the query ends as soon as the
+latest row for every distinct symbol value is found.
 
 ```questdb-sql title="Latest records by customer ID"
 SELECT * FROM balances
@@ -113,12 +121,12 @@ value:
 
 ### Multiple columns
 
-When multiple columns are specified in `LATEST ON` queries, the returned results
-are the most recent **unique combinations** of the column values. This example
-query returns `LATEST ON` customer ID and balance currency:
+When `PARTITION BY` has multiple columns, the query returns the most recent row
+for each **unique combination** of the column values. This example returns the
+latest balance per customer ID and balance currency:
 
 ```questdb-sql title="Latest balance by customer and currency"
-SELECT cust_id, balance_ccy, balance
+SELECT cust_id, balance_ccy, balance, ts
 FROM balances
 LATEST ON ts PARTITION BY cust_id, balance_ccy;
 ```
@@ -126,25 +134,27 @@ LATEST ON ts PARTITION BY cust_id, balance_ccy;
 The results return the most recent records for each unique combination of
 `cust_id` and `balance_ccy`.
 
-| cust_id | balance_ccy | balance | inactive | ts                          |
-| ------- | ----------- | ------- | -------- | --------------------------- |
-| 1       | EUR         | 650.5   | FALSE    | 2020-04-22T16:11:32.904234Z |
-| 2       | USD         | 900.75  | FALSE    | 2020-04-22T16:12:43.504432Z |
-| 2       | EUR         | 880.2   | FALSE    | 2020-04-22T16:18:34.404665Z |
-| 1       | USD         | 330.5   | FALSE    | 2020-04-22T16:20:14.404997Z |
+| cust_id | balance_ccy | balance | ts                          |
+| ------- | ----------- | ------- | --------------------------- |
+| 1       | EUR         | 650.5   | 2020-04-22T16:11:32.904234Z |
+| 2       | USD         | 900.75  | 2020-04-22T16:12:43.504432Z |
+| 2       | EUR         | 880.2   | 2020-04-22T16:18:34.404665Z |
+| 1       | USD         | 330.5   | 2020-04-22T16:20:14.404997Z |
 
 #### Performance considerations
 
-When the `LATEST ON` clause contains a single `symbol` column, QuestDB will know
-all distinct values upfront and stop scanning table contents once the latest
-entry has been found for each distinct symbol value.
+When `PARTITION BY` has a single `SYMBOL` column, QuestDB knows all distinct
+values upfront and stops scanning once the latest row has been found for each
+distinct symbol value.
 
-When the `LATEST ON` clause contains multiple columns, QuestDB has to scan the
-entire table to find distinct combinations of column values.
+When `PARTITION BY` has only `SYMBOL` columns, QuestDB stops once it has found
+every possible combination of symbol values. In practice many combinations never
+occur, so the query often scans the whole table.
 
-Although scanning is fast, performance will degrade on hundreds of millions of
-records. If there are multiple columns in the `LATEST ON` clause, this will
-result in a full table scan.
+When `PARTITION BY` has any non-`SYMBOL` column, QuestDB scans the whole table
+(or the time range selected by `WHERE`) to find the distinct values.
+
+Scanning is fast, but it slows down on hundreds of millions of rows.
 
 ### LATEST ON over sub-query
 
@@ -204,12 +214,12 @@ LATEST ON ts PARTITION BY cust_id;
 This query executes `WHERE` before `LATEST ON` and returns the most recent
 balance which is above 800. The execution order is as follows:
 
-- filter out all balances below 800
+- keep only balances above 800
 - find the latest balance by `cust_id`
 
 | cust_id | balance_ccy | balance | ts                          |
 | ------- | ----------- | ------- | --------------------------- |
-| 1       | USD         | 1500    | 2020-04-22T16:11:22.704665Z |
+| 1       | USD         | 1500    | 2020-04-21T16:11:32.904234Z |
 | 2       | EUR         | 880.2   | 2020-04-22T16:18:34.404665Z |
 
 #### LATEST ON first
@@ -223,27 +233,34 @@ This query executes `LATEST ON` before `WHERE` and returns the most recent
 records, then filters out those below 800. The steps are:
 
 1. Find the latest balances by customer ID.
-2. Filter out balances below 800. Since the latest balance for customer 1 is
+2. Keep only balances above 800. Since the latest balance for customer 1 is
    equal to 330.5, it is filtered out in this step.
 
-| cust_id | balance_ccy | balance | inactive | ts                          |
-| ------- | ----------- | ------- | -------- | --------------------------- |
-| 2       | EUR         | 880.2   | FALSE    | 2020-04-22T16:18:34.404665Z |
+| cust_id | balance_ccy | balance | ts                          |
+| ------- | ----------- | ------- | --------------------------- |
+| 2       | EUR         | 880.2   | 2020-04-22T16:18:34.404665Z |
 
 #### Combination
 
-It's possible to combine a time-based filter with the balance filter from the
-previous example to query the latest values for the `2020-04-21` date and filter
-out those below 800.
+Combine a time filter with the balance filter from the previous example to get
+the latest balance per customer on `2020-04-21`, then keep only balances above
+800:
 
-```questdb-sql demo title="Filter a time slice, then apply LATEST ON"
-(fx_trades WHERE timestamp IN '$today' LATEST ON timestamp PARTITION BY symbol)
-WHERE price > 3;
+```questdb-sql title="Filter a time slice, then apply LATEST ON"
+(balances WHERE ts IN '2020-04-21' LATEST ON ts PARTITION BY cust_id)
+WHERE balance > 800;
 ```
 
-Since QuestDB allows you to omit the `SELECT * FROM` part of the query, we
-omitted it to keep the query compact.
+| cust_id | balance_ccy | balance | ts                          |
+| ------- | ----------- | ------- | --------------------------- |
+| 1       | USD         | 1500    | 2020-04-21T16:11:32.904234Z |
 
-Such a combination is very powerful since it allows you to find the latest
-values for a time slice of the data and then apply a filter to them in a single
-query.
+On `2020-04-21`, the latest balance for customer 2 is 780.2, so it is filtered
+out. `SELECT * FROM` is omitted to keep the query compact.
+
+The same pattern works on the demo instance:
+
+```questdb-sql demo title="Latest trade per symbol today, above a price"
+(fx_trades WHERE timestamp IN '$today' LATEST ON timestamp PARTITION BY symbol)
+WHERE price > 1;
+```
