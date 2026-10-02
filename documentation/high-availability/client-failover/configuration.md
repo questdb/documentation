@@ -52,7 +52,7 @@ for the full list. The failover-relevant keys are:
 |---|---|---|---|
 | `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely, so raising this does nothing for failover windows. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Starting backoff sleep at round exhaustion. Doubles up to `reconnect_max_backoff_millis`. |
-| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter, the actual sleep lands in `[max, 2·max)` once the base saturates. |
+| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter, the actual sleep lands in `[max, 2·max)` once the base saturates. The Node.js client uses full jitter, so its sleep lands in `[0, max)`. |
 | `initial_connect_retry` | `off` \| `on` \| `async` | `off` | Whether to apply the same retry loop to the very first connect attempt. See below. |
 
 ### `initial_connect_retry`

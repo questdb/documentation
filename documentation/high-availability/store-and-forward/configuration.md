@@ -50,7 +50,7 @@ and host-walk semantics are documented in
 |---|---|---|---|
 | `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. Exception: a Node.js sender in default memory mode, without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, applies it to every outage; see [the Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect). |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
-| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
+| `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`; the Node.js client uses full jitter, `[0, max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
 | `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++, Python, Go and Node.js | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 

@@ -157,7 +157,8 @@ length, and what bounds your tolerance is buffer capacity
   `QwpReconnectExhaustedError`; see the
   [Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect).
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
-  reconnect storms when many producers share a cluster
+  reconnect storms when many producers share a cluster. The Node.js client
+  uses full jitter, `[0, base)`, instead
 - Inter-host pause within a round: **none** — the client walks the full
   address list as fast as `auth_timeout_ms` allows, paying one backoff
   sleep at round exhaustion
@@ -198,7 +199,7 @@ will not help.
 | Condition | Why terminal |
 |---|---|
 | HTTP `401` / `403` on upgrade | Credentials are assumed to be cluster-wide. Some clients retry after a sender's first successful connection; see [Authentication is cluster-wide](#authentication-is-cluster-wide). |
-| Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
+| Server rejection with a terminal policy: by default `SCHEMA_MISMATCH`, `PARSE_ERROR`, `SECURITY_ERROR`, and `PROTOCOL_VIOLATION`, or a batch that keeps being rejected | Replaying the same bytes reproduces the rejection. Retriable categories, such as `WRITE_ERROR`, are resent instead; see [Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames). |
 
 ### Topology — handled inside the round
 
