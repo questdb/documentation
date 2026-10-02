@@ -85,6 +85,19 @@ Comma-separated list of numerical CPU core indexes.
 Number of dedicated worker threads assigned to refresh materialized views.
 When `0`, uses the shared worker pool.
 
+## mat.view.refresh.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the materialized view refresh pool in Fiber mode, where work can suspend
+and release its worker instead of holding it until it finishes. Setting this to
+`false` puts the pool in legacy mode.
+
+Unlike the pools that serve user queries, this one is not a prerequisite for
+QuestDB Enterprise [resource groups](/docs/concepts/resource-groups/), because
+materialized view refresh runs outside them.
+
 ## mat.view.refresh.worker.haltOnError
 
 - **Default**: `false`
