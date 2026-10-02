@@ -298,7 +298,7 @@ The pooled QWP sender and `connectQwpNodeSender()` expose these methods:
 | `booleanColumn`, `byteColumn`, `shortColumn`, `int32Column` | BOOLEAN, BYTE, SHORT, INT |
 | `longColumn`, `intColumn` | LONG; safe integer `number` or `bigint` |
 | `float32Column`, `doubleColumn`, `floatColumn` | FLOAT, DOUBLE, DOUBLE |
-| `timestampColumn(name, value, unit?)`, `dateColumn` | TIMESTAMP/TIMESTAMP_NS and DATE |
+| `timestampColumn(name, value, unit = "us")`, `dateColumn` | TIMESTAMP/TIMESTAMP_NS and DATE; for units, see [Designated timestamp](#designated-timestamp) |
 | `charColumn`, `binaryColumn`, `uuidColumn` | CHAR, BINARY (`Uint8Array`), UUID |
 | `long256Column`, `ipv4Column`, `geohashColumn` | LONG256, IPv4, GEOHASH |
 | `decimalColumnText`, `decimalColumn`, `decimal64Column`, `decimal128Column`, `decimal256Column` | DECIMAL; see [Decimals](#decimals) |
@@ -327,7 +327,10 @@ dictionary full.
 
 `at(value, unit)` accepts `"us"` (the default), `"ms"`, or `"ns"`.
 `Date.now()` is **milliseconds**, so use `.at(Date.now(), "ms")`;
-without the unit the row lands in 1970. Nanoseconds require a `bigint`.
+without the unit the row lands in 1970. `timestampColumn(name, value, unit)`
+takes the same units with the same `"us"` default, so pass the unit there
+too: `.timestampColumn("exchange_ts", Date.now(), "ms")`. Nanoseconds require
+a `bigint`.
 `atNow()` asks QuestDB to assign arrival time, which changes on replay. Use
 the event's timestamp for deduplication. For a newly created table, `"ns"`
 creates a TIMESTAMP_NS designated timestamp; the other units create
@@ -470,9 +473,14 @@ targets 10 GiB with it. When full, publishing waits up to 30 seconds by
 default, then rejects with `QwpMemoryReplayAppendTimeoutError` or
 `QwpReplayStoreAppendTimeoutError`. The batch stays staged: slow down and
 retry `flush()`; do not write the rows again. If you close the sender
-instead, `close()` tries once more and, if there is still no room, drops the
-staged rows with a warning and rejects with the same error. Configure the cap
-with `sf_max_total_bytes` and the wait with `sf_append_deadline_millis`.
+instead, it tries once more and, if there is still no room, drops the staged
+rows with a warning. A borrowed sender's `close()` then rejects with the same
+error, after up to `sf_append_deadline_millis` plus
+`close_flush_timeout_millis` (35 seconds by default). A standalone `Sender`'s
+`close()` waits at most `close_flush_timeout_millis` (5 seconds by default)
+and, with the default deadlines, rejects with `QwpSenderCloseTimeoutError`.
+Configure the cap with `sf_max_total_bytes` and the wait with
+`sf_append_deadline_millis`.
 
 #### Batch size limits
 
@@ -492,9 +500,11 @@ After `flush()`, wait for the cumulative watermark:
 `await sender.waitForAcknowledged(sender.publishedSequence, 10_000)`.
 
 `publishedSequence` includes batches sent by auto-flush; `acknowledgedSequence`
-is the last accepted one. `waitForAcknowledged()` rejects on a server
-rejection, or with `QwpIngressAckTimeoutError` on timeout; without a timeout
-argument, it waits up to `ackTimeoutMs` (15 seconds by default). A timeout
+is the last accepted one. `waitForAcknowledged()` rejects with
+`QwpIngressNackError` when QuestDB terminally rejects a batch (see
+[Ingestion errors](#ingestion-errors)), or with `QwpIngressAckTimeoutError` on
+timeout; without a timeout argument, it waits up to `ackTimeoutMs`
+(15 seconds by default). A timeout
 alone does not mean the batch was rejected: it may still be in flight. **Do
 not use the return value of `flushAndGetSequence()` as the watermark for all
 your rows**: it returns `-1n` if an earlier auto-flush already published them.
@@ -1032,7 +1042,8 @@ Set `timeoutMs` per query (or `egressSession.queryTimeoutMs` by default).
 A deadline cancels the query and reports `QwpEgressQueryTimeoutError`.
 Leaving a `for await` loop early also cancels the query, and `completion`
 then rejects with `QwpEgressQueryAbandonedError`. `query.cancel()` requests
-cancellation but does not wait for it.
+cancellation but does not wait for it; the query then fails with
+`QwpEgressQueryError` and `status` `QWP_STATUS.CANCELLED`.
 
 Cancellation is prompt only with a credit window (see
 [Flow control](#flow-control)). Without one, the server keeps streaming after
@@ -1143,8 +1154,8 @@ can import it for `instanceof` checks:
 | Local value validation | Fix the value; the row in progress was discarded. Test `QwpBatchTooLargeError` before `RangeError` because it extends `RangeError`. |
 | `QwpMemoryReplayAppendTimeoutError` / `QwpReplayStoreAppendTimeoutError` | The batch stays staged. Slow down and retry the flush, not the rows. |
 | ACK timeout: `QwpIngressAckTimeoutError` from `waitForAcknowledged()`, or a plain `Error` from a `flush()` that waits for an acknowledgement | Not a rejection: QuestDB may still acknowledge the batch. Do not write the rows again; wait again, or raise `ackTimeoutMs` or `durableAckTimeoutMs`. See [Awaiting acknowledgements](#awaiting-acknowledgements). |
-| Server rejection | See [Ingestion errors](#ingestion-errors); a terminal rejection fails the sender. |
-| `QwpEgressQueryError` | Check `status`: fix SQL or bind values for `PARSE_ERROR`; retry on a new lease for `CANCELLED`, such as a query cancelled by a server shutdown. The lease remains usable after a SQL error. |
+| Server rejection: `QwpIngressNackError` from `waitForAcknowledged()`, or an `onSenderError` report | See [Ingestion errors](#ingestion-errors); a terminal rejection fails the sender. |
+| `QwpEgressQueryError` | Check `status`: fix SQL or bind values for `PARSE_ERROR`. `CANCELLED` comes from your own `query.cancel()` or, with `failover=off`, from a server shutdown: retry on a new lease only a query you did not cancel. The lease remains usable after a SQL error. |
 | `QwpEgressSessionClosedError` | The query connection was lost with failover off. Close the lease and retry the whole query. |
 | `QwpReconnectExhaustedError` | Close the failed sender or query lease and borrow a new one. |
 
@@ -1220,8 +1231,9 @@ category has a fixed default policy, because Node.js does not apply the
 The handler also runs for retriable rejections, which the client resends: only
 `terminal` (the sender stops) and `abandoned` (journal data set aside) mean
 the rows are not being delivered. Without a callback, the client logs
-rejections. `waitForAcknowledged()`
-rejects for a rejected batch. Branch on category, not the unstable message
+rejections. `waitForAcknowledged()` rejects with `QwpIngressNackError` for a
+terminally rejected batch; its `senderError` property has the fields above.
+Branch on category, not the unstable message
 text, and redact messages before sending them to external trackers.
 `ingressSession.onError` receives an event with `error`, `terminal`,
 `timestampMs`, and, for a server rejection, `senderError`. It also reports
@@ -1309,9 +1321,14 @@ try {
 ```
 
 `requestId` numbers queries per connection; it is not a server-side
-correlation ID. A server that shuts down cancels running queries: they fail
-with `status` `QWP_STATUS.CANCELLED` instead of failing over, so retry them on
-a new lease. Other failures are separate classes, not `QwpEgressQueryError`:
+correlation ID. A server that shuts down interrupts its running queries. With
+failover on (the default), the client treats this as a lost connection: it
+runs the query again from its first row, or fails with
+`QwpReconnectExhaustedError` once failover gives up; see
+[Query failover](#query-failover). With `failover=off`, the query fails with
+`status` `QWP_STATUS.CANCELLED`; retry it on a new lease. Your own
+`query.cancel()` also produces `CANCELLED`, so do not retry a query you
+cancelled. Other failures are separate classes, not `QwpEgressQueryError`:
 
 - `QwpEgressQueryTimeoutError`: `timeoutMs` expired.
 - `QwpEgressQueryAbandonedError`: the loop ended early; see
@@ -1325,20 +1342,68 @@ another.
 
 ### Connection-level errors
 
-The pool wraps connection creation failures in `QwpPoolResourceError`; inspect
-its `cause`. A `QwpUpgradeError` covers any failure while opening the
-WebSocket, so check its `kind`: `authentication` for an HTTP `401` or `403`,
-`transport` or `timeout` when QuestDB is unreachable, and others such as
-`role-rejected` and `version-mismatch`. `QwpRoleMismatchError` and
-`QwpDurableAckUnavailableError` extend `QwpUpgradeError`, so test for them
-first. With several endpoints, a connection that fails on every endpoint, for
-example because none is reachable, has a `QwpFailoverError` cause whose
-`attempts` records each endpoint's failure. An authentication rejection is the
-exception: it stops the endpoint sweep at once, so the cause is that
-`QwpUpgradeError` itself. With one endpoint, the cause is always that
-endpoint's error. A borrow at pool capacity times out as
-`QwpPoolAcquireTimeoutError` after `acquire_timeout_ms` (5 seconds by
-default).
+The pool wraps a failure to open a connection in `QwpPoolResourceError`.
+Follow its `cause` chain to the reason:
+
+- **Retried first connection.** If the first connection is retried, the next
+  cause is a `QwpReconnectExhaustedError` that wraps the last attempt's error.
+  Queries retry it with `failover=on`, any `failover_*` key, or a typed
+  `egressSession.reconnect`; senders retry it with `initial_connect_retry=on`
+  or any `reconnect_*` key (see [Startup and outage modes](#ingestion-modes)).
+- **Several endpoints.** When every endpoint fails, for example because none is
+  reachable, the error is a `QwpFailoverError` whose `attempts` records each
+  endpoint's failure.
+- **One endpoint.** The error is that endpoint's `QwpUpgradeError`.
+- **Authentication.** A `401` or `403` stops the endpoint sweep and is not
+  retried, so the cause is the `QwpUpgradeError` itself, even with several
+  endpoints or a retried first connection.
+
+A `QwpUpgradeError` covers any failure while opening the WebSocket, so check
+its `kind`: `authentication` for an HTTP `401` or `403`, `transport` or
+`timeout` when QuestDB is unreachable, and others such as `role-rejected` and
+`version-mismatch`. `QwpRoleMismatchError` and `QwpDurableAckUnavailableError`
+extend `QwpUpgradeError`, so test for them first. A borrow at pool capacity
+times out as `QwpPoolAcquireTimeoutError` after `acquire_timeout_ms`
+(5 seconds by default).
+
+```typescript
+import {
+  connectQwpNodeClient,
+  QwpFailoverError,
+  QwpPoolResourceError,
+  QwpReconnectExhaustedError,
+  QwpUpgradeError,
+} from "@questdb/nodejs-client";
+
+// Skip the pool and retry wrappers to reach the connection error itself.
+function connectionError(error: unknown): unknown {
+  let cause = error;
+  while (
+    (cause instanceof QwpPoolResourceError ||
+      cause instanceof QwpReconnectExhaustedError) &&
+    cause.cause !== undefined
+  ) {
+    cause = cause.cause;
+  }
+  return cause;
+}
+
+try {
+  const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+  console.log("connected to QuestDB");
+  await db.close();
+} catch (error) {
+  const cause = connectionError(error);
+  if (cause instanceof QwpUpgradeError && cause.kind === "authentication") {
+    console.error("QuestDB rejected the credentials");
+  } else if (cause instanceof QwpFailoverError) {
+    console.error("no endpoint accepted the connection:", cause.attempts);
+  } else {
+    console.error("cannot connect to QuestDB:", cause);
+  }
+  process.exitCode = 1;
+}
+```
 
 An authentication rejection never moves the client to another endpoint. It is
 terminal before a sender's first successful connection. After that, senders
@@ -1471,8 +1536,10 @@ Between failover attempts, the client waits a random delay below a ceiling
 that starts at `failover_backoff_initial_ms` (50 ms by default) and doubles up
 to `failover_backoff_max_ms` (1 second). It makes at most
 `failover_max_attempts` (8) attempts within `failover_max_duration_ms`
-(30 seconds), so the attempt limit can end failover before the time budget:
-raise `failover_max_attempts` for longer outages. When failover gives up, the
+(30 seconds). Against refused connections, as while a server restarts, eight
+attempts take only a few seconds, so the attempt limit ends failover long
+before the time budget: raise `failover_max_attempts` together with
+`failover_max_duration_ms` for longer outages. When failover gives up, the
 query fails with `QwpReconnectExhaustedError`; close the lease and borrow a
 new one.
 
@@ -1739,8 +1806,10 @@ const db = await connectQwpNodeClient(
     // Start while QuestDB is down and journal rows across restarts.
     "lazy_connect=on;sf_dir=/var/lib/myapp/qdb-sf;sender_id=trades;" +
     "sf_max_segment_bytes=1m;" +
-    // Bound query buffering; let query failover run for up to a minute.
-    "initial_credit=1048576;failover_max_duration_ms=60000;",
+    // Bound query buffering. Let query failover retry for up to a minute:
+    // the default cap of 8 attempts would otherwise end it within seconds.
+    "initial_credit=1048576;failover_max_attempts=1000;" +
+    "failover_max_duration_ms=60000;",
   {
     ingressSession: {
       onSenderError: (error) => {
