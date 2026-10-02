@@ -73,7 +73,7 @@ external (SSO/OIDC) users cannot be given a limit; the statement is rejected for
 both. An external user inherits a limit from its groups instead. A set limit
 takes priority over the user's groups and over the
 [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
-workload limit; see [memory limits](/docs/security/rbac/#memory-limits) for how
+workload limit; see [memory limits](/docs/security/rbac/memory-limits/) for how
 limits resolve.
 
 ## Examples

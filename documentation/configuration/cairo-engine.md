@@ -997,7 +997,7 @@ covered.
 
 QuestDB Enterprise can additionally set a memory limit per user, group, or
 service account, which overrides the query workload limit for a principal's
-queries. See [role-based access control](/docs/security/rbac/#memory-limits).
+queries. See [role-based access control](/docs/security/rbac/memory-limits/).
 
 ### Sizing a limit
 

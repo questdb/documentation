@@ -125,5 +125,5 @@ If `http.settings.readonly` configuration is set to true, instance information i
 :::
 
 :::info
-When using QuestDB Enterprise with Role-Based Access Control (RBAC), only the users with `SETTINGS` or `DATABASE ADMIN` permission can edit the instance information. See [Database Permissions](/docs/security/rbac/#database-permissions) for more details.
+When using QuestDB Enterprise with Role-Based Access Control (RBAC), only the users with `SETTINGS` or `DATABASE ADMIN` permission can edit the instance information. See [Database Permissions](/docs/security/rbac/permissions-reference/#database-permissions) for more details.
 :::

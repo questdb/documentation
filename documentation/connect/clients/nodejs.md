@@ -87,9 +87,37 @@ const sender = Sender.fromEnv();
     ...
 ```
 
-When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/security/rbac/#authentication) for more
-info.
+When using QuestDB Enterprise, authentication can also be done via a
+[REST token](/docs/security/rbac/authentication/) in the `token` setting.
+
+This client does not run an OIDC flow. QuestDB Enterprise also accepts an OIDC
+bearer token, which you acquire out of band from your Identity Provider:
+QuestDB publishes the provider's endpoints on its
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), and the same
+response tells you [which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
+See [OpenID Connect](/docs/security/oidc/), and
+[implementing the flow yourself](/docs/security/oidc/device-flow/#implementing-the-flow-yourself) for the device grant's
+requests and polling rules.
+
+Pass the selected bearer token to `Sender` with the same `token` setting. Use
+`https::` so the credential is encrypted in transit:
+
+```javascript title="Use an OIDC bearer token"
+const { Sender } = require("@questdb/nodejs-client")
+
+const token = process.env.QUESTDB_OIDC_TOKEN
+if (!token) {
+  throw new Error("QUESTDB_OIDC_TOKEN is not set")
+}
+
+const sender = Sender.fromConfig(
+  `https::addr=questdb.example.com:9000;token=${token};`,
+)
+```
+
+The sender treats this as a static token: reconnecting does not acquire or read
+a replacement. Before the token expires, finish and flush the current batch,
+close the sender, acquire a new token, and construct a new sender with it.
 
 ## Basic insert
 

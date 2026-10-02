@@ -166,7 +166,7 @@ REVOKE SELECT ON products(id) FROM john;
 
 If the user has a database- or table-level permission, then revoking it on a
 lower level triggers
-[permission level re-adjustment](/docs/security/rbac/#permission-level-re-adjustment).
+[permission level re-adjustment](/docs/security/rbac/granting-permissions/#permission-level-re-adjustment).
 Permission is switched to lower level and `materialized`:
 
 - database level permission is pushed to table level, so e.g. SELECT will not

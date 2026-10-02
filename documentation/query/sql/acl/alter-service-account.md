@@ -72,7 +72,7 @@ ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT { size | UNLIMITED };
 A user who assumes the service account runs under its memory limit. Group limits
 are never merged into a service account. Setting it requires the
 `SET MEMORY LIMIT` permission. See
-[memory limits](/docs/security/rbac/#memory-limits) for how the limit interacts
+[memory limits](/docs/security/rbac/memory-limits/) for how the limit interacts
 with the
 [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairoquerymemorylimitbytes)
 workload limit.

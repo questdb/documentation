@@ -97,7 +97,7 @@ every node runs the new version. The permission is stored in a form older
 versions cannot read, and a `GRANT ALL` issued before the upgrade does not
 include it. Accounts that triggered role switches through `SYSTEM ADMIN` on
 3.3.x need an explicit `GRANT SWITCH ROLE`. See
-[Failover operator](/docs/security/rbac/#failover-operator).
+[Failover operator](/docs/security/rbac/common-scenarios/#failover-operator).
 
 ### QuestDB Enterprise BYOC
 

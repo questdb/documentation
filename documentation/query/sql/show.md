@@ -379,7 +379,7 @@ SHOW GROUPS john;
 The `memory_limit` column is reported in bytes (`2147483648` is 2 GiB) and is
 `null` when the group has no limit of its own. `external_alias` is empty when
 the group is not mapped to an external group. See
-[memory limits](/docs/security/rbac/#memory-limits).
+[memory limits](/docs/security/rbac/memory-limits/).
 
 ### SHOW PARAMETERS
 
@@ -622,14 +622,14 @@ column of [`query_activity`](/docs/query/functions/meta/#query_activity), which
 reports the effective limit and includes it. In `SHOW GROUPS` and
 `SHOW SERVICE ACCOUNTS` above it is instead the
 listed entity's own limit, since neither inherits one. See
-[memory limits](/docs/security/rbac/#memory-limits).
+[memory limits](/docs/security/rbac/memory-limits/).
 
 :::note
 
 `memory_limit` is appended as the last column of `SHOW USERS`, `SHOW GROUPS`,
 and `SHOW SERVICE ACCOUNTS`, including their filtered forms. Tools that bind
 these columns by position rather than by name must account for it. See
-[upgrading](/docs/security/rbac/#memory-limit-upgrade).
+[upgrading](/docs/security/rbac/memory-limits/#memory-limit-upgrade).
 
 :::
 

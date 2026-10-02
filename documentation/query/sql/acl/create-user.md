@@ -36,7 +36,7 @@ user's queries may allocate, set a limit on the user with
 [`ALTER USER ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-user/#set-memory-limit),
 or on one of its groups with
 [`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group/#set-memory-limit).
-See [memory limits](/docs/security/rbac/#memory-limits) for how the two
+See [memory limits](/docs/security/rbac/memory-limits/) for how the two
 interact.
 
 The chosen name must be unique across all users (including the built-in admin),
@@ -45,7 +45,7 @@ fails and an error is raised, unless the `IF NOT EXISTS` clause is included in
 the statement.
 
 Note that new users can only access the database if the necessary
-[endpoint permissions](/docs/security/rbac/#endpoint-permissions) have been
+[endpoint permissions](/docs/security/rbac/authentication/#endpoint-permissions) have been
 granted.
 
 ## Conditional user creation

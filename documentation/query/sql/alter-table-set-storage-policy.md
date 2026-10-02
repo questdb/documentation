@@ -206,5 +206,5 @@ Stages that are not set are omitted from the output.
   view listing active policies
 - [`SHOW CREATE TABLE`](/docs/query/sql/show/#show-create-table) — displays
   the attached `STORAGE POLICY` clause
-- [RBAC permissions](/docs/security/rbac/#permissions) — `SET`, `REMOVE`,
+- [RBAC permissions](/docs/security/rbac/permissions-reference/) — `SET`, `REMOVE`,
   `ENABLE`, and `DISABLE STORAGE POLICY` permissions

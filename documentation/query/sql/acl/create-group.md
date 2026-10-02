@@ -40,7 +40,7 @@ atomically. `WITH EXTERNAL ALIAS` cannot be combined with `IF NOT EXISTS`. To
 map or unmap an existing group, use
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/). For the external group
 mapping flow, see the
-[OpenID Connect (OIDC) integration](/docs/security/oidc/#mapping-user-permissions)
+[Mapping groups and permissions](/docs/security/oidc/group-mapping/)
 guide.
 
 `CREATE GROUP` cannot set a memory limit: a new group has none, and
@@ -56,6 +56,14 @@ the statement.
 
 Contrary to users and service accounts, it is not possible to log in as group. A
 group only serves as a container for permissions which are shared between users.
+
+External aliases are globally unique. If the alias is already reserved,
+`CREATE GROUP` fails instead of reusing the mapping.
+
+## Permissions
+
+Creating a group requires the `CREATE GROUP` permission. The `WITH EXTERNAL
+ALIAS` form also requires `ADD EXTERNAL ALIAS`.
 
 ## Examples
 
@@ -75,7 +83,7 @@ SHOW GROUPS;
 
 that yields:
 
-| name     | external_alias                          | memory_limit |
-| -------- | --------------------------------------- | ------------ |
-| admins   |                                         | null         |
-| analysts | CN=Analysts,OU=Users,DC=example,DC=com  | null         |
+| name     | external_alias                         | memory_limit |
+| -------- | -------------------------------------- | ------------ |
+| admins   |                                        | null         |
+| analysts | CN=Analysts,OU=Users,DC=example,DC=com | null         |
