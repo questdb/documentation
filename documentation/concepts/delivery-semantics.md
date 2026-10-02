@@ -38,6 +38,11 @@ the server confirms a batch, the client reconnects and re-sends. If the
 server had already committed the batch but the acknowledgement was lost in
 flight, the second send produces duplicates.
 
+QWP's `wireSeq` cannot suppress this replay: it is assigned by receive order,
+exists only for response correlation on one connection, and resets after a
+reconnect. Requests carry no persistent message identifier that the server can
+use to recognize the same frame on the next connection.
+
 This path applies to every QuestDB client deployment.
 
 ### Multi-host failover replay
