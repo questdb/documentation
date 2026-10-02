@@ -154,6 +154,11 @@ spawn background drainers to clear them.
 - You prefer "automatic eventual delivery" over "operator manually
   reattaches the slot."
 
+On the Node.js client, both a restarted process and a drainer recover a
+crashed sender's slot only if they can reclaim its lock, which fails in a
+replaced container or in a container restarted in place. Clear such locks
+with [Node.js lock recovery](/docs/high-availability/store-and-forward/operating-and-tuning/#nodejs-lock-recovery).
+
 ### Leave it off when
 
 - Each `sender_id` is statically pinned to a specific process — there

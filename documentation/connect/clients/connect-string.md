@@ -656,6 +656,11 @@ and releases it — **multiple orphans drain in parallel**, up to
 - `drain_orphans` — `on` enables the orphan drainer pool. Default: `off`.
 - `max_background_drainers` — maximum concurrent drainers. Default: `4`.
 
+Without `drain_orphans=on`, the pooled Node.js client still replays slots of
+its own `sender_id` that no running sender holds; the key adds other
+`sender_id`s. See
+[Node.js journal replay](/docs/connect/clients/nodejs/#replaying-the-journal-after-a-restart).
+
 For delivery semantics, architecture, and tradeoffs (at-least-once
 guarantees, DEDUP requirements, segment-granular trim), see
 [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/).

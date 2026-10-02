@@ -60,9 +60,11 @@ The Node.js client does not use an OS lock. It locks a slot with a
 `.lock.owner` directory that records the owner's host name and process ID, and
 keeps `.lock` and `.lock.pid` only for compatibility. After a crash, a new
 Node.js sender takes the slot over automatically only on the same host, once
-the recorded process ID is no longer in use. In containers that usually fails,
-because the application runs as process ID 1 and a replacement container has a
-new host name, and the new sender reports `QwpReplayStoreLockedError`.
+the recorded process ID is no longer in use. Containers usually defeat that
+check: a replacement container has a new host name, and a container restarted
+in place typically gives the restarted process its previous process ID, which
+is often 1. The new sender then reports `QwpReplayStoreLockedError` on every
+start.
 [Node.js lock recovery](#nodejs-lock-recovery) describes how to remove a stale
 lock safely.
 
@@ -123,10 +125,11 @@ is skipped, not stolen.
 
 A Node.js sender can leave its `.lock.owner` directory behind when it crashes.
 On the same host, the next sender reclaims the lock automatically once the
-recorded process has exited. It cannot reclaim a lock recorded on another
-host, such as a container replaced under a new host name, or one whose process
-ID now belongs to another running process; a new sender on the slot then fails
-with `QwpReplayStoreLockedError`. To recover:
+recorded process ID is no longer in use. It cannot reclaim a lock recorded on
+another host, such as a container replaced under a new host name, or one whose
+process ID is in use again, including by the restarted process itself in a
+container restarted in place; a new sender on the slot then fails with
+`QwpReplayStoreLockedError`. To recover:
 
 1. Verify that the previous owner has exited and that no process is using the
    slot. The `.lock.owner` directory records the owner's host name and process
@@ -143,7 +146,8 @@ Never delete the shared `.slot-locks` directory or another slot's locks.
 
 Automate this cleanup only where the deployment guarantees that the previous
 owner has exited before a new one starts, for example a single replica that
-uses the Kubernetes `Recreate` update strategy and a `ReadWriteOnce` volume. A
+uses the Kubernetes `Recreate` update strategy and a `ReadWriteOnce` volume,
+or a container restarted in place whose volume no other process uses. A
 startup step can then remove the stale owner directories of the client's own
 slots before it creates the client. Anywhere two processes can overlap,
 recover manually. See also the

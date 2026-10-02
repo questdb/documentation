@@ -361,9 +361,12 @@ With `initial_connect_retry=async`:
   surface on later producer calls or at close-time.
 
 A sender in async mode does not give up because time passed. What stops it is
-a terminal condition: poison-frame escalation at any time, and an
-authentication rejection or durable-ack capability mismatch before its first
-successful connection. After that first connection, the Java reference client
+a terminal condition: a server rejection with a terminal policy (by default
+`SCHEMA_MISMATCH`, `PARSE_ERROR`, `SECURITY_ERROR`, and `PROTOCOL_VIOLATION`;
+see [Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames)),
+poison-frame escalation at any time, and an authentication rejection or
+durable-ack capability mismatch before its first successful connection. After
+that first connection, the Java reference client
 retries authentication and durable-ack rejections instead, so a credential or
 capability change on the cluster cannot stop the producer. The Rust, C, C++,
 Python, Go, and .NET clients treat them as terminal. Producer calls can also
@@ -595,5 +598,12 @@ source states the contract directly:
 > converts it into the durable-ack capability-gap budget. Neither bounds this
 > loop's steady-state reconnect.
 
-`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
-are terminal across all endpoints. Everything else is retried.
+`QwpAuthFailedException`, `WebSocketUpgradeException`, and
+`QwpDurableAckMismatchException` raised inside the loop are terminal across
+all endpoints before the sender's first successful connection, and in an
+orphan drainer. After a first successful connection, the loop reports each one
+to the error handler as `RETRIABLE` (`SECURITY_ERROR` for an authentication or
+upgrade rejection, `PROTOCOL_VIOLATION` for a durable-ack mismatch) and keeps
+retrying; see
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+Everything else is retried.

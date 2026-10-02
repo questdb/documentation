@@ -338,6 +338,19 @@ until an operator intervenes.
 The orphan flow is opt-in because in a multi-tenant deployment with
 shared `sf_dir`, blindly draining unknown slots may be surprising.
 
+:::caution Node.js client
+
+A Node.js drainer adopts a slot only if it can take the slot's `.lock.owner`
+lock. It can reclaim a crashed owner's lock only on the same host, and only
+when the recorded process ID is no longer in use, so it skips a slot whose
+owner ran in a replaced container or in a container restarted in place. Those
+rows stay on disk until the stale lock is removed; see
+[Node.js lock recovery](/docs/high-availability/store-and-forward/operating-and-tuning/#nodejs-lock-recovery).
+A pooled Node.js client also replays slots of its own `sender_id` without
+`drain_orphans=on`; the key adds the other `sender_id`s.
+
+:::
+
 ## Error frames
 
 Not every server response is an OK. A rejected batch is **not** silently
