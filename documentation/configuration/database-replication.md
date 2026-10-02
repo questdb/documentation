@@ -136,7 +136,7 @@ better for constrained networks but more costly.
 
 ### replication.primary.throttle.window.duration
 
-- **Default**: `10000`
+- **Default**: `1000`
 - **Reloadable**: no
 
 The millisecond duration of the sliding window used to process replication

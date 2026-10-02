@@ -754,8 +754,9 @@ wait for the upload, for up to `durableAckTimeoutMs` (by default
 `ackTimeoutMs`, 15 seconds). Under light load, the primary uploads WAL data
 only when
 [`replication.primary.throttle.window.duration`](/docs/high-availability/tuning/#throttle-window)
-expires: 10 seconds by default, and 60 seconds in the network-efficiency
-profile. Set the deadline well above it:
+expires: 1 second by default, or 60 seconds with the
+[network-efficiency settings](/docs/high-availability/tuning/#network-efficiency).
+Set the deadline well above the configured window:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
