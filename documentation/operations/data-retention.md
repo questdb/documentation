@@ -5,17 +5,24 @@ description: How to employ a data retention strategy to delete old data and save
 
 ## Background
 
-The nature of [time-series data](/blog/what-is-time-series-data/) is that the relevance of information diminishes
-over time. If stale data is no longer required, users can delete old data from
-QuestDB to either save disk space or adhere to a data retention policy. This is
-achieved in QuestDB by removing data partitions from a table.
+With [time-series data](/blog/what-is-time-series-data/), older data usually
+matters less over time. When you no longer need old data, you can delete it from
+QuestDB to save disk space or to meet a data retention policy. You do this by
+removing or tiering table partitions, or by applying row-level retention to a
+materialized view.
 
-QuestDB offers four approaches for data retention:
+QuestDB offers five approaches for data retention:
 
 - **TTL** _(automatic, open source)_: Use
   [Time To Live (TTL)](/docs/concepts/ttl/) to automatically drop partitions when
   data ages beyond a specified threshold. This is the simplest approach and is
   available in both open source and Enterprise editions.
+- **EXPIRE ROWS** _(automatic, materialized views only)_: Use
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) to keep only some rows in a
+  materialized view, such as the latest row per key, the top-N rows per group,
+  or rows matching a condition. The base table is not touched. Some policies hide
+  expired rows without freeing their disk space, so check the policy's
+  enforcement mode if you care about reclaiming storage.
 - **Storage policy** _(automatic, Enterprise only)_: Use a
   [storage policy](/docs/concepts/storage-policy/) to automate the partition
   lifecycle — convert to Parquet locally and drop old data on a schedule. This is
@@ -30,8 +37,8 @@ QuestDB offers four approaches for data retention:
 - **Manual**: Use `DROP PARTITION` commands as described on this page for
   explicit control over which partitions to remove and when.
 
-This page provides a high-level overview of partitioning with examples to drop
-data by date. For more details on partitioning, see the
+This page lists the retention options, then shows partitioning examples that drop
+data by date. For more on partitioning, see the
 [partitioning](/docs/concepts/partitions/) page.
 
 ## Manual partition management
@@ -109,8 +116,9 @@ syntax. Partitions may be dropped by:
   chronologically. Depending on the types of queries users are performing on a
   dataset, it may not be desirable to have gaps caused by dropped partitions.
 - Unlike TTL, `DROP PARTITION` commands must be triggered manually or via
-  external scheduling (e.g., cron jobs). For fully automated retention, consider
-  using [TTL](/docs/concepts/ttl/) instead.
+  external scheduling (e.g., cron jobs). For automated partition retention,
+  consider [TTL](/docs/concepts/ttl/) or a
+  [storage policy](/docs/concepts/storage-policy/) instead.
 
 ### Example
 

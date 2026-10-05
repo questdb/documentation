@@ -89,6 +89,8 @@ A view's TTL is independent of its base table's TTL. For full syntax, see
 [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#ttl-time-to-live)
 and
 [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/).
+For row-level retention on passthrough materialized views, such as keeping the
+latest row per key, see [`EXPIRE ROWS`](/docs/concepts/expire-rows/).
 
 ## How TTL works
 

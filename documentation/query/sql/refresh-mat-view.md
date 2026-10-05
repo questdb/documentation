@@ -45,8 +45,10 @@ REFRESH MATERIALIZED VIEW trades_hourly FULL;
 - You need to rebuild after dropping partitions from the base table
 
 :::warning
-Full refresh on large base tables can take significant time. The view remains
-queryable during refresh but returns stale data until complete.
+A FULL refresh deletes the view's data before rebuilding it, and can take a long
+time on large base tables. You can still query the view while it rebuilds, but
+queries may see it empty or half-rebuilt as the refresh runs. If the rebuild
+fails, the view is not automatically restored to its previous contents.
 :::
 
 ### INCREMENTAL
@@ -151,7 +153,7 @@ REFRESH MATERIALIZED VIEW trades_hourly
 | Aspect | Description |
 | ------ | ----------- |
 | Execution | Asynchronous - command returns immediately |
-| View availability | View remains queryable during refresh (returns current data) |
+| View availability | Still queryable; a FULL refresh may show empty or half-rebuilt contents (see [FULL](#full)) |
 | Concurrency | Only one refresh runs at a time per view |
 | Cancellation | Use [`CANCEL QUERY`](/docs/query/sql/cancel-query/) to stop a long-running refresh |
 
