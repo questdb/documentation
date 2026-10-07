@@ -327,7 +327,7 @@ You should see a successful rollout followed by all three CRDs.
 You're ready to create QuestDB. The manifest below connects it to your Blob
 container and starts one instance with a backup every five minutes.
 
-It uses the tested v0.2.1 `4.0.0-enterprise` image. Change the tag only when
+It uses the tested v0.3.1 `4.0.1-enterprise` image. Change the tag only when
 QuestDB provides another one.
 
 ```sh
@@ -351,7 +351,7 @@ metadata:
   name: questdb
   namespace: $QDB_NAMESPACE
 spec:
-  image: registry.distribution.questdb.io/questdb:4.0.0-enterprise
+  image: registry.distribution.questdb.io/questdb:4.0.1-enterprise
   imagePullSecrets:
     - name: questdb-registry
   instances: 1
