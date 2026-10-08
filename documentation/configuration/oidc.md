@@ -27,9 +27,9 @@ OAuth2 audience as set on the tokens issued by the OIDC Provider. Defaults
 to the client ID if not set.
 
 With `acl.oidc.groups.encoded.in.token=true`, QuestDB accepts a token only when
-its `aud` claim matches this value, and accepts a single audience. Keep the
-default: the ID tokens that the Web Console sends carry the client ID, so
-another value makes Web Console logins fail. See
+its `aud` claim is this value, or a list that contains it. The setting takes a
+single value. Keep the default: the ID tokens that the Web Console sends carry
+the client ID, so another value makes Web Console logins fail. See
 [Token validation](/docs/security/oidc/#token-validation).
 
 ### acl.oidc.client.id
@@ -278,10 +278,12 @@ token.
 
 The claim in the user information that contains the user's principal, such as
 a username, an email address, or an object ID. Displayed in the Web Console,
-returned by `current_user()`, and logged for audit purposes. The principal must
-be unique for each user: QuestDB keeps one external user per principal and
-replaces its groups at every login, so users who share a principal share
-permissions. Avoid display names, such as the `name` claim.
+returned by `current_user()`, and logged for audit purposes. Pick a claim that
+identifies one user or service, and that the provider never gives to anyone
+else: QuestDB keeps one external user per principal and replaces its groups at
+every login, so users who share a principal share permissions. Avoid display
+names, such as the `name` claim. See
+[Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
 
 Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
 priority order, such as `preferred_username,oid`. QuestDB takes the principal

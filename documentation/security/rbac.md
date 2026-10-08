@@ -57,11 +57,11 @@ Control *what data* users can access:
 
 Control *how* users can connect:
 
-| Permission | Protocol                        | Use case                                   |
-| ---------- | ------------------------------- | ------------------------------------------ |
-| `HTTP`     | REST API, Web Console, ILP/HTTP | Interactive users, web applications        |
-| `PGWIRE`   | PostgreSQL Wire Protocol        | SQL clients, BI tools, programmatic access |
-| `ILP`      | InfluxDB Line Protocol (TCP)    | High-throughput data ingestion             |
+| Permission | Protocol                                            | Use case                                   |
+| ---------- | --------------------------------------------------- | ------------------------------------------ |
+| `HTTP`     | REST API, Web Console, ILP/HTTP, QWP over WebSocket | Interactive users, web applications        |
+| `PGWIRE`   | PostgreSQL Wire Protocol                            | SQL clients, BI tools, programmatic access |
+| `ILP`      | InfluxDB Line Protocol (TCP)                        | High-throughput data ingestion             |
 
 ```questdb-sql
 -- User can connect via PostgreSQL protocol only (not web console)
@@ -262,6 +262,13 @@ CREATE SERVICE ACCOUNT app_account WITH PASSWORD 'pwd';
 ```
 
 Names must be unique across all users, service accounts, and groups.
+
+QuestDB Enterprise also accepts external users: people and services that log
+in through an [OpenID Connect provider](/docs/security/oidc/), such as Azure
+services that run as a Microsoft Entra ID managed identity. QuestDB does not
+store external users, and permissions cannot be granted to them directly. They
+get the permissions of the QuestDB groups that their external groups map to.
+See [User permissions](/docs/security/oidc/#user-permissions).
 
 #### Why service accounts?
 

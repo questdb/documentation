@@ -171,7 +171,7 @@ following are **not** supported:
 
 | Path | Status | Workaround |
 | --- | --- | --- |
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens). |
+| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
 | Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | On token expiry, close the handle and build a fresh one with the new token. |
 
