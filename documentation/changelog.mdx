@@ -8,6 +8,17 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### Reference
+
+- [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) and [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) - Documented the comma-separated fallback claim lists in priority order and the startup validation. `acl.oidc.groups.claim` is now listed with no default, as it must be set when OIDC is enabled
+- [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the property name, previously documented as `acl.oidc.pkce.enabled`, which QuestDB ignores
+
+### Updated
+
+- [OpenID Connect (OIDC)](/docs/security/oidc/#user-and-group-claims) - New section on how QuestDB reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, the startup checks, and the `Failed to find required claims` log message. The Microsoft Entra ID guide now covers [accepting managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) next to user logins
+
 ## September 2026
 
 ### QuestDB Enterprise Releases

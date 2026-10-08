@@ -100,13 +100,17 @@ When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2
 token should be sent in the password field, while the username field should
 contain the string `_sso`, or left empty if that is an option.
 
-### acl.oidc.pkce.enabled
+### acl.oidc.pkce.required
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables or disables PKCE for the Authorization Code Flow. This should always
-be enabled in production. The Web Console is not fully secure without it.
+Whether the Web Console uses PKCE (Proof Key for Code Exchange) in the
+Authorization Code Flow. This should always be enabled in production. The Web
+Console is not fully secure without it.
+
+Earlier versions of this page listed the property as `acl.oidc.pkce.enabled`.
+QuestDB ignores that name, so a value set under it has no effect.
 
 ### acl.oidc.ropc.flow.enabled
 
@@ -196,6 +200,25 @@ which it connects.
 
 ## User and group claims
 
+QuestDB reads the principal and the group memberships of an external user from
+the user information: the User Info endpoint's response, or the ID token when
+`acl.oidc.groups.encoded.in.token` is `true`. `acl.oidc.sub.claim` and
+`acl.oidc.groups.claim` each take a single claim name, or a comma-separated
+list of claim names in priority order. QuestDB uses the first claim on the list
+that carries a value, so one configuration can accept tokens that carry the
+same information under different claim names. For the resolution rules and an
+example, see
+[User and group claims](/docs/security/oidc/#user-and-group-claims) in the
+OIDC guide.
+
+Claim lists are available since QuestDB Enterprise 4.0.2. Earlier versions
+read the whole value as a single claim name, so a list makes every OIDC login
+fail.
+
+With OIDC enabled, QuestDB refuses to start when either setting is empty, when
+a setting lists the same claim twice, or when both settings list the same
+claim.
+
 ### acl.oidc.cache.ttl
 
 - **Default**: `30000`
@@ -207,11 +230,17 @@ is validated and user info refreshed.
 
 ### acl.oidc.groups.claim
 
-- **Default**: `groups`
+- **Default**: none
 - **Reloadable**: no
 
-The name of the custom claim in the user information that contains the
-group memberships of the user.
+The claim in the user information that contains the group memberships of the
+user, as an array of group names or as a single group name. Required when OIDC
+is enabled.
+
+Accepts a comma-separated list of claims in priority order, such as
+`groups,roles`. QuestDB takes the groups from the first claim on the list that
+holds at least one group name, and does not combine groups from several
+claims. A login is rejected when none of the listed claims holds a group name.
 
 ### acl.oidc.groups.encoded.in.token
 
@@ -227,6 +256,12 @@ group memberships directly into the token.
 - **Default**: `sub`
 - **Reloadable**: no
 
-The name of the claim in the user information that contains the user's name.
-Could be a username, full name, or email. Displayed in the Web Console and
-logged for audit purposes.
+The claim in the user information that contains the user's principal. Could be
+a username, full name, email, or object ID. Displayed in the Web Console,
+returned by `current_user()`, and logged for audit purposes.
+
+Accepts a comma-separated list of claims in priority order, such as
+`name,oid,sub`. QuestDB takes the principal from the first claim on the list
+that holds a non-empty value. A login is rejected when none of the listed
+claims holds one. An empty value does not fall back to the default `sub`: with
+OIDC enabled, QuestDB refuses to start.
