@@ -342,13 +342,14 @@ QuestDB Enterprise adds production features for Azure:
 - **Blob Storage replication** - Continuous backup for durability
 - **Cold storage** - Move old partitions to Blob Storage, query on-demand
 - **High availability** - Automatic failover across instances
-- **EntraID SSO** - Single sign-on with Microsoft Entra ID
+- **Entra ID SSO** - Single sign-on with Microsoft Entra ID
 
-For EntraID integration, see the
-[Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
-Azure services that run as a managed identity or a service principal can also
-authenticate to QuestDB with Entra ID app-only tokens. See
-[Accept managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens).
+For Entra ID integration, see the
+[Microsoft Entra ID OIDC guide](/docs/security/oidc/#microsoft-entraid).
+Since QuestDB Enterprise 4.0.2, Azure services that run as a managed identity
+or a service principal can also authenticate to QuestDB with Entra ID app-only
+tokens. See
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
 

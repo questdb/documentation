@@ -26,6 +26,12 @@ For detailed information about OIDC, see the
 OAuth2 audience as set on the tokens issued by the OIDC Provider. Defaults
 to the client ID if not set.
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB accepts a token only when
+its `aud` claim matches this value, and accepts a single audience. Keep the
+default: the ID tokens that the Web Console sends carry the client ID, so
+another value makes Web Console logins fail. See
+[Token validation](/docs/security/oidc/#token-validation).
+
 ### acl.oidc.client.id
 
 - **Default**: none
@@ -204,22 +210,26 @@ which it connects.
 
 QuestDB reads the principal and the group memberships of an external user from
 the user information: the User Info endpoint's response or, when
-`acl.oidc.groups.encoded.in.token` is `true`, the payload of the JWT that the
-client presents. `acl.oidc.sub.claim` and `acl.oidc.groups.claim` each take a
-single claim name or, since QuestDB Enterprise 4.0.2, a comma-separated list of
-claim names in priority order. For how QuestDB picks the claims, with examples,
-and for how versions before 4.0.2 differ, see
+`acl.oidc.groups.encoded.in.token` is `true`, the payload of a JWT, such as an
+ID token. `acl.oidc.sub.claim` and `acl.oidc.groups.claim` each take a single
+claim name or, since QuestDB Enterprise 4.0.2, a comma-separated list of claim
+names in priority order. For how QuestDB picks the claims, with examples, see
 [User and group claims](/docs/security/oidc/#user-and-group-claims) in the
-OIDC guide.
+OIDC guide. For how versions before 4.0.2 differ, see
+[Versions before 4.0.2](/docs/security/oidc/#versions-before-402).
 
 ### acl.oidc.cache.ttl
 
 - **Default**: `30000`
 - **Reloadable**: no
 
-User info cache entry TTL in milliseconds. QuestDB caches user info responses
-for each valid access token. This setting controls how often the access token
-is validated and user info refreshed.
+How long QuestDB caches the user information of a valid token, in
+milliseconds: the User Info endpoint's response or, when
+`acl.oidc.groups.encoded.in.token` is `true`, the result of validating the
+token. This setting controls how often a token is validated again and the user
+information refreshed. With `acl.oidc.groups.encoded.in.token=true`, the user
+information comes from the token itself, so a change to it takes effect when
+the client presents a new token.
 
 ### acl.oidc.groups.claim
 
@@ -241,20 +251,25 @@ On earlier versions, a list makes every OIDC login fail. With
 `acl.oidc.groups.encoded.in.token=true`, earlier versions also require a
 `groups` array in the token, whatever this setting names.
 
+See [How QuestDB picks a claim](/docs/security/oidc/#how-questdb-picks-a-claim)
+and [Startup validation](/docs/security/oidc/#startup-validation).
+
 ### acl.oidc.groups.encoded.in.token
 
 - **Default**: `false`
 - **Reloadable**: no
 
-When `true`, QuestDB reads the principal and the group memberships from the
-JWT that the client presents, such as an ID token or an Entra ID app-only
-access token, instead of calling the User Info endpoint. QuestDB validates the
+When `true`, QuestDB reads the principal and the group memberships from a JWT
+instead of calling the User Info endpoint: the ID token, which the Web Console
+sends and QuestDB obtains itself in the ROPC flow, or a token that a client
+presents, such as an Entra ID app-only access token. QuestDB validates the
 token itself, as described in
 [Token validation](/docs/security/oidc/#token-validation). Set to `true` if the
 OIDC Provider encodes group memberships directly into the token.
 
-Since QuestDB Enterprise 4.0.2, QuestDB also rejects expired tokens. Earlier
-versions do not check the `exp` claim of the token.
+Since QuestDB Enterprise 4.0.2, QuestDB also rejects expired tokens and tokens
+without an `exp` claim. Earlier versions do not check the `exp` claim of the
+token.
 
 ### acl.oidc.sub.claim
 
@@ -277,3 +292,6 @@ when it names a claim that `acl.oidc.groups.claim` also lists. An empty value
 does not fall back to the default `sub`.
 
 On earlier versions, a list makes every OIDC login fail.
+
+See [How QuestDB picks a claim](/docs/security/oidc/#how-questdb-picks-a-claim)
+and [Startup validation](/docs/security/oidc/#startup-validation).

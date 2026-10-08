@@ -12,17 +12,21 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
-- [User and group claims](/docs/security/oidc/#user-and-group-claims) - How QuestDB Enterprise 4.0.2 reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, why the principal must be unique, the startup checks, token validation, and the log messages of rejected logins
-- [Accept managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) - Let services that run as a Microsoft Entra ID managed identity or service principal authenticate to QuestDB Enterprise 4.0.2 with app-only tokens, next to user logins: the Entra ID setup, the claim lists, the app role mapping, and a Python example
+- [User and group claims](/docs/security/oidc/#user-and-group-claims) - How QuestDB Enterprise 4.0.2 reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, why the principal must be unique, the startup checks, token validation, the log messages of rejected logins, and how earlier versions differ
+- [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) - Let services that run as a Microsoft Entra ID managed identity or service principal authenticate to QuestDB Enterprise 4.0.2 with app-only tokens, next to user logins: the Entra ID setup, the claim lists, the app role mapping, how to keep app roles the only way in, and Python examples that ingest and renew the token
 
 ### Reference
 
 - [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) and [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) - Documented the comma-separated fallback claim lists of QuestDB Enterprise 4.0.2 and the startup validation. `acl.oidc.groups.claim` is now listed with no default, as it must be set when OIDC is enabled
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the property name, previously documented as `acl.oidc.pkce.enabled`, which QuestDB does not recognize
+- [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken) - Documented that QuestDB Enterprise 4.0.2 rejects expired tokens and tokens without an `exp` claim, which earlier versions accept, and which token QuestDB reads the principal and the groups from
+- [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience) and [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented that QuestDB accepts a single audience, and what the cache holds when the groups are encoded in the token
 
 ### Updated
 
-- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected what happens when the groups claim is missing or empty: QuestDB rejects the login. A user is authenticated without permissions only when none of their groups is mapped to a QuestDB group
+- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected what happens when the groups claim is missing or empty: QuestDB rejects the login. A user is authenticated without permissions only when none of their groups is mapped to a QuestDB group. With the groups encoded in the token, a change to them takes effect when the client presents a new token
+- [Authentication and authorization flow](/docs/security/oidc/#8-find-user-information) and [non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Corrected which token reaches QuestDB with `acl.oidc.groups.encoded.in.token=true`: the ID token, not the access token
+- [Endpoint permissions](/docs/security/rbac/#endpoint-permissions) - The `HTTP` permission also covers QWP over WebSocket, and the authentication methods point to OIDC for external users and services
 - [Microsoft Entra ID guide](/docs/security/oidc/#microsoft-entraid) - Uses `preferred_username` as the principal claim instead of the display name, and registers the application as single-tenant
 
 ## September 2026

@@ -332,6 +332,13 @@ QuestDB supports three authentication methods:
 | **JWK Token**      | ILP ingestion            | InfluxDB Line Protocol    |
 | **REST API Token** | Programmatic REST access | REST API                  |
 
+QuestDB Enterprise can also authenticate external users and services with
+tokens from an OpenID Connect provider, such as Microsoft Entra ID. They get
+their permissions from the QuestDB groups that their external groups map to.
+See [OpenID Connect (OIDC)](/docs/security/oidc/#user-permissions), and for
+Azure services,
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens).
+
 Users can have multiple authentication methods enabled simultaneously:
 
 ```questdb-sql
@@ -360,11 +367,11 @@ to protect credentials in transit.
 
 Before a user can connect, they need endpoint permissions:
 
-| Permission | Allows access to                       |
-| ---------- | -------------------------------------- |
-| `HTTP`     | REST API, Web Console, ILP over HTTP   |
-| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)   |
-| `ILP`      | InfluxDB Line Protocol TCP (port 9009) |
+| Permission | Allows access to                                         |
+| ---------- | -------------------------------------------------------- |
+| `HTTP`     | REST API, Web Console, ILP over HTTP, QWP over WebSocket |
+| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)                     |
+| `ILP`      | InfluxDB Line Protocol TCP (port 9009)                   |
 
 ```questdb-sql
 -- Typical setup for an interactive user
