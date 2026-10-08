@@ -10,14 +10,20 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## October 2026
 
+### New
+
+- [User and group claims](/docs/security/oidc/#user-and-group-claims) - How QuestDB Enterprise 4.0.2 reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, why the principal must be unique, the startup checks, token validation, and the log messages of rejected logins
+- [Accept managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) - Let services that run as a Microsoft Entra ID managed identity or service principal authenticate to QuestDB Enterprise 4.0.2 with app-only tokens, next to user logins: the Entra ID setup, the claim lists, the app role mapping, and a Python example
+
 ### Reference
 
-- [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) and [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) - Documented the comma-separated fallback claim lists in priority order and the startup validation. `acl.oidc.groups.claim` is now listed with no default, as it must be set when OIDC is enabled
-- [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the property name, previously documented as `acl.oidc.pkce.enabled`, which QuestDB ignores
+- [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) and [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) - Documented the comma-separated fallback claim lists of QuestDB Enterprise 4.0.2 and the startup validation. `acl.oidc.groups.claim` is now listed with no default, as it must be set when OIDC is enabled
+- [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the property name, previously documented as `acl.oidc.pkce.enabled`, which QuestDB does not recognize
 
 ### Updated
 
-- [OpenID Connect (OIDC)](/docs/security/oidc/#user-and-group-claims) - New section on how QuestDB reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, the startup checks, and the `Failed to find required claims` log message. The Microsoft Entra ID guide now covers [accepting managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) next to user logins
+- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected what happens when the groups claim is missing or empty: QuestDB rejects the login. A user is authenticated without permissions only when none of their groups is mapped to a QuestDB group
+- [Microsoft Entra ID guide](/docs/security/oidc/#microsoft-entraid) - Uses `preferred_username` as the principal claim instead of the display name, and registers the application as single-tenant
 
 ## September 2026
 

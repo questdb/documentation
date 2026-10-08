@@ -346,6 +346,9 @@ QuestDB Enterprise adds production features for Azure:
 
 For EntraID integration, see the
 [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
+Azure services that run as a managed identity or a service principal can also
+authenticate to QuestDB with Entra ID app-only tokens. See
+[Accept managed identity and service principal tokens](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
 

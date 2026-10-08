@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC) Integration
-description: Configure OpenID Connect (OIDC) integration with external Identity Providers for SSO authentication in QuestDB Enterprise Web Console.
+description: Configure OpenID Connect (OIDC) in QuestDB Enterprise for Web Console SSO, token authentication for clients and services, claim mapping, and Entra ID managed identities.
 ---
 
 import Screenshot from "@theme/Screenshot";
@@ -13,8 +13,10 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
 QuestDB.
 
-It is a convenient way to integrate QuestDB into your enterprise environment,
-and it provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/).
+It is a convenient way to integrate QuestDB into your enterprise environment.
+It provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/),
+and token authentication for applications and services that connect to
+QuestDB.
 
 Microsoft Active Directory and Azure AD, for example, can be turned into an
 Identity Provider.
@@ -259,6 +261,11 @@ https://oidc.provider:443/idp/userinfo.openid
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB skips this call. It
+validates the token itself, as described in
+[Token validation](#token-validation), and reads the user information from the
+token's payload.
+
 ### 9. Receive user information
 
 If the access token is valid, QuestDB receives the required user information
@@ -297,7 +304,7 @@ and then sends the results back:
       "type": "STRING"
     }
   ],
-  "dataset": [["External User"]],
+  "dataset": [["externalUser"]],
   "count": 1,
   "timestamp": -1
 }
@@ -584,9 +591,15 @@ Tokens that the OIDC provider issues to an application, rather than to a user,
 often carry the principal and the groups under different claim names. To accept
 both kinds of token with one configuration, list the claims of both in
 `acl.oidc.sub.claim` and `acl.oidc.groups.claim`, as described in
-[User and group claims](#user-and-group-claims). For Microsoft Entra ID managed
-identities and service principals, which also need v2.0 access tokens and an
-app role, see
+[User and group claims](#user-and-group-claims).
+
+QuestDB must also be able to validate the application's token. With
+`acl.oidc.groups.encoded.in.token=true`, the token must be a JWT whose `aud`
+claim matches `acl.oidc.audience`, as described in
+[Token validation](#token-validation). Otherwise, QuestDB sends the token to the
+provider's User Info endpoint, which some providers refuse for tokens issued to
+applications. For Microsoft Entra ID managed identities and service principals,
+see
 [Accept managed identity and service principal tokens](#accept-managed-identity-and-service-principal-tokens).
 
 ## OIDC for the PGWire endpoint
@@ -725,9 +738,9 @@ It should be set accordingly to your organization's policies.
 
 QuestDB reads two values from the user information of an external user: the
 principal, which identifies the user, and the groups the user belongs to. The
-user information is the response of the User Info endpoint, or the payload of
-the token itself, such as an ID token, when `acl.oidc.groups.encoded.in.token`
-is `true`.
+user information is the response of the User Info endpoint or, when
+`acl.oidc.groups.encoded.in.token` is `true`, the payload of the JWT that the
+client presents, such as an ID token or an Entra ID app-only access token.
 
 - [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) names the
   claim that carries the principal, `sub` by default. The principal identifies
@@ -740,13 +753,32 @@ is `true`.
 QuestDB rejects the login when the user information carries no principal or no
 group.
 
+The principal must be unique for each user and service. QuestDB keeps one
+external user for each principal, and every login replaces the groups of that
+user with the groups of the login. Two people who resolve to the same principal
+share one QuestDB user, and a session that is already open, such as a PGWire
+connection, can run with the groups of whoever logged in last. Pick a claim
+that the provider keeps unique, such as a username or an object ID, not a
+display name. Changing the claim on an existing deployment gives every user a
+new principal. Permissions stay the same, because they come from the groups.
+
 :::warning Requires QuestDB Enterprise 4.0.2
 
 This section describes QuestDB Enterprise 4.0.2 and later. Earlier versions
-read the whole value of each setting as a single claim name, so a claim list
-makes every OIDC login fail. With `acl.oidc.groups.encoded.in.token=true`,
-earlier versions also reject any token that does not carry a `groups` array,
-whatever `acl.oidc.groups.claim` names.
+differ as follows:
+
+- They read the whole value of each setting as a single claim name, so a claim
+  list makes every OIDC login fail.
+- With `acl.oidc.groups.encoded.in.token=true`, they reject any token that does
+  not carry a `groups` array, whatever `acl.oidc.groups.claim` names. They do
+  not check the `exp` claim, so they accept expired tokens.
+- They read a `null` claim as the value `null`. Every account whose principal
+  claim is `null` logs in as the same principal, `null`, and `null` and empty
+  group names count as groups.
+- They reject a login when a claim that is not listed holds an array of
+  objects or nested arrays.
+- They start with an empty `acl.oidc.sub.claim`, or with the same claim in both
+  settings, and then reject every OIDC login.
 
 :::
 
@@ -755,14 +787,15 @@ whatever `acl.oidc.groups.claim` names.
 Both settings accept a comma-separated list of claim names in priority order,
 so one configuration can accept tokens that carry the principal and the groups
 under different claim names. Tokens issued to users and tokens issued to
-applications often differ this way. For example, Microsoft Entra ID user tokens
-carry `name` and `groups`, while its
+applications often differ this way. For example, Microsoft Entra ID user
+tokens, configured as in the [Entra ID guide](#microsoft-entraid), carry
+`preferred_username` and `groups`, while its
 [app-only tokens](#accept-managed-identity-and-service-principal-tokens) carry
 `oid` and `roles`:
 
 ```ini title="server.conf"
-acl.oidc.sub.claim=name,oid,sub
-acl.oidc.groups.claim=groups,roles
+acl.oidc.sub.claim=preferred_username,oid
+acl.oidc.groups.claim=roles,groups
 ```
 
 QuestDB takes the principal from the first claim on the list that carries a
@@ -774,7 +807,7 @@ token payloads, shortened to the relevant claims, as follows:
 {
   "sub": "AAAAAAAAAAAAAAAAAAAAAIkzqFVrSaSaFHy782bbtaQ",
   "oid": "6f2d8c4e-31a7-4b5e-9c0d-8e1f2a3b4c5d",
-  "name": "Jane Smith",
+  "preferred_username": "jane.smith@example.com",
   "groups": ["87654321-1234-1234-1234-123456789abc"]
 }
 ```
@@ -787,24 +820,31 @@ token payloads, shortened to the relevant claims, as follows:
 }
 ```
 
-| Token    | Principal                  | Groups                         |
-| -------- | -------------------------- | ------------------------------ |
-| User     | `Jane Smith`, from `name`  | `87654321-...`, from `groups`  |
-| App-only | `4c9a4e3b-...`, from `oid` | `QuestDB.Ingest`, from `roles` |
+| Token    | Principal                                           | Groups                         |
+| -------- | --------------------------------------------------- | ------------------------------ |
+| User     | `jane.smith@example.com`, from `preferred_username` | `87654321-...`, from `groups`  |
+| App-only | `4c9a4e3b-...`, from `oid`                          | `QuestDB.Ingest`, from `roles` |
+
+`roles` comes before `groups` because an app-only token can also carry a
+`groups` claim, and QuestDB takes the groups from the first claim on the list
+that holds one. See
+[Accept managed identity and service principal tokens](#accept-managed-identity-and-service-principal-tokens).
 
 The following rules decide which claim QuestDB uses. They apply to a single
 claim name as well:
 
-- The order of the list decides, not the order of the claims in the token. A
-  token that carries both `groups` and `roles` gets its groups from `groups`
-  alone. QuestDB does not combine groups from several claims.
+- The order of the list decides, not the order of the claims in the token.
+  With the configuration above, a token that carries both `roles` and `groups`
+  gets its groups from `roles` alone. QuestDB does not combine groups from
+  several claims.
 - A claim that is missing, `null`, or empty falls through to the next claim on
   the list. Empty means an empty string, or an empty array for a groups claim.
   The string `"null"` counts as missing too.
 - Group names that are `null` or empty are skipped. A groups claim that holds
   nothing else falls through to the next claim.
-- Only top-level claims count. A claim nested in another claim, such as `name`
-  inside `address`, is ignored.
+- Only top-level claims count. A claim nested in another claim is ignored,
+  such as the `roles` that Keycloak puts inside its `realm_access` claim. To
+  use such values, configure the provider to emit them as a top-level claim.
 - Claim names are case-sensitive.
 - A listed claim must have the expected shape: a single value, such as a
   string, for the principal, and a single value or a flat array of values for
@@ -814,50 +854,77 @@ claim name as well:
 - Claims that are not listed are ignored, whatever their shape.
 
 With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token before
-it applies these rules, and the token must carry a non-empty `sub` claim even
-when another claim supplies the principal. See
-[Rejected logins](#rejected-logins).
+it applies these rules. See [Token validation](#token-validation).
 
 ### Startup validation
 
 With OIDC enabled, QuestDB checks both settings at startup. Spaces around claim
-names are trimmed and empty entries are skipped, so `name, oid,,sub` reads as
-`name,oid,sub`. QuestDB refuses to start when:
+names are trimmed and empty entries are skipped, so
+`preferred_username, oid,,sub` reads as `preferred_username,oid,sub`. QuestDB
+refuses to start when:
 
 - `acl.oidc.groups.claim` is not set, or either setting is empty:
   `required property is not set: acl.oidc.groups.claim`, or the same message
   for `acl.oidc.sub.claim`. An empty `acl.oidc.sub.claim` does not fall back
   to the default `sub`.
 - A setting lists the same claim twice:
-  `claim is listed more than once in acl.oidc.sub.claim [claim=name]`.
+  `claim is listed more than once in acl.oidc.sub.claim [claim=oid]`.
 - Both settings list the same claim:
   `claim cannot be listed in both acl.oidc.sub.claim and acl.oidc.groups.claim [claim=oid]`.
+
+### Token validation
+
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token
+itself before it reads any claim:
+
+- The token must be a JWT whose `kid` header names one of the signing keys that
+  the provider publishes.
+- Its `aud` claim must match
+  [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience), which
+  defaults to the client ID. QuestDB accepts a single audience.
+- Its `exp` claim must not have passed. QuestDB allows 60 seconds of clock
+  skew.
+- It must carry a non-empty `sub` claim, whatever claims `acl.oidc.sub.claim`
+  lists.
+
+QuestDB does not check the issuer (`iss`) or the tenant of the token. It
+accepts any token that the provider's keys sign for the expected audience, so
+make sure that no one outside your organization can obtain tokens for the
+QuestDB application. With Microsoft Entra ID, register the application as
+single-tenant, as described in
+[Set up the client application in Entra ID](#set-up-the-client-application-in-entra-id).
+
+QuestDB checks a token when a request or a connection authenticates with it,
+and caches the result for up to
+[`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl). An open
+PGWire or WebSocket connection stays open when its token expires.
+
+With `acl.oidc.groups.encoded.in.token=false`, QuestDB sends the token to the
+provider's User Info endpoint, which validates it. See
+[Find user information](#8-find-user-information).
 
 ### Rejected logins
 
 When the user information carries none of the listed principal claims, or none
 of the listed groups claims, QuestDB rejects the login. HTTP clients receive
 `401 Unauthorized`, and PGWire clients receive `invalid username/password`. The
-server log names both lists, followed by the user information QuestDB
-received:
+server log contains `Failed to find required claims`, followed by both lists
+and the user information QuestDB received:
 
 ```text
-Failed to find required claims [subClaims=[name,oid,sub], groupsClaims=[groups,roles], userInfo={...}]
+Failed to find required claims [subClaims=[preferred_username,oid], groupsClaims=[roles,groups], userInfo={...}]
 ```
 
 Compare the claims in `userInfo` with the two lists to find the claim names
 that your provider uses. A listed claim of an unexpected shape, such as an
 object in a groups claim, is logged as
-`Request failed [error=unexpected input format ...]` instead.
+`Request failed [error=unexpected input format ...]` instead. With Microsoft
+Entra ID, a user who belongs to more than 200 groups gets no `groups` claim in
+the token, so QuestDB rejects the login unless another listed claim carries
+groups.
 
-With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token
-before it reads any claim. The token must be a JWT whose `kid` header names one
-of the signing keys that the provider publishes. It must also carry an `aud`
-claim that matches
-[`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience), an `exp`
-claim that has not passed, and a non-empty `sub` claim, whatever claims
-`acl.oidc.sub.claim` lists. A token that fails these checks is rejected the
-same way, but the server log gives the reason instead of the claim lists, for
+A token that fails [token validation](#token-validation) is rejected the same
+way, but the server log gives the reason instead of the claim lists, for
 example:
 
 ```text
@@ -868,6 +935,17 @@ Request failed [errorMsg=Failed to decode JWT token Error(ExpiredSignature)]
 `InvalidAudience` usually means that the token was requested for another API,
 or that Entra ID issued a v1.0 access token. See
 [Accept managed identity and service principal tokens](#accept-managed-identity-and-service-principal-tokens).
+Don't set `acl.oidc.audience` to the Application ID URI to work around it:
+QuestDB accepts a single audience, and the ID tokens of Web Console users carry
+the application ID, so their logins would fail.
+
+With `acl.oidc.groups.encoded.in.token=false`, the provider's User Info
+endpoint rejects a token that is invalid or expired, and QuestDB rejects the
+login.
+
+If the login succeeds but every request is denied, check that at least one of
+the user's groups is mapped to a QuestDB group that has the endpoint
+permission. See [Mapping user permissions](#mapping-user-permissions).
 
 ## Configuration options
 
@@ -1231,6 +1309,10 @@ If all has been wired up well, then login will succeed.
 This document sets up SSO authentication for the [QuestDB Web Console](/docs/getting-started/web-console/overview/) in
 [Microsoft EntraID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id), formerly known as Azure AD.
 
+It also shows how to let services that run as a managed identity or a service
+principal call QuestDB with app-only tokens. See
+[Accept managed identity and service principal tokens](#accept-managed-identity-and-service-principal-tokens).
+
 
 :::tip
 
@@ -1244,6 +1326,11 @@ First thing first, let's pick a name for the client!
 
 Then head to _Microsoft Entra Admin Center_, and register the application
 under _Identity - App registrations - New registration_.
+
+Under _Supported account types_, select _Accounts in this organizational
+directory only_. QuestDB does not check which tenant issued a token, so the
+application must not accept accounts from other tenants. See
+[Token validation](#token-validation).
 
 <Screenshot
   alt="EntraID image, app registration."
@@ -1414,8 +1501,8 @@ The below should be set in QuestDB's `server.conf`:
 # enable OIDC
 acl.oidc.enabled=true
 
-# the claim contains the username or user id
-acl.oidc.sub.claim=name
+# the claim contains the user's unique username
+acl.oidc.sub.claim=preferred_username
 
 # the claim contains the user's group memberships
 acl.oidc.groups.claim=groups
@@ -1497,10 +1584,17 @@ will have the access granted to them.
 
 Services that authenticate as themselves, with a managed identity or a service
 principal, receive app-only access tokens from Entra ID. These tokens carry no
-`name` or `groups` claim. They identify the caller by the object ID of its
-service principal in the `oid` claim, and list the
+`name` or `preferred_username` claim. They identify the caller by the object ID
+of its service principal in the `oid` claim, and list the
 [app roles](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps)
-assigned to it in the `roles` claim.
+assigned to it in the `roles` claim. They can also carry a `groups` claim, when
+the service principal is a member of a security group and the QuestDB
+application emits group claims, as set up under _Token configuration_ above.
+
+QuestDB treats the service as an external user, not as a QuestDB
+[service account](/docs/security/rbac/#users-and-service-accounts). Like any
+external user, it gets its permissions only from the QuestDB groups that its
+app roles map to, and permissions cannot be granted to it directly.
 
 :::warning Requires QuestDB Enterprise 4.0.2
 
@@ -1510,62 +1604,66 @@ included.
 
 :::
 
-To accept app-only tokens alongside user logins, replace the two claim settings
-of the [QuestDB configuration](#questdb-configuration) with fallback lists:
+First, configure the QuestDB application in Entra ID:
 
-```shell
-# user tokens carry name, app-only tokens carry oid
-acl.oidc.sub.claim=name,oid,sub
+1. Make sure that the application is single-tenant: its supported account type
+   must be _Accounts in this organizational directory only_. QuestDB does not
+   check the issuer or the tenant of a token, and an app role has the same
+   value in every tenant that uses the application. With a multitenant
+   registration, another tenant can assign the same role to its own service
+   principals, and QuestDB maps their tokens to the same QuestDB groups.
+2. Make the application issue v2.0 access tokens: in its _Manifest_, set
+   `api.requestedAccessTokenVersion` to `2`. The legacy manifest format calls
+   this property `accessTokenAcceptedVersion`. QuestDB accepts a token only
+   when its `aud` claim matches `acl.oidc.audience`, which defaults to the
+   application ID. A v2.0 token always carries the application ID there. A
+   v1.0 token, the default for applications that accept organizational
+   accounts only, can carry the Application ID URI instead. Web Console logins
+   are not affected, because the Web Console presents ID tokens.
+3. Under _Expose an API_, set the Application ID URI, which defaults to
+   `api://<application ID>`. Services request their tokens for the scope
+   `<Application ID URI>/.default`. A token requested for any other API, such
+   as Microsoft Graph, carries that API in `aud`, and QuestDB rejects it.
+4. Under _App roles_, define a role for each kind of access, with the
+   _Applications_ member type. The examples below use the value
+   `QuestDB.Ingest`.
+5. Assign at least one role to each managed identity or service principal.
+   Assign the role to the identity itself: Entra ID does not add a role
+   assigned to a group to the tokens of the service principals in that group.
 
-# user tokens carry groups, app-only tokens carry roles
-acl.oidc.groups.claim=groups,roles
+   - For the service principal of an app registration, open that registration,
+     not the QuestDB one. Under _API permissions_, select _Add a permission_,
+     _APIs my organization uses_, the QuestDB application, and
+     _Application permissions_. Add the role, and grant admin consent.
+   - For a managed identity, assign the role through Microsoft Graph, as
+     described in
+     [Assign a managed identity to an application role](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-assign-app-role-managed-identity).
+
+Then replace the two claim settings of the
+[QuestDB configuration](#questdb-configuration) with fallback lists. Keep
+`acl.oidc.groups.encoded.in.token=true`, so that QuestDB validates app-only
+tokens against the signing keys of Entra ID, the same way as ID tokens:
+
+```ini title="server.conf"
+# user tokens carry preferred_username, app-only tokens carry oid
+acl.oidc.sub.claim=preferred_username,oid
+
+# app-only tokens carry roles, user tokens carry groups
+acl.oidc.groups.claim=roles,groups
 ```
 
-User logins still take the principal from `name` and the groups from `groups`.
-App-only tokens take the principal from `oid` and the groups from `roles`. See
-[User and group claims](#user-and-group-claims) for how QuestDB picks a claim
-from each list.
-
-App-only tokens have further requirements:
-
-- Keep `acl.oidc.groups.encoded.in.token=true`. QuestDB then validates
-  app-only tokens against the signing keys of Entra ID, the same way as ID
-  tokens.
-- Keep the QuestDB application single-tenant: its supported account type must
-  be _Accounts in this organizational directory only_. QuestDB checks the
-  signature, `aud`, and `exp` of a token, but not its issuer or tenant, and an
-  app role has the same value in every tenant that uses the application. With
-  a multitenant registration, another tenant can assign the same role to its
-  own service principals, and QuestDB maps their tokens to the same QuestDB
-  groups.
-- Make the QuestDB application issue v2.0 access tokens by setting
-  `requestedAccessTokenVersion` to `2` in its manifest. QuestDB accepts a
-  token only when its `aud` claim matches `acl.oidc.audience`, which defaults
-  to the application ID. A v2.0 token always carries the application ID there.
-  A v1.0 token, the default for applications that accept organizational
-  accounts only, can carry the Application ID URI instead, such as
-  `api://...`.
-- Define the app roles with the _Applications_ member type, and assign at
-  least one of them to each managed identity or service principal. QuestDB
-  rejects a token that carries no role.
-- Assign the role to the identity itself, because Entra ID does not add a role
-  assigned to a group to the tokens of the service principals in that group.
-  For the service principal of an app registration, add the role as an
-  application permission under the registration's _API permissions_, and grant
-  admin consent. For a managed identity, assign the role through Microsoft
-  Graph, as described in
-  [Assign a managed identity to an application role](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-assign-app-role-managed-identity).
-
-QuestDB reads the roles from the token, so a change to the roles of a service
-takes effect when the service presents a new token. Azure caches managed
-identity tokens for around 24 hours, so a role assigned to, or removed from, a
-managed identity can take hours to reach QuestDB. See the
-[managed identity best practices](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations).
+User logins take the principal from `preferred_username` and the groups from
+`groups`, as before. Their tokens carry no `roles` claim, as long as the app
+roles of the QuestDB application admit applications only. App-only tokens take
+the principal from `oid` and the groups from `roles`, even when they also carry
+a `groups` claim. QuestDB rejects a token that carries neither a role nor a
+group. See [User and group claims](#user-and-group-claims) for how QuestDB
+picks a claim from each list.
 
 Map each app role to a QuestDB group by the role's value, the same way as an
 Entra ID group, and grant the group what the service needs. A service that
-ingests over HTTP needs the `HTTP` endpoint permission and `INSERT` on its
-tables:
+ingests over HTTP or QWP needs the `HTTP` endpoint permission and `INSERT` on
+its tables:
 
 ```questdb-sql title="Map an app role to a group that ingests into fx_trades"
 CREATE GROUP ingestApps WITH EXTERNAL ALIAS 'QuestDB.Ingest';
@@ -1573,37 +1671,59 @@ GRANT HTTP TO ingestApps;
 GRANT INSERT ON fx_trades TO ingestApps;
 ```
 
-If the service sends columns that the table does not have yet, also grant the
-group `ADD COLUMN` on the table. See
+If the service creates tables, also grant the group `CREATE TABLE`. If it sends
+columns that a table does not have yet, grant `ADD COLUMN` on the table. See
 [Endpoint permissions](/docs/security/rbac/#endpoint-permissions) for the other
 endpoints.
 
-The service requests its token for the QuestDB application. Under _Expose an
-API_, give the QuestDB application an Application ID URI, which defaults to
-`api://<application ID>`. The service then requests the scope
-`<Application ID URI>/.default`. A token for any other API, such as Microsoft
-Graph, carries that API in `aud`, and QuestDB rejects it. With the
+Finally, the service requests its token for the QuestDB application. With the
 [Azure Identity library](https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme)
 for Python, `DefaultAzureCredential` requests the token as the managed identity
 of the Azure resource that the service runs on, or as a service principal set
-up in environment variables:
+up in environment variables. For a user-assigned managed identity, set the
+`AZURE_CLIENT_ID` environment variable to the client ID of the identity.
+Otherwise, the credential uses the system-assigned identity. Install the
+libraries with `python3 -m pip install -U questdb azure-identity`:
 
-```python title="Request an app-only token for QuestDB"
+```python title="Ingest into fx_trades with an app-only token"
+import questdb
 from azure.identity import DefaultAzureCredential
+from questdb import TimestampNanos
 
 # Application ID URI of the QuestDB application, followed by /.default
 scope = "api://8de84b90-1ea5-4e41-9e84-dba860aa01a6/.default"
-token = DefaultAzureCredential().get_token(scope)
+credential = DefaultAzureCredential()
+token = credential.get_token(scope)
 
-conf = f"http::addr=localhost:9000;token={token.token};"
+conf = f"wss::addr=questdb.example.com:9000;token={token.token};"
+with questdb.connect(conf) as db:
+    with db.sender() as sender:
+        sender.row(
+            "fx_trades",
+            symbols={"symbol": "EURUSD", "side": "buy"},
+            columns={"price": 1.0842, "quantity": 100000.0},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
 ```
 
-Use `conf` with the `Sender`, as in
-[Non-interactive clients](#non-interactive-clients). For the
+The client presents the same token on every connection that it opens, and
+QuestDB rejects an expired token. Before `token.expires_on`, a Unix timestamp,
+a long-running service closes the handle and connects again with a new token.
+The credential caches the token in memory and requests a new one when the
+cached token nears expiry, so calling `get_token()` before each reconnect is
+cheap. See
+[Authentication and TLS](/docs/connect/clients/python/#authentication-and-tls)
+for the client options. For the
 [PGWire endpoint](#oidc-for-the-pgwire-endpoint), send the token as the
-password of the `_sso` user instead. The token expires at `token.expires_on`, a
-Unix timestamp, and QuestDB rejects an expired token, so a long-running service
-requests a new token before then, and creates a new sender or connection with
-it.
+password of the `_sso` user instead.
+
+QuestDB reads the roles from the token, so a change to the roles of a service
+takes effect when the service presents a new token. Azure caches managed
+identity tokens for around 24 hours, so a role assigned to, or removed from, a
+managed identity can take hours to reach QuestDB. See the
+[managed identity best practices](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations).
+To cut a service off without waiting for its token to expire, revoke the
+permissions of its QuestDB group.
 
 <br />
