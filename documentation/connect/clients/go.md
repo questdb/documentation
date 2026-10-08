@@ -360,8 +360,8 @@ db, err := qdb.Connect(ctx,
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on both
 the ingress and egress WebSocket upgrades. It is a **static credential**: the
 client sends exactly the string you pass and never refreshes or renews it.
-Acquire it out of band — QuestDB Enterprise issues bearer tokens through its
-[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime yourself.
+Acquire it out of band, for example from the identity provider of the QuestDB Enterprise
+[OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and manage its lifetime yourself.
 When the token expires or is rotated, construct a new handle with the new token.
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive
