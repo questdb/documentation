@@ -57,11 +57,11 @@ Control *what data* users can access:
 
 Control *how* users can connect:
 
-| Permission | Protocol                        | Use case                                   |
-| ---------- | ------------------------------- | ------------------------------------------ |
-| `HTTP`     | REST API, Web Console, ILP/HTTP | Interactive users, web applications        |
-| `PGWIRE`   | PostgreSQL Wire Protocol        | SQL clients, BI tools, programmatic access |
-| `ILP`      | InfluxDB Line Protocol (TCP)    | High-throughput data ingestion             |
+| Permission | Protocol                                            | Use case                                   |
+| ---------- | --------------------------------------------------- | ------------------------------------------ |
+| `HTTP`     | REST API, Web Console, ILP/HTTP, QWP over WebSocket | Interactive users, web applications        |
+| `PGWIRE`   | PostgreSQL Wire Protocol                            | SQL clients, BI tools, programmatic access |
+| `ILP`      | InfluxDB Line Protocol (TCP)                        | High-throughput data ingestion             |
 
 ```questdb-sql
 -- User can connect via PostgreSQL protocol only (not web console)
@@ -248,7 +248,7 @@ GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
 
 ### Users and service accounts
 
-QuestDB has two types of principals:
+QuestDB has two types of local principals:
 
 - **Users**: For human individuals. Can belong to multiple groups and inherit
   permissions from them. Cannot be assumed by others.
@@ -262,6 +262,15 @@ CREATE SERVICE ACCOUNT app_account WITH PASSWORD 'pwd';
 ```
 
 Names must be unique across all users, service accounts, and groups.
+
+QuestDB Enterprise also accepts external users: people and services that log
+in through an [OpenID Connect provider](/docs/security/oidc/), such as users
+who sign in to the Web Console with Microsoft Entra ID, and, since QuestDB
+Enterprise 4.0.2, Azure services that run as a Microsoft Entra ID managed
+identity. QuestDB does not persist external users, and permissions cannot be
+granted to them directly. They get the permissions of the QuestDB groups that
+their external groups map to. See
+[User permissions](/docs/security/oidc/#user-permissions).
 
 #### Why service accounts?
 
@@ -324,13 +333,20 @@ dropped, all members lose the permissions they inherited from that group.
   width={745}
 />
 
-QuestDB supports three authentication methods:
+QuestDB supports three local authentication methods:
 
 | Method             | Use case                 | Endpoints                 |
 | ------------------ | ------------------------ | ------------------------- |
 | **Password**       | Interactive users        | REST API, PostgreSQL Wire |
 | **JWK Token**      | ILP ingestion            | InfluxDB Line Protocol    |
 | **REST API Token** | Programmatic REST access | REST API                  |
+
+QuestDB Enterprise can also authenticate external users and services with
+tokens from an OpenID Connect provider, such as Microsoft Entra ID. They get
+their permissions from the QuestDB groups that their external groups map to.
+See [OpenID Connect (OIDC)](/docs/security/oidc/#user-permissions), and for
+Azure services on QuestDB Enterprise 4.0.2 or later,
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 Users can have multiple authentication methods enabled simultaneously:
 
@@ -360,11 +376,11 @@ to protect credentials in transit.
 
 Before a user can connect, they need endpoint permissions:
 
-| Permission | Allows access to                       |
-| ---------- | -------------------------------------- |
-| `HTTP`     | REST API, Web Console, ILP over HTTP   |
-| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)   |
-| `ILP`      | InfluxDB Line Protocol TCP (port 9009) |
+| Permission | Allows access to                                         |
+| ---------- | -------------------------------------------------------- |
+| `HTTP`     | REST API, Web Console, ILP over HTTP, QWP over WebSocket |
+| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)                     |
+| `ILP`      | InfluxDB Line Protocol TCP (port 9009)                   |
 
 ```questdb-sql
 -- Typical setup for an interactive user

@@ -360,9 +360,21 @@ db, err := qdb.Connect(ctx,
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on both
 the ingress and egress WebSocket upgrades. It is a **static credential**: the
 client sends exactly the string you pass and never refreshes or renews it.
-Acquire it out of band — QuestDB Enterprise issues bearer tokens through its
-[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime yourself.
-When the token expires or is rotated, construct a new handle with the new token.
+Acquire it out of band, for example from the identity provider of the QuestDB Enterprise
+[OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and manage its lifetime yourself.
+For Azure services, see
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+Before the token expires, construct a new handle with a new token, wait until
+QuestDB has acknowledged what the old handle sent (`FlushAndGetSequence` and
+`AwaitAckedFsn`), then close the old one: its final flush is best-effort and
+bounded by `close_flush_timeout_millis`. With `sf_dir`, flush and close the old
+handle first, then
+construct the new one with the same `sender_id`: two handles cannot hold the
+same store-and-forward slot, and the new handle replays what the old one left
+on disk. The client sends the token on every connection that it opens,
+including reconnects. On QuestDB Enterprise 4.0.2 and later, or with the User
+Info endpoint, QuestDB rejects it on new connections shortly after it expires;
+see [Token lifetime](/docs/security/oidc/#token-lifetime).
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive
 with `username`/`password`.

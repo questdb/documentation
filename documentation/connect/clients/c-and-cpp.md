@@ -251,8 +251,8 @@ threads, close it at shutdown.
 You don't open connections yourself: **borrow** a lease (a sender or reader),
 use it on one thread, then **return** it (recycles the connection) or **drop**
 it (retires it). In C++ the borrowed sender wrapper and pooled reader return on
-destruction; `drop_on_return()` forces a drop. The pool connects lazily, and
-reconnects and fails over on its own.
+destruction; `drop_on_return()` forces a drop. The pool opens its first
+connections when you create it, and reconnects and fails over on its own.
 
 ### Which borrow?
 
@@ -271,14 +271,19 @@ the schema server-side.
 
 The connect string uses a QWP/WebSocket scheme: `ws` / `wss`. For auth and TLS
 keys, see the
-[connect string reference](/docs/connect/clients/connect-string/). The pool is
-**lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
-parse and validate the string but perform no blocking network I/O, so auth /
-TLS / connect errors surface from the first borrow, not at construction. The
-one exception is the on-disk send queue (`sf_dir`, see
-[Durability and backpressure](#durability-and-backpressure)): at connect the
-pool reopens any queue directories a previous run left holding unacknowledged
-rows, then reconnects and resends them in the background.
+[connect string reference](/docs/connect/clients/connect-string/). By default,
+the pool connects **eagerly**: `questdb_db_connect` (C) and the
+`questdb::pool` constructor (C++) parse and validate the string, then open the
+warm minimum of connections (`sender_pool_min` senders and `query_pool_min`
+readers, one of each by default) before they return, so auth / TLS / connect
+errors surface from `questdb_db_connect` or the constructor. With
+[`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys), they
+perform no blocking network I/O: senders connect in the background, readers
+connect on the first borrow, and the errors surface from those operations
+instead. With the on-disk send queue (`sf_dir`, see
+[Durability and backpressure](#durability-and-backpressure)), the pool also
+reopens, at connect, any queue directories a previous run left holding
+unacknowledged rows, then reconnects and resends them in the background.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -320,10 +325,13 @@ wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (E
   rejects it.
 - **`auth_timeout_ms`** (default 15000) bounds the WebSocket upgrade.
 
-Because the pool connects lazily, a bad credential surfaces as
-`line_sender_error_auth_error` from the **first borrow** on each connection.
-Handle it there, not at `connect` (see
-[Which errors mean what](#which-errors-mean-what)).
+Because the pool connects eagerly by default, a bad credential surfaces as
+`line_sender_error_auth_error` from `questdb_db_connect` or the `questdb::pool`
+constructor. With `lazy_connect=on`, it surfaces later: from a reader's first
+borrow, or, because senders connect in the background, from a sender's wait or
+a later call on it. A connection that the pool opens later, such as a
+reconnect, can also fail authentication, for example after the token expires
+(see [Which errors mean what](#which-errors-mean-what)).
 
 ### Unsupported auth paths
 
@@ -332,9 +340,9 @@ following are **not** supported:
 
 | Path | Status | Workaround |
 |---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. |
+| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. For Azure services, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the pool and build a fresh one with the new token. |
+| Token rotation mid-session | Not supported. The pool sends the credentials in the WebSocket upgrade of every connection that it opens, including reconnects, and cannot switch to a new token while it runs. | Before the token expires, build a new pool with a new token, then close the old one once its senders have waited for their acknowledgements (`qwp_sender_wait`, C++ `wait()`): closing a pool discards the rows that QuestDB has not acknowledged within `close_flush_timeout_millis`. With `sf_dir`, flush and close the old pool first, then build the new one with the same `sender_id`: two pools cannot hold the same store-and-forward slot, and the new pool replays what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with the User Info endpoint, QuestDB rejects the token on new connections shortly after it expires; see [Token lifetime](/docs/security/oidc/#token-lifetime). |
 
 ## Headers
 
@@ -1591,7 +1599,8 @@ int main()
             // Enterprise; the connect fails against a server without replication.
             "request_durable_ack=on;"};
 
-        // First borrow opens the connection: give it the failover budget.
+        // If the pool has to open a connection, retry it within the
+        // failover budget.
         auto sender =
             pool.borrow_sender_with_retry(pool.reconnect_max_duration_ms());
 
@@ -1640,7 +1649,8 @@ int main(void)
     db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
-    /* First borrow opens the connection: give it the failover budget. */
+    /* If the pool has to open a connection, retry it within the failover
+       budget. */
     sender = questdb_db_borrow_sender_with_retry(
         db, questdb_db_reconnect_max_duration_ms(db), &err);
     if (!sender) goto on_error;

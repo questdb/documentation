@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
-description: Configuration settings for OpenID Connect integration in QuestDB Enterprise.
+description: "Configure OIDC in QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience, and principal and groups claims with fallback lists."
 ---
 
 :::note
@@ -26,6 +26,16 @@ For detailed information about OIDC, see the
 OAuth2 audience as set on the tokens issued by the OIDC Provider. Defaults
 to the client ID if not set.
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB accepts a token only when
+its `aud` claim is this value, or a list that contains it. The setting takes a
+single value. Keep the default: the ID tokens that the Web Console sends carry
+the client ID, so another value makes Web Console logins fail. See
+[Token validation](/docs/security/oidc/#token-validation).
+
+With `acl.oidc.groups.encoded.in.token=false`, QuestDB does not use this
+setting: it accepts any access token that the provider's User Info endpoint
+accepts, whatever its audience.
+
 ### acl.oidc.client.id
 
 - **Default**: none
@@ -42,6 +52,15 @@ enabled.
 URL where the OpenID Provider's configuration information can be loaded in
 JSON format. Should always end with `/.well-known/openid-configuration`.
 
+QuestDB downloads the document when it starts, and takes the provider's
+endpoints from it. QuestDB does not start when it cannot download or parse the
+document. The error starts with
+`Unable to download OIDC provider configuration from` or
+`Unable to parse OIDC provider configuration`. To let QuestDB start while the
+provider is unreachable, set [`acl.oidc.host`](#acloidchost) and the
+[endpoint settings](#endpoints) instead. QuestDB refuses to start when both
+this setting and `acl.oidc.host` are set.
+
 ### acl.oidc.enabled
 
 - **Default**: `false`
@@ -55,8 +74,11 @@ configuration options must also be set.
 - **Default**: none
 - **Reloadable**: no
 
-OIDC provider hostname. Required when OIDC is enabled, unless the OIDC
-configuration URL is set.
+OIDC provider hostname. Required when OIDC is enabled, unless
+[`acl.oidc.configuration.url`](#acloidcconfigurationurl) is set. The two
+settings cannot be combined: QuestDB refuses to start when both are set. With
+`acl.oidc.host`, QuestDB starts even when the provider is unreachable, and only
+OIDC logins fail until the provider is reachable again.
 
 ### acl.oidc.http.timeout
 
@@ -89,6 +111,14 @@ location where it was loaded from (`window.location.href`).
 The OIDC server asks consent for the scopes listed in this property. The
 scope `openid` is mandatory and must always be included.
 
+The Web Console requests these scopes when the user logs in. Add
+`offline_access` if the provider issues a refresh token only for that scope,
+such as Microsoft Entra ID. Without a refresh token, the Web Console cannot
+renew its tokens, and does not log the user out when the user is disabled in
+the provider. See
+[Credentials received](/docs/security/oidc/#6-credentials-received) in the
+OIDC guide.
+
 ## Authentication flows
 
 ### acl.oidc.pg.token.as.password.enabled
@@ -100,13 +130,19 @@ When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2
 token should be sent in the password field, while the username field should
 contain the string `_sso`, or left empty if that is an option.
 
-### acl.oidc.pkce.enabled
+### acl.oidc.pkce.required
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables or disables PKCE for the Authorization Code Flow. This should always
-be enabled in production. The Web Console is not fully secure without it.
+Whether the Web Console uses PKCE (Proof Key for Code Exchange) in the
+Authorization Code Flow. This should always be enabled in production. The Web
+Console is not fully secure without it.
+
+`acl.oidc.pkce.enabled` is not a QuestDB setting. QuestDB reports it as an
+invalid setting at startup and does not apply its value, and with
+[`config.validation.strict=true`](/docs/configuration/overview/#configvalidationstrict)
+it refuses to start. Use `acl.oidc.pkce.required` instead.
 
 ### acl.oidc.ropc.flow.enabled
 
@@ -115,6 +151,17 @@ be enabled in production. The Web Console is not fully secure without it.
 
 Enables or disables the Resource Owner Password Credentials flow. When
 enabled, this flow must also be configured in the OIDC Provider.
+
+### acl.oidc.state.required
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Whether the Web Console sends a random `state` parameter in the authorization
+request of the Authorization Code Flow, and rejects the redirect back from the
+OIDC Provider when it does not carry the same `state`. This ties the redirect
+to a login that the same browser started, which protects against cross-site
+request forgery on the login redirect.
 
 ## Endpoints
 
@@ -132,8 +179,20 @@ Identity Platform.
 - **Reloadable**: no
 
 JSON Web Key Set (JWKS) Endpoint. Provides the list of public keys used to
-decode and validate ID tokens issued by the OIDC Provider. The default value
-should work for the Ping Identity Platform.
+decode and validate the tokens issued by the OIDC Provider, such as ID tokens,
+when `acl.oidc.groups.encoded.in.token` is `true`. The default value should
+work for the Ping Identity Platform.
+
+### acl.oidc.public.keys.expiry
+
+- **Default**: `120000`
+- **Reloadable**: no
+
+How long QuestDB uses the public keys that it downloaded from the JWKS
+endpoint, in milliseconds, before it downloads them again. QuestDB also
+downloads the keys again when a token names a key ID that it does not know,
+such as a key that the OIDC Provider has just started to use. See
+[Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins).
 
 ### acl.oidc.token.endpoint
 
@@ -196,37 +255,102 @@ which it connects.
 
 ## User and group claims
 
+QuestDB reads the principal and the group memberships of an external user from
+the user information: the User Info endpoint's response or, when
+`acl.oidc.groups.encoded.in.token` is `true`, the payload of a JWT, such as an
+ID token. `acl.oidc.sub.claim` and `acl.oidc.groups.claim` each take a single
+claim name or, since QuestDB Enterprise 4.0.2, a comma-separated list of claim
+names in priority order. For how QuestDB picks the claims, with examples, see
+[User and group claims](/docs/security/oidc/#user-and-group-claims) in the
+OIDC guide. For how versions before 4.0.2 differ, see
+[Versions before 4.0.2](/docs/security/oidc/#versions-before-402).
+
 ### acl.oidc.cache.ttl
 
 - **Default**: `30000`
 - **Reloadable**: no
 
-User info cache entry TTL in milliseconds. QuestDB caches user info responses
-for each valid access token. This setting controls how often the access token
-is validated and user info refreshed.
+How long QuestDB caches the user information of a valid token, in
+milliseconds: the User Info endpoint's response or, when
+`acl.oidc.groups.encoded.in.token` is `true`, the result of validating the
+token. This setting controls how often a token is validated again and the user
+information refreshed. With `acl.oidc.groups.encoded.in.token=true`, the user
+information comes from the token itself, so a change to it takes effect when
+the client presents a new token. For username and password logins through the
+ROPC flow, QuestDB caches the result of the login for this long, then requests
+a new token from the provider, so with either setting, changes take effect
+after this time.
 
 ### acl.oidc.groups.claim
 
-- **Default**: `groups`
+- **Default**: none
 - **Reloadable**: no
 
-The name of the custom claim in the user information that contains the
-group memberships of the user.
+The claim in the user information that contains the group memberships of the
+user, as an array of group names or as a single group name. Required when OIDC
+is enabled.
+
+Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
+priority order, in the form `claimName[,claimName ...]`, such as
+`roles,groups`. Spaces around claim names are trimmed, and empty entries are
+skipped. QuestDB takes the groups from the first claim on the list that holds
+at least one group name, and does not combine groups from several claims. A login is rejected when none of the listed claims
+holds a group name. With OIDC enabled, QuestDB refuses to start when the list
+names a claim twice, or names a claim that `acl.oidc.sub.claim` also lists.
+
+On earlier versions, a list makes every OIDC login fail. With
+`acl.oidc.groups.encoded.in.token=true`, earlier versions also require a
+`groups` array in the token, whatever this setting names.
+
+See [How QuestDB picks a claim](/docs/security/oidc/#how-questdb-picks-a-claim)
+and [Startup validation](/docs/security/oidc/#startup-validation).
 
 ### acl.oidc.groups.encoded.in.token
 
 - **Default**: `false`
 - **Reloadable**: no
 
-When `true`, QuestDB looks for group memberships in the ID token instead of
-calling the User Info endpoint. Set to `true` if the OIDC Provider encodes
-group memberships directly into the token.
+When `true`, QuestDB reads the principal and the group memberships from a JWT
+instead of calling the User Info endpoint: the ID token, which the Web Console
+sends and QuestDB obtains itself in the ROPC flow, or a token that a client
+presents, such as an Entra ID app-only access token. QuestDB validates the
+token itself, as described in
+[Token validation](/docs/security/oidc/#token-validation). Set to `true` if the
+OIDC Provider encodes group memberships directly into the token.
+
+Since QuestDB Enterprise 4.0.2, QuestDB also rejects expired tokens and tokens
+without an `exp` claim. Earlier versions do not check the `exp` claim of the
+token.
 
 ### acl.oidc.sub.claim
 
 - **Default**: `sub`
 - **Reloadable**: no
 
-The name of the claim in the user information that contains the user's name.
-Could be a username, full name, or email. Displayed in the Web Console and
-logged for audit purposes.
+The claim in the user information that contains the user's principal, such as
+a username, an email address, or an object ID. Displayed in the Web Console,
+returned by `current_user()`, and logged for audit purposes. Pick a claim that
+identifies one user or service, and that the provider never gives to anyone
+else: QuestDB keeps one external user per principal and replaces its groups at
+every login, so users who share a principal share permissions. Avoid display
+names, such as the `name` claim. See
+[Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
+
+For username and password logins through the ROPC flow, the principal is the
+username that the client sends instead. QuestDB still requires one of the
+listed claims to carry a value, but does not use that value.
+
+Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
+priority order, in the form `claimName[,claimName ...]`, such as
+`preferred_username,oid`. Spaces around claim names are trimmed, and empty
+entries are skipped. QuestDB takes the principal from the first claim on the
+list that holds a non-empty value. A login is
+rejected when none of the listed claims holds one. With OIDC enabled, QuestDB
+refuses to start when the value is empty, when the list names a claim twice, or
+when it names a claim that `acl.oidc.groups.claim` also lists. An empty value
+does not fall back to the default `sub`.
+
+On earlier versions, a list makes every OIDC login fail.
+
+See [How QuestDB picks a claim](/docs/security/oidc/#how-questdb-picks-a-claim)
+and [Startup validation](/docs/security/oidc/#startup-validation).
