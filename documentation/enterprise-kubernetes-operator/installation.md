@@ -59,7 +59,6 @@ one operator watches `QuestDBCluster` objects in all namespaces.
 
 The full list of rules is in the chart's `templates/rbac/role.yaml`.
 
-
 The chart also creates a namespaced Role in the operator's namespace for leader
 election (Leases, ConfigMaps, Events), and, when metrics are enabled, a
 ClusterRole to create TokenReviews and SubjectAccessReviews so it can check who
