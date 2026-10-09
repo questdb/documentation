@@ -50,6 +50,57 @@ Follow the complete cloud checklist before installing:
 - [Amazon EKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/aws/)
 - [Azure AKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/azure/)
 
+## Operator permissions
+
+The chart binds the operator's ServiceAccount to the
+`questdb-operator-manager-role` ClusterRole with a ClusterRoleBinding, so its
+permissions apply in every namespace. There is no namespace-scoped install mode:
+one operator watches `QuestDBCluster` objects in all namespaces.
+
+| Resource                             | Verbs                                               | Why                                                                                                                                                   |
+| ------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pods                                 | create, get, list, watch, patch, delete             | Runs the database pods. Deletes a pod to fence an old primary, replace a failed or outdated pod, or scale down.                                       |
+| PersistentVolumeClaims               | create, get, list, watch, update, patch, delete     | Creates each instance's data volume and grows it on resize. Deletes a volume only after its pod is gone, on scale-down or when re-creating a replica. |
+| Services, ConfigMaps                 | create, get, list, watch, update, patch             | The `-rw`/`-ro` Services and each cluster's server config.                                                                                            |
+| Secrets                              | create, get, list, watch, update, patch             | See [Secrets](#secrets) below.                                                                                                                        |
+| PodDisruptionBudgets                 | create, get, list, watch, update, patch, delete     | Keeps a cluster's PDB in step with its size; deletes it when the cluster no longer needs one.                                                         |
+| Nodes                                | get, list, watch                                    | Read-only. Spots a pod stuck on a failed node.                                                                                                        |
+| StorageClasses                       | get, list, watch                                    | Read-only. Checks `allowVolumeExpansion` before growing a volume.                                                                                     |
+| Events (`events.k8s.io`)             | create, patch                                       | Records what it did on your objects.                                                                                                                  |
+| `QuestDBCluster`, `QuestDBPromotion` | create, get, list, watch, update, patch, delete     | Reconciles them and writes their status and finalizers. The operator does not create or delete your clusters or promotions.                           |
+| `QuestDBObjectStore`                 | get, list, watch                                    | Read-only. Passes your object-store settings to the QuestDB pods.                                                                                     |
+| ValidatingWebhookConfigurations      | list, watch; get, update on the operator's own only | Self-signed webhook certificate mode only: writes the CA into the operator's own webhook. Not granted in external certificate mode.                   |
+
+The chart also creates a namespaced Role in the operator's namespace for leader
+election (Leases, ConfigMaps, Events), and, when metrics are enabled, a
+ClusterRole to create TokenReviews and SubjectAccessReviews so it can check who
+is reading `/metrics`.
+
+### Secrets
+
+The operator reads Secrets you point it at: the admin password
+(`spec.auth.adminSecret`), object-store credentials, and PGWire TLS
+certificates. It creates and updates Secrets of its own: a generated admin
+password if you don't supply one, its own database login, the object-store
+connection strings handed to the pods, and the webhook certificate in
+self-signed mode.
+
+It watches Secrets in every namespace so that a renewed TLS certificate takes
+effect, but it keeps only their metadata (names and labels) in memory, never the
+contents. It reads contents directly from the Kubernetes API when it needs them.
+
+The role has no `delete` on Secrets, on purpose. The operator never deletes a
+Secret. The ones it creates for a cluster are owned by that `QuestDBCluster`,
+and Kubernetes removes them when you delete the cluster. The webhook certificate
+Secret in the operator's namespace is never removed by the operator.
+
+### Object store
+
+The operator never touches your object store and has no cloud permissions. It
+does not create or delete buckets, containers, or IAM roles, and never reads or
+writes your data there. The QuestDB pods do all object-store I/O, with the
+identity or credentials you configure.
+
 ## Canonical Helm install
 
 The OCI chart on GHCR is public; its operator image is private. Replace the
