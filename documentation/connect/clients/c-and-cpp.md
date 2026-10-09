@@ -334,7 +334,7 @@ following are **not** supported:
 |---|---|---|
 | OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. For Azure services, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the pool and build a fresh one with the new token. |
+| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | Before the token expires, build a new pool with a new token, then close the old one. QuestDB checks the token again on every new connection, including reconnects, and rejects it once it has expired; see [Token lifetime](/docs/security/oidc/#token-lifetime). |
 
 ## Headers
 

@@ -265,7 +265,9 @@ acl.oidc.ropc.flow.enabled=true
 `preferred_username` shows the user's sign-in name in the Web Console and in
 the logs. Entra ID can change a sign-in name, and can give it to a new user
 later. To identify users by an object ID that never changes, set
-`acl.oidc.sub.claim=oid`. See
+`acl.oidc.sub.claim=oid`. Users who log in with a username and password
+through the ROPC flow, such as with `psql`, get the username that they type as
+the principal instead, whatever the claim. See
 [Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
 
 The application ID and the OIDC configuration endpoint's URL can be found
@@ -379,9 +381,11 @@ the permissions of its Entra ID security groups instead. See
    token, the default for applications that accept organizational accounts
    only, can carry the Application ID URI instead. Web Console logins are not affected, because the
    Web Console presents ID tokens.
-4. Under _App roles_, define a role for each kind of access, with the
-   _Applications_ member type. The examples below use the value
-   `QuestDB.Ingest`.
+4. Under _App roles_, define a role for each service, with the _Applications_
+   member type. A role of its own, mapped to a QuestDB group of its own, lets
+   you cut off one service without affecting the others, as described in
+   [Change or revoke access](#change-or-revoke-access). The examples below use
+   the value `QuestDB.FxIngest`, for a service that ingests FX trades.
 5. Assign a role to each managed identity or service principal that needs
    access. Assign the role to the identity itself: Entra ID does not add a role
    assigned to a group to the tokens of the service principals in that group.
@@ -447,10 +451,10 @@ Entra ID group, and grant the group what the service needs. A service that
 ingests over HTTP or [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/)
 needs the `HTTP` endpoint permission and `INSERT` on its tables:
 
-```questdb-sql title="Map an app role to a group that ingests into fx_trades"
-CREATE GROUP ingestApps WITH EXTERNAL ALIAS 'QuestDB.Ingest';
-GRANT HTTP TO ingestApps;
-GRANT INSERT ON fx_trades TO ingestApps;
+```questdb-sql title="Map the app role of the service to a group that ingests into fx_trades"
+CREATE GROUP fxIngest WITH EXTERNAL ALIAS 'QuestDB.FxIngest';
+GRANT HTTP TO fxIngest;
+GRANT INSERT ON fx_trades TO fxIngest;
 ```
 
 A service that queries its tables also needs `SELECT` on them, and a service
@@ -655,7 +659,14 @@ opened. They stay open when their token expires. If the next token of the
 service carries neither a role nor a group, QuestDB rejects it, and the open
 connections keep the groups of the last token that QuestDB accepted. To cut a
 service off, revoke the permissions of its QuestDB group. This takes effect at
-once, on open connections too, but it cuts off every service that holds the
-app role, so to cut off one service at a time, give each service an app role,
-and a QuestDB group, of its own. See
-[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+once, on open connections too, for every service that holds the app role,
+which is why each service gets an app role and a QuestDB group of its own:
+
+```questdb-sql title="Cut off the service that ingests into fx_trades"
+REVOKE INSERT ON fx_trades FROM fxIngest;
+REVOKE HTTP FROM fxIngest;
+```
+
+Granting the permissions again restores access on the connections that are
+still open, and for every token of the service that QuestDB still accepts. See
+[Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access).

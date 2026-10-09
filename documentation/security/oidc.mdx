@@ -18,7 +18,8 @@ same provider, over HTTP, QWP, or PGWire. External users are not created in
 QuestDB: they get the permissions of the QuestDB groups that their groups in
 the Identity Provider map to.
 
-This page covers the login flow, which token a client sends, how QuestDB maps
+Start with the [minimal configuration](#configuration-options). The rest of
+this page covers the login flow, which token a client sends, how QuestDB maps
 the claims of a token to a principal and to QuestDB groups, including the
 [fallback claim lists](#fallback-claim-lists) of QuestDB Enterprise 4.0.2 that
 accept user and app-only tokens with one configuration,
@@ -28,6 +29,39 @@ step-by-step setup, see the guides for
 [Microsoft Entra ID](/docs/security/oidc-entra-id/), which also covers Azure
 managed identities and service principals, and
 [PingFederate](/docs/security/oidc-pingfederate/).
+
+## Configuration options
+
+A minimal configuration enables OIDC, points QuestDB at the provider, and
+names the client ID and the groups claim:
+
+```ini title="server.conf"
+# enable OIDC
+acl.oidc.enabled=true
+
+# the OIDC discovery document of the provider; alternatively, set
+# acl.oidc.host and the endpoint settings
+acl.oidc.configuration.url=https://idp.example.com/.well-known/openid-configuration
+
+# the client ID that the provider assigned to QuestDB
+acl.oidc.client.id=questdb
+
+# required, no default: the claim that carries the groups
+acl.oidc.groups.claim=groups
+
+# optional, sub by default: the claim that carries the principal
+# acl.oidc.sub.claim=sub
+
+# optional, false by default: read the claims from a JWT, such as the ID token,
+# instead of calling the User Info endpoint
+# acl.oidc.groups.encoded.in.token=true
+```
+
+For all OIDC-related configuration options of QuestDB, see
+[Configuration](/docs/configuration/oidc/). For complete examples, see the
+QuestDB configuration in the
+[Microsoft Entra ID](/docs/security/oidc-entra-id/#questdb-configuration) and
+[PingFederate](/docs/security/oidc-pingfederate/#questdb-configuration) guides.
 
 ## Architecture overview
 
@@ -56,7 +90,10 @@ the _client_, and it is assigned an identifier: the **Client Id**.
 Each application which integrates via OIDC should be given a different **Client
 Id**. Clients that send ID tokens to QuestDB are the exception: QuestDB accepts
 an ID token only when it was issued for QuestDB's client ID, as described in
-[Non-interactive clients](#non-interactive-clients).
+[Non-interactive clients](#non-interactive-clients). Separate client IDs do not
+limit which access tokens QuestDB accepts when it reads the user information
+from the User Info endpoint, the default. See
+[Token validation](#token-validation).
 
 ### OIDC Provider
 
@@ -397,7 +434,7 @@ data = parse.urlencode( {
     "username": "testuser",
     "password": "testpwd",
     "scope": "openid",
-    "client_id": "testclient"
+    "client_id": "questdb"
 } ).encode()
 req = request.Request(url=url, data=data)
 req.add_header("Content-Type", "application/x-www-form-urlencoded")
@@ -457,7 +494,7 @@ data = parse.urlencode( {
     "username": user,
     "password": pwd,
     "scope": "openid",
-    "client_id": "testclient"
+    "client_id": "questdb"
 } ).encode()
 req = request.Request(url=url, data=data)
 req.add_header("Content-Type", "application/x-www-form-urlencoded")
@@ -589,74 +626,169 @@ kinds of token with one configuration, list the claims of both, which requires
 QuestDB Enterprise 4.0.2 or later. See
 [Fallback claim lists](#fallback-claim-lists).
 
-The following example requests a token for a user with the Resource Owner
-Password Credentials grant, then ingests over ILP/HTTP. It assumes that
-QuestDB's client ID is `testclient`:
+The examples below ingest into `fx_trades` over QWP with the
+[Python client](/docs/connect/clients/python/). Ingestion fails when it has to
+create a table or add a column for an external user, so create the table in
+advance, with every column that the client sends. See
+[Tables created by external users](#tables-created-by-external-users). The
+examples connect over TLS with `wss::`; against a server without TLS, use
+`ws::`.
+
+### Client credentials grant
+
+A service that authenticates as itself requests an access token with the
+client credentials grant, using its own client ID and secret, and sends the
+token to QuestDB. This example assumes `acl.oidc.groups.encoded.in.token=true`,
+and a provider that issues the token as a JWT whose `aud` claim contains the
+value of `acl.oidc.audience`:
 
 ```python
-import json
 import os
+
+import questdb
 import requests
-import pandas as pd
+from questdb import TimestampNanos
+
+token_endpoint = "https://oidc.provider:443/as/token.oauth2"
+response = requests.post(
+    token_endpoint,
+    data={
+        "grant_type": "client_credentials",
+        "client_id": os.environ["CLIENT_ID"],
+        "client_secret": os.environ["CLIENT_SECRET"],
+        # the scope of the QuestDB API, if the provider needs one, such as
+        # api://<application ID>/.default for Microsoft Entra ID
+        "scope": os.environ["QUESTDB_SCOPE"],
+    },
+    timeout=10,
+)
+response.raise_for_status()
+access_token = response.json()["access_token"]
+
+conf = f"wss::addr=questdb.example.com:9000;token={access_token};"
+with questdb.connect(conf) as db:
+    with db.sender() as sender:
+        sender.row(
+            "fx_trades",
+            symbols={"symbol": "EURUSD", "side": "buy"},
+            columns={"price": 1.0842, "quantity": 100000.0},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
+```
+
+The service gets the permissions of the QuestDB groups that the groups or roles
+in its token map to, as described in
+[Mapping user permissions](#mapping-user-permissions). For Microsoft Entra ID,
+see
+[Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals),
+which requests the token without a client secret.
+
+### Resource Owner Password Credentials grant
+
+The following example requests a token for a user with the Resource Owner
+Password Credentials grant, then ingests over QWP. It requests the token with
+QuestDB's client ID, `questdb` in the
+[minimal configuration](#configuration-options):
+
+```python
+import os
+
+import questdb
+import requests
 from dotenv import load_dotenv
-from questdb.ingress import Sender
+from questdb import TimestampNanos
 
 load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
 token_endpoint = "https://oidc.provider:443/as/token.oauth2"
-response = requests.post(token_endpoint,
-                         data={"grant_type": "password",
-                               "client_id": "testclient",
-                               "username": user,
-                               "password": pwd,
-                               "scope": "openid"},
-                         headers={"Content-Type": "application/x-www-form-urlencoded"})
-
-response_body = response.content.decode("utf-8")
-tokens = json.loads(response_body)
+response = requests.post(
+    token_endpoint,
+    data={
+        "grant_type": "password",
+        "client_id": "questdb",
+        "username": user,
+        "password": pwd,
+        "scope": "openid",
+    },
+    timeout=10,
+)
+response.raise_for_status()
+tokens = response.json()
 access_token = tokens["access_token"]
 
-conf = f"http::addr=localhost:9000;token={access_token};"
-with Sender.from_conf(conf) as sender:
-    df = pd.read_csv("data.csv")
-    df["ts"] = pd.to_datetime(df["ts"])
-    sender.dataframe(df, table_name="foo", at="ts")
+conf = f"wss::addr=questdb.example.com:9000;token={access_token};"
+with questdb.connect(conf) as db:
+    with db.sender() as sender:
+        sender.row(
+            "fx_trades",
+            symbols={"symbol": "GBPUSD", "side": "sell"},
+            columns={"price": 1.2634, "quantity": 250000.0},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
 ```
 
 With `acl.oidc.groups.encoded.in.token=true`, send the ID token instead of the
 access token:
 
 ```python
-conf = f"http::addr=localhost:9000;token={tokens['id_token']};"
+conf = f"wss::addr=questdb.example.com:9000;token={tokens['id_token']};"
 ```
 
 Alternatively, a user may rely on QuestDB to authenticate them via the OAuth2
 provider when the Resource Owner Password Credentials flow is enabled on the
-server side:
+server side. The client then sends the username and password instead of a
+token, and the principal is the username, as described in
+[User and group claims](#user-and-group-claims):
 
 ```python
 import os
-import pandas as pd
+
+import questdb
 from dotenv import load_dotenv
-from questdb.ingress import Sender
+from questdb import TimestampNanos
 
 load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
-conf = f"http::addr=localhost:9000;username={user};password={pwd};"
-with Sender.from_conf(conf) as sender:
-    df = pd.read_csv("data.csv")
-    df["ts"] = pd.to_datetime(df["ts"])
-    sender.dataframe(df, table_name="foo", at="ts")
+conf = f"wss::addr=questdb.example.com:9000;username={user};password={pwd};"
+with questdb.connect(conf) as db:
+    with db.sender() as sender:
+        sender.row(
+            "fx_trades",
+            symbols={"symbol": "GBPUSD", "side": "sell"},
+            columns={"price": 1.2634, "quantity": 250000.0},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
 ```
 
-Ingestion fails when it has to create a table or add a column for an external
-user, so the examples above need the table `foo` to exist, with the columns of
-`data.csv`. See
-[Tables created by external users](#tables-created-by-external-users).
+### Token lifetime
+
+A client configured with a fixed token, such as with the `token` setting of
+its configuration string, sends that token on every connection that it opens
+and never refreshes it. QuestDB checks a token when a request or a connection
+authenticates with it:
+
+- A connection that is already open, such as a QWP or PGWire connection,
+  stays open when its token expires.
+- Every HTTP request, and every new connection, including a reconnect, a
+  failover, and an additional connection of a client's pool, authenticates
+  with the token again. With `acl.oidc.groups.encoded.in.token=true`, QuestDB
+  Enterprise 4.0.2 and later reject the token from up to 60 seconds plus
+  `acl.oidc.cache.ttl` after it expires, as described in
+  [Token validation](#token-validation). Earlier versions do not check whether
+  the token has expired. With the User Info endpoint, the provider rejects the
+  expired token once the user information that QuestDB cached for it expires.
+
+A long-running client must therefore switch to a new token before the old one
+expires: request a new token, create a new client with it, then close the old
+client. For a Python example, see
+[Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service).
 
 ## OIDC for the PGWire endpoint
 
@@ -743,22 +875,7 @@ mapped QuestDB group instead; see
 [memory limits](/docs/security/rbac/#memory-limits).
 
 QuestDB works the list of external groups out from the
-[user information](#user-and-group-claims).
-
-If we take the example used earlier, we will see that the message contains a
-claim called `groups`. This name is configurable in QuestDB, and since QuestDB
-Enterprise 4.0.2, QuestDB can fall back to other claims when the user
-information does not carry it, or when it holds no group name. See
-[User and group claims](#user-and-group-claims).
-
-If the groups claim is missing or holds no group name, QuestDB rejects the
-login. See [Troubleshooting OIDC logins](#troubleshooting-oidc-logins).
-
-If none of the user's groups is mapped to a QuestDB group, the user is
-authenticated, but has no permissions at all.
-
-The user has to have at least the `HTTP` permission to be able to successfully
-login via the [Web Console](/docs/getting-started/web-console/overview/).
+[user information](#user-and-group-claims), such as this User Info response:
 
 ```json title="User info response example with Active Directory groups"
 {
@@ -770,6 +887,42 @@ login via the [Web Console](/docs/getting-started/web-console/overview/).
   ]
 }
 ```
+
+The groups are in a claim called `groups`. This name is configurable in
+QuestDB, and since QuestDB Enterprise 4.0.2, QuestDB can fall back to other
+claims when the user information does not carry it, or when it holds no group
+name. See [User and group claims](#user-and-group-claims).
+
+If the groups claim is missing or holds no group name, QuestDB rejects the
+login. See [Troubleshooting OIDC logins](#troubleshooting-oidc-logins).
+
+An external alias must equal a group name in the user information exactly,
+including its case. The group names depend on the provider: for example, the
+distinguished names of Active Directory groups, as above, or, with Microsoft
+Entra ID, the object IDs of security groups and the values of app roles, as
+described in
+[Map groups and grant permissions](/docs/security/oidc-entra-id/#map-groups-and-grant-permissions)
+and
+[Map app roles to QuestDB groups](/docs/security/oidc-entra-id/#map-app-roles-to-questdb-groups).
+
+If none of the user's groups is mapped to a QuestDB group, the user is
+authenticated, but has no permissions at all.
+
+Grant each mapped QuestDB group the
+[endpoint permission](/docs/security/rbac/#endpoint-permissions) of every
+interface that its users connect to, and the permissions on the tables that
+they use:
+
+- `HTTP` for the [Web Console](/docs/getting-started/web-console/overview/),
+  the REST API, ILP/HTTP, and QWP over WebSocket.
+- `PGWIRE` for the [PGWire endpoint](#oidc-for-the-pgwire-endpoint).
+
+```questdb-sql title="Let the members of a mapped group log in and query fx_trades"
+GRANT HTTP, PGWIRE TO groupName;
+GRANT SELECT ON fx_trades TO groupName;
+```
+
+### Group changes, sessions, and revoking access
 
 QuestDB keeps the groups of the last token that it accepted for each external
 user, and every session and connection of the user runs with them. QuestDB
@@ -786,6 +939,11 @@ such as a disabled user, when it checks a token of the user again:
   Enterprise 4.0.2 and later, QuestDB accepts the old token for up to 60
   seconds plus `acl.oidc.cache.ttl` after it expires. Earlier versions do not
   check whether the token has expired. See [Token validation](#token-validation).
+
+For a username and password login through the [ROPC flow](#enable-ropc),
+QuestDB requests a new token from the provider itself once the cached result
+expires, so with either setting, changes take effect after
+`acl.oidc.cache.ttl`.
 
 A token that QuestDB rejects does not change the groups, so some access
 outlives the token:
@@ -864,6 +1022,12 @@ Two settings name the claims that QuestDB reads:
 QuestDB rejects the login when the user information carries no principal or no
 group.
 
+A username and password login through the [ROPC flow](#enable-ropc), over HTTP
+basic authentication or PGWire, is the exception to the principal claim: its
+principal is the username that the client sends. QuestDB still requires one of
+the claims that `acl.oidc.sub.claim` lists to carry a value, but does not use
+that value.
+
 ### Choose the principal claim
 
 QuestDB keeps one in-memory external user for each principal, and every login
@@ -885,6 +1049,12 @@ to anyone else:
 Never use a display name, such as the `name` claim, because different people
 can share one. Changing the claim on an existing deployment gives every user a
 new principal. Permissions stay the same, because they come from the groups.
+
+The claim does not apply to username and password logins through the ROPC
+flow, which use the username that the client sends as the principal. A person
+who logs in to the Web Console, and with a username and password to the PGWire
+endpoint, appears as two external users, unless the claim carries the same
+username.
 
 ### Fallback claim lists
 
@@ -924,14 +1094,14 @@ token payloads, shortened to the relevant claims, as follows:
 {
   "sub": "4c9a4e3b-0d6f-4f43-9a8e-27d2b1f0c5a1",
   "oid": "4c9a4e3b-0d6f-4f43-9a8e-27d2b1f0c5a1",
-  "roles": ["QuestDB.Ingest"]
+  "roles": ["QuestDB.FxIngest"]
 }
 ```
 
-| Token    | Principal                                           | Groups                         |
-| -------- | --------------------------------------------------- | ------------------------------ |
-| User     | `jane.smith@example.com`, from `preferred_username` | `87654321-...`, from `groups`  |
-| App-only | `4c9a4e3b-...`, from `oid`                          | `QuestDB.Ingest`, from `roles` |
+| Token    | Principal                                           | Groups                           |
+| -------- | --------------------------------------------------- | -------------------------------- |
+| User     | `jane.smith@example.com`, from `preferred_username` | `87654321-...`, from `groups`    |
+| App-only | `4c9a4e3b-...`, from `oid`                          | `QuestDB.FxIngest`, from `roles` |
 
 `roles` comes before `groups` because an app-only token can also carry a
 `groups` claim, and QuestDB takes the groups from the first claim on the list
@@ -969,12 +1139,12 @@ With the configuration in [Fallback claim lists](#fallback-claim-lists),
 QuestDB reads these token payloads, shortened to the relevant claims, as
 follows:
 
-| Claims in the token                                    | Result                                                                                                                      |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `"preferred_username": ""`, `"oid": "4c9a4e3b-..."`    | Principal `4c9a4e3b-...`, from `oid`: the empty `preferred_username` falls through                                          |
-| `"roles": []`, `"groups": ["87654321-..."]`            | Groups `87654321-...`, from `groups`: the empty `roles` array falls through                                                 |
-| `"roles": [null, ""]`, `"groups": ["87654321-..."]`    | Groups `87654321-...`, from `groups`: `roles` holds no group name once `null` and `""` are skipped                          |
-| `"roles": ["QuestDB.Ingest"]`, `"groups": {"id": "x"}` | The login fails with `unexpected input format`: `groups` is listed and holds an object, even though `roles` carries a group |
+| Claims in the token                                      | Result                                                                                                                      |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `"preferred_username": ""`, `"oid": "4c9a4e3b-..."`      | Principal `4c9a4e3b-...`, from `oid`: the empty `preferred_username` falls through                                          |
+| `"roles": []`, `"groups": ["87654321-..."]`              | Groups `87654321-...`, from `groups`: the empty `roles` array falls through                                                 |
+| `"roles": [null, ""]`, `"groups": ["87654321-..."]`      | Groups `87654321-...`, from `groups`: `roles` holds no group name once `null` and `""` are skipped                          |
+| `"roles": ["QuestDB.FxIngest"]`, `"groups": {"id": "x"}` | The login fails with `unexpected input format`: `groups` is listed and holds an object, even though `roles` carries a group |
 
 With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token before
 it applies these rules. See [Token validation](#token-validation).
@@ -1029,10 +1199,18 @@ after it expires. After that, it rejects the token on every request and new
 connection. An HTTP request that also carries a valid session cookie, such as
 a request of the Web Console, is still accepted through the session, and a
 PGWire or WebSocket connection that is already open stays open when its token
-expires. See [Mapping user permissions](#mapping-user-permissions).
+expires. See
+[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access),
+and, for clients, [Token lifetime](#token-lifetime).
 
 With `acl.oidc.groups.encoded.in.token=false`, QuestDB sends the token to the
-provider's User Info endpoint, which validates it. See
+provider's User Info endpoint, which validates it, and checks nothing else.
+QuestDB does not check the audience of the token or the client that it was
+issued to, and does not use `acl.oidc.audience`: it accepts any access token
+that the User Info endpoint accepts. Any application that can obtain such a
+token for a user, from the same provider, can therefore call QuestDB as that
+user. With `acl.oidc.groups.encoded.in.token=true`, QuestDB checks the `aud`
+claim instead, as described above. See
 [Find user information](#8-find-user-information).
 
 ## Troubleshooting OIDC logins
@@ -1107,7 +1285,9 @@ login.
 
 If the login succeeds but every request is denied, check that at least one of
 the user's groups is mapped to a QuestDB group that has the endpoint
-permission. See [Mapping user permissions](#mapping-user-permissions).
+permission of the interface: `HTTP` for the Web Console, the REST API,
+ILP/HTTP, and QWP, or `PGWIRE` for the PGWire endpoint. See
+[Mapping user permissions](#mapping-user-permissions).
 
 If the login succeeds but ingestion fails when it creates a table or adds a
 column, create the table and its columns in advance: ingestion cannot create a
@@ -1150,39 +1330,6 @@ When you upgrade from an earlier version:
 - In a replicated cluster, upgrade every node before you change a setting to a
   claim list. Earlier versions reject every OIDC login when a setting lists
   more than one claim.
-
-## Configuration options
-
-A minimal configuration enables OIDC, points QuestDB at the provider, and
-names the client ID and the groups claim:
-
-```ini title="server.conf"
-# enable OIDC
-acl.oidc.enabled=true
-
-# the OIDC discovery document of the provider; alternatively, set
-# acl.oidc.host and the endpoint settings
-acl.oidc.configuration.url=https://idp.example.com/.well-known/openid-configuration
-
-# the client ID that the provider assigned to QuestDB
-acl.oidc.client.id=questdb
-
-# required, no default: the claim that carries the groups
-acl.oidc.groups.claim=groups
-
-# optional, sub by default: the claim that carries the principal
-# acl.oidc.sub.claim=sub
-
-# optional, false by default: read the claims from a JWT, such as the ID token,
-# instead of calling the User Info endpoint
-# acl.oidc.groups.encoded.in.token=true
-```
-
-For all OIDC-related configuration options of QuestDB, see
-[Configuration](/docs/configuration/oidc/). For complete examples, see the
-QuestDB configuration in the
-[Microsoft Entra ID](/docs/security/oidc-entra-id/#questdb-configuration) and
-[PingFederate](/docs/security/oidc-pingfederate/#questdb-configuration) guides.
 
 <br />
 

@@ -91,10 +91,14 @@ db = questdb.connect("ws::addr=localhost:9000;")
 
 `connect()` accepts only `ws`/`wss` configuration strings; ILP schemes such
 as `http::` or `tcp::` belong to the [legacy Sender](#legacy-ilp-clients).
-It parses and validates the string without opening a connection: the first
-`sender()`, `dataframe()`, or `query()` call opens one, and later calls
-reuse pooled connections. Servers without QWP support fail during the
-WebSocket upgrade; see
+It parses and validates the string, then opens the warm minimum of
+connections before it returns (see [The pool](#the-pool)), so an unreachable
+server or rejected credentials raise from `connect()`. Later calls reuse
+pooled connections. With
+[`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
+`connect()` returns without connecting, and the first `sender()`,
+`dataframe()`, or `query()` call opens a connection. Servers without QWP
+support fail during the WebSocket upgrade; see
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
 
 Instead of a configuration string, `connect()` also takes the equivalent
@@ -147,8 +151,8 @@ are exchanged. By default, `connect()` opens its first connections before it
 returns (see [The pool](#the-pool)), so bad credentials raise
 `QuestDBErrorCode.AuthError` from `connect()` itself. With
 [`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
-`connect()` opens no connection, and bad credentials raise from the first
-operation that needs the connection instead. Queries and `dataframe()` calls
+`connect()` returns without connecting, and bad credentials raise from the
+first operation that needs the connection instead. Queries and `dataframe()` calls
 raise it directly. Row senders connect in the background, so a
 fire-and-forget `flush()` can return before the upgrade fails. The error then
 surfaces from `flush(wait=True)`, `wait()`, or the next call on the lease, and
@@ -177,7 +181,7 @@ following are **not** supported:
 | --- | --- | --- |
 | OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | Before the token expires, build a fresh handle with a new token, then close the old one. See [Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service) for an example. |
+| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens, including reconnects and failover, so an expired token also breaks mid-session reconnection. | Before the token expires, build a fresh handle with a new token, then close the old one. See [Token lifetime](/docs/security/oidc/#token-lifetime) for how QuestDB treats an expiring token, and [Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service) for an example. |
 
 ## The pool
 
@@ -192,7 +196,7 @@ returns: `sender_pool_min` sender and `query_pool_min` reader connections, one
 of each by default (see [Pool settings](#pool-settings)). An unreachable
 server or bad credentials therefore raise from `connect()`. With
 [`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
-`connect()` performs no network I/O: `dataframe()`, `query()`, and
+`connect()` performs no blocking network I/O: `dataframe()`, `query()`, and
 `server_info()` connect on first use, and `sender()` connects in the
 background. In both modes, call `flush(wait=True)` or `wait()` to surface
 connection and delivery errors from row senders.
@@ -306,47 +310,6 @@ QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value
 in one of those columns is received as `false` or `0`; use a wider nullable
 type when the distinction matters.
 
-:::note Auto-flush
-
-The pooled sender auto-flushes by default at 1,000 rows, after 100 ms, or when
-its estimated encoded size reaches 90% of the current QWP frame limit. Until
-the server advertises that limit, the byte threshold is 8 MiB (or the lower
-local queue limit). The interval is checked only by `row()`; there is no
-background timer that flushes an idle buffer.
-
-Override the thresholds with `auto_flush_rows`, `auto_flush_interval`, and
-`auto_flush_bytes`. Set `auto_flush_bytes=off` to disable only the byte trigger,
-or `auto_flush=off` to disable all row-triggered publishing. Auto-flush does not
-wait for an acknowledgement; errors propagate from `row()`.
-
-:::
-
-`flush()` publishes the buffered rows to the local queue and returns;
-delivery continues in the background. `flush(wait=True)` additionally blocks
-until the server acknowledges everything published on this lease, and
-`wait(timeout_millis)` is the standalone barrier with an explicit no-progress
-timeout (`0` means no deadline; `wait()` returns immediately when the lease
-published nothing). Every server rejection goes to the pool's
-[rejection handler](#server-rejections), logged by default, and the
-store-and-forward queue replays the retriable ones. The barrier raises on a
-terminal failure: a terminal connection failure, or a terminal rejection, such
-as a schema mismatch or a missing grant, which latches the connection and
-raises `QuestDBServerRejectionError`. Closing the lease (leaving the `with`
-block) flushes remaining rows without waiting.
-
-The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
-and no manual progress pump; those exist only on the standalone
-[legacy `Sender`](#legacy-ilp-clients). The rest of the ws delivery
-surface is on the lease: `flush_and_get_fsn()` /
-`flush_and_keep_and_get_fsn()` return the published frame's sequence
-number, `await_acked_fsn(fsn, timeout_millis)` waits for its
-acknowledgement, `published_fsn()` / `acked_fsn()` report progress without
-blocking, and `poll_error()` / `error_events_dropped()` pull the
-rejections recorded since the lease was borrowed. FSNs are watermarks of
-the lease's pooled connection — use them while the lease is held; they are
-not portable across leases. Use `auto_flush=off` when
-`flush_and_get_fsn()` must define exact application batches.
-
 ### Multi-dimensional arrays
 
 A numpy array keeps its shape on the wire, so an N-dimensional array lands in an
@@ -386,6 +349,50 @@ np.array([[1, 2], [3, 4]], dtype=np.int64)
 
 Cast first with `arr.astype(np.float64)` when your source data is `float32` or
 an integer type.
+
+### Flushing and acknowledgements
+
+`flush()` publishes the buffered rows to the local queue and returns;
+delivery continues in the background. `flush(wait=True)` additionally blocks
+until the server acknowledges everything published on this lease, and
+`wait(timeout_millis)` is the standalone barrier with an explicit no-progress
+timeout (`0` means no deadline; `wait()` returns immediately when the lease
+published nothing). Every server rejection goes to the pool's
+[rejection handler](#server-rejections), logged by default, and the
+store-and-forward queue replays the retriable ones. The barrier raises on a
+terminal failure: a terminal connection failure, or a terminal rejection, such
+as a schema mismatch or a missing grant, which latches the connection and
+raises `QuestDBServerRejectionError`. A terminal rejection that arrives after
+the barrier returned raises from the next call on the lease. Closing the lease
+(leaving the `with` block) flushes remaining rows without waiting.
+
+:::note Auto-flush
+
+The pooled sender auto-flushes by default at 1,000 rows, after 100 ms, or when
+its estimated encoded size reaches 90% of the current QWP frame limit. Until
+the server advertises that limit, the byte threshold is 8 MiB (or the lower
+local queue limit). The interval is checked only by `row()`; there is no
+background timer that flushes an idle buffer.
+
+Override the thresholds with `auto_flush_rows`, `auto_flush_interval`, and
+`auto_flush_bytes`. Set `auto_flush_bytes=off` to disable only the byte trigger,
+or `auto_flush=off` to disable all row-triggered publishing. Auto-flush does not
+wait for an acknowledgement; errors propagate from `row()`.
+
+:::
+
+The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
+and no manual progress pump; those exist only on the standalone
+[legacy `Sender`](#legacy-ilp-clients). The rest of the ws delivery
+surface is on the lease: `flush_and_get_fsn()` /
+`flush_and_keep_and_get_fsn()` return the published frame's sequence
+number, `await_acked_fsn(fsn, timeout_millis)` waits for its
+acknowledgement, `published_fsn()` / `acked_fsn()` report progress without
+blocking, and `poll_error()` / `error_events_dropped()` pull the
+rejections recorded since the lease was borrowed. FSNs are watermarks of
+the lease's pooled connection: use them while the lease is held, because they
+are not portable across leases. Use `auto_flush=off` when
+`flush_and_get_fsn()` must define exact application batches.
 
 ## DataFrame ingestion
 
@@ -654,8 +661,10 @@ background delivery continues, so retry `wait()` rather than flushing the
 same rows again.
 
 `flush(wait=True)` and `wait()` observe the accepted (`Ok`) acknowledgement:
-the server took responsibility for the frames. They are pure barriers —
-data-fate notification is a separate channel, the
+the server took responsibility for the frames. They raise on a terminal
+failure, including a terminal rejection, as described in
+[Flushing and acknowledgements](#flushing-and-acknowledgements). Every
+rejection, terminal or retriable, also goes to the
 [rejection handler](#server-rejections). A durable-level wait (waiting
 for object-storage upload on Enterprise deployments) is not exposed on the
 pooled Python API. The `request_durable_ack=on` connect key is accepted, and
@@ -818,10 +827,11 @@ The `db.error_events_delivered` and `db.error_events_dropped`
 properties report totals.
 
 Use the handler for dead-lettering, alerting, and metrics. Terminal
-rejections additionally latch the connection: the next call on the affected
-sender lease raises `QuestDBServerRejectionError`, and the pool retires the
-connection instead of lending it out again. Producer-side abort logic
-belongs with that raised error, not in the handler.
+rejections additionally latch the connection: `flush(wait=True)` or `wait()`
+on the affected sender lease raises `QuestDBServerRejectionError`, or, when
+the rejection arrives after that call returned, the next call on the lease
+raises it. The pool retires the connection instead of lending it out again.
+Producer-side abort logic belongs with that raised error, not in the handler.
 
 ### Reader failover
 
@@ -868,7 +878,7 @@ Codes you will most often dispatch on:
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
 | `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
 | `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` consumer or `polars.DataFrame(result)`. | Discard partial state and rerun the query. |
-| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
+| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, security error such as a missing grant, ...) latched by the connection; raised by `flush(wait=True)` or `wait()` on the affected lease, or by its next call when the rejection arrives later. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |
 
 `QuestDBServerRejectionError` marks a terminal server rejection; its

@@ -371,7 +371,9 @@ acl.oidc.ropc.flow.enabled=true
 QuestDB reads the groups from the User Info response, so keep the default,
 `acl.oidc.groups.encoded.in.token=false`. It reads the principal from the
 `sub` claim by default. To read it from another claim of the User Info
-response, set `acl.oidc.sub.claim`. See
+response, set `acl.oidc.sub.claim`. Users who log in with a username and
+password through the ROPC flow, such as with `psql`, get the username that
+they type as the principal instead. See
 [Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
 For the other settings, such as the TLS settings that a private certificate
 authority needs, see [Configuration](/docs/configuration/oidc/).

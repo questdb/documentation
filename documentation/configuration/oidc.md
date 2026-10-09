@@ -32,6 +32,10 @@ single value. Keep the default: the ID tokens that the Web Console sends carry
 the client ID, so another value makes Web Console logins fail. See
 [Token validation](/docs/security/oidc/#token-validation).
 
+With `acl.oidc.groups.encoded.in.token=false`, QuestDB does not use this
+setting: it accepts any access token that the provider's User Info endpoint
+accepts, whatever its audience.
+
 ### acl.oidc.client.id
 
 - **Default**: none
@@ -252,7 +256,10 @@ milliseconds: the User Info endpoint's response or, when
 token. This setting controls how often a token is validated again and the user
 information refreshed. With `acl.oidc.groups.encoded.in.token=true`, the user
 information comes from the token itself, so a change to it takes effect when
-the client presents a new token.
+the client presents a new token. For username and password logins through the
+ROPC flow, QuestDB caches the result of the login for this long, then requests
+a new token from the provider, so with either setting, changes take effect
+after this time.
 
 ### acl.oidc.groups.claim
 
@@ -308,6 +315,10 @@ else: QuestDB keeps one external user per principal and replaces its groups at
 every login, so users who share a principal share permissions. Avoid display
 names, such as the `name` claim. See
 [Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
+
+For username and password logins through the ROPC flow, the principal is the
+username that the client sends instead. QuestDB still requires one of the
+listed claims to carry a value, but does not use that value.
 
 Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
 priority order, in the form `claimName[,claimName ...]`, such as
