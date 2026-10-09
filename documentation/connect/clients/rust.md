@@ -125,16 +125,21 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-`QuestDb::connect` parses the connect string and doesn't normally perform any
-blocking network I/O. The exception to that happens when store-and-forward
-durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the dirty slots at construction
-and start replaying them in the background.
+By default, `QuestDb::connect` parses the connect string, then opens the warm
+minimum of connections before it returns: `sender_pool_min` senders and
+`query_pool_min` readers, one of each by default. An unreachable server,
+rejected credentials, or a TLS error therefore fails `connect()` itself.
+Senders honour `initial_connect_retry` while they connect, and readers fail
+fast. With store-and-forward on disk, the pool also reopens the slots that a
+previous client left holding unsent data, and replays them in the background.
 
-The ingestion sender creates its local producer on first borrow and connects its
+With [`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
+`connect()` performs no blocking network I/O, and `query_pool_min` defaults to
+`0`. A borrowed sender then creates its local producer at once and connects its
 delivery runner in the background, so it can queue data while the server is
-temporarily unavailable. Reader errors and direct Arrow/Polars transport errors
-surface from the borrow or during operation rather than from `connect()`.
+unavailable, and reader errors surface from the first borrow. In both modes,
+direct Arrow/Polars transport errors surface from the borrow or during
+operation rather than from `connect()`.
 
 ## Authentication and TLS
 
@@ -770,14 +775,15 @@ and is not part of that thread-bound borrow list.
 
 | Key | Default | Guidance |
 | --- | --- | --- |
-| `sender_pool_min` | `1` | Warm minimum of ingestion connections retained once they have been opened. Set it near steady concurrent use. |
+| `sender_pool_min` | `1` | Warm minimum of ingestion connections, opened by `connect()` unless `lazy_connect=on`. Set it near steady concurrent use. |
 | `sender_pool_max` | `4` | Ingestion pool growth cap. Set it at or above peak concurrent sender borrows. |
-| `query_pool_min` | `1` | Warm minimum of reader connections retained once they have been opened. |
+| `query_pool_min` | `1`, or `0` with `lazy_connect=on` | Warm minimum of reader connections, opened by `connect()` unless `lazy_connect=on`. |
 | `query_pool_max` | `4` | Reader pool growth cap. Set it at or above peak concurrent reader borrows. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits for a returned connection once its pool is at its cap. `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the warm minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
+| `lazy_connect` | `off` | `on` makes `connect()` open no connections, so that it tolerates a server that is down at startup. See [Connecting](#connecting). |
 
 Setting an ingress `reconnect_*` key without explicitly setting
 `initial_connect_retry` promotes the initial mode to synchronous retry. See the

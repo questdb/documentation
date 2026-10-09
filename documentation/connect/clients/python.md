@@ -181,7 +181,7 @@ following are **not** supported:
 | --- | --- | --- |
 | OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens, including reconnects and failover, and cannot switch to a new token while it runs. | Before the token expires, build a fresh handle with a new token, then close the old one. With `sf_dir`, flush and close the old handle first, then build the new one with the same `sender_id`: two handles cannot hold the same store-and-forward slot, and the new handle replays what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with the User Info endpoint, QuestDB rejects the token on new connections shortly after it expires, so reconnects and failover then fail too; see [Token lifetime](/docs/security/oidc/#token-lifetime). For an example, see [Request a token in the service](/docs/security/oidc/entra-id/#request-a-token-in-the-service). |
+| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens, including reconnects and failover, and cannot switch to a new token while it runs. | Before the token expires, build a fresh handle with a new token, then close the old one once its senders have flushed with `flush(wait=True)`: closing a handle discards the rows that QuestDB has not acknowledged within `close_flush_timeout_millis`. With `sf_dir`, flush and close the old handle first, then build the new one with the same `sender_id`: two handles cannot hold the same store-and-forward slot, and the new handle replays what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with the User Info endpoint, QuestDB rejects the token on new connections shortly after it expires, so reconnects and failover then fail too; see [Token lifetime](/docs/security/oidc/#token-lifetime). For an example, see [Request a token in the service](/docs/security/oidc/entra-id/#request-a-token-in-the-service). |
 
 ## The pool
 
@@ -833,6 +833,12 @@ the rejection arrives after that call returned, the next call on the lease
 raises it. The pool retires the connection instead of lending it out again.
 Producer-side abort logic belongs with that raised error, not in the handler.
 
+Without `sf_dir`, the rejected rows are dropped. With `sf_dir`, they stay in
+the store-and-forward slot, and the next connection that takes over the slot
+sends them again before any later batch. Later batches then fail the same way
+until QuestDB accepts the rejected rows, for example once you grant a missing
+permission, so don't send the rows again.
+
 ### Reader failover
 
 Reader failover has a separate policy:
@@ -878,7 +884,7 @@ Codes you will most often dispatch on:
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
 | `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
 | `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` consumer or `polars.DataFrame(result)`. | Discard partial state and rerun the query. |
-| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, security error such as a missing grant, ...) latched by the connection; raised by `flush(wait=True)` or `wait()` on the affected lease, or by its next call when the rejection arrives later. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
+| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, security error such as a missing grant, ...) latched by the connection; raised by `flush(wait=True)` or `wait()` on the affected lease, or by its next call when the rejection arrives later. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data, the schema, or the grant. With `sf_dir`, don't send the rows again: they stay on disk and are sent first (see [Server rejections](#server-rejections)). |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |
 
 `QuestDBServerRejectionError` marks a terminal server rejection; its

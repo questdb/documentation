@@ -364,8 +364,11 @@ Acquire it out of band, for example from the identity provider of the QuestDB En
 [OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and manage its lifetime yourself.
 For Azure services, see
 [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
-Before the token expires, construct a new handle with a new token, then close
-the old one. With `sf_dir`, flush and close the old handle first, then
+Before the token expires, construct a new handle with a new token, wait until
+QuestDB has acknowledged what the old handle sent (`FlushAndGetSequence` and
+`AwaitAckedFsn`), then close the old one: its final flush is best-effort and
+bounded by `close_flush_timeout_millis`. With `sf_dir`, flush and close the old
+handle first, then
 construct the new one with the same `sender_id`: two handles cannot hold the
 same store-and-forward slot, and the new handle replays what the old one left
 on disk. The client sends the token on every connection that it opens,

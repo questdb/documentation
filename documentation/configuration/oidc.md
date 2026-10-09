@@ -111,6 +111,14 @@ location where it was loaded from (`window.location.href`).
 The OIDC server asks consent for the scopes listed in this property. The
 scope `openid` is mandatory and must always be included.
 
+The Web Console requests these scopes when the user logs in. Add
+`offline_access` if the provider issues a refresh token only for that scope,
+such as Microsoft Entra ID. Without a refresh token, the Web Console cannot
+renew its tokens, and does not log the user out when the user is disabled in
+the provider. See
+[Credentials received](/docs/security/oidc/#6-credentials-received) in the
+OIDC guide.
+
 ## Authentication flows
 
 ### acl.oidc.pg.token.as.password.enabled

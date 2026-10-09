@@ -15,9 +15,12 @@ This guide sets up single sign-on (SSO) for the QuestDB Enterprise
 [Web Console](/docs/getting-started/web-console/overview/) with
 [PingFederate](https://www.pingidentity.com/en/platform/capabilities/authentication-authority/pingfederate.html)
 as the OpenID Connect (OIDC) provider. PingFederate authenticates users against
-Microsoft Entra ID, formerly Azure Active Directory, over a secure LDAP
-connection, and passes their group memberships to QuestDB in the User Info
-response. QuestDB maps those groups to its own groups to grant permissions.
+an Active Directory domain over secure LDAP (LDAPS), and passes their group
+memberships to QuestDB in the User Info response. QuestDB maps those groups to
+its own groups to grant permissions. The domain in this guide is a
+[Microsoft Entra Domain Services](https://learn.microsoft.com/en-us/entra/identity/domain-services/overview)
+managed domain with secure LDAP enabled, because Microsoft Entra ID itself has
+no LDAP endpoint. An on-premises Active Directory works the same way.
 
 For how QuestDB uses OIDC in general, such as the login flow and how it maps
 groups to permissions, see [OpenID Connect (OIDC)](/docs/security/oidc/).
@@ -159,12 +162,12 @@ It is also important to whitelist the [Web Console](/docs/getting-started/web-co
   width={500}
 />
 
-## Set up a Microsoft Entra ID Data Source
+## Set up an Active Directory data source {#set-up-a-microsoft-entra-id-data-source}
 
 PingFederate needs a Data Source setup.
 
-This is a secure LDAP connection to Microsoft Entra ID, formerly known as Azure
-Active Directory.
+This is a secure LDAP connection to the Active Directory domain, here a
+Microsoft Entra Domain Services managed domain.
 
 The data source needs a:
 
@@ -303,7 +306,7 @@ This is also where the directory search parameters are defined.
 Back at the Attribute Sources & User Lookup Section section, note we have set
 `email`.
 
-The source is `LDAP (test)`, while the value is `usePrincipalName`:
+The source is `LDAP (test)`, while the value is `userPrincipalName`:
 
 <Screenshot
   alt="PingFederate, Policy Management ui"

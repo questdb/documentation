@@ -59,6 +59,11 @@ acl.oidc.groups.claim=groups
 # optional, false by default: read the claims from a JWT, such as the ID token,
 # instead of calling the User Info endpoint; required for Microsoft Entra ID
 # acl.oidc.groups.encoded.in.token=true
+
+# optional, openid by default: the scopes that the Web Console requests; add
+# offline_access if the provider issues a refresh token only for that scope,
+# such as Microsoft Entra ID, so that the Web Console can renew its tokens
+# acl.oidc.scope=openid offline_access
 ```
 
 QuestDB downloads the discovery document when it starts, and does not start
@@ -291,16 +296,24 @@ grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&clie
 
 If the PKCE check is passed, the Web Console receives the ID and access tokens.
 
-There is a third token in the response too, the refresh token.
+The response can carry a third token too, the refresh token. Some providers,
+such as Microsoft Entra ID, issue it only when the Web Console requests the
+`offline_access` scope, which
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) sets.
 
-The Web Console uses the refresh token to request new tokens shortly before the
-access token expires. With `acl.oidc.groups.encoded.in.token=true`, it sends
-QuestDB the ID token rather than the access token, and the ID token can expire
-first, as described in
+Before it sends a query, the Web Console uses the refresh token to request new
+tokens when the access token expires within 30 seconds. With
+`acl.oidc.groups.encoded.in.token=true`, it sends QuestDB the ID token rather
+than the access token, and the ID token can expire first, as described in
 [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
+When the provider refuses to issue new tokens, for example because the user is
+disabled, the Web Console logs the user out.
 
-Without the refresh token mechanism, the user would be forced to re-authenticate
-when the access token expires.
+Without a refresh token, the Web Console never requests new tokens. Once QuestDB
+stops accepting the tokens of the login, it accepts the requests of the Web
+Console through its HTTP session, until the session expires and the Web Console
+logs the user out, as described in
+[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
 
 The validity of the tokens are configurable inside the OIDC Provider.
 
@@ -845,8 +858,12 @@ once QuestDB stops accepting the token, as described in
 [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 A long-running client must therefore switch to a new token before the old one
-expires: request a new token, create a new client with it, then close the old
-client.
+expires: request a new token, create a new client with it, wait until the old
+client has delivered what it sent, then close the old client. A QWP client that
+is closed discards the rows that QuestDB has not acknowledged within
+`close_flush_timeout_millis`, unless it keeps them on disk with `sf_dir`, so
+wait for the acknowledgement first, for example with `flush(wait=True)` in the
+[Python client](/docs/connect/clients/python/#flushing-and-acknowledgements).
 
 A client that keeps its
 [store-and-forward](/docs/connect/clients/connect-string/#sf-keys) data on
@@ -866,20 +883,45 @@ shows both orders in Python.
 ## OIDC for the PGWire endpoint
 
 If the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
-Resource Owner Password Credentials (ROPC) </a> flow is not an option, we can still authenticate via OIDC on the PGWire endpoint.
-However, in this case the client's responsibility to source the token required for authentication.
-This method works wherever a Postgres client library is available, including jupyter notebooks.
+Resource Owner Password Credentials (ROPC) </a> flow is not an option, clients
+can still authenticate on the PGWire endpoint with OIDC, using a token that they
+request from the provider themselves. This works with any PostgreSQL client
+library, including in Jupyter notebooks.
 
-Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
+Enable token authentication for the PGWire endpoint in the server
+configuration:
 
-The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option:
+```ini title="server.conf"
+acl.oidc.pg.token.as.password.enabled=true
+```
+
+The client sends the token in the password field, and the string `_sso` in the
+username field, or leaves the username empty if it can. QuestDB validates the
+token the same way as over HTTP, and takes the principal and the groups from
+it, not from the username field. Send the token that an HTTP client would send:
+
+- With the User Info endpoint, the default, an access token.
+- With `acl.oidc.groups.encoded.in.token=true`, for a user, an ID token
+  requested with QuestDB's client ID, and for a service, an access token whose
+  `aud` claim contains `acl.oidc.audience`. QuestDB rejects a token for another
+  audience, such as a user's access token for another API, and logs
+  `InvalidAudience`.
+
+See [Non-interactive clients](#non-interactive-clients). Like a password, the
+token crosses the network in the clear unless the connection uses
+[TLS](/docs/security/tls/#enabling-tls-for-pgwire), so require TLS on the
+client:
 
 ```python
 import psycopg as pg
 
+# a token that the client requested from the provider, as described above
 token = "token_requested_from_the_oauth2_provider"
 
-conn_str = f"user=_sso password={token} host=localhost port=8812 dbname=qdb"
+conn_str = (
+    f"user=_sso password={token} host=questdb.example.com port=8812 "
+    "dbname=qdb sslmode=require"
+)
 with pg.connect(conn_str, autocommit=True) as connection:
     with connection.cursor() as cur:
         cur.execute('select current_user()')
@@ -1030,11 +1072,14 @@ outlives the token:
   The session ends when the Web Console logs the user out, or after it has
   been idle for `http.session.timeout`, 30 minutes by default. Every request
   restarts the idle timer, so a session in use does not expire. The Web
-  Console logs the user out, and ends the session, when it cannot refresh the
-  token, for example after the user is disabled. A session that the Web
-  Console does not end, for example because the browser was closed, stays
-  valid for any client that reuses its cookie, for as long as that client
-  stays active.
+  Console logs the user out, and ends the session, when the provider refuses
+  to refresh its tokens, for example after the user is disabled. It refreshes
+  them only with a refresh token, as described in
+  [step 6](#6-credentials-received): without one, a disabled user keeps
+  working through the session for as long as they stay active. A session that
+  the Web Console does not end, for example because the browser was closed,
+  stays valid for any client that reuses its cookie, for as long as that
+  client stays active.
 
 To cut off access immediately, revoke the permissions of the QuestDB groups
 that the user's groups map to. This takes effect at once for every session and
@@ -1183,7 +1228,12 @@ token payloads, shortened to the relevant claims, as follows:
 
 `roles` comes before `groups` because an app-only token can also carry a
 `groups` claim, and QuestDB takes the groups from the first claim on the list
-that holds one. See
+that holds one. For the same reason, a user token that carries a `roles` claim
+takes its groups from `roles` alone, and the groups in its `groups` claim no
+longer count. Entra ID puts no `roles` claim into user tokens as long as the
+app roles of the QuestDB application admit applications only. With any
+provider, make sure that the first claim on the list appears only in the
+tokens that should take their groups from it. See
 [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 ### How QuestDB picks a claim
@@ -1204,7 +1254,11 @@ QuestDB uses, for a single claim name and for a list:
   such as the `roles` that Keycloak puts inside its `realm_access` claim. To
   use such values, configure the provider to emit them as a top-level claim.
   In Keycloak, for example, add a _User Realm Role_ mapper with the
-  _Token Claim Name_ `roles` to the client that requests the token.
+  _Token Claim Name_ `roles` to the client of the service that requests the
+  token. Don't add it to the client that the Web Console uses, the one that
+  `acl.oidc.client.id` names: every Keycloak user has the default realm roles,
+  so with `roles,groups`, the tokens of Web Console users would take their
+  groups from `roles`.
 - Claim names are case-sensitive.
 - A listed claim must have the expected shape: a single value, such as a
   string, for the principal, and a single value or a flat array of values for
@@ -1302,13 +1356,15 @@ Console, is accepted through the session. See
 For what a client must do before its token expires, see
 [Token lifetime](#token-lifetime).
 
-The Web Console requests new tokens shortly before the access token expires,
-but with `acl.oidc.groups.encoded.in.token=true`, it sends the ID token. When
-the provider issues ID tokens that expire before its access tokens, the Web
-Console keeps sending the ID token after it has expired, until it requests new
-tokens. Microsoft Entra ID issues such tokens by default: ID tokens are valid
-for one hour, and access tokens for a random 60 to 90 minutes. QuestDB
-Enterprise 4.0.2 and later then reject the ID token, log
+The Web Console requests new tokens when the access token expires within 30
+seconds, but with `acl.oidc.groups.encoded.in.token=true`, it sends the ID
+token. When the provider issues ID tokens that expire before its access tokens,
+the Web Console keeps sending the ID token after it has expired, until it
+requests new tokens. Microsoft Entra ID issues such tokens by default: ID
+tokens are valid for one hour, and access tokens for a random 60 to 90 minutes.
+Without a refresh token, the Web Console never requests new tokens, and keeps
+sending the expired token. QuestDB Enterprise 4.0.2 and later then reject the
+ID token, log
 `Failed to decode JWT token Error(ExpiredSignature)`, and accept the request
 through the session of the Web Console, which keeps the groups of the last
 token that QuestDB accepted. When the session has expired too, for example

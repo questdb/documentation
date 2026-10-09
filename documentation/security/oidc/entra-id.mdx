@@ -330,8 +330,9 @@ In QuestDB Enterprise 4.0.2 and later, the server log can show
 `Failed to decode JWT token Error(ExpiredSignature)` for Web Console users.
 By default, Entra ID issues ID tokens that are valid for one hour, and access
 tokens that are valid for 60 to 90 minutes. The Web Console requests new
-tokens shortly before the access token expires, so it can keep sending an
-expired ID token for up to half an hour. QuestDB accepts these requests
+tokens, with the refresh token that Entra ID issues for the `offline_access`
+scope, when the access token expires within 30 seconds, so it can keep sending
+an expired ID token for up to half an hour. QuestDB accepts these requests
 through the session of the Web Console. See
 [When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
 
@@ -412,6 +413,18 @@ the permissions of its Entra ID security groups instead. See
      described in
      [Assign a managed identity to an application role](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-assign-app-role-managed-identity).
 
+:::warning
+
+Complete these steps before a managed identity requests its first token for
+QuestDB. Azure caches managed identity tokens for
+[around 24 hours](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations),
+and you cannot make it issue a new token before the cached one expires. A
+token that the service requested before the role assignment or the manifest
+change carries no role, or the audience of a v1.0 token, and QuestDB rejects
+it until Azure issues a new one.
+
+:::
+
 ### Configure QuestDB
 
 On QuestDB Enterprise 4.0.2 or later, replace the two claim settings of the
@@ -434,7 +447,10 @@ acl.oidc.groups.claim=roles,groups
 
 User logins still take the principal from `preferred_username` and the groups
 from `groups`. Their tokens carry no `roles` claim, as long as the app roles of
-the QuestDB application admit applications only. App-only tokens take the
+the QuestDB application admit applications only. If an app role also admits
+users and groups, the tokens of the users who hold it carry a `roles` claim,
+and QuestDB takes their groups from `roles` alone, without their security
+groups. App-only tokens take the
 principal from `oid` and the groups from `roles`, even when they also carry a
 `groups` claim. QuestDB rejects a token that carries neither a role nor a
 group. See
@@ -639,6 +655,12 @@ handle. To keep the service running instead, catch the error around the batch,
 and decide whether to retry or drop the batch: a batch fails the same way
 until you fix the cause of the rejection, such as a missing grant.
 
+With store-and-forward on disk, described next, the client keeps the rejected
+batch instead: it stays in the slot, and the next connection that takes over
+the slot, in this handle or a new one, sends it again before any later batch.
+Later batches then fail the same way until QuestDB accepts the rejected batch,
+for a missing grant once you grant it, so don't send the batch again.
+
 The example keeps its store-and-forward data in memory, the default. With
 [`sf_dir`](/docs/connect/clients/connect-string/#sf-keys), the client keeps the
 rows that QuestDB has not acknowledged on disk, in a slot named after its
@@ -738,6 +760,12 @@ which is why each service gets an app role and a QuestDB group of its own:
 REVOKE INSERT ON fx_trades FROM fxIngest;
 REVOKE HTTP FROM fxIngest;
 ```
+
+After the revoke, QuestDB rejects the next batch of the service:
+`flush(wait=True)` raises `QuestDBServerRejectionError`, and the examples above
+stop. Without `sf_dir`, the rejected rows are lost. With `sf_dir`, they stay on
+disk, and land once you grant the permissions again and the service connects
+with the same `sender_id`.
 
 Granting the permissions again restores access on the connections that are
 still open, and for every token of the service that QuestDB still accepts. See
