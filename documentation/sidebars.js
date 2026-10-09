@@ -729,21 +729,21 @@ module.exports = {
           collapsed: true,
           link: {
             type: "doc",
-            id: "security/oidc",
+            id: "security/oidc/index",
           },
           items: [
             {
-              id: "security/oidc",
+              id: "security/oidc/index",
               type: "doc",
               label: "Overview",
             },
             {
-              id: "security/oidc-entra-id",
+              id: "security/oidc/entra-id",
               type: "doc",
               label: "Microsoft Entra ID",
             },
             {
-              id: "security/oidc-pingfederate",
+              id: "security/oidc/pingfederate",
               type: "doc",
               label: "PingFederate",
             },

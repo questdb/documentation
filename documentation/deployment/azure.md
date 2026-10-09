@@ -345,11 +345,11 @@ QuestDB Enterprise adds production features for Azure:
 - **Entra ID SSO** - Single sign-on with Microsoft Entra ID
 
 For Entra ID integration, see the
-[Microsoft Entra ID guide](/docs/security/oidc-entra-id/).
+[Microsoft Entra ID guide](/docs/security/oidc/entra-id/).
 Since QuestDB Enterprise 4.0.2, Azure services that run as a managed identity
 or a service principal can also authenticate to QuestDB with Entra ID app-only
 tokens. See
-[Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
 

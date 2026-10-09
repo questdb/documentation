@@ -346,7 +346,7 @@ tokens from an OpenID Connect provider, such as Microsoft Entra ID. They get
 their permissions from the QuestDB groups that their external groups map to.
 See [OpenID Connect (OIDC)](/docs/security/oidc/#user-permissions), and for
 Azure services on QuestDB Enterprise 4.0.2 or later,
-[Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 Users can have multiple authentication methods enabled simultaneously:
 

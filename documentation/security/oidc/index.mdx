@@ -1,5 +1,6 @@
 ---
 title: OpenID Connect (OIDC) Integration
+slug: /security/oidc
 description: "Configure OIDC in QuestDB Enterprise: Web Console SSO, token authentication for clients and services, claim mapping, token validation, and troubleshooting."
 ---
 
@@ -29,9 +30,9 @@ accept user and app-only tokens with one configuration,
 [token validation](#token-validation), and
 [troubleshooting rejected logins](#troubleshooting-oidc-logins). For
 step-by-step setup, see the guides for
-[Microsoft Entra ID](/docs/security/oidc-entra-id/), which also covers Azure
+[Microsoft Entra ID](/docs/security/oidc/entra-id/), which also covers Azure
 managed identities and service principals, and
-[PingFederate](/docs/security/oidc-pingfederate/).
+[PingFederate](/docs/security/oidc/pingfederate/).
 
 ## Configuration options
 
@@ -73,8 +74,8 @@ reachable again. QuestDB refuses to start when both
 For all OIDC-related configuration options of QuestDB, see
 [Configuration](/docs/configuration/oidc/). For complete examples, see the
 QuestDB configuration in the
-[Microsoft Entra ID](/docs/security/oidc-entra-id/#questdb-configuration) and
-[PingFederate](/docs/security/oidc-pingfederate/#questdb-configuration) guides.
+[Microsoft Entra ID](/docs/security/oidc/entra-id/#questdb-configuration) and
+[PingFederate](/docs/security/oidc/pingfederate/#questdb-configuration) guides.
 
 ## Where QuestDB reads the user information
 
@@ -130,12 +131,11 @@ In OAuth2/OIDC terms, the [Web Console](/docs/getting-started/web-console/overvi
 the _client_, and it is assigned an identifier: the **Client Id**.
 
 Each application which integrates via OIDC should be given a different **Client
-Id**. Clients that send ID tokens to QuestDB are the exception: QuestDB accepts
-an ID token only when it was issued for QuestDB's client ID, as described in
-[Non-interactive clients](#non-interactive-clients). Separate client IDs do not
-limit which access tokens QuestDB accepts when it reads the user information
-from the User Info endpoint, the default. See
-[Token validation](#token-validation).
+Id**, except clients that send ID tokens to QuestDB: they request them with
+QuestDB's client ID, as described in
+[Non-interactive clients](#non-interactive-clients). With the User Info
+endpoint, the default, separate client IDs do not restrict which access tokens
+QuestDB accepts; see [Token validation](#token-validation).
 
 ### OIDC Provider
 
@@ -293,8 +293,11 @@ If the PKCE check is passed, the Web Console receives the ID and access tokens.
 
 There is a third token in the response too, the refresh token.
 
-The refresh token is used by the Web Console to refresh the access token before
-it expires.
+The Web Console uses the refresh token to request new tokens shortly before the
+access token expires. With `acl.oidc.groups.encoded.in.token=true`, it sends
+QuestDB the ID token rather than the access token, and the ID token can expire
+first, as described in
+[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 Without the refresh token mechanism, the user would be forced to re-authenticate
 when the access token expires.
@@ -564,8 +567,9 @@ the OAuth2 provider.
 ```python
 from dotenv import load_dotenv
 import os
-from urllib import request
+from urllib import request, parse
 import base64
+import json
 
 load_dotenv()
 user = os.environ.get("username")
@@ -647,7 +651,7 @@ and on who the client authenticates as:
   client: the Web Console then sends the ID token, and QuestDB reads the
   principal and the groups from it. A provider that returns the groups only
   from its User Info endpoint, as set up in the
-  [PingFederate guide](/docs/security/oidc-pingfederate/), must also put them
+  [PingFederate guide](/docs/security/oidc/pingfederate/), must also put them
   into the ID token, or QuestDB rejects every Web Console login.
 - With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token
   itself, so send a JWT that passes [Token validation](#token-validation):
@@ -660,7 +664,7 @@ and on who the client authenticates as:
     for QuestDB. Configure the provider so that the `aud` claim of the token
     contains the value of `acl.oidc.audience`, which defaults to QuestDB's
     client ID. For Microsoft Entra ID, see
-    [Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
+    [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 Tokens that the provider issues to a service often carry the principal and the
 groups under different claim names than the tokens of users. To accept both
@@ -743,7 +747,7 @@ The service gets the permissions of the QuestDB groups that the groups or roles
 in its token map to, as described in
 [Mapping user permissions](#mapping-user-permissions). For Microsoft Entra ID,
 see
-[Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals),
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals),
 which requests the token without a client secret.
 
 ### Resource Owner Password Credentials grant
@@ -833,19 +837,12 @@ with questdb.connect(conf) as db:
 
 A client configured with a fixed token, such as with the `token` setting of
 its configuration string, sends that token on every connection that it opens
-and never refreshes it. QuestDB checks a token when a request or a connection
-authenticates with it:
-
-- A connection that is already open, such as a QWP or PGWire connection,
-  stays open when its token expires.
-- Every HTTP request, and every new connection, including a reconnect, a
-  failover, and an additional connection of a client's pool, authenticates
-  with the token again. With `acl.oidc.groups.encoded.in.token=true`, QuestDB
-  Enterprise 4.0.2 and later reject the token from up to 60 seconds plus
-  `acl.oidc.cache.ttl` after it expires, as described in
-  [Token validation](#token-validation). Earlier versions do not check whether
-  the token has expired. With the User Info endpoint, the provider rejects the
-  expired token once the user information that QuestDB cached for it expires.
+and never refreshes it. A connection that is already open, such as a QWP or
+PGWire connection, stays open when its token expires. Every HTTP request and
+every new connection, including a reconnect, a failover, and an additional
+connection of a client's pool, authenticates with the token again, and fails
+once QuestDB stops accepting the token, as described in
+[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 A long-running client must therefore switch to a new token before the old one
 expires: request a new token, create a new client with it, then close the old
@@ -863,7 +860,7 @@ The old client is closed by then, so when the new client fails to start, for
 example while QuestDB is unreachable, retry it instead of falling back to the
 old client, and request a current token for each attempt, because an outage
 can outlast the token.
-[Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service)
+[Request a token in the service](/docs/security/oidc/entra-id/#request-a-token-in-the-service)
 shows both orders in Python.
 
 ## OIDC for the PGWire endpoint
@@ -977,9 +974,9 @@ including its case. The group names depend on the provider: for example, the
 distinguished names of Active Directory groups, as above, or, with Microsoft
 Entra ID, the object IDs of security groups and the values of app roles, as
 described in
-[Map groups and grant permissions](/docs/security/oidc-entra-id/#map-groups-and-grant-permissions)
+[Map groups and grant permissions](/docs/security/oidc/entra-id/#map-groups-and-grant-permissions)
 and
-[Map app roles to QuestDB groups](/docs/security/oidc-entra-id/#map-app-roles-to-questdb-groups).
+[Map app roles to QuestDB groups](/docs/security/oidc/entra-id/#map-app-roles-to-questdb-groups).
 
 If none of the user's groups is mapped to a QuestDB group, the user is
 authenticated, but has no permissions at all.
@@ -1011,10 +1008,9 @@ such as a disabled user, when it checks a token of the user again:
   to your organization's policies.
 - With `acl.oidc.groups.encoded.in.token=true`, when the client presents a new
   token. QuestDB reads the groups from the token instead of asking the Identity
-  Provider, so refreshing the cache does not pick up changes. In QuestDB
-  Enterprise 4.0.2 and later, QuestDB accepts the old token for up to 60
-  seconds plus `acl.oidc.cache.ttl` after it expires. Earlier versions do not
-  check whether the token has expired. See [Token validation](#token-validation).
+  Provider, so refreshing the cache does not pick up changes, and the old token
+  keeps its groups until QuestDB stops accepting it, as described in
+  [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 For a username and password login through the [ROPC flow](#enable-ropc),
 QuestDB requests a new token from the provider itself once the cached result
@@ -1142,9 +1138,9 @@ value as one claim name, so a list makes every OIDC login fail.
 
 Tokens issued to users and tokens issued to applications often differ this
 way. For example, Microsoft Entra ID user tokens, configured as in the
-[Entra ID guide](/docs/security/oidc-entra-id/#web-console-sign-in), carry
+[Entra ID guide](/docs/security/oidc/entra-id/#web-console-sign-in), carry
 `preferred_username` and `groups`, while its
-[app-only tokens](/docs/security/oidc-entra-id/#managed-identities-and-service-principals)
+[app-only tokens](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)
 carry `oid` and `roles`:
 
 ```ini title="server.conf"
@@ -1188,7 +1184,7 @@ token payloads, shortened to the relevant claims, as follows:
 `roles` comes before `groups` because an app-only token can also carry a
 `groups` claim, and QuestDB takes the groups from the first claim on the list
 that holds one. See
-[Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 ### How QuestDB picks a claim
 
@@ -1270,20 +1266,7 @@ accepts any token that the provider's keys sign for the expected audience, so
 make sure that no one outside your organization can obtain tokens for the
 QuestDB application. With Microsoft Entra ID, register the application as
 single-tenant, as described in
-[Set up the client application in Entra ID](/docs/security/oidc-entra-id/#set-up-the-client-application-in-entra-id).
-
-QuestDB checks a token when a request or a connection authenticates with it,
-and caches the result for up to
-[`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl), 30 seconds
-by default. Because of the clock skew and the cache, QuestDB can accept a
-token, on new connections too, for up to 60 seconds plus `acl.oidc.cache.ttl`
-after it expires. After that, it rejects the token on every request and new
-connection. An HTTP request that also carries a valid session cookie, such as
-a request of the Web Console, is still accepted through the session, and a
-PGWire or WebSocket connection that is already open stays open when its token
-expires. See
-[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access),
-and, for clients, [Token lifetime](#token-lifetime).
+[Set up the client application in Entra ID](/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id).
 
 With `acl.oidc.groups.encoded.in.token=false`, QuestDB sends the token to the
 provider's User Info endpoint, which validates it, and checks nothing else.
@@ -1294,6 +1277,44 @@ token for a user, from the same provider, can therefore call QuestDB as that
 user. With `acl.oidc.groups.encoded.in.token=true`, QuestDB checks the `aud`
 claim instead, as described above. See
 [Find user information](#8-find-user-information).
+
+### When QuestDB stops accepting a token
+
+QuestDB checks a token when a request or a new connection authenticates with
+it, and caches the result for up to
+[`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl), 30 seconds
+by default:
+
+- With `acl.oidc.groups.encoded.in.token=true`, QuestDB Enterprise 4.0.2 and
+  later accept a token for up to 60 seconds, the allowed clock skew, plus
+  `acl.oidc.cache.ttl` after it expires. After that, they reject it on every
+  request and new connection, including reconnects. Earlier versions do not
+  check whether the token has expired.
+- With the User Info endpoint, the provider rejects an expired token. QuestDB
+  asks the provider again once the user information that it cached for the
+  token expires.
+
+Some access outlives the token. A PGWire or WebSocket connection, such as a QWP
+connection, that is already open stays open when its token expires, and an HTTP
+request that also carries a valid session cookie, such as a request of the Web
+Console, is accepted through the session. See
+[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
+For what a client must do before its token expires, see
+[Token lifetime](#token-lifetime).
+
+The Web Console requests new tokens shortly before the access token expires,
+but with `acl.oidc.groups.encoded.in.token=true`, it sends the ID token. When
+the provider issues ID tokens that expire before its access tokens, the Web
+Console keeps sending the ID token after it has expired, until it requests new
+tokens. Microsoft Entra ID issues such tokens by default: ID tokens are valid
+for one hour, and access tokens for a random 60 to 90 minutes. QuestDB
+Enterprise 4.0.2 and later then reject the ID token, log
+`Failed to decode JWT token Error(ExpiredSignature)`, and accept the request
+through the session of the Web Console, which keeps the groups of the last
+token that QuestDB accepted. When the session has expired too, for example
+because the Web Console sent no request for longer than
+`http.session.timeout`, QuestDB rejects the request, and the Web Console logs
+the user out.
 
 ## Troubleshooting OIDC logins
 
@@ -1337,10 +1358,18 @@ Request failed [errorMsg=Unable to find public key with key id [...]]
 
 `InvalidAudience` usually means that the token was requested for another API,
 or that Entra ID issued a v1.0 access token. See
-[Managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 Don't set `acl.oidc.audience` to the Application ID URI to work around it: the
 setting takes a single value, and the ID tokens of Web Console users carry the
 application ID, so their logins would fail.
+
+`ExpiredSignature` means that the token has expired. A client configured with a
+fixed token must switch to a new token before then, as described in
+[Token lifetime](#token-lifetime). For Web Console users, the error can also
+mean that the Web Console still sends an ID token that has expired, which it
+does with Microsoft Entra ID. QuestDB then accepts the requests through the
+session of the Web Console. See
+[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 `Unable to find public key with key id` means that none of the signing keys
 that the provider publishes matches the token. QuestDB downloads the keys again
@@ -1402,7 +1431,10 @@ When you upgrade from an earlier version:
 - With `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects expired tokens
   and tokens without an `exp` claim. A client that keeps using a token after it
   expires, such as a client configured with a fixed token, must request a new
-  token before the old one expires.
+  token before the old one expires. With Microsoft Entra ID, the server log
+  also shows `ExpiredSignature` errors for Web Console users, whose ID tokens
+  expire before the Web Console requests new tokens. See
+  [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 - QuestDB refuses to start with an empty `acl.oidc.sub.claim`, or with a claim
   that is listed twice or in both settings. See
   [Startup validation](#startup-validation).
@@ -1419,12 +1451,12 @@ When you upgrade from an earlier version:
 
 ### Microsoft Entra ID {#microsoft-entraid}
 
-The [Microsoft Entra ID guide](/docs/security/oidc-entra-id/) sets up single
+The [Microsoft Entra ID guide](/docs/security/oidc/entra-id/) sets up single
 sign-on for the Web Console, and app-only tokens for Azure services that run as
 a managed identity or a service principal.
 
 ### PingFederate
 
-The [PingFederate guide](/docs/security/oidc-pingfederate/) sets up single
+The [PingFederate guide](/docs/security/oidc/pingfederate/) sets up single
 sign-on for the Web Console, with PingFederate authenticating users against
 Microsoft Entra ID over LDAP.

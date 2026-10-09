@@ -324,6 +324,19 @@ To test, head to the Web Console and login.
 If all has been wired up well, then login will succeed, and the user
 will have the access granted to them.
 
+:::note
+
+In QuestDB Enterprise 4.0.2 and later, the server log can show
+`Failed to decode JWT token Error(ExpiredSignature)` for Web Console users.
+By default, Entra ID issues ID tokens that are valid for one hour, and access
+tokens that are valid for 60 to 90 minutes. The Web Console requests new
+tokens shortly before the access token expires, so it can keep sending an
+expired ID token for up to half an hour. QuestDB accepts these requests
+through the session of the Web Console. See
+[When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
+
+:::
+
 ## Managed identities and service principals
 
 Azure services that run as a managed identity or a service principal can
@@ -538,7 +551,8 @@ The client presents the same token on every connection that it opens: the
 first one, the additional connections of its pool, and the connections that
 replace a failed one. Shortly after the token expires, QuestDB rejects these
 new connections, as described in
-[Token validation](/docs/security/oidc/#token-validation). A long-running
+[When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
+A long-running
 service must therefore switch to a new token before the old one expires: it
 connects with the new token, then closes the old handle.
 `token.expires_on` is a Unix timestamp.
