@@ -52,6 +52,15 @@ enabled.
 URL where the OpenID Provider's configuration information can be loaded in
 JSON format. Should always end with `/.well-known/openid-configuration`.
 
+QuestDB downloads the document when it starts, and takes the provider's
+endpoints from it. QuestDB does not start when it cannot download or parse the
+document. The error starts with
+`Unable to download OIDC provider configuration from` or
+`Unable to parse OIDC provider configuration`. To let QuestDB start while the
+provider is unreachable, set [`acl.oidc.host`](#acloidchost) and the
+[endpoint settings](#endpoints) instead. QuestDB refuses to start when both
+this setting and `acl.oidc.host` are set.
+
 ### acl.oidc.enabled
 
 - **Default**: `false`
@@ -65,8 +74,11 @@ configuration options must also be set.
 - **Default**: none
 - **Reloadable**: no
 
-OIDC provider hostname. Required when OIDC is enabled, unless the OIDC
-configuration URL is set.
+OIDC provider hostname. Required when OIDC is enabled, unless
+[`acl.oidc.configuration.url`](#acloidcconfigurationurl) is set. The two
+settings cannot be combined: QuestDB refuses to start when both are set. With
+`acl.oidc.host`, QuestDB starts even when the provider is unreachable, and only
+OIDC logins fail until the provider is reachable again.
 
 ### acl.oidc.http.timeout
 

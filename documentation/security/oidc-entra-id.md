@@ -1,7 +1,7 @@
 ---
-title: Microsoft Entra ID
+title: Microsoft Entra ID (Azure AD) OIDC setup
 sidebar_label: Microsoft Entra ID
-description: "Connect Microsoft Entra ID to QuestDB Enterprise: Web Console SSO for users, and app-only tokens for Azure managed identities and service principals."
+description: "Set up Microsoft Entra ID (Azure AD) OIDC for QuestDB Enterprise: Web Console SSO, and app-only tokens for managed identities and service principals."
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -146,15 +146,15 @@ width={600}
 Our next stop is the _Token configuration_, where the OAuth2/OIDC access and ID
 tokens can be customized.
 
-Note that users can be authenticated without customized tokens, but authorization
-would prove to be challenging. The user's security groups are not included
-in the tokens by default.
+Entra ID does not include the user's security groups in the tokens by default,
+and QuestDB rejects a login whose user information carries no group, so the
+tokens must be customized.
 
-QuestDB can be configured to request the user's groups from the UserInfo
-endpoint of the OAuth2 server, but Entra ID cannot be configured to provide
-this information via the UserInfo endpoint.
-Therefore, we choose to customize the tokens, QuestDB will decode and
-validate the ID token, and take the group information from there.
+QuestDB can also request the user's groups from the User Info endpoint of the
+OAuth2 server, but Entra ID cannot be configured to return them from that
+endpoint. Therefore, QuestDB decodes and validates the ID token, and takes the
+groups from it, with `acl.oidc.groups.encoded.in.token=true` in the
+[QuestDB configuration](#questdb-configuration) below.
 
 QuestDB authorization relies on receiving the group memberships of the user.
 Entra ID groups should be mapped to QuestDB groups, and permissions can be
@@ -409,6 +409,9 @@ lists below make every OIDC login fail. Keep
 tokens against the signing keys of Entra ID, the same way as ID tokens:
 
 ```ini title="server.conf"
+# unchanged: QuestDB validates the tokens itself and reads the claims from them
+acl.oidc.groups.encoded.in.token=true
+
 # user tokens carry preferred_username, app-only tokens carry oid
 acl.oidc.sub.claim=preferred_username,oid
 
@@ -616,18 +619,65 @@ finally:
     db.close()
 ```
 
-The example keeps its store-and-forward data in memory, the default. With
-`sf_dir`, `connect()` fails while the old handle holds the slot of the same
-`sender_id`, so `renew()` keeps the old token until it expires. Close the old
-handle first instead, then connect with the new token and the same
-`sender_id`. The new handle replays what the old one left on disk, as
-described in [Token lifetime](/docs/security/oidc/#token-lifetime).
-
 A terminal rejection raises `QuestDBServerRejectionError` from
 `flush(wait=True)` and ends the loop, and the `finally` block closes the
 handle. To keep the service running instead, catch the error around the batch,
 and decide whether to retry or drop the batch: a batch fails the same way
 until you fix the cause of the rejection, such as a missing grant.
+
+The example keeps its store-and-forward data in memory, the default. With
+[`sf_dir`](/docs/connect/clients/connect-string/#sf-keys), the client keeps the
+rows that QuestDB has not acknowledged on disk, in a slot named after its
+`sender_id`, and two handles cannot hold the same slot. `connect()` with the
+new token then raises `QuestDBError`, because the old handle still holds the
+slot, so `renew()` above never switches to the new token, and the service fails
+once it has to open a new connection after QuestDB stops accepting the old
+token. Close the old handle first instead, then connect with the new token and
+the same `sender_id`: the new handle takes over the slot, and replays what the
+old one left on disk. The old handle is closed by then, so when the new
+connection fails, retry it instead of falling back to the old handle. With
+`sf_dir`, replace `connect()` and `renew()` in the example with:
+
+```python title="Switch to a new token with store-and-forward on disk"
+# the store-and-forward slot of the service
+SF_CONF = "sf_dir=/var/lib/fx-ingest/sf;sender_id=fx-ingest;"
+
+
+def connect(token):
+    conf = f"wss::addr={ADDR};token={token.token};{SF_CONF}"
+    return questdb.connect(conf, error_handler=on_rejection)
+
+
+def renew(token, db):
+    # returns the token and the handle to use from now on
+    try:
+        new_token = credential.get_token(SCOPE)
+    except AzureError as e:
+        # keep the old token and handle, and try again with the next batch
+        print("token renewal failed:", e)
+        return token, db
+    # the credential returns the cached token until it renews it
+    if new_token.token == token.token:
+        return token, db
+    # release the slot; the rows that QuestDB has not acknowledged stay on disk
+    db.close()
+    while True:
+        try:
+            # the new handle takes over the slot and replays its rows
+            return new_token, connect(new_token)
+        except QuestDBError as e:
+            # the old handle is closed, so retry instead of falling back to it
+            print("connect failed, retrying in 5 seconds:", e)
+        time.sleep(5)
+        try:
+            # an outage can outlast the token, so get a current one
+            new_token = credential.get_token(SCOPE)
+        except AzureError as e:
+            print("token renewal failed:", e)
+```
+
+For the rules that apply to every client, see
+[Token lifetime](/docs/security/oidc/#token-lifetime).
 
 See [Authentication and TLS](/docs/connect/clients/python/#authentication-and-tls)
 for the client options. For the

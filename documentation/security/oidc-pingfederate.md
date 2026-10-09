@@ -1,5 +1,5 @@
 ---
-title: PingFederate
+title: PingFederate OIDC setup
 sidebar_label: PingFederate
 description: "Set up Web Console single sign-on for QuestDB Enterprise with PingFederate as the OIDC provider, authenticating users over LDAP."
 ---

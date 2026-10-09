@@ -18,9 +18,12 @@ same provider, over HTTP, QWP, or PGWire. External users are not created in
 QuestDB: they get the permissions of the QuestDB groups that their groups in
 the Identity Provider map to.
 
-Start with the [minimal configuration](#configuration-options). The rest of
-this page covers the login flow, which token a client sends, how QuestDB maps
-the claims of a token to a principal and to QuestDB groups, including the
+Start with the [minimal configuration](#configuration-options), and decide
+[where QuestDB reads the user information](#where-questdb-reads-the-user-information):
+from the provider's User Info endpoint, or from the token that the client
+sends. The rest of this page covers the login flow, which token a client
+sends, how QuestDB maps the claims of a token to a principal and to QuestDB
+groups, including the
 [fallback claim lists](#fallback-claim-lists) of QuestDB Enterprise 4.0.2 that
 accept user and app-only tokens with one configuration,
 [token validation](#token-validation), and
@@ -39,8 +42,8 @@ names the client ID and the groups claim:
 # enable OIDC
 acl.oidc.enabled=true
 
-# the OIDC discovery document of the provider; alternatively, set
-# acl.oidc.host and the endpoint settings
+# the OIDC discovery document of the provider, which QuestDB downloads at
+# startup; alternatively, set acl.oidc.host and the endpoint settings
 acl.oidc.configuration.url=https://idp.example.com/.well-known/openid-configuration
 
 # the client ID that the provider assigned to QuestDB
@@ -53,15 +56,54 @@ acl.oidc.groups.claim=groups
 # acl.oidc.sub.claim=sub
 
 # optional, false by default: read the claims from a JWT, such as the ID token,
-# instead of calling the User Info endpoint
+# instead of calling the User Info endpoint; required for Microsoft Entra ID
 # acl.oidc.groups.encoded.in.token=true
 ```
+
+QuestDB downloads the discovery document when it starts, and does not start
+when it cannot download or parse it. The error starts with
+`Unable to download OIDC provider configuration from` or
+`Unable to parse OIDC provider configuration`. To let QuestDB start while the
+provider is unreachable, set `acl.oidc.host` and the
+[endpoint settings](/docs/configuration/oidc/#endpoints) instead: QuestDB then
+starts without the provider, and only OIDC logins fail until the provider is
+reachable again. QuestDB refuses to start when both
+`acl.oidc.configuration.url` and `acl.oidc.host` are set.
 
 For all OIDC-related configuration options of QuestDB, see
 [Configuration](/docs/configuration/oidc/). For complete examples, see the
 QuestDB configuration in the
 [Microsoft Entra ID](/docs/security/oidc-entra-id/#questdb-configuration) and
 [PingFederate](/docs/security/oidc-pingfederate/#questdb-configuration) guides.
+
+## Where QuestDB reads the user information
+
+`acl.oidc.groups.encoded.in.token` decides where QuestDB reads the principal
+and the groups of an external user from, and with it, which token a client
+sends and what QuestDB checks:
+
+| | User Info endpoint (default) | Token (`acl.oidc.groups.encoded.in.token=true`) |
+| --- | --- | --- |
+| Claims come from | the provider's User Info response for the token | the payload of a JWT: the ID token for Web Console and ROPC logins, or the token that a client sends |
+| The Web Console sends | the access token | the ID token |
+| Other clients send | an access token | for a user, an ID token requested with QuestDB's client ID; for a service, an access token whose `aud` contains `acl.oidc.audience` |
+| The token is validated by | the provider's User Info endpoint | QuestDB: signature, `aud`, `exp` (QuestDB Enterprise 4.0.2 and later), and `sub` |
+| `acl.oidc.audience` | not used | must be in the `aud` claim |
+| A change to the groups applies | after `acl.oidc.cache.ttl` | when the client presents a new token |
+| Suits providers that | return the groups from the User Info endpoint, such as PingFederate | put the groups into the tokens, such as Microsoft Entra ID, and issue tokens that services request for themselves |
+
+The setting applies to every client, the Web Console included. Microsoft Entra
+ID does not return the groups from its User Info endpoint, so with Entra ID,
+set `acl.oidc.groups.encoded.in.token=true`: with the default, QuestDB rejects
+every login. A provider that returns the groups only from its User Info
+endpoint needs the default, unless you also configure it to put the groups into
+the ID token.
+
+For which token each client sends, see
+[Non-interactive clients](#non-interactive-clients). For what QuestDB checks,
+see [Token validation](#token-validation), and for when a change in the
+Identity Provider takes effect, see
+[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
 
 ## Architecture overview
 
@@ -807,8 +849,7 @@ authenticates with it:
 
 A long-running client must therefore switch to a new token before the old one
 expires: request a new token, create a new client with it, then close the old
-client. For a Python example, see
-[Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service).
+client.
 
 A client that keeps its
 [store-and-forward](/docs/connect/clients/connect-string/#sf-keys) data on
@@ -818,6 +859,12 @@ start while the old client is open. Flush and close the old client first, then
 create the new client with the new token and the same `sender_id`. The new
 client replays what the old client left on disk, as described in
 [Sender restart and replay](/docs/connect/clients/connect-string/#sender-restart-and-replay).
+The old client is closed by then, so when the new client fails to start, for
+example while QuestDB is unreachable, retry it instead of falling back to the
+old client, and request a current token for each attempt, because an outage
+can outlast the token.
+[Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service)
+shows both orders in Python.
 
 ## OIDC for the PGWire endpoint
 
@@ -1101,7 +1148,13 @@ way. For example, Microsoft Entra ID user tokens, configured as in the
 carry `oid` and `roles`:
 
 ```ini title="server.conf"
+# Entra ID puts the groups and the app roles into the tokens
+acl.oidc.groups.encoded.in.token=true
+
+# user tokens carry preferred_username, app-only tokens carry oid
 acl.oidc.sub.claim=preferred_username,oid
+
+# app-only tokens carry roles, user tokens carry groups
 acl.oidc.groups.claim=roles,groups
 ```
 
