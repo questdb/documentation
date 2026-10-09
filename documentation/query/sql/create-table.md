@@ -827,7 +827,10 @@ clause is used, the permissions instead go to the user, group, or service
 account named in that clause.
 
 The `OWNED BY` clause cannot be omitted if the table is created by an external
-user, because permissions cannot be granted to them.
+user, who logs in through OIDC, because permissions cannot be granted to them.
+The owner must then be one of the QuestDB groups that the external user belongs
+to. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
 
 ```questdb-sql
 CREATE GROUP analysts;

@@ -12,10 +12,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Microsoft Entra ID](/docs/security/oidc-entra-id/) - New page for Microsoft Entra ID: the Web Console sign-in guide, moved from the OIDC page, and app-only tokens for Azure managed identities and service principals in QuestDB Enterprise 4.0.2, with the app role mapping, how to keep app roles the only way in, and Python examples that ingest and renew the token
 - [User and group claims](/docs/security/oidc/#user-and-group-claims) - How QuestDB Enterprise 4.0.2 reads the principal and the groups from the user information: fallback claim lists, the rules for missing, `null`, and empty claims, how to choose the principal claim, and the startup checks
 - [Token validation](/docs/security/oidc/#token-validation), [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins), and [Versions before 4.0.2](/docs/security/oidc/#versions-before-402) - What QuestDB checks in a token and how long it accepts one after it expires, the log messages of rejected logins, how earlier versions differ, and what to check when you upgrade
-- [Tables created by external users](/docs/security/oidc/#tables-created-by-external-users) - Ingestion cannot create a table or add a column for a user who logs in through OIDC, so create the tables in advance, or create them with SQL and `OWNED BY`
-- [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens) - Let services that run as a Microsoft Entra ID managed identity or service principal authenticate to QuestDB Enterprise 4.0.2 with app-only tokens, next to user logins: the Entra ID setup, the claim lists, the app role mapping, how to keep app roles the only way in, and Python examples that ingest and renew the token
+- [Tables created by external users](/docs/security/oidc/#tables-created-by-external-users) - Ingestion cannot create a table or add a column for a user who logs in through OIDC, so create the tables in advance, or create them with SQL and `OWNED BY`, naming one of the user's QuestDB groups
 
 ### Reference
 
@@ -23,13 +23,17 @@ This page tracks significant updates to the QuestDB documentation.
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the property name, previously documented as `acl.oidc.pkce.enabled`, which QuestDB does not recognize
 - [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken) - Documented that QuestDB Enterprise 4.0.2 rejects expired tokens and tokens without an `exp` claim, which earlier versions accept, and which token QuestDB reads the principal and the groups from
 - [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience) and [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented that `acl.oidc.audience` takes a single value, which the `aud` claim of a token must be or contain, and what the cache holds when the groups are encoded in the token
+- [`acl.oidc.public.keys.expiry`](/docs/configuration/oidc/#acloidcpublickeysexpiry) and [`acl.oidc.state.required`](/docs/configuration/oidc/#acloidcstaterequired) - Documented how long QuestDB uses the signing keys of the OIDC provider before it downloads them again, and the `state` check of the Web Console login
 
 ### Updated
 
-- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected what happens when the groups claim is missing or empty: QuestDB rejects the login. A user is authenticated without permissions only when none of their groups is mapped to a QuestDB group. With the groups encoded in the token, a change to them takes effect when the client presents a new token. The HTTP session of the Web Console is not tied to the token
-- [Authentication and authorization flow](/docs/security/oidc/#8-find-user-information) and [non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Corrected which token reaches QuestDB with `acl.oidc.groups.encoded.in.token=true`: the ID token, not the access token
+- [OpenID Connect (OIDC)](/docs/security/oidc/) - The identity provider guides moved to their own pages, under OpenID Connect (OIDC) in the sidebar, and the introduction lists what the page covers
+- [PingFederate](/docs/security/oidc-pingfederate/) - Moved from the OIDC page to its own page
+- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected what happens when the groups claim is missing or empty: QuestDB rejects the login. A user is authenticated without permissions only when none of their groups is mapped to a QuestDB group. Documented when a change in the identity provider takes effect, that the HTTP session of the Web Console is not tied to the token and does not expire while in use, and how to cut off access immediately
+- [Find user information](/docs/security/oidc/#8-find-user-information) and [non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Corrected which token of a user reaches QuestDB with `acl.oidc.groups.encoded.in.token=true`: the ID token rather than the access token. Non-interactive clients also covers the tokens that services obtain for themselves
 - [Endpoint permissions](/docs/security/rbac/#endpoint-permissions) - The `HTTP` permission also covers QWP over WebSocket. The [authentication methods](/docs/security/rbac/#authentication) and [users and service accounts](/docs/security/rbac/#users-and-service-accounts) describe external users, who log in through OIDC
-- [Microsoft Entra ID guide](/docs/security/oidc/#microsoft-entraid) - Uses `preferred_username` as the principal claim instead of the display name, explains when to use `oid` instead, and registers the application as single-tenant
+- [Microsoft Entra ID guide](/docs/security/oidc-entra-id/#web-console-sign-in) - Uses `preferred_username` as the principal claim instead of the display name, explains when to use `oid` instead, and registers the application as single-tenant
+- [Python client](/docs/connect/clients/python/#authentication-and-tls) - Corrected when bad credentials raise: by default, `connect()` opens its first connections and raises, and `lazy_connect=on` defers the error to the first operation
 
 ## September 2026
 

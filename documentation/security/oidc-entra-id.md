@@ -1,0 +1,629 @@
+---
+title: Microsoft Entra ID
+sidebar_label: Microsoft Entra ID
+description: "Connect Microsoft Entra ID to QuestDB Enterprise: Web Console SSO for users, and app-only tokens for Azure managed identities and service principals."
+---
+
+import Screenshot from "@theme/Screenshot"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  OpenID Connect (OIDC) enables SSO and token authentication with external Identity Providers.
+</EnterpriseNote>
+
+[Microsoft Entra ID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id),
+formerly Azure Active Directory (Azure AD), can be the OpenID Connect (OIDC)
+provider of QuestDB Enterprise. This guide sets up one Entra ID application for
+two kinds of access:
+
+- [Web Console sign-in](#web-console-sign-in): users log in to the
+  [Web Console](/docs/getting-started/web-console/overview/) with single
+  sign-on (SSO), and get the permissions of the QuestDB groups that their
+  Entra ID security groups map to.
+- [Managed identities and service principals](#managed-identities-and-service-principals):
+  Azure services authenticate with app-only access tokens, and get the
+  permissions of the QuestDB groups that their app roles map to. Requires
+  QuestDB Enterprise 4.0.2 or later.
+
+For how QuestDB uses OIDC in general, such as the login flow, the claims it
+reads, and how it validates tokens, see
+[OpenID Connect (OIDC)](/docs/security/oidc/).
+
+## Web Console sign-in
+
+This section sets up single sign-on for the Web Console. To also let services
+that run as a managed identity or a service principal call QuestDB with
+app-only tokens, complete this setup, then follow
+[Managed identities and service principals](#managed-identities-and-service-principals).
+
+:::tip
+
+To enlarge the images, click or tap them.
+
+:::
+
+### Set up the client application in Entra ID
+
+First thing first, let's pick a name for the client!
+
+Then head to _Microsoft Entra Admin Center_, and register the application
+under _Identity - App registrations - New registration_.
+
+Under _Supported account types_, select _Accounts in this organizational
+directory only_. QuestDB does not check which tenant issued a token, so the
+application must not accept accounts from other tenants. See
+[Token validation](/docs/security/oidc/#token-validation).
+
+<Screenshot
+  alt="Entra ID, app registration."
+  src="images/guides/active-directory-entraid/1_app_registration.webp"
+  title="App registration"
+  width={750}
+/>
+
+The QuestDB [Web Console](/docs/getting-started/web-console/overview/) is a SPA (Single Page App).
+
+As a result, it cannot store safely a client secret.
+
+Instead, it can use PKCE (Proof Key for Code Exchange) to secure the flow.
+
+When registering the application, select the SPA platform.
+
+We also have to specify the URL of the [Web Console](/docs/getting-started/web-console/overview/) as Redirect URI.
+
+<Screenshot
+  alt="Entra ID, SPA and redirection URI"
+  src="images/guides/active-directory-entraid/2_spa_redirect_uri.webp"
+  title="Add SPA platform with the redirection URI"
+  width={600}
+/>
+
+After clicking _Register_, we have created a client application with the
+name _QuestDB_.
+
+Each application is assigned a unique id (known as Client ID in the
+OAuth2 - OIDC standard). The client will identify itself with this id
+when sending requests to Entra ID.
+
+<Screenshot
+alt="Entra ID, application ID"
+src="images/guides/active-directory-entraid/3_application_id.webp"
+title="Application ID"
+width={600}
+/>
+
+We find the platform configurations under _Authentication_. This is the place where
+the previously set redirect URI can be viewed and modified. We can also specify
+additional redirect URIs, if necessary.
+
+The redirect URIs of the application are automatically eligible for the
+_Authorization Code Flow with PKCE_, which is a special version of the OAuth2 standard's
+Authorization Code Flow. It is specifically designed for applications where a client
+secret (e.g. a password) could not be kept safely. As single page applications run in
+the browser, they fall into this category.
+
+The redirect URIs are also added to the _CORS_ (Cross-Origin Resource Sharing) policy
+of Entra ID. CORS is a mechanism to allow a web page, such as the Web Console, to access
+resources from a different domain than the one that served the page. In this context
+this means that we let the Web Console to access Entra ID, while its origin is the
+HTTP endpoint of QuestDB.
+
+<Screenshot
+alt="Entra ID, PKCE and CORS"
+src="images/guides/active-directory-entraid/4_cors_pkce.webp"
+title="PKCE and CORS"
+width={600}
+/>
+
+If we scroll down to the bottom of this page, we can also find a section where we
+can enable the _Resource Owner Password Credential Flow_.
+
+This OAuth2 flow is legacy, and should be enabled only if there is a requirement
+of connecting to QuestDB using SSO (Single Sign-On) via clients not supporting
+redirect based web flows.
+This could mean a Postgres client without OAuth2 integration, such as _psql_, or
+a standalone in-house client application, or could be just a jupyter notebook.
+
+The main issue with this flow is that the client application has to be trusted
+with the user's login details. The user's credentials are passed to the
+application, in this case to QuestDB, and the client application uses these
+credentials to authenticate the user by forwarding them to the identity provider,
+in this case to Entra ID.
+
+It is guaranteed that QuestDB does not store the user's credentials in any way.
+They are not persisted into the database, not even in encrypted form.
+The login details are treated as passthrough information. Only exception is
+that server logs can contain the username, logged for audit purposes.
+
+<Screenshot
+alt="Entra ID, enable ROPC"
+src="images/guides/active-directory-entraid/5_ropc.webp"
+title="Enable ROPC"
+width={600}
+/>
+
+Our next stop is the _Token configuration_, where the OAuth2/OIDC access and ID
+tokens can be customized.
+
+Note that users can be authenticated without customized tokens, but authorization
+would prove to be challenging. The user's security groups are not included
+in the tokens by default.
+
+QuestDB can be configured to request the user's groups from the UserInfo
+endpoint of the OAuth2 server, but Entra ID cannot be configured to provide
+this information via the UserInfo endpoint.
+Therefore, we choose to customize the tokens, QuestDB will decode and
+validate the ID token, and take the group information from there.
+
+QuestDB authorization relies on receiving the group memberships of the user.
+Entra ID groups should be mapped to QuestDB groups, and permissions can be
+granted to the QuestDB groups. Detailed information about group mappings can
+be found in the [OIDC integration](/docs/security/oidc/#user-permissions)
+documentation.
+
+<Screenshot
+alt="Entra ID, token customization"
+src="images/guides/active-directory-entraid/6_token_customization.webp"
+title="Token customization"
+width={600}
+/>
+
+The customized tokens contain user information which cannot be accessed
+without permission. User information is provided by Microsoft Graph, so
+the client application needs specific permissions to access
+Microsoft Graph APIs.
+
+These permissions can be configured under _API permissions_. It is important
+to note that we will be setting _Delegated_ permissions here, meaning we
+are not granting actual permissions to access user data. Instead, each user
+logging into QuestDB will have to consent to accessing their user profile.
+
+<Screenshot
+alt="Entra ID, API permissions"
+src="images/guides/active-directory-entraid/7_API_permissions.webp"
+title="API permissions"
+width={600}
+/>
+
+By default, the _User.Read_ permission is added to the list, but what we
+really need is:
+ - openid: to be able to issue ID tokens
+ - profile: to access user information
+ - offline_access: to be able to issue refresh tokens
+
+By clicking on _Microsoft Graph_ we can select and add these permissions.
+
+<Screenshot
+alt="Entra ID, add openid permissions"
+src="images/guides/active-directory-entraid/8_add_openid_permissions.webp"
+title="Add openid permissions"
+width={600}
+/>
+
+The _User.Read_ permission is not needed. It can be removed by clicking
+on the `...` at the end of the row, and selecting _Remove permission_ from
+the popup menu.
+
+<Screenshot
+alt="Entra ID, permissions final"
+src="images/guides/active-directory-entraid/9_permissions_final.webp"
+title="Permissions final list"
+width={600}
+/>
+
+With this we have finished setting up the QuestDB client application
+in Entra ID, and now we can wire QuestDB and Entra ID together by
+adding OIDC configuration to QuestDB.
+
+### QuestDB configuration
+
+The below should be set in QuestDB's `server.conf`:
+
+```ini title="server.conf"
+# enable OIDC
+acl.oidc.enabled=true
+
+# the claim contains the user's sign-in name
+acl.oidc.sub.claim=preferred_username
+
+# the claim contains the user's group memberships
+acl.oidc.groups.claim=groups
+
+# groups are encoded in the token
+acl.oidc.groups.encoded.in.token=true
+
+# OIDC configuration endpoint of Entra ID
+acl.oidc.configuration.url=https://login.microsoftonline.com/12345678-1234-1234-1234-123456789abc/v2.0/.well-known/openid-configuration
+
+# application ID taken from Entra ID
+acl.oidc.client.id=8de84b90-1ea5-4e41-9e84-dba860aa01a6
+
+# redirect URI, QuestDB's HTTP endpoint
+acl.oidc.redirect.uri=http://localhost:9000
+
+# OAuth scopes the user has to consent to
+acl.oidc.scope=openid profile offline_access
+
+# enable ROPC flow
+# optional, required only if ROPC is enabled in Entra ID
+acl.oidc.ropc.flow.enabled=true
+```
+
+`preferred_username` shows the user's sign-in name in the Web Console and in
+the logs. Entra ID can change a sign-in name, and can give it to a new user
+later. To identify users by an object ID that never changes, set
+`acl.oidc.sub.claim=oid`. See
+[Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
+
+The application ID and the OIDC configuration endpoint's URL can be found
+in the Overview of the application in Entra ID.
+
+The application ID is displayed right under the application's name, the
+OIDC configuration endpoint is displayed on the panel which opens up when
+the _Endpoints_ button is clicked.
+
+<Screenshot
+alt="Entra ID, overview"
+src="images/guides/active-directory-entraid/10_overview.webp"
+title="Application overview"
+width={600}
+/>
+
+### Map groups and grant permissions
+
+Now we can start QuestDB, and login with the built-in admin to create
+group mappings.
+
+As mentioned earlier, authorization works by mapping Entra ID groups
+to QuestDB groups. When the user logs in, QuestDB decodes Entra ID
+group memberships from the token, then finds the QuestDB groups
+mapped to them, and the user gets the permissions based on the
+mapped groups.
+
+```questdb-sql title="Create a group which is mapped to an Entra ID group"
+CREATE GROUP extUsers WITH EXTERNAL ALIAS '87654321-1234-1234-1234-123456789abc';
+```
+The above command maps the Entra ID group identified by object
+id `87654321-1234-1234-1234-123456789abc` to a QuestDB group called `extUsers`.
+
+We should grant the necessary QuestDB endpoint permissions first
+to make sure users can access the Web Console, Postgres and ILP
+interfaces as required. [Read more about endpoint permissions](/docs/security/rbac/#endpoint-permissions).
+
+```questdb-sql title="Grant endpoint permissions"
+GRANT HTTP, PGWIRE TO extUsers;
+```
+
+Now we can grant the rest of the permissions as required. We can
+grant access to tables, for example.
+
+```questdb-sql title="Grant database permissions"
+GRANT SELECT ON fx_trades, core_price TO extUsers;
+```
+
+### Confirm group mappings and login
+
+To test, head to the Web Console and login.
+
+If all has been wired up well, then login will succeed, and the user
+will have the access granted to them.
+
+## Managed identities and service principals
+
+Azure services that run as a managed identity or a service principal can
+authenticate to QuestDB with app-only access tokens from Entra ID, next to the
+users who log in to the Web Console. Each service gets the permissions of the
+QuestDB groups that its app roles map to.
+
+:::warning Requires QuestDB Enterprise 4.0.2
+
+Accepting app-only tokens requires QuestDB Enterprise 4.0.2 or later. On
+earlier versions, the configuration below rejects every OIDC login, user logins
+included.
+
+:::
+
+This setup builds on the Web Console setup above: the application registered in
+[Set up the client application in Entra ID](#set-up-the-client-application-in-entra-id),
+and the [QuestDB configuration](#questdb-configuration).
+
+App-only tokens identify the caller by the object ID of its service principal,
+in the `oid` claim, and list the
+[app roles](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps)
+assigned to it in the `roles` claim. They carry no `name` or
+`preferred_username` claim. If the service principal is a member of a security
+group, its token also carries a `groups` claim, because the QuestDB application
+emits group claims, as set up under _Token configuration_ in
+[Set up the client application in Entra ID](#set-up-the-client-application-in-entra-id).
+
+QuestDB treats the service as an external user, not as a QuestDB
+[service account](/docs/security/rbac/#users-and-service-accounts), so
+permissions cannot be granted to it directly. With the configuration below,
+when its token carries no role but carries a `groups` claim, the service gets
+the permissions of its Entra ID security groups instead. See
+[Restrict access to app roles](#restrict-access-to-app-roles).
+
+### Configure the application in Entra ID
+
+1. Make sure that the application is single-tenant, as set up in
+   [Set up the client application in Entra ID](#set-up-the-client-application-in-entra-id).
+   QuestDB does not check which tenant issued a token, as described in
+   [Token validation](/docs/security/oidc/#token-validation). An app role has
+   the same value in every tenant that uses the application, so with a
+   multitenant registration, another tenant could assign the role to its own
+   service principals, and QuestDB would map their tokens to the same QuestDB
+   groups.
+2. Under _Expose an API_, set the Application ID URI, which defaults to
+   `api://<application ID>`. Services request their tokens for the scope
+   `<Application ID URI>/.default`. A token requested for any other API, such
+   as Microsoft Graph, carries that API in `aud`, and QuestDB rejects it.
+3. Make the application issue v2.0 access tokens: in its _Manifest_, set
+   `api.requestedAccessTokenVersion` to `2`. The legacy manifest format calls
+   this property `accessTokenAcceptedVersion`. The `aud` claim of a v2.0 token
+   always carries the application ID, which
+   [Token validation](/docs/security/oidc/#token-validation) checks. A v1.0
+   token, the default for applications that accept organizational accounts
+   only, can carry the Application ID URI instead. Web Console logins are not affected, because the
+   Web Console presents ID tokens.
+4. Under _App roles_, define a role for each kind of access, with the
+   _Applications_ member type. The examples below use the value
+   `QuestDB.Ingest`.
+5. Assign a role to each managed identity or service principal that needs
+   access. Assign the role to the identity itself: Entra ID does not add a role
+   assigned to a group to the tokens of the service principals in that group.
+
+   - For the service principal of an app registration, open that registration,
+     not the QuestDB one. Under _API permissions_, select _Add a permission_,
+     _APIs my organization uses_, the QuestDB application, and
+     _Application permissions_. Add the role, and grant admin consent.
+   - For a managed identity, assign the role through Microsoft Graph, as
+     described in
+     [Assign a managed identity to an application role](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-assign-app-role-managed-identity).
+
+### Configure QuestDB
+
+Replace the two claim settings of the
+[QuestDB configuration](#questdb-configuration) with fallback lists, and
+restart QuestDB. Keep `acl.oidc.groups.encoded.in.token=true`, so that QuestDB
+validates app-only tokens against the signing keys of Entra ID, the same way as
+ID tokens:
+
+```ini title="server.conf"
+# user tokens carry preferred_username, app-only tokens carry oid
+acl.oidc.sub.claim=preferred_username,oid
+
+# app-only tokens carry roles, user tokens carry groups
+acl.oidc.groups.claim=roles,groups
+```
+
+User logins still take the principal from `preferred_username` and the groups
+from `groups`. Their tokens carry no `roles` claim, as long as the app roles of
+the QuestDB application admit applications only. App-only tokens take the
+principal from `oid` and the groups from `roles`, even when they also carry a
+`groups` claim. QuestDB rejects a token that carries neither a role nor a
+group. See
+[How QuestDB picks a claim](/docs/security/oidc/#how-questdb-picks-a-claim).
+
+If your QuestDB configuration sets `acl.oidc.sub.claim=oid`, as described in
+[Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim),
+keep it: app-only tokens carry `oid` too, so only `acl.oidc.groups.claim`
+needs a list.
+
+### Map app roles to QuestDB groups
+
+QuestDB cannot create a table or add a column on ingestion for the service,
+because the service is an external user. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
+As the admin, create the tables that the service writes to, with every column
+that it sends:
+
+```questdb-sql title="Create fx_trades before the service writes to it"
+CREATE TABLE fx_trades (
+  timestamp TIMESTAMP_NS,
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+Map each app role to a QuestDB group by the role's value, the same way as an
+Entra ID group, and grant the group what the service needs. A service that
+ingests over HTTP or [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/)
+needs the `HTTP` endpoint permission and `INSERT` on its tables:
+
+```questdb-sql title="Map an app role to a group that ingests into fx_trades"
+CREATE GROUP ingestApps WITH EXTERNAL ALIAS 'QuestDB.Ingest';
+GRANT HTTP TO ingestApps;
+GRANT INSERT ON fx_trades TO ingestApps;
+```
+
+A service that queries its tables also needs `SELECT` on them, and a service
+that connects to the
+[PGWire endpoint](/docs/security/oidc/#oidc-for-the-pgwire-endpoint) also
+needs the `PGWIRE` endpoint permission. See
+[Endpoint permissions](/docs/security/rbac/#endpoint-permissions) for the other
+endpoints.
+
+### Restrict access to app roles
+
+Unless _Assignment required_ is enabled for the QuestDB application, any
+service principal in the tenant can get a token for QuestDB. A token without a
+role falls back to the `groups` claim, so a service principal in a mapped
+security group gets the permissions of that group without an app role. To make
+an app role the only way for a service to get permissions, do one of the
+following:
+
+- Keep managed identities and service principals out of the security groups
+  that are mapped to QuestDB groups.
+- Enable _Assignment required_ in the _Properties_ of the QuestDB application,
+  under _Enterprise applications_. Users then need an assignment too, directly
+  or through a group, to log in to the Web Console. Assigning a group requires
+  Microsoft Entra ID P1 or P2, and gives access only to the direct members of
+  the group, not to the members of its nested groups. Entra ID also stops
+  asking users for consent, so
+  [grant tenant-wide admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent)
+  to the QuestDB application, or users cannot log in.
+
+### Request a token in the service
+
+The service requests its token for the QuestDB application. With the
+[Azure Identity library](https://learn.microsoft.com/en-us/python/api/overview/azure/identity-readme)
+for Python, `DefaultAzureCredential` requests the token as the managed identity
+of the Azure resource that the service runs on, or as a service principal set
+up in environment variables. For a user-assigned managed identity, set the
+`AZURE_CLIENT_ID` environment variable to the client ID of the identity.
+Otherwise, the credential uses the system-assigned identity.
+
+The examples use the QWP API of the `questdb` package, version 5.0 or later.
+Install the libraries with
+`python3 -m pip install -U questdb azure-identity pandas`. pandas is only
+needed for `to_pandas()` in [Verify the setup](#verify-the-setup):
+
+```python title="Ingest into fx_trades with an app-only token"
+import questdb
+from azure.identity import DefaultAzureCredential
+from questdb import TimestampNanos
+
+# Application ID URI of the QuestDB application, followed by /.default
+scope = "api://8de84b90-1ea5-4e41-9e84-dba860aa01a6/.default"
+credential = DefaultAzureCredential()
+token = credential.get_token(scope)
+
+conf = f"wss::addr=questdb.example.com:9000;token={token.token};"
+with questdb.connect(conf) as db:
+    with db.sender() as sender:
+        sender.row(
+            "fx_trades",
+            symbols={"symbol": "EURUSD", "side": "buy"},
+            columns={"price": 1.0842, "quantity": 100000.0},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
+```
+
+`flush(wait=True)` returns when the server has accepted the rows. Rows that the
+server rejects, for example because the group lacks `INSERT` on the table, go
+to the error handler of the connection, which logs them by default. See
+[Server rejections](/docs/connect/clients/python/#server-rejections).
+
+The client presents the same token on every connection that it opens: the
+first one, the additional connections of its pool, and the connections that
+replace a failed one. Shortly after the token expires, QuestDB rejects these
+new connections, as described in
+[Token validation](/docs/security/oidc/#token-validation). A long-running
+service must therefore switch to a new token before the old one expires: it
+connects with the new token, then closes the old handle.
+`token.expires_on` is a Unix timestamp.
+
+The credential caches the token in memory, and requests a new one when the
+cached token expires within 5 minutes, or earlier when the token's refresh
+time has passed, so calling `get_token()` often is cheap. The following example
+looks for a new token in the last 10 minutes of the old one. When it cannot get
+a new token or connect with it, it keeps the old token and handle, and tries
+again with the next batch:
+
+```python title="Keep ingesting across token expiry"
+import time
+
+import questdb
+from azure.core.exceptions import AzureError
+from azure.identity import DefaultAzureCredential
+from questdb import QuestDBError, TimestampNanos
+
+SCOPE = "api://8de84b90-1ea5-4e41-9e84-dba860aa01a6/.default"
+ADDR = "questdb.example.com:9000"
+# look for a new token when the old one expires within this many seconds
+REFRESH_MARGIN_SECONDS = 600
+
+credential = DefaultAzureCredential()
+
+
+def on_rejection(error):
+    # rows that the server rejected, for example for a missing grant
+    print("rejected:", error.category.tag, error.message)
+
+
+def connect(token):
+    conf = f"wss::addr={ADDR};token={token.token};"
+    return questdb.connect(conf, error_handler=on_rejection)
+
+
+def renew(token, db):
+    # returns the token and the handle to use from now on
+    try:
+        new_token = credential.get_token(SCOPE)
+        # the credential returns the cached token until it renews it
+        if new_token.token == token.token:
+            return token, db
+        new_db = connect(new_token)
+    except (AzureError, QuestDBError) as e:
+        # keep the old token and handle, and try again with the next batch
+        print("token renewal failed:", e)
+        return token, db
+    db.close()
+    return new_token, new_db
+
+
+def next_trades():
+    # replace with your source of trades
+    time.sleep(1)
+    return [("EURUSD", "buy", 1.0842, 100000.0)]
+
+
+token = credential.get_token(SCOPE)
+db = connect(token)
+try:
+    while True:
+        trades = next_trades()
+        if time.time() > token.expires_on - REFRESH_MARGIN_SECONDS:
+            token, db = renew(token, db)
+        with db.sender() as sender:
+            for symbol, side, price, quantity in trades:
+                sender.row(
+                    "fx_trades",
+                    symbols={"symbol": symbol, "side": side},
+                    columns={"price": price, "quantity": quantity},
+                    at=TimestampNanos.now(),
+                )
+            sender.flush(wait=True)
+finally:
+    db.close()
+```
+
+See [Authentication and TLS](/docs/connect/clients/python/#authentication-and-tls)
+for the client options. For the
+[PGWire endpoint](/docs/security/oidc/#oidc-for-the-pgwire-endpoint), enable
+`acl.oidc.pg.token.as.password.enabled`, and send the token as the password of
+the `_sso` user.
+
+### Verify the setup
+
+`current_user()` returns the principal that QuestDB sees for the service: the
+object ID of its service principal, from the `oid` claim. For a managed
+identity, that is the _Object (principal) ID_ that the Azure portal shows for
+the identity, not its client ID. Run the query from the service while it is
+connected:
+
+```python title="Check the principal of the service"
+# db is an open handle, such as the one in the examples above
+with db.query("SELECT current_user()") as result:
+    print(result.to_pandas())
+```
+
+If the service cannot connect, the server log gives the reason, as described in
+[Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins).
+For a token that carries neither a role nor a group, the log lists the claims
+that the token carries.
+
+### Change or revoke access
+
+QuestDB reads the roles from the token, so a change to the roles of a service
+takes effect when the service presents a new token. Azure caches managed
+identity tokens for around 24 hours, so a role assigned to, or removed from, a
+managed identity can take hours to reach QuestDB. See the
+[managed identity best practices](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations).
+To cut a service off without waiting for its token to expire, revoke the
+permissions of its QuestDB group. This cuts off every service that holds the
+app role, so to cut off one service at a time, give each service an app role,
+and a QuestDB group, of its own.

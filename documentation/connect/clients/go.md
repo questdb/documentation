@@ -362,6 +362,8 @@ the ingress and egress WebSocket upgrades. It is a **static credential**: the
 client sends exactly the string you pass and never refreshes or renews it.
 Acquire it out of band, for example from the identity provider of the QuestDB Enterprise
 [OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and manage its lifetime yourself.
+For Azure services, see
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
 When the token expires or is rotated, construct a new handle with the new token.
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive

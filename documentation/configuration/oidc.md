@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
-description: Configuration settings for OpenID Connect integration in QuestDB Enterprise.
+description: "Configure OIDC in QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience, and principal and groups claims with fallback lists."
 ---
 
 :::note
@@ -128,6 +128,17 @@ it refuses to start. Use `acl.oidc.pkce.required` instead.
 Enables or disables the Resource Owner Password Credentials flow. When
 enabled, this flow must also be configured in the OIDC Provider.
 
+### acl.oidc.state.required
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Whether the Web Console sends a random `state` parameter in the authorization
+request of the Authorization Code Flow, and rejects the redirect back from the
+OIDC Provider when it does not carry the same `state`. This ties the redirect
+to a login that the same browser started, which protects against cross-site
+request forgery on the login redirect.
+
 ## Endpoints
 
 ### acl.oidc.authorization.endpoint
@@ -144,8 +155,20 @@ Identity Platform.
 - **Reloadable**: no
 
 JSON Web Key Set (JWKS) Endpoint. Provides the list of public keys used to
-decode and validate ID tokens issued by the OIDC Provider. The default value
-should work for the Ping Identity Platform.
+decode and validate the tokens issued by the OIDC Provider, such as ID tokens,
+when `acl.oidc.groups.encoded.in.token` is `true`. The default value should
+work for the Ping Identity Platform.
+
+### acl.oidc.public.keys.expiry
+
+- **Default**: `120000`
+- **Reloadable**: no
+
+How long QuestDB uses the public keys that it downloaded from the JWKS
+endpoint, in milliseconds, before it downloads them again. QuestDB also
+downloads the keys again when a token names a key ID that it does not know,
+such as a key that the OIDC Provider has just started to use. See
+[Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins).
 
 ### acl.oidc.token.endpoint
 
@@ -241,9 +264,10 @@ user, as an array of group names or as a single group name. Required when OIDC
 is enabled.
 
 Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
-priority order, such as `roles,groups`. QuestDB takes the groups from the first
-claim on the list that holds at least one group name, and does not combine
-groups from several claims. A login is rejected when none of the listed claims
+priority order, in the form `claimName[,claimName ...]`, such as
+`roles,groups`. Spaces around claim names are trimmed, and empty entries are
+skipped. QuestDB takes the groups from the first claim on the list that holds
+at least one group name, and does not combine groups from several claims. A login is rejected when none of the listed claims
 holds a group name. With OIDC enabled, QuestDB refuses to start when the list
 names a claim twice, or names a claim that `acl.oidc.sub.claim` also lists.
 
@@ -286,8 +310,10 @@ names, such as the `name` claim. See
 [Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
 
 Since QuestDB Enterprise 4.0.2, accepts a comma-separated list of claims in
-priority order, such as `preferred_username,oid`. QuestDB takes the principal
-from the first claim on the list that holds a non-empty value. A login is
+priority order, in the form `claimName[,claimName ...]`, such as
+`preferred_username,oid`. Spaces around claim names are trimmed, and empty
+entries are skipped. QuestDB takes the principal from the first claim on the
+list that holds a non-empty value. A login is
 rejected when none of the listed claims holds one. With OIDC enabled, QuestDB
 refuses to start when the value is empty, when the list names a claim twice, or
 when it names a claim that `acl.oidc.groups.claim` also lists. An empty value

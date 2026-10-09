@@ -248,7 +248,7 @@ GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
 
 ### Users and service accounts
 
-QuestDB has two types of principals:
+QuestDB has two types of local principals:
 
 - **Users**: For human individuals. Can belong to multiple groups and inherit
   permissions from them. Cannot be assumed by others.
@@ -266,8 +266,9 @@ Names must be unique across all users, service accounts, and groups.
 QuestDB Enterprise also accepts external users: people and services that log
 in through an [OpenID Connect provider](/docs/security/oidc/), such as Azure
 services that run as a Microsoft Entra ID managed identity. QuestDB does not
-store external users, and permissions cannot be granted to them directly. They
-get the permissions of the QuestDB groups that their external groups map to.
+persist external users, and permissions cannot be granted to them directly.
+They get the permissions of the QuestDB groups that their external groups map
+to.
 See [User permissions](/docs/security/oidc/#user-permissions).
 
 #### Why service accounts?
@@ -331,7 +332,7 @@ dropped, all members lose the permissions they inherited from that group.
   width={745}
 />
 
-QuestDB supports three authentication methods:
+QuestDB supports three local authentication methods:
 
 | Method             | Use case                 | Endpoints                 |
 | ------------------ | ------------------------ | ------------------------- |
@@ -344,7 +345,7 @@ tokens from an OpenID Connect provider, such as Microsoft Entra ID. They get
 their permissions from the QuestDB groups that their external groups map to.
 See [OpenID Connect (OIDC)](/docs/security/oidc/#user-permissions), and for
 Azure services,
-[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens).
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
 
 Users can have multiple authentication methods enabled simultaneously:
 

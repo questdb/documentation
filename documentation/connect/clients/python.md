@@ -143,13 +143,17 @@ token = questdb.connect(
 ```
 
 Authentication happens during the WebSocket upgrade, before any data frames
-are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
-first operation that needs the connection, not from `connect()`. Queries and
-`dataframe()` calls raise it directly. Row senders connect in the
-background, so a fire-and-forget `flush()` can return before the upgrade
-fails; the error then surfaces from `flush(wait=True)`, `wait()`, or the
-next call on the lease — and immediately through the
-[connection listener](#failover-and-errors) as an `AuthFailed` event.
+are exchanged. By default, `connect()` opens its first connections before it
+returns (see [The pool](#the-pool)), so bad credentials raise
+`QuestDBErrorCode.AuthError` from `connect()` itself. With
+[`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
+`connect()` opens no connection, and bad credentials raise from the first
+operation that needs the connection instead. Queries and `dataframe()` calls
+raise it directly. Row senders connect in the background, so a
+fire-and-forget `flush()` can return before the upgrade fails. The error then
+surfaces from `flush(wait=True)`, `wait()`, or the next call on the lease, and
+immediately through the [connection listener](#failover-and-errors) as an
+`AuthFailed` event.
 
 With `wss`, the default combines the bundled `webpki` root store with the
 operating-system certificate store. Override it with configuration keys:
@@ -171,9 +175,9 @@ following are **not** supported:
 
 | Path | Status | Workaround |
 | --- | --- | --- |
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/#accept-managed-identity-and-service-principal-tokens). |
+| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | On token expiry, close the handle and build a fresh one with the new token. |
+| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | Before the token expires, build a fresh handle with a new token, then close the old one. See [Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service) for an example. |
 
 ## The pool
 
@@ -183,10 +187,15 @@ borrows a connection, opening one on demand, and returns it when the lease
 or result closes; when every slot is busy, a borrow waits for a free one
 (see [Pool settings](#pool-settings)).
 
-`connect()` performs no blocking network I/O. `dataframe()`, `query()`,
-and `server_info()` connect on first use; `sender()` connects in the
-background, so call `flush(wait=True)` or `wait()` to surface connection and
-delivery errors.
+By default, `connect()` opens the warm minimum of connections before it
+returns: `sender_pool_min` sender and `query_pool_min` reader connections, one
+of each by default (see [Pool settings](#pool-settings)). An unreachable
+server or bad credentials therefore raise from `connect()`. With
+[`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
+`connect()` performs no network I/O: `dataframe()`, `query()`, and
+`server_info()` connect on first use, and `sender()` connects in the
+background. In both modes, call `flush(wait=True)` or `wait()` to surface
+connection and delivery errors from row senders.
 
 ### Choose an API
 
