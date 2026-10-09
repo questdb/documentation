@@ -57,19 +57,8 @@ The chart binds the operator's ServiceAccount to the
 permissions apply in every namespace. There is no namespace-scoped install mode:
 one operator watches `QuestDBCluster` objects in all namespaces.
 
-| Resource                             | Verbs                                               | Why                                                                                                                                                   |
-| ------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pods                                 | create, get, list, watch, patch, delete             | Runs the database pods. Deletes a pod to fence an old primary, replace a failed or outdated pod, or scale down.                                       |
-| PersistentVolumeClaims               | create, get, list, watch, update, patch, delete     | Creates each instance's data volume and grows it on resize. Deletes a volume only after its pod is gone, on scale-down or when re-creating a replica. |
-| Services, ConfigMaps                 | create, get, list, watch, update, patch             | The `-rw`/`-ro` Services and each cluster's server config.                                                                                            |
-| Secrets                              | create, get, list, watch, update, patch             | See [Secrets](#secrets) below.                                                                                                                        |
-| PodDisruptionBudgets                 | create, get, list, watch, update, patch, delete     | Keeps a cluster's PDB in step with its size; deletes it when the cluster no longer needs one.                                                         |
-| Nodes                                | get, list, watch                                    | Read-only. Spots a pod stuck on a failed node.                                                                                                        |
-| StorageClasses                       | get, list, watch                                    | Read-only. Checks `allowVolumeExpansion` before growing a volume.                                                                                     |
-| Events (`events.k8s.io`)             | create, patch                                       | Records what it did on your objects.                                                                                                                  |
-| `QuestDBCluster`, `QuestDBPromotion` | create, get, list, watch, update, patch, delete     | Reconciles them and writes their status and finalizers. The operator does not create or delete your clusters or promotions.                           |
-| `QuestDBObjectStore`                 | get, list, watch                                    | Read-only. Passes your object-store settings to the QuestDB pods.                                                                                     |
-| ValidatingWebhookConfigurations      | list, watch; get, update on the operator's own only | Self-signed webhook certificate mode only: writes the CA into the operator's own webhook. Not granted in external certificate mode.                   |
+The full list of rules is in the chart's `templates/rbac/role.yaml`.
+
 
 The chart also creates a namespaced Role in the operator's namespace for leader
 election (Leases, ConfigMaps, Events), and, when metrics are enabled, a
