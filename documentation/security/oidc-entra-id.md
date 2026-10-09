@@ -177,9 +177,10 @@ Select _Add groups claim_, and set it up as follows:
   and the _Access_ token.
 - Leave _Emit groups as role claims_ cleared for both. Otherwise, Entra ID
   sends the groups in the `roles` claim instead of the `groups` claim that the
-  [QuestDB configuration](#questdb-configuration) below reads, and mixes the
-  groups of services with their app roles in
-  [Managed identities and service principals](#managed-identities-and-service-principals).
+  [QuestDB configuration](#questdb-configuration) below reads, and the `roles`
+  claim no longer carries the app roles that
+  [Managed identities and service principals](#managed-identities-and-service-principals)
+  relies on.
 
 The customized tokens contain user information which cannot be accessed
 without permission. User information is provided by Microsoft Graph, so
@@ -614,6 +615,13 @@ try:
 finally:
     db.close()
 ```
+
+The example keeps its store-and-forward data in memory, the default. With
+`sf_dir`, `connect()` fails while the old handle holds the slot of the same
+`sender_id`, so `renew()` keeps the old token until it expires. Close the old
+handle first instead, then connect with the new token and the same
+`sender_id`. The new handle replays what the old one left on disk, as
+described in [Token lifetime](/docs/security/oidc/#token-lifetime).
 
 A terminal rejection raises `QuestDBServerRejectionError` from
 `flush(wait=True)` and ends the loop, and the `finally` block closes the

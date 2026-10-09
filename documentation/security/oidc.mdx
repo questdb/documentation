@@ -634,6 +634,26 @@ advance, with every column that the client sends. See
 examples connect over TLS with `wss::`; against a server without TLS, use
 `ws::`.
 
+As the admin, create the table, and grant the QuestDB group that the client's
+groups map to the `HTTP` endpoint permission and `INSERT` on the table:
+
+```questdb-sql title="Create fx_trades and let the client's group ingest into it"
+CREATE TABLE fx_trades (
+  timestamp TIMESTAMP_NS,
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+CREATE GROUP fxIngest WITH EXTERNAL ALIAS 'fx-ingest';
+GRANT HTTP TO fxIngest;
+GRANT INSERT ON fx_trades TO fxIngest;
+```
+
+Replace `fx-ingest` with a group or role name that the client's token carries,
+as described in [Mapping user permissions](#mapping-user-permissions).
+
 ### Client credentials grant
 
 A service that authenticates as itself requests an access token with the
@@ -789,6 +809,15 @@ A long-running client must therefore switch to a new token before the old one
 expires: request a new token, create a new client with it, then close the old
 client. For a Python example, see
 [Request a token in the service](/docs/security/oidc-entra-id/#request-a-token-in-the-service).
+
+A client that keeps its
+[store-and-forward](/docs/connect/clients/connect-string/#sf-keys) data on
+disk, with `sf_dir`, must switch in the other order. Two clients cannot hold
+the same slot, so a new client with the `sender_id` of the old client fails to
+start while the old client is open. Flush and close the old client first, then
+create the new client with the new token and the same `sender_id`. The new
+client replays what the old client left on disk, as described in
+[Sender restart and replay](/docs/connect/clients/connect-string/#sender-restart-and-replay).
 
 ## OIDC for the PGWire endpoint
 

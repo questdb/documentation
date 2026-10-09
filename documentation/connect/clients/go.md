@@ -365,9 +365,13 @@ Acquire it out of band, for example from the identity provider of the QuestDB En
 For Azure services, see
 [Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
 Before the token expires, construct a new handle with a new token, then close
-the old one. QuestDB checks the token again on every new connection, including
-reconnects, and rejects it once it has expired; see
-[Token lifetime](/docs/security/oidc/#token-lifetime).
+the old one. With `sf_dir`, flush and close the old handle first, then
+construct the new one with the same `sender_id`: two handles cannot hold the
+same store-and-forward slot, and the new handle replays what the old one left
+on disk. The client sends the token on every connection that it opens,
+including reconnects. On QuestDB Enterprise 4.0.2 and later, or with the User
+Info endpoint, QuestDB rejects it on new connections shortly after it expires;
+see [Token lifetime](/docs/security/oidc/#token-lifetime).
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive
 with `username`/`password`.
