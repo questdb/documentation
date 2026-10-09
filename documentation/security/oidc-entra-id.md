@@ -130,10 +130,11 @@ application, in this case to QuestDB, and the client application uses these
 credentials to authenticate the user by forwarding them to the identity provider,
 in this case to Entra ID.
 
-It is guaranteed that QuestDB does not store the user's credentials in any way.
-They are not persisted into the database, not even in encrypted form.
-The login details are treated as passthrough information. Only exception is
-that server logs can contain the username, logged for audit purposes.
+QuestDB does not persist the user's credentials, not even in encrypted form:
+the login details are treated as passthrough information. The server logs can
+contain the username, logged for audit purposes, and, when a login fails, the
+claims of the user and the response of Entra ID, which can contain tokens.
+Restrict access to the server logs.
 
 <Screenshot
 alt="Entra ID, enable ROPC"
@@ -162,11 +163,23 @@ be found in the [OIDC integration](/docs/security/oidc/#user-permissions)
 documentation.
 
 <Screenshot
-alt="Entra ID, token customization"
+alt="Entra ID, Edit groups claim: Security groups, with Group ID for the ID and Access tokens"
 src="images/guides/active-directory-entraid/6_token_customization.webp"
 title="Token customization"
 width={600}
 />
+
+Select _Add groups claim_, and set it up as follows:
+
+- Under _Select group types to include in Access, ID, and SAML tokens_, select
+  _Security groups_.
+- Under _Customize token properties by type_, select _Group ID_ for the _ID_
+  and the _Access_ token.
+- Leave _Emit groups as role claims_ cleared for both. Otherwise, Entra ID
+  sends the groups in the `roles` claim instead of the `groups` claim that the
+  [QuestDB configuration](#questdb-configuration) below reads, and mixes the
+  groups of services with their app roles in
+  [Managed identities and service principals](#managed-identities-and-service-principals).
 
 The customized tokens contain user information which cannot be accessed
 without permission. User information is provided by Microsoft Graph, so
@@ -332,9 +345,10 @@ in the `oid` claim, and list the
 [app roles](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps)
 assigned to it in the `roles` claim. They carry no `name` or
 `preferred_username` claim. If the service principal is a member of a security
-group, its token also carries a `groups` claim, because the QuestDB application
-emits group claims, as set up under _Token configuration_ in
+group, its token can also carry a `groups` claim, depending on the group claims
+that the QuestDB application emits, as set up under _Token configuration_ in
 [Set up the client application in Entra ID](#set-up-the-client-application-in-entra-id).
+Do not rely on it: grant permissions to services through app roles.
 
 QuestDB treats the service as an external user, not as a QuestDB
 [service account](/docs/security/rbac/#users-and-service-accounts), so
@@ -382,11 +396,12 @@ the permissions of its Entra ID security groups instead. See
 
 ### Configure QuestDB
 
-Replace the two claim settings of the
+On QuestDB Enterprise 4.0.2 or later, replace the two claim settings of the
 [QuestDB configuration](#questdb-configuration) with fallback lists, and
-restart QuestDB. Keep `acl.oidc.groups.encoded.in.token=true`, so that QuestDB
-validates app-only tokens against the signing keys of Entra ID, the same way as
-ID tokens:
+restart QuestDB. Earlier versions read each setting as one claim name, so the
+lists below make every OIDC login fail. Keep
+`acl.oidc.groups.encoded.in.token=true`, so that QuestDB validates app-only
+tokens against the signing keys of Entra ID, the same way as ID tokens:
 
 ```ini title="server.conf"
 # user tokens carry preferred_username, app-only tokens carry oid
@@ -411,7 +426,7 @@ needs a list.
 
 ### Map app roles to QuestDB groups
 
-QuestDB cannot create a table or add a column on ingestion for the service,
+Ingestion fails when it has to create a table or add a column for the service,
 because the service is an external user. See
 [Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
 As the admin, create the tables that the service writes to, with every column
@@ -450,7 +465,8 @@ endpoints.
 Unless _Assignment required_ is enabled for the QuestDB application, any
 service principal in the tenant can get a token for QuestDB. A token without a
 role falls back to the `groups` claim, so a service principal in a mapped
-security group gets the permissions of that group without an app role. To make
+security group can get the permissions of that group without an app role, if
+its token carries the group. To make
 an app role the only way for a service to get permissions, do one of the
 following:
 
@@ -502,9 +518,12 @@ with questdb.connect(conf) as db:
         sender.flush(wait=True)
 ```
 
-`flush(wait=True)` returns when the server has accepted the rows. Rows that the
-server rejects, for example because the group lacks `INSERT` on the table, go
-to the error handler of the connection, which logs them by default. See
+`flush(wait=True)` returns when the server has acknowledged the rows. The
+client passes every rejection to the error handler of the handle, which logs it
+by default. A rejection that resending cannot fix, such as a missing `INSERT`
+grant on the table or a value that does not match the column type, is
+terminal: `flush(wait=True)` also raises `QuestDBServerRejectionError`, and the
+pool retires the connection. See
 [Server rejections](/docs/connect/clients/python/#server-rejections).
 
 The client presents the same token on every connection that it opens: the
@@ -540,7 +559,8 @@ credential = DefaultAzureCredential()
 
 
 def on_rejection(error):
-    # rows that the server rejected, for example for a missing grant
+    # every rejection; a terminal one, such as a missing grant, also
+    # raises QuestDBServerRejectionError from flush(wait=True)
     print("rejected:", error.category.tag, error.message)
 
 
@@ -591,6 +611,12 @@ finally:
     db.close()
 ```
 
+A terminal rejection raises `QuestDBServerRejectionError` from
+`flush(wait=True)` and ends the loop, and the `finally` block closes the
+handle. To keep the service running instead, catch the error around the batch,
+and decide whether to retry or drop the batch: a batch fails the same way
+until you fix the cause of the rejection, such as a missing grant.
+
 See [Authentication and TLS](/docs/connect/clients/python/#authentication-and-tls)
 for the client options. For the
 [PGWire endpoint](/docs/security/oidc/#oidc-for-the-pgwire-endpoint), enable
@@ -619,11 +645,17 @@ that the token carries.
 ### Change or revoke access
 
 QuestDB reads the roles from the token, so a change to the roles of a service
-takes effect when the service presents a new token. Azure caches managed
-identity tokens for around 24 hours, so a role assigned to, or removed from, a
-managed identity can take hours to reach QuestDB. See the
+takes effect when QuestDB accepts a new token of the service. Azure caches
+managed identity tokens for around 24 hours, so a role assigned to, or removed
+from, a managed identity can take hours to reach QuestDB. See the
 [managed identity best practices](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/managed-identity-best-practice-recommendations).
-To cut a service off without waiting for its token to expire, revoke the
-permissions of its QuestDB group. This cuts off every service that holds the
+
+Removing a role does not cut off the connections that the service has already
+opened. They stay open when their token expires. If the next token of the
+service carries neither a role nor a group, QuestDB rejects it, and the open
+connections keep the groups of the last token that QuestDB accepted. To cut a
+service off, revoke the permissions of its QuestDB group. This takes effect at
+once, on open connections too, but it cuts off every service that holds the
 app role, so to cut off one service at a time, give each service an app role,
-and a QuestDB group, of its own.
+and a QuestDB group, of its own. See
+[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).

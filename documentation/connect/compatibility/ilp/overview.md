@@ -441,9 +441,9 @@ GRANT add column, insert ON all tables TO ingest_user; -- grants permissions to 
 GRANT add column, insert ON table1, table2 TO ingest_user; -- grants permissions to add columns and insert data to specific tables
 ```
 
-External users, who log in through [OpenID Connect](/docs/security/oidc/),
-cannot create tables or add columns on ingestion. Create the tables in advance,
-with every column that the client sends. See
+Ingestion fails when it has to create a table or add a column for an external
+user, who logs in through [OpenID Connect](/docs/security/oidc/). Create the
+tables in advance, with every column that the client sends. See
 [Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
 
 Read more setup details in the

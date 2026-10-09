@@ -264,12 +264,13 @@ CREATE SERVICE ACCOUNT app_account WITH PASSWORD 'pwd';
 Names must be unique across all users, service accounts, and groups.
 
 QuestDB Enterprise also accepts external users: people and services that log
-in through an [OpenID Connect provider](/docs/security/oidc/), such as Azure
-services that run as a Microsoft Entra ID managed identity. QuestDB does not
-persist external users, and permissions cannot be granted to them directly.
-They get the permissions of the QuestDB groups that their external groups map
-to.
-See [User permissions](/docs/security/oidc/#user-permissions).
+in through an [OpenID Connect provider](/docs/security/oidc/), such as users
+who sign in to the Web Console with Microsoft Entra ID, and, since QuestDB
+Enterprise 4.0.2, Azure services that run as a Microsoft Entra ID managed
+identity. QuestDB does not persist external users, and permissions cannot be
+granted to them directly. They get the permissions of the QuestDB groups that
+their external groups map to. See
+[User permissions](/docs/security/oidc/#user-permissions).
 
 #### Why service accounts?
 
@@ -344,7 +345,7 @@ QuestDB Enterprise can also authenticate external users and services with
 tokens from an OpenID Connect provider, such as Microsoft Entra ID. They get
 their permissions from the QuestDB groups that their external groups map to.
 See [OpenID Connect (OIDC)](/docs/security/oidc/#user-permissions), and for
-Azure services,
+Azure services on QuestDB Enterprise 4.0.2 or later,
 [Microsoft Entra ID managed identities and service principals](/docs/security/oidc-entra-id/#managed-identities-and-service-principals).
 
 Users can have multiple authentication methods enabled simultaneously:

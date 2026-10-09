@@ -346,6 +346,36 @@ to the existing PCV.
 
 Then select the `username` attribute of the PCV as `USER_KEY`.
 
+## QuestDB configuration
+
+Set the following in QuestDB's `server.conf`. QuestDB's default endpoint paths
+match PingFederate, so set the host of PingFederate, not the endpoints:
+
+```ini title="server.conf"
+# enable OIDC
+acl.oidc.enabled=true
+
+# the host of PingFederate; also set acl.oidc.port if it is not 443
+acl.oidc.host=pingfederate.example.com
+
+# the client ID set up in Set up PingFederate client
+acl.oidc.client.id=questdb
+
+# the claim set up in Add groups to OIDC policy management
+acl.oidc.groups.claim=groups
+
+# optional, required only if ROPC is enabled in PingFederate
+acl.oidc.ropc.flow.enabled=true
+```
+
+QuestDB reads the groups from the User Info response, so keep the default,
+`acl.oidc.groups.encoded.in.token=false`. It reads the principal from the
+`sub` claim by default. To read it from another claim of the User Info
+response, set `acl.oidc.sub.claim`. See
+[Choose the principal claim](/docs/security/oidc/#choose-the-principal-claim).
+For the other settings, such as the TLS settings that a private certificate
+authority needs, see [Configuration](/docs/configuration/oidc/).
+
 ## Confirm QuestDB mappings and login
 
 QuestDB requires a mapping, as laid out in the

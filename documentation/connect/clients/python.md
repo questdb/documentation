@@ -326,11 +326,13 @@ delivery continues in the background. `flush(wait=True)` additionally blocks
 until the server acknowledges everything published on this lease, and
 `wait(timeout_millis)` is the standalone barrier with an explicit no-progress
 timeout (`0` means no deadline; `wait()` returns immediately when the lease
-published nothing). The barrier raises only on a terminal connection
-failure: server rejections are pushed to the pool's
-[rejection handler](#server-rejections) — logged by default — rather than
-raised from the wait. Closing the lease (leaving the `with` block) flushes
-remaining rows without waiting.
+published nothing). Every server rejection goes to the pool's
+[rejection handler](#server-rejections), logged by default, and the
+store-and-forward queue replays the retriable ones. The barrier raises on a
+terminal failure: a terminal connection failure, or a terminal rejection, such
+as a schema mismatch or a missing grant, which latches the connection and
+raises `QuestDBServerRejectionError`. Closing the lease (leaving the `with`
+block) flushes remaining rows without waiting.
 
 The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
 and no manual progress pump; those exist only on the standalone

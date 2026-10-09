@@ -19,9 +19,10 @@ QuestDB: they get the permissions of the QuestDB groups that their groups in
 the Identity Provider map to.
 
 This page covers the login flow, which token a client sends, how QuestDB maps
-the claims of a token to a principal and to QuestDB groups, including
-[fallback claim lists](#fallback-claim-lists) that accept user and app-only
-tokens with one configuration, [token validation](#token-validation), and
+the claims of a token to a principal and to QuestDB groups, including the
+[fallback claim lists](#fallback-claim-lists) of QuestDB Enterprise 4.0.2 that
+accept user and app-only tokens with one configuration,
+[token validation](#token-validation), and
 [troubleshooting rejected logins](#troubleshooting-oidc-logins). For
 step-by-step setup, see the guides for
 [Microsoft Entra ID](/docs/security/oidc-entra-id/), which also covers Azure
@@ -244,7 +245,9 @@ instead, as described in step 8.
 Treat the token as a credential, and serve QuestDB over
 [TLS](/docs/security/tls/). An access token can be opaque, but an ID token is a
 signed JWT that anyone who holds it can decode, including the user's name and
-groups.
+groups. Restrict access to the server logs too: when QuestDB rejects a login,
+it can log the token, the response of the provider, or the claims of the user.
+See [Troubleshooting OIDC logins](#troubleshooting-oidc-logins).
 
 :::
 
@@ -561,7 +564,12 @@ and on who the client authenticates as:
   provider's User Info endpoint, so send the access token. Some providers
   refuse tokens issued to applications at that endpoint, so to accept tokens
   that services obtain for themselves, use
-  `acl.oidc.groups.encoded.in.token=true`.
+  `acl.oidc.groups.encoded.in.token=true`. The setting applies to every
+  client: the Web Console then sends the ID token, and QuestDB reads the
+  principal and the groups from it. A provider that returns the groups only
+  from its User Info endpoint, as set up in the
+  [PingFederate guide](/docs/security/oidc-pingfederate/), must also put them
+  into the ID token, or QuestDB rejects every Web Console login.
 - With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates the token
   itself, so send a JWT that passes [Token validation](#token-validation):
   - For a user, send the ID token, because the provider often issues the
@@ -577,7 +585,8 @@ and on who the client authenticates as:
 
 Tokens that the provider issues to a service often carry the principal and the
 groups under different claim names than the tokens of users. To accept both
-kinds of token with one configuration, list the claims of both. See
+kinds of token with one configuration, list the claims of both, which requires
+QuestDB Enterprise 4.0.2 or later. See
 [Fallback claim lists](#fallback-claim-lists).
 
 The following example requests a token for a user with the Resource Owner
@@ -644,7 +653,7 @@ with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name="foo", at="ts")
 ```
 
-QuestDB cannot create a table or add a column on ingestion for an external
+Ingestion fails when it has to create a table or add a column for an external
 user, so the examples above need the table `foo` to exist, with the columns of
 `data.csv`. See
 [Tables created by external users](#tables-created-by-external-users).
@@ -737,8 +746,9 @@ QuestDB works the list of external groups out from the
 [user information](#user-and-group-claims).
 
 If we take the example used earlier, we will see that the message contains a
-claim called `groups`. This name is configurable in QuestDB, and QuestDB can
-fall back to other claims when a token does not carry it. See
+claim called `groups`. This name is configurable in QuestDB, and since QuestDB
+Enterprise 4.0.2, QuestDB can fall back to other claims when the user
+information does not carry it, or when it holds no group name. See
 [User and group claims](#user-and-group-claims).
 
 If the groups claim is missing or holds no group name, QuestDB rejects the
@@ -761,8 +771,10 @@ login via the [Web Console](/docs/getting-started/web-console/overview/).
 }
 ```
 
-QuestDB picks up a change to the user's groups or status in the Identity
-Provider, such as a disabled user, as follows:
+QuestDB keeps the groups of the last token that it accepted for each external
+user, and every session and connection of the user runs with them. QuestDB
+picks up a change to the user's groups or status in the Identity Provider,
+such as a disabled user, when it checks a token of the user again:
 
 - With the User Info endpoint, the default, when the cached user information
   expires. [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl),
@@ -770,19 +782,29 @@ Provider, such as a disabled user, as follows:
   to your organization's policies.
 - With `acl.oidc.groups.encoded.in.token=true`, when the client presents a new
   token. QuestDB reads the groups from the token instead of asking the Identity
-  Provider, so refreshing the cache does not pick up changes. Until then,
-  QuestDB accepts the old token for up to 60 seconds plus `acl.oidc.cache.ttl`
-  after it expires. See [Token validation](#token-validation).
+  Provider, so refreshing the cache does not pick up changes. In QuestDB
+  Enterprise 4.0.2 and later, QuestDB accepts the old token for up to 60
+  seconds plus `acl.oidc.cache.ttl` after it expires. Earlier versions do not
+  check whether the token has expired. See [Token validation](#token-validation).
 
-In both cases, connections that are already open, such as PGWire connections,
-stay open. The HTTP session that the Web Console opens at login is not tied to
-the token either. QuestDB accepts requests in the session, with the groups of
-the user's latest login, until the user logs out or the session has been idle
-for `http.session.timeout`, 30 minutes by default. Every request restarts the
-idle timer, so a session in use does not expire. The Web Console logs the user
-out when it cannot refresh the token, for example after the user is disabled,
-but another client that reuses the session cookie keeps the access for as long
-as it stays active.
+A token that QuestDB rejects does not change the groups, so some access
+outlives the token:
+
+- Connections that are already open, such as PGWire and QWP connections, stay
+  open when their token expires, and keep running with the groups of the last
+  token that QuestDB accepted for the user.
+- The HTTP session that the Web Console opens at login is not tied to the
+  token. When QuestDB rejects the token of a request that carries a valid
+  session cookie, for example because the user is disabled or because the
+  token no longer carries a group, it accepts the request through the session.
+  The session ends when the Web Console logs the user out, or after it has
+  been idle for `http.session.timeout`, 30 minutes by default. Every request
+  restarts the idle timer, so a session in use does not expire. The Web
+  Console logs the user out, and ends the session, when it cannot refresh the
+  token, for example after the user is disabled. A session that the Web
+  Console does not end, for example because the browser was closed, stays
+  valid for any client that reuses its cookie, for as long as that client
+  stays active.
 
 To cut off access immediately, revoke the permissions of the QuestDB groups
 that the user's groups map to. This takes effect at once for every session and
@@ -793,9 +815,10 @@ connection, including those of other users who map to the same groups.
 When a user creates a table or adds a column, QuestDB grants that user all
 permissions on it. Permissions cannot be granted to external users, so:
 
-- Ingestion, over ILP/HTTP or QWP, cannot create a table or add a column for an
-  external user. Create the tables in advance, with every column that the
-  client sends.
+- Ingestion, over ILP/HTTP or QWP, fails when it has to create a table or add a
+  column for an external user. QuestDB rolls back a new table, but a new column
+  stays in the table even though the request fails. Create the tables in
+  advance, with every column that the client sends.
 - An external user that creates a table or adds a column with SQL must name
   the owner with `OWNED BY`: one of the QuestDB groups that its groups map to,
   as set up in [Mapping user permissions](#mapping-user-permissions), not the
@@ -811,10 +834,11 @@ permissions on it. Permissions cannot be granted to external users, so:
 
 ## User and group claims
 
-:::warning Requires QuestDB Enterprise 4.0.2
+:::note
 
-This section describes QuestDB Enterprise 4.0.2 and later. For earlier
-versions, see [Versions before 4.0.2](#versions-before-402).
+Fallback claim lists, and the rules and startup checks that come with them,
+require QuestDB Enterprise 4.0.2 or later. For how earlier versions read the
+claims, see [Versions before 4.0.2](#versions-before-402).
 
 :::
 
@@ -864,11 +888,14 @@ new principal. Permissions stay the same, because they come from the groups.
 
 ### Fallback claim lists
 
-Both settings accept a comma-separated list of claim names in priority order,
-so one configuration can accept tokens that carry the principal and the groups
-under different claim names. Tokens issued to users and tokens issued to
-applications often differ this way. For example, Microsoft Entra ID user
-tokens, configured as in the
+In QuestDB Enterprise 4.0.2 and later, `acl.oidc.sub.claim` and
+`acl.oidc.groups.claim` accept a comma-separated list of claim names in
+priority order, so one configuration can accept tokens that carry the principal
+and the groups under different claim names. Earlier versions read the whole
+value as one claim name, so a list makes every OIDC login fail.
+
+Tokens issued to users and tokens issued to applications often differ this
+way. For example, Microsoft Entra ID user tokens, configured as in the
 [Entra ID guide](/docs/security/oidc-entra-id/#web-console-sign-in), carry
 `preferred_username` and `groups`, while its
 [app-only tokens](/docs/security/oidc-entra-id/#managed-identities-and-service-principals)
@@ -998,9 +1025,11 @@ and caches the result for up to
 [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl), 30 seconds
 by default. Because of the clock skew and the cache, QuestDB can accept a
 token, on new connections too, for up to 60 seconds plus `acl.oidc.cache.ttl`
-after it expires. After that, it rejects every request and new connection that
-presents the token. A PGWire or WebSocket connection that is already open stays
-open when its token expires.
+after it expires. After that, it rejects the token on every request and new
+connection. An HTTP request that also carries a valid session cookie, such as
+a request of the Web Console, is still accepted through the session, and a
+PGWire or WebSocket connection that is already open stays open when its token
+expires. See [Mapping user permissions](#mapping-user-permissions).
 
 With `acl.oidc.groups.encoded.in.token=false`, QuestDB sends the token to the
 provider's User Info endpoint, which validates it. See
@@ -1061,6 +1090,17 @@ and when it meets a key ID that it does not know, so either another provider
 issued the token, or QuestDB cannot reach the provider's keys, which it logs as
 `Unable to download public keys from OIDC provider`.
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB accepts only a JWT. It
+rejects a token that is not one, such as an opaque access token, and logs the
+whole token:
+
+```text
+Request failed [errorMsg=Invalid token format, cannot find header separator, expected format of JWT: <header>.<payload>.<signature> [token=...]]
+```
+
+Send a JWT instead, as described in
+[Non-interactive clients](#non-interactive-clients).
+
 With `acl.oidc.groups.encoded.in.token=false`, the provider's User Info
 endpoint rejects a token that is invalid or expired, and QuestDB rejects the
 login.
@@ -1069,9 +1109,12 @@ If the login succeeds but every request is denied, check that at least one of
 the user's groups is mapped to a QuestDB group that has the endpoint
 permission. See [Mapping user permissions](#mapping-user-permissions).
 
-If the login succeeds but ingestion fails because a table or a column does not
-exist, create it in advance. QuestDB cannot create a table or add a column on
-ingestion for an external user. See
+If the login succeeds but ingestion fails when it creates a table or adds a
+column, create the table and its columns in advance: ingestion cannot create a
+table or add a column for an external user. The error contains
+`Cannot grant permissions to an external user`. When ingestion adds a column,
+the client can receive `WAL writer is distressed and cannot be used any more`
+instead, and the column stays in the table. See
 [Tables created by external users](#tables-created-by-external-users).
 
 ## Versions before 4.0.2
@@ -1110,8 +1153,36 @@ When you upgrade from an earlier version:
 
 ## Configuration options
 
+A minimal configuration enables OIDC, points QuestDB at the provider, and
+names the client ID and the groups claim:
+
+```ini title="server.conf"
+# enable OIDC
+acl.oidc.enabled=true
+
+# the OIDC discovery document of the provider; alternatively, set
+# acl.oidc.host and the endpoint settings
+acl.oidc.configuration.url=https://idp.example.com/.well-known/openid-configuration
+
+# the client ID that the provider assigned to QuestDB
+acl.oidc.client.id=questdb
+
+# required, no default: the claim that carries the groups
+acl.oidc.groups.claim=groups
+
+# optional, sub by default: the claim that carries the principal
+# acl.oidc.sub.claim=sub
+
+# optional, false by default: read the claims from a JWT, such as the ID token,
+# instead of calling the User Info endpoint
+# acl.oidc.groups.encoded.in.token=true
+```
+
 For all OIDC-related configuration options of QuestDB, see
-[Configuration](/docs/configuration/oidc/).
+[Configuration](/docs/configuration/oidc/). For complete examples, see the
+QuestDB configuration in the
+[Microsoft Entra ID](/docs/security/oidc-entra-id/#questdb-configuration) and
+[PingFederate](/docs/security/oidc-pingfederate/#questdb-configuration) guides.
 
 <br />
 
