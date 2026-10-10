@@ -642,15 +642,18 @@ A `wait()` timeout is a no-progress timeout: the data remains queued and
 background delivery continues, so retry `wait()` rather than flushing the
 same rows again.
 
-`flush(wait=True)` and `wait()` observe the accepted (`Ok`) acknowledgement:
-the server took responsibility for the frames. They are pure barriers —
-data-fate notification is a separate channel, the
-[rejection handler](#server-rejections). A durable-level wait (waiting
-for object-storage upload on Enterprise deployments) is not exposed on the
-pooled Python API. The `request_durable_ack=on` connect key is accepted, and
-a server without durable-ack support rejects the first operation with
-`QuestDBErrorCode.ProtocolVersionError`; see the
-[connect string reference](/docs/connect/clients/connect-string/).
+`flush(wait=True)`, `wait()`, and the acknowledged FSN use the connection's
+configured barrier. With the default `request_durable_ack=off`, this is the
+accepted (`Ok`) acknowledgement. `request_durable_ack=local` waits for
+local-disk durability and requires WAL tables with `cairo.commit.mode=adaptive`;
+`replicated` or the legacy alias `on` waits for the replication/object-store
+boundary. `local,replicated` is accepted by the client but current servers deny
+that combined request. The pooled Python API does not select a different tier
+per call. A server that cannot grant the complete request fails
+the connection with `QuestDBErrorCode.ProtocolVersionError`; see the
+[connect string reference](/docs/connect/clients/connect-string/). Data-fate
+notification remains a separate channel, the
+[rejection handler](#server-rejections).
 
 Store-and-forward is bounded. When producers continuously outrun the server,
 publication can wait for ack-driven space and then raise

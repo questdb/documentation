@@ -433,7 +433,10 @@ db.flush_arrow_batch(
 
 Pass `Some(ColumnName)` instead of `None` to source the designated timestamp
 from an Arrow timestamp column. Passing `None` for the ACK level selects
-`Durable` when `request_durable_ack=on`, otherwise `Ok`.
+`LocalDurable` for `request_durable_ack=local`, `Durable` for `on`,
+`replicated`, or `local,replicated`, and `Ok` for `off`. Local durability also
+requires WAL tables with `cairo.commit.mode=adaptive`; current servers deny the
+combined request.
 
 For Polars, configure ingestion with `PolarsIngestOptions`:
 
@@ -666,9 +669,13 @@ rejected at build time.
 | Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
 `AckLevel::Ok` means the server accepted all frames through the boundary.
-`AckLevel::Durable` requires `request_durable_ack=on` and Enterprise server
-support. Requesting `Durable` without opting in is rejected before the buffer
-or chunk is changed.
+`AckLevel::LocalDurable` waits for the server's local disk and requires
+`request_durable_ack=local`, WAL tables, and `cairo.commit.mode=adaptive`.
+`AckLevel::Durable` waits for the replication/object-store boundary and requires
+`request_durable_ack=on` or `replicated`. `local,replicated` is accepted by the
+client but current servers deny the combined request. Requesting a level not
+selected by the connect string is rejected before the buffer or chunk is
+changed.
 
 A `wait` timeout is a no-progress timeout. The data remains queued and its
 background delivery continues. Retry `wait()` or keep observing `acked_fsn()`;

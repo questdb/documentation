@@ -59,12 +59,12 @@ Cross-reference:
 
 ## Durable-ack keys
 
-Opt in to object-store-durable trim. See
+Choose the local-disk or replicated durability boundary that drives trim. See
 [Durable-ack: when to opt in](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
+| `request_durable_ack` | enum: `off`, `on`, `local`, `replicated`, `local,replicated` | `off` | `local` trims on local-disk durable acknowledgements and requires adaptive commit mode. `replicated` trims after object-store replication. `on` is the legacy replicated alias. The combined value is protocol-defined but current servers do not grant it. A missing or partial grant fails the connection. WebSocket transports only. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -109,7 +109,7 @@ The parser rejects:
 - `sf_durability` values other than `memory`, `flush`, `append`. `flush`
   and `append` parse but are rejected at build time today.
 - `sender_id` containing path separators or empty.
-- `request_durable_ack=on` on non-WebSocket transports.
+- Any non-`off` `request_durable_ack` value on non-WebSocket transports.
 
 ## Worked examples
 

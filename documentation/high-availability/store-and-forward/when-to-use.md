@@ -73,51 +73,47 @@ string.
 
 ## Durable-ack: when to opt in
 
-By default the substrate trims unacked data on OK ack from the server.
-That means the substrate releases a frame once the server has acknowledged
-it into the WAL. The frame is durable on the **primary's** disk; whether
-it has been replicated to the object store or to replicas is a separate
-matter.
+By default the substrate trims unacked data after the server's OK response.
+An OK confirms a WAL commit, but is not itself a promise that the transaction
+has reached durable storage.
 
-When the connect string sets `request_durable_ack=on`, trim is held back
-until a separate `STATUS_DURABLE_ACK` frame confirms the data has been
-uploaded from the WAL to the **configured object store** (S3, Azure Blob,
-GCS, or NFS).
+Set `request_durable_ack=local` to retain the frame until QuestDB confirms that
+the WAL transaction is durable on the primary's disk. This requires a WAL table
+and `cairo.commit.mode=adaptive`. Set `request_durable_ack=replicated` (or its
+legacy alias, `on`) to retain the frame until `STATUS_DURABLE_ACK` confirms that
+the WAL reached the configured object store (S3, Azure Blob, GCS, or NFS).
 
 ### Choose durable-ack when
 
-- You require object-store durability before considering a write
-  acknowledged — e.g. compliance requirements, end-to-end exactly-once
-  pipelines with cross-region recovery.
-- Loss of an entire primary node (and its local disk) must not lose
-  in-flight data — replicas haven't downloaded the WAL yet, only the
-  object store has.
-- You are willing to trade later trim (and so larger steady-state SF
-  disk usage) for the stronger guarantee.
+- Use `local` when power-loss-safe durability on one server is sufficient and
+  you want to retain the client copy until that boundary.
+- Use `replicated` when loss of the primary and its disk must not lose in-flight
+  data, or for compliance and cross-region recovery requirements.
+- You are willing to trade later trim, and therefore larger steady-state SF
+  storage use, for the selected guarantee.
 
 ### Stay on the default OK trim when
 
-- WAL-local durability on the primary is sufficient.
-- You want minimum steady-state disk usage.
-- You are running OSS or a build that does not support durable-ack.
-  (The handshake fails loudly if you opt in but the server cannot
-  deliver — see below.)
+- Your upstream source can replay the server's local durability window.
+- You want minimum steady-state storage use.
+- The server does not support the durability tier you require.
 
 ### Caveats
 
-- **Server support is required.** The client sends
-  `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
-  back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
-  uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
-  that never arrive would let the SF disk fill up.
-- **Idle keepalive.** The OSS server only flushes pending durable-ack
-  frames during inbound recv events. The client sends a WebSocket PING
-  every `durable_ack_keepalive_interval_millis` (default 200 ms) when
-  there are pending confirmations and the producer is idle.
+- **Server support is required.** The server must echo the complete requested
+  tier set in `X-QWP-Durable-Ack`. A missing, partial, or different grant makes
+  the connection fail loudly. The legacy `on` request uses `true` on the wire
+  and expects `enabled`.
+- **Local mode prerequisite.** OSS can grant `local`, but the watermark advances
+  only for adaptive WAL tables. Since `nosync` is the server default, enabling
+  `local` without adaptive mode can leave the sender waiting indefinitely.
+- **Idle keepalive.** The server only flushes pending durable-ack frames during
+  inbound receive events. The client sends a WebSocket PING every
+  `durable_ack_keepalive_interval_millis` (default 200 ms) while confirmations
+  are pending and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
-  `ingest_rate × time_to_object_store_durability`. Size
-  `sf_max_total_bytes` accordingly.
+  `ingest_rate × time_to_requested_durability`. Size `sf_max_total_bytes`
+  accordingly.
 
 ## Orphan adoption: when to enable
 

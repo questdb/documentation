@@ -665,35 +665,33 @@ Requires QuestDB Enterprise (multi-host).
 
 *Applies to: ingress.*
 
-:::note QuestDB Enterprise
+Durable acknowledgements let a store-and-forward sender retain each frame until
+QuestDB confirms the requested durability boundary:
 
-Durable ACK requires QuestDB Enterprise. OSS is single-node and does not
-ship WALs off-box, so the server-side durability-acknowledgement signal
-that drives this protocol is enterprise-only.
+- `request_durable_ack=local` waits for `STATUS_LOCAL_DURABLE_ACK`. The WAL
+  transaction survives power loss on that server, but not loss of its disk.
+  This requires WAL tables and `cairo.commit.mode=adaptive`; a `nosync` server
+  can accept the handshake without producing local progress.
+- `request_durable_ack=replicated` waits for `STATUS_DURABLE_ACK` after the WAL
+  reaches the configured object store. This requires QuestDB Enterprise with
+  replication.
+- `request_durable_ack=local,replicated` requests both streams. It is
+  protocol-defined but not currently granted by servers. When supported, only
+  the stronger replicated stream may drive trim.
+- `request_durable_ack=on` is the legacy alias for `replicated`. It retains the
+  original `true` request and `enabled` confirmation on the wire.
+- `request_durable_ack=off` (the default) trims on ordinary OK responses.
 
-:::
+A server grants the complete requested tier set or fails the connection; it
+never silently substitutes a weaker guarantee.
 
-QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an
-object store or another file system — typically over the network. After
-durably shipping a WAL, the server emits a `STATUS_DURABLE_ACK` frame to
-the store-and-forward client; the client marks that frame's FSN as durable
-only after this acknowledgement arrives.
+`durable_ack_keepalive_interval_millis` controls how often the client sends a
+WebSocket PING while durable work is pending. This is required because the
+server emits pending durable progress only while handling inbound traffic.
+Default: `200` ms. Set to `0` or a negative value to disable.
 
-The benefit: if the primary dies before shipping a WAL, the client still
-holds the corresponding frames in its SF buffer and replays them against
-the new primary on failover — closing the data-loss window that a
-transport-level OK ACK alone cannot close.
-
-- `request_durable_ack` — when `on`, the client gates trim on
-  `STATUS_DURABLE_ACK` frames from the server, suppressing OK-driven trim.
-  Default: `off`.
-- `durable_ack_keepalive_interval_millis` — interval at which the client
-  emits keepalive PINGs while waiting for durable-ack frames. Required
-  because the server only flushes pending durable acks on inbound recv
-  events. Default: `200` (ms). Set to `0` or a negative value to disable.
-
-See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
-wire protocol for the underlying mechanism.
+See the [QWP ingress WebSocket protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+for the wire-level contract.
 
 ## Query client keys {#egress-keys}
 
@@ -901,7 +899,7 @@ description and behaviour notes.
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
-| `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
+| `request_durable_ack`                   | enum (`off` / `on` / `local` / `replicated` / `local,replicated`) | `off` | [Durable ACK](#durable-ack) |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
