@@ -73,7 +73,7 @@ export const tablesTitle = "Screenshot of QuestDB tables in the VisuaLeaf sideba
 Right-click the database and choose `New SQL Editor`, then run queries with:
 
 - `Run All` (<kbd>F5</kbd>) to run the whole script, or
-- `Run` (<kbd>F9</kbd>) to run the current statement.
+- `Run` (<kbd>F9</kbd>) to run the selected text.
 
 QuestDB-specific SQL such as `SAMPLE BY` works as written:
 
