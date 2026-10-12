@@ -127,7 +127,7 @@ It is a WAL table partitioned by day, with this schema:
 | `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
 | `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
 | `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds.                                      |
-| `status`         | `SYMBOL`    | `ok`, or `error` when the read failed or was cancelled. A failed read is recorded because it was attempted. |
+| `status`         | `SYMBOL`    | `ok`, or `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). |
 | `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id.          |
 
 Reads that stream page frames, such as Parquet export, record the row when the
@@ -164,15 +164,24 @@ variable:
 - Holds a sub-query anywhere in its value, such as
   `(SELECT max(timestamp) FROM trades)`. The error is the same, with the type
   `CURSOR`.
-- Is an aggregate function, such as `max(price)`. The error is
-  `audited view parameter cannot be an aggregate function`.
+- Refers to a column, such as `price` or `price * 2`. An `AUDITED` value is
+  evaluated once per read, apart from the rows the read returns, so it cannot
+  use a column. The error is `Invalid column: price`. The same declaration
+  without `AUDITED` is accepted.
+- Is an aggregate function, such as `count()`. The error is
+  `audited view parameter cannot be an aggregate function`. An aggregate over a
+  column, such as `max(price)`, fails on the column first, with
+  `Invalid column: price`.
 - Can change while the query runs, such as `rnd_int()` or `systimestamp()`. The
   error is `audited view parameter has a value that can change during the query`.
   A value built on `now()` is fixed for the whole query, and is recorded.
 
-`CREATE VIEW ... WITH AUDIT`, `ALTER VIEW` and `CREATE OR REPLACE VIEW` check the
-view's own declarations the same way, so a view that no read could audit is
-refused when it is defined.
+These rules are checked when the read compiles, so a read refused by one of them
+records no row. `CREATE VIEW ... WITH AUDIT`, `ALTER VIEW` and
+`CREATE OR REPLACE VIEW` check the view's own declarations against the same
+rules, so a view whose default values break one is refused when it is defined.
+The size limit below is not checked there: a view whose default values are too
+large to record is created, and every read that uses those defaults fails.
 
 A read also fails when an `AUDITED` value cannot be evaluated, for example when
 a caller's override makes a function raise an error. This holds even when the
@@ -223,20 +232,22 @@ the remote tier the nodes would overwrite and delete each other's partitions.
 
 To remove older rows, drop partitions, or truncate the table with
 [`TRUNCATE TABLE`](/docs/query/sql/truncate/). Retention is the operator's to
-manage.
+manage, and nothing records that these statements ran: see
+[Protection](#protection) for the statements that remove rows, and
+[Permissions](#permissions) for who may run them.
 
 ### Protection
 
-Only the server writes the trail. Statements that could erase it, forge or
-rewrite its rows, or stop it are refused for every principal, the built-in
-admin included:
+Only the server writes the trail. Statements that would forge or rewrite its
+rows, drop or rename the table, change its structure, or stop the server
+writing it are refused for every principal, the built-in admin included:
 
 | Statement                                                                                                   | Error                                                                                     |
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `DROP TABLE`, a [CSV import](/docs/connect/compatibility/rest-api/#imp---import-data) with `overwrite=true`  | `cannot drop the view audit table`                                                        |
 | `RENAME TABLE`, from or to its name                                                                         | `cannot rename the view audit table`                                                      |
-| `INSERT`, `UPDATE`, `COPY`, any other CSV import, ILP, including an ILP row that would add a column         | `cannot write to the view audit table, only the server records rows in it`                |
-| `ALTER TABLE` that adds, drops, renames or retypes a column, or turns deduplication on or off               | `cannot change the structure of the view audit table`                                     |
+| `INSERT`, `UPDATE`, `COPY`, any other CSV import, ILP, including an ILP row that would add a column, and `ALTER TABLE ADD COLUMN` | `cannot write to the view audit table, only the server records rows in it`                |
+| `ALTER TABLE` that drops, renames or retypes a column, or turns deduplication on or off                     | `cannot change the structure of the view audit table`                                     |
 | `ALTER TABLE SET TYPE` from WAL to non-WAL                                                                  | `cannot change the type of the view audit table`                                          |
 | `ALTER TABLE SUSPEND WAL`                                                                                   | `cannot suspend the view audit table`                                                     |
 | `ALTER TABLE RESUME WAL FROM TRANSACTION n`                                                                 | `cannot resume the view audit table from a transaction, it would skip recorded reads`     |
@@ -245,10 +256,21 @@ admin included:
 
 `DROP ALL TABLES` skips system tables, so it leaves the trail in place.
 
-These remain available: `SELECT`, `TRUNCATE TABLE`, partition operations such
-as `DROP PARTITION` and `CONVERT PARTITION TO PARQUET`, a storage policy that
-stays local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended
-trail without losing a row.
+Removing rows is not refused. These statements are retention operations,
+governed only by the [permissions](#permissions) they need, as on any other
+table. Nothing records that they ran.
+
+- [`TRUNCATE TABLE`](/docs/query/sql/truncate/)
+- [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
+  [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
+- [`SET TTL`](/docs/query/sql/alter-table-set-ttl/)
+- A [storage policy](/docs/query/sql/alter-table-set-storage-policy/) with a
+  `DROP LOCAL` stage
+
+These remain available too: `SELECT`, other partition operations such as
+`CONVERT PARTITION TO PARQUET`, any other change to a storage policy that stays
+local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended trail
+without losing a row.
 
 Changes to the table's columns are refused because each node keeps its own
 table, so such a change would stay on the node that made it, and because the
@@ -258,7 +280,8 @@ See [Delivery](#delivery).
 The write and `SET TYPE` refusals are made by access control, so they do not
 apply when it is turned off with
 [`acl.enabled=false`](/docs/configuration/iam/#aclenabled). The other refusals
-always apply.
+always apply, and `ALTER TABLE ADD COLUMN` is then refused with
+`cannot change the structure of the view audit table`.
 
 ## What counts as a read
 
@@ -286,11 +309,21 @@ values.
 
 These record nothing:
 
+- A statement refused before it runs: a syntax error, an unknown column or
+  function, an `AUDITED` value that
+  [cannot be audited](#values-that-cannot-be-audited), or a principal without
+  `SELECT` on the view. Access is checked when the statement compiles, so a
+  denied attempt to read an audited view is usually not in the trail. The
+  exception is a cached or prepared plan, which is checked again when it runs:
+  a refusal there records a row with status `error`. The plan can come from an
+  earlier execution of the same SQL text, or from a statement prepared before a
+  `REVOKE`.
 - `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `ALTER VIEW` and
   `CREATE OR REPLACE VIEW` whose query reads an audited view, when the check
   passes. Each opens its query only to check it, and hands no rows to anyone. A
-  check that fails records a row with status `error`, like any failed read,
-  because its error message can carry values from the rows it read.
+  check that fails while it runs records a row with status `error`, like any
+  read that fails, because its error message can carry values from the rows it
+  read.
 - Reads the database runs on its own behalf: materialized view refreshes, WAL
   apply, and view compilation, including
   [`COMPILE VIEW`](/docs/query/sql/compile-view/). No principal is reading data
@@ -419,7 +452,8 @@ Lost rows show in the server log only. No metric reports them.
 | Drop an audited view, with `DROP VIEW` or `DROP ALL TABLES`         | `DROP VIEW` on the view and `AUDIT VIEW`                  |
 | Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`. The view stays audited |
 | Read an audited view                                                | `SELECT` on the view, as for any [view](/docs/concepts/views/#definer-security-model-enterprise) |
-| Read or truncate the trail                                          | `SELECT` or `TRUNCATE TABLE` on `sys.view_audit`          |
+| Read the trail                                                      | `SELECT` on `sys.view_audit`                              |
+| Remove rows from the trail                                          | Any of `TRUNCATE TABLE`, `DROP PARTITION`, `DETACH PARTITION`, `SET TABLE PARAM` (for `SET TTL`) or `SET STORAGE POLICY` (for a `DROP LOCAL` stage), on `sys.view_audit` or `ON ALL TABLES` |
 
 `AUDIT VIEW` is a database-level permission, included in `ALL` and
 `DATABASE ADMIN`. It guards every statement that binds a view to the trail,
@@ -434,14 +468,18 @@ A view's auditing is set when it is created. `ALTER VIEW` and
 view, or to stop auditing one, drop it and create it again.
 
 `CREATE OR REPLACE VIEW ... WITH AUDIT` over an existing audited view is
-accepted and changes nothing, so a deploy script that created the view can run
-again. Over a view that is not audited, it fails with
+accepted: the body is replaced as usual, the view stays audited, and
+`WITH AUDIT` adds nothing. So a deploy script that creates the view this way can
+run again, unless it uses `OWNED BY`, which `CREATE OR REPLACE VIEW` over an
+existing view rejects. Over a view that is not audited, it fails with
 `cannot audit an existing view, drop and re-create it WITH AUDIT`. `ALTER VIEW`
 does not accept `WITH AUDIT`.
 
-Grant `SELECT` on `sys.view_audit` to the people who review the trail, and
-`TRUNCATE TABLE` only to the operators who manage its retention. No principal
-can write rows to it, whatever it holds: see [Protection](#protection).
+Grant `SELECT` on `sys.view_audit` to the people who review the trail, and the
+permissions that remove its rows only to the operators who manage its
+retention. A grant of those permissions `ON ALL TABLES` covers the trail too, so
+review existing grants as well. No principal can write rows to it, whatever it
+holds: see [Protection](#protection).
 
 ## Replication, backups, and read-only instances
 
@@ -488,6 +526,10 @@ audited are unaffected.
   join, so the only such statement that compiles reads, in a sub-query, an
   audited view whose query reads only the updated table. The same statement on
   a non-WAL table is recorded.
+- **Denied reads are usually not recorded.** Access to a view is checked when a
+  statement compiles, and a statement refused there records no row. So the trail
+  is not a record of failed access attempts: see
+  [What counts as a read](#what-counts-as-a-read).
 - **Copies are recorded once.** `INSERT INTO ... SELECT` and
   `CREATE TABLE AS SELECT` record the read that made the copy. Reads of the copy
   are not audited.

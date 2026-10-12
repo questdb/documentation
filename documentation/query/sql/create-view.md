@@ -253,10 +253,12 @@ to `CREATE VIEW`. The view stays audited through `ALTER VIEW` and
 To audit an existing view, drop it and create it again.
 
 Over an existing view, `CREATE OR REPLACE VIEW` accepts `WITH AUDIT` only when
-the view is already audited. There it changes nothing, so the statement that
-created the view can run again. Over a view that is not audited, it fails with
+the view is already audited. There the body is replaced as usual, the view
+stays audited, and `WITH AUDIT` adds nothing, so the statement that created the
+view can run again. Over a view that is not audited, it fails with
 `cannot audit an existing view, drop and re-create it WITH AUDIT`.
-`CREATE OR REPLACE VIEW` over an existing view does not accept `OWNED BY`.
+`CREATE OR REPLACE VIEW` over an existing view does not accept `OWNED BY`, so a
+statement that uses it cannot run again.
 
 ## See also
 
