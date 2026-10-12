@@ -10,11 +10,29 @@ Audited views are [Enterprise](/enterprise/) only.
 :::
 
 An audited view records each read of it in the `sys.view_audit` table. These
-settings control the in-memory queue that carries rows from the reading query
-to the background job that writes them, and the storage policy the table is
-created with.
+settings control how large a read's recorded parameters may be, the in-memory
+queue that carries rows from the reading query to the background job that
+writes them, and the storage policy the table is created with.
+
+The server checks the values at startup, and refuses to start, naming the
+property, when one is out of range.
 
 For details, see [Audited views](/docs/security/audited-views/).
+
+## view.audit.params.max.size
+
+- **Default**: `1M` (1 MiB)
+- **Reloadable**: no
+
+Largest `params` value, in bytes, that one read of an audited view may record.
+A read whose audited parameters render past it is refused with
+`view audit parameters are too large to record, the read is refused`, and
+records a row with status `error` and `NULL` in `params`. This keeps a caller
+from passing a value too large to record, such as a very long override of a
+list or text parameter.
+
+Range: `1K` (1024 bytes) to 256 MiB minus one byte, the largest value a
+`VARCHAR` column holds.
 
 ## view.audit.queue.capacity
 
@@ -23,7 +41,8 @@ For details, see [Audited views](/docs/security/audited-views/).
 
 Number of audit rows the queue holds between the queries that read audited
 views and the job that writes them to `sys.view_audit`. The value is rounded up
-to a power of two, and the queue is allocated on the heap at startup.
+to a power of two, and the queue is allocated on the heap at startup. Range:
+`1` to `1073741824` (2<sup>30</sup>).
 
 Recording never makes a read wait. When the queue is full, the read still runs,
 its row is dropped, and the server logs `view audit queue is full, dropping
@@ -31,6 +50,21 @@ rows`. Raise the capacity if that message appears during bursts of audited
 reads. Auditing is lossy by design: see
 [Delivery](/docs/security/audited-views/#delivery) for every case in which a
 read goes unrecorded.
+
+## view.audit.queue.params.max.size
+
+- **Default**: `64M` (64 MiB)
+- **Reloadable**: no
+
+Total size, in bytes, that the `params` of the rows waiting in the queue may add
+up to. It bounds the heap the queue can hold, which the slot count alone does
+not: each slot can hold up to
+[`view.audit.params.max.size`](#viewauditparamsmaxsize). A read whose row does
+not fit is still served, and its row is dropped as on a full queue, with the
+same log message.
+
+Must be at least `view.audit.params.max.size`, so that a read within that limit
+always fits an empty queue.
 
 ## view.audit.storage.policy
 
@@ -50,4 +84,6 @@ exists: use
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
 for that. Set the property to an empty value to create the table with no
 storage policy. If the server rejects the policy, it logs the error and creates
-the table without one.
+the table without one. A policy with `TO REMOTE` or `DROP REMOTE` is always
+rejected, because each node keeps its own trail under the same table name: see
+[Retention](/docs/security/audited-views/#retention).

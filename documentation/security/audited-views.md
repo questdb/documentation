@@ -72,8 +72,12 @@ DECLARE [ OVERRIDABLE ] [ AUDITED ] @variable := expression
 - `WITH AUDIT` and `OWNED BY` may appear in either order. `WITH AUDIT` requires
   the [`AUDIT VIEW`](#permissions) permission.
 - `AUDITED` and `OVERRIDABLE` are independent and may appear in either order.
-  `AUDITED` takes effect only in the body of a view created `WITH AUDIT`.
-  Elsewhere it is accepted and has no effect.
+- `AUDITED` takes effect only in the `DECLARE` block that opens the body of a
+  view created `WITH AUDIT`. In a sub-query, a CTE, or a set-operation branch
+  after the first, it fails with
+  `AUDITED is only allowed in the top-level DECLARE block`. In the block that
+  opens a statement, or the body of a view created without `WITH AUDIT`, it is
+  accepted and has no effect.
 - A view created `WITH AUDIT` with no `AUDITED` variables still records every
   read, with `{}` in `params`.
 
@@ -109,16 +113,19 @@ trail, declare the bounds as timestamps, as `@since` does above.
 
 ## The audit table
 
-The server creates `sys.view_audit` at startup. The `sys.` prefix follows
+The server creates `sys.view_audit` at startup, and a replica promoted to
+primary creates it if it does not have it yet. No client can create a table or
+view of that name.
+The `sys.` prefix follows
 [`cairo.system.table.prefix`](/docs/configuration/cairo-engine/#cairosystemtableprefix).
 It is a WAL table partitioned by day, with this schema:
 
 | Column           | Type        | Description                                                                                                  |
 | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
 | `ts`             | `TIMESTAMP` | When the read finished and the row was recorded. The designated timestamp.                                   |
-| `principal`      | `SYMBOL`    | The user or service account that ran the query.                                                              |
+| `principal`      | `SYMBOL`    | The user or service account the read ran as, taken when the read starts. After `ASSUME SERVICE ACCOUNT`, it is the service account. |
 | `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
-| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated. |
+| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
 | `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds.                                      |
 | `status`         | `SYMBOL`    | `ok`, or `error` when the read failed or was cancelled. A failed read is recorded because it was attempted. |
 | `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id.          |
@@ -141,6 +148,7 @@ text and a report can group on the column directly:
 | ------------------------------------------------- | ---------------------------------------------------------------------- |
 | `BOOLEAN`                                         | `true` or `false`                                                      |
 | `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE` | Number                                                                 |
+| `DECIMAL`                                         | Number at the type's scale, every digit written out: `150.00m` is `150.00` |
 | `CHAR`, `STRING`, `SYMBOL`, `VARCHAR`             | String                                                                 |
 | `TIMESTAMP`                                       | ISO 8601 string, in the timestamp's own precision (micro or nanosecond) |
 | `DATE`                                            | ISO 8601 string, with microseconds                                     |
@@ -156,6 +164,8 @@ variable:
 - Holds a sub-query anywhere in its value, such as
   `(SELECT max(timestamp) FROM trades)`. The error is the same, with the type
   `CURSOR`.
+- Is an aggregate function, such as `max(price)`. The error is
+  `audited view parameter cannot be an aggregate function`.
 - Can change while the query runs, such as `rnd_int()` or `systimestamp()`. The
   error is `audited view parameter has a value that can change during the query`.
   A value built on `now()` is fixed for the whole query, and is recorded.
@@ -170,6 +180,12 @@ query never uses the variable, such as one that only feeds a column the query
 does not select. The read returns the error without reading any data, and
 records a row with status `error` and `NULL` in `params`. The trail cannot show
 what such a read was given, so the read does not run.
+
+The same happens when a read's `params` would be larger than
+[`view.audit.params.max.size`](/docs/configuration/audited-views/#viewauditparamsmaxsize),
+1 MiB by default, for example when a caller overrides a list or a text
+parameter with a very long value. The error is
+`view audit parameters are too large to record, the read is refused`.
 
 ### Query the trail
 
@@ -199,26 +215,68 @@ Parquet. The setting applies only when the server creates the table. After
 that, change the policy with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
 
-The table cannot be dropped, so the trail cannot be erased by whoever holds
-`DROP TABLE`. That holds for every route that drops a table: `DROP TABLE`,
-`DROP ALL TABLES`, and a
-[CSV import](/docs/connect/compatibility/rest-api/#imp---import-data) with
-`overwrite=true`. It can be truncated with
-[`TRUNCATE TABLE`](/docs/query/sql/truncate/), which keeps retention the
-operator's to manage.
+A policy can convert and drop local partitions, but cannot move the trail to
+object storage: `TO REMOTE` and `DROP REMOTE` are refused with
+`cannot set storage policy with 'TO REMOTE' on the view audit table` (or
+`'DROP REMOTE'`). Every node keeps its own trail under the same table name, so in
+the remote tier the nodes would overwrite and delete each other's partitions.
 
-`ALTER TABLE` cannot change the table's structure: adding, dropping, renaming
-or retyping a column, and turning deduplication on or off, are refused. Each
-node keeps its own table, so such a change would stay on the node that made it.
-The storage policy, partition operations and `TRUNCATE TABLE` remain available.
+To remove older rows, drop partitions, or truncate the table with
+[`TRUNCATE TABLE`](/docs/query/sql/truncate/). Retention is the operator's to
+manage.
+
+### Protection
+
+Only the server writes the trail. Statements that could erase it, forge or
+rewrite its rows, or stop it are refused for every principal, the built-in
+admin included:
+
+| Statement                                                                                                   | Error                                                                                     |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `DROP TABLE`, a [CSV import](/docs/connect/compatibility/rest-api/#imp---import-data) with `overwrite=true`  | `cannot drop the view audit table`                                                        |
+| `RENAME TABLE`, from or to its name                                                                         | `cannot rename the view audit table`                                                      |
+| `INSERT`, `UPDATE`, `COPY`, any other CSV import, ILP, including an ILP row that would add a column         | `cannot write to the view audit table, only the server records rows in it`                |
+| `ALTER TABLE` that adds, drops, renames or retypes a column, or turns deduplication on or off               | `cannot change the structure of the view audit table`                                     |
+| `ALTER TABLE SET TYPE` from WAL to non-WAL                                                                  | `cannot change the type of the view audit table`                                          |
+| `ALTER TABLE SUSPEND WAL`                                                                                   | `cannot suspend the view audit table`                                                     |
+| `ALTER TABLE RESUME WAL FROM TRANSACTION n`                                                                 | `cannot resume the view audit table from a transaction, it would skip recorded reads`     |
+| A storage policy with `TO REMOTE` or `DROP REMOTE`                                                          | `cannot set storage policy with 'TO REMOTE' on the view audit table`                      |
+| `CREATE TABLE`, `CREATE VIEW` or another `CREATE` of its name, or `COPY` into it, while the table is missing | `cannot create the view audit table, only the server creates it`                         |
+
+`DROP ALL TABLES` skips system tables, so it leaves the trail in place.
+
+These remain available: `SELECT`, `TRUNCATE TABLE`, partition operations such
+as `DROP PARTITION` and `CONVERT PARTITION TO PARQUET`, a storage policy that
+stays local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended
+trail without losing a row.
+
+Changes to the table's columns are refused because each node keeps its own
+table, so such a change would stay on the node that made it, and because the
+server stops writing the trail when a column it writes is missing or retyped.
+See [Delivery](#delivery).
+
+The write and `SET TYPE` refusals are made by access control, so they do not
+apply when it is turned off with
+[`acl.enabled=false`](/docs/configuration/iam/#aclenabled). The other refusals
+always apply.
 
 ## What counts as a read
 
 A read is one execution of a statement that reads rows through an audited view:
-`SELECT`, `INSERT INTO ... SELECT`, `CREATE TABLE AS SELECT`, or an `UPDATE` of a
-non-WAL table that reads the view in its `FROM` clause or in a sub-query. Each
-execution records its own rows, including every execution of a cached or
-prepared statement.
+`SELECT`, `INSERT INTO ... SELECT`, `CREATE TABLE AS SELECT`, an `UPDATE` of a
+non-WAL table that reads the view in its `FROM` clause or in a sub-query, or an
+[`EXPLAIN`](/docs/query/sql/explain/) of a `SELECT`, `INSERT INTO ... SELECT`
+or `CREATE TABLE AS SELECT`. Each execution records its own rows, including
+every execution of a cached or prepared statement.
+
+`EXPLAIN` counts because it opens the plan it prints. That runs the plan's
+sub-queries, and the printed plan can show values they read, such as a scalar
+sub-query's result used as an interval bound.
+
+A [`PIVOT ... FOR ... IN (SELECT ...)`](/docs/query/sql/pivot/) sub-query runs
+when the statement compiles, to find the pivot's columns. When it reads an
+audited view, it records a row at that point, even if the statement is only
+prepared or fails later. Executing the statement then records another.
 
 When one statement mentions the same view more than once, in a join, a union,
 or a sub-query, the view records one row for each distinct set of parameter
@@ -233,8 +291,14 @@ These record nothing:
   passes. Each opens its query only to check it, and hands no rows to anyone. A
   check that fails records a row with status `error`, like any failed read,
   because its error message can carry values from the rows it read.
-- Reads the database runs on its own behalf: materialized view refreshes and
-  WAL apply. No principal is reading data there.
+- Reads the database runs on its own behalf: materialized view refreshes, WAL
+  apply, and view compilation, including
+  [`COMPILE VIEW`](/docs/query/sql/compile-view/). No principal is reading data
+  there.
+- An attempt that fails before it reads anything, because its plan went stale
+  when a view or table changed after it compiled, or because a reader pool was
+  full. The server recompiles and retries a stale plan, and the retry records
+  the read.
 - An `UPDATE` of a WAL table. See [Limitations](#limitations).
 
 ## Audited views that read other audited views
@@ -309,27 +373,39 @@ The rule in full:
 Auditing is lossy by design, and there is no lossless mode. Recording a read
 never makes the read wait, and a read is never refused because its row cannot
 be recorded, except on a
-[read-only instance](#replication-and-read-only-instances). Treat the trail as a
-best-effort record: under overload, or when a write fails, a read can go
-unrecorded.
+[read-only instance](#replication-backups-and-read-only-instances), or when its
+parameters are [too large to record](#values-that-cannot-be-audited). Treat the
+trail as a best-effort record: under overload, or when a write fails, a read
+can go unrecorded.
 
 A read puts its row on a bounded in-memory queue, and a background job writes
 the queue to the table. The queue holds
 [`view.audit.queue.capacity`](/docs/configuration/audited-views/#viewauditqueuecapacity)
-rows, 4096 by default.
+rows, 4096 by default, and the `params` of the rows in it may add up to
+[`view.audit.queue.params.max.size`](/docs/configuration/audited-views/#viewauditqueueparamsmaxsize),
+64 MiB by default.
 
 A read goes unrecorded when:
 
-- **The queue is full when the read finishes**, because audited reads outpace
-  the job. The server logs `view audit queue is full, dropping rows` with a
-  running total, on the first drop and every 1024th after that. Raise the
-  capacity if this appears during bursts of audited reads.
+- **The queue is full when the read finishes**: it has no free slot, or no room
+  left for the row's `params`, because audited reads outpace the job. The
+  server logs `view audit queue is full, dropping rows` with a running total,
+  on the first drop and every 1024th after that. Raise the capacity if this
+  appears during bursts of audited reads, or the size limit if the reads carry
+  large parameters.
+- **The read cannot copy its row into the queue**, for example when the heap is
+  exhausted. The server logs `could not record view audit row`.
 - **The job fails to write a batch.** The batch, up to 1024 rows, is lost, and
-  the server logs `could not write view audit rows`.
-- **The audit table is missing a column, or a column has the wrong type.** The
-  server logs the reason once and discards audit rows. The server creates the
-  table with the right columns and SQL cannot change them, so this happens only
-  to a table created some other way. See [Retention](#retention).
+  the server logs `could not write view audit rows` with the number lost.
+- **The audit table cannot take rows**: a column is missing or has the wrong
+  type, `ts` is not its designated timestamp, or it is not a WAL table. The
+  server logs the reason once, and discards audit rows until it restarts with
+  the table repaired. Convert a non-WAL table with
+  [`ALTER TABLE SET TYPE WAL`](/docs/query/sql/alter-table-set-type/). The
+  server creates the table in the right shape, and SQL cannot change its
+  columns or convert it to non-WAL, so with access control on this happens only
+  to a table of that name that predates the upgrade to audited views. See
+  [Protection](#protection).
 - **The server stops or crashes with rows still in the queue.** The queue is
   held in memory only.
 
@@ -354,15 +430,20 @@ permission a principal who can alter a view, or drop and recreate it, could
 shed its auditing unremarked.
 
 A view's auditing is set when it is created. `ALTER VIEW` and
-`CREATE OR REPLACE VIEW` over an existing view keep it, and do not accept
-`WITH AUDIT`. To audit an existing view, or to stop auditing one, drop it and
-create it again.
+`CREATE OR REPLACE VIEW` over an existing view keep it. To audit an existing
+view, or to stop auditing one, drop it and create it again.
 
-`sys.view_audit` takes ordinary table permissions. Grant `SELECT` on it to the
-people who review the trail, and keep write permissions such as `INSERT`,
-`UPDATE` and `TRUNCATE TABLE` to the operators who manage it.
+`CREATE OR REPLACE VIEW ... WITH AUDIT` over an existing audited view is
+accepted and changes nothing, so a deploy script that created the view can run
+again. Over a view that is not audited, it fails with
+`cannot audit an existing view, drop and re-create it WITH AUDIT`. `ALTER VIEW`
+does not accept `WITH AUDIT`.
 
-## Replication and read-only instances
+Grant `SELECT` on `sys.view_audit` to the people who review the trail, and
+`TRUNCATE TABLE` only to the operators who manage its retention. No principal
+can write rows to it, whatever it holds: see [Protection](#protection).
+
+## Replication, backups, and read-only instances
 
 Every node records the reads it serves, replicas included, into its own
 `sys.view_audit`. The rows are not replicated between nodes, so the complete
@@ -374,7 +455,18 @@ the reads it serves into that table. Until the definition arrives, the replica
 keeps its audit rows in the queue, and a read whose row finds the queue full
 goes unrecorded, as in [Delivery](#delivery). This matters only for a replica
 that starts before its primary has created the table, such as when replicas
-are upgraded first.
+are upgraded first. A replica promoted to primary before the table reached it
+creates the table itself, with
+[`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy).
+
+A [backup](/docs/operations/backup/) includes the node's `sys.view_audit`, and
+restoring it onto an empty node brings that table back. Restoring a newer
+backup onto a node that was restored before keeps the node's own table, with
+the reads it recorded since. A node restored from a backup taken before audited
+views existed creates the table at startup without a storage policy, and logs
+an advisory with the `ALTER TABLE ... SET STORAGE POLICY` statement that
+applies it. Run that statement once you no longer restore newer backups onto
+the node: until then, the storage policy tables belong to the backup.
 
 An instance started with `readonly=true` cannot write the trail, so it refuses
 reads of audited views with

@@ -37,7 +37,11 @@ The `AUDITED` keyword only takes effect inside the definition of an
 [audited view](/docs/security/audited-views/), a QuestDB Enterprise feature. It
 marks a variable whose resolved value each read of the view records in the
 audit trail. It is independent of `OVERRIDABLE`, and the two may appear in
-either order. Elsewhere it is accepted and has no effect.
+either order. It is allowed only in the `DECLARE` block that opens a view body
+or a statement: in a subquery, a CTE, or a set-operation branch after the
+first, it fails with `AUDITED is only allowed in the top-level DECLARE block`.
+In a statement's own block, or in a view that is not audited, it is accepted
+and has no effect.
 
 A [value list](#value-lists) declares the set of values an `IN` filter tests
 against.
@@ -257,7 +261,7 @@ of `IN`. These fail:
 | `SELECT @symbols`, `WHERE symbol = @symbols`           | `declared list can only be used on the right-hand side of IN` |
 | `OVER (PARTITION BY @symbols)`                         | `declared list can only be used on the right-hand side of IN` |
 | `@all := (@symbols, 'SOL-USDT')`                       | `declared list can only be used on the right-hand side of IN` |
-| `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`         | `nested lists are not supported`                          |
+| `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`         | `nested lists are not supported, list members have to be values` |
 | `@x := ()`                                             | `value expected in list`                                  |
 
 To combine a list with more values, write both in the `IN`:
