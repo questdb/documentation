@@ -397,7 +397,14 @@ See [Operating cold storage](/docs/operations/cold-storage/#backup-and-restore) 
   own [`backup_instance_name`](#backup-instance-name), so backing up both
   a primary and its replica creates two separate backup sets in the object
   store. Typically, backing up the primary is sufficient since replicas sync
-  from the same data.
+  from the same data. The exception is the audit trail of audited views, which
+  is per node (next bullet).
+- **The view audit table is per node** (Enterprise): each node records the
+  reads of [audited views](/docs/security/audited-views/) it serves in its own
+  `sys.view_audit`, and replication does not copy those rows. A backup of the
+  primary holds only the primary's trail, so back up each replica whose trail
+  you need to keep. Scheduled backups run on the primary only, so a replica
+  needs a manual `BACKUP DATABASE`.
 - **Same backup object store for all nodes**: When using replication, all
   nodes in the cluster should use the same `backup.object.store` connection
   string. The [WAL cleaner](/docs/high-availability/wal-cleanup/) reads
@@ -583,6 +590,11 @@ more recent than the oldest available WAL data.
 
    QuestDB restores from the backup first, then switches to WAL replay to catch
    up with the primary.
+
+   The new replica's `sys.view_audit` starts as a copy of the primary's, up to
+   the time of the backup. When you merge the trails of
+   [audited views](/docs/security/audited-views/#replication-backups-and-read-only-instances)
+   across nodes, leave those rows out of the replica's, or they count twice.
 
 :::note
 

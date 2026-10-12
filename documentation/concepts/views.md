@@ -188,8 +188,9 @@ DECLARE @limit := 50 SELECT * FROM mixed_params
 
 ### List parameters
 
-A parameter can hold a list of values for an `IN` filter. A caller can override
-it with a list of any length:
+A parameter can hold a list of values for an `IN` filter. Each statement that
+reads the view can override it with a list of any length. In a prepared
+statement, the length is fixed by its text: `($1, $2)` always takes two values.
 
 ```questdb-sql
 CREATE VIEW trades_for AS (
@@ -461,10 +462,10 @@ For more details on permissions, see
 
 ### Audited views (Enterprise)
 
-A view created `WITH AUDIT` records every read of it in the `sys.view_audit`
+A view created `WITH AUDIT` records each read of it in the `sys.view_audit`
 table: who read it, when, and the values its `AUDITED` parameters resolved to,
-including a caller's overrides and bind variables. Use it to keep an audit
-trail of access to sensitive data:
+including a caller's overrides and bind variables. Use it to keep a
+best-effort audit trail of access to sensitive data:
 
 ```questdb-sql
 CREATE VIEW trades_by_symbol AS (
@@ -530,4 +531,4 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [Materialized Views](/docs/concepts/materialized-views/): Incrementally maintained `SAMPLE BY` aggregates
   - [Live views](/docs/concepts/live-views/): Incrementally maintained row-per-input window-function results
   - [DECLARE](/docs/query/sql/declare/): Parameter declaration for views
-  - [Audited views](/docs/security/audited-views/): Record every read of a view (Enterprise)
+  - [Audited views](/docs/security/audited-views/): Keep an audit trail of reads of a view (Enterprise)

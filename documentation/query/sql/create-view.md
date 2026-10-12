@@ -25,7 +25,7 @@ CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] view_name AS ( query )
 | `OR REPLACE` | Replaces existing view or creates new one |
 | `view_name` | Name of the view (case-insensitive, Unicode supported) |
 | `query` | SELECT statement defining the view |
-| `WITH AUDIT` | Enterprise only. Records every read of the view. See [WITH AUDIT](#with-audit-enterprise) |
+| `WITH AUDIT` | Enterprise only. Records each read of the view in an audit trail. See [WITH AUDIT](#with-audit-enterprise) |
 | `OWNED BY` | Enterprise only. Assigns the view's owner. See [OWNED BY](#owned-by-enterprise) |
 
 `WITH AUDIT` and `OWNED BY` may appear in either order.
@@ -235,8 +235,10 @@ OWNED BY 'analysts';
 ## WITH AUDIT (Enterprise)
 
 `WITH AUDIT` makes the view an [audited view](/docs/security/audited-views/):
-every read of it records a row in `sys.view_audit`, with the principal, the
+each read of it records a row in `sys.view_audit`, with the principal, the
 time, and the resolved values of the variables the view declares `AUDITED`.
+Recording is best-effort, so under overload a row can be lost: see
+[Delivery](/docs/security/audited-views/#delivery).
 
 ```questdb-sql title="Create an audited view"
 CREATE VIEW trades_by_symbol AS (
@@ -259,6 +261,11 @@ view can run again. Over a view that is not audited, it fails with
 `cannot audit an existing view, drop and re-create it WITH AUDIT`.
 `CREATE OR REPLACE VIEW` over an existing view does not accept `OWNED BY`, so a
 statement that uses it cannot run again.
+
+`CREATE VIEW IF NOT EXISTS ... WITH AUDIT` does nothing when a view of that
+name exists, even one that is not audited, and reports success. Check with
+[`SHOW CREATE VIEW`](/docs/query/sql/show/#show-create-view), which shows
+`WITH AUDIT` after the body of an audited view.
 
 ## See also
 

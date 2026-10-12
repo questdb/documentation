@@ -1,10 +1,16 @@
 ---
 title: DECLARE keyword
 sidebar_label: DECLARE
-description: DECLARE SQL keyword reference documentation.
+description:
+  "DECLARE binds @variables in QuestDB SQL: scalar values, value lists for IN
+  filters, bind variables, and OVERRIDABLE and AUDITED view parameters."
 ---
 
 `DECLARE` specifies a series of variable bindings used throughout your query.
+A variable can hold a scalar value, a [value list](#value-lists) for an `IN`
+filter such as `symbol IN @symbols`, or a bind variable. In a view definition,
+a variable can be a parameter that the caller overrides or that an audited view
+records.
 
 This syntax is supported within `SELECT` queries.
 
@@ -207,66 +213,6 @@ FROM second;
 | 10 | 9 |
 
 
-### Value lists
-
-A parenthesised, comma-separated list declares the values of an `IN` filter
-once, so that a query or a view can name the set instead of spelling it out:
-
-```questdb-sql title="Declare the values of an IN filter"
-DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
-SELECT timestamp, symbol, price, amount
-FROM trades
-WHERE symbol IN @symbols AND timestamp IN '$now-1h..$now';
-```
-
-The list is expanded into the `IN` when the query is parsed, so the query above
-is exactly `symbol IN ('BTC-USDT', 'ETH-USDT')`. Each member keeps its own type,
-and every form of `IN` works as it does with a written-out list, including
-`NOT IN` and interval scans on the designated timestamp.
-
-- `IN @symbols` and `IN (@symbols)` are equivalent.
-- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
-- One list variable can be assigned to another: `@majors := @symbols`.
-- A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
-  `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
-  after the last member of a longer list.
-- A bracketed sub-query, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
-  sub-query and not a list.
-
-Members can be bind variables, which lets one prepared statement filter on a
-different set of values each time:
-
-```questdb-sql title="A list of bind variables"
-DECLARE @symbols := ($1, $2)
-SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
-```
-
-In a [view](/docs/concepts/views/#parameterized-views), an `OVERRIDABLE` list
-can be overridden with a list of a different length:
-
-```questdb-sql title="A list parameter in a view"
-CREATE VIEW trades_for AS (
-  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
-  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
-);
-
-DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for;
-```
-
-A list has no value of its own, so it can only be used on the right-hand side
-of `IN`. These fail:
-
-| Query                                                  | Error                                                     |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| `SELECT @symbols`, `WHERE symbol = @symbols`           | `declared list can only be used on the right-hand side of IN` |
-| `OVER (PARTITION BY @symbols)`                         | `declared list can only be used on the right-hand side of IN` |
-| `@all := (@symbols, 'SOL-USDT')`                       | `declared list can only be used on the right-hand side of IN` |
-| `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`         | `nested lists are not supported, list members have to be values` |
-| `@x := ()`                                             | `value expected in list`                                  |
-
-To combine a list with more values, write both in the `IN`:
-`symbol IN (@symbols, 'SOL-USDT')`.
-
 ### Bind variables
 
 `DECLARE` syntax will work with prepared statements over PG Wire, so long as the client library
@@ -307,6 +253,108 @@ SELECT avg(@col), min(@col), max(@col)
 FROM trades
 WHERE symbol = @symbol;
 ```
+
+## Value lists
+
+A parenthesised, comma-separated list declares the values of an `IN` filter
+once, so that a query or a view can name the set instead of spelling it out:
+
+```questdb-sql title="Declare the values of an IN filter"
+DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE symbol IN @symbols AND timestamp IN '$now-1h..$now';
+```
+
+```questdb-sql title="Exclude the values of a list"
+DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE symbol NOT IN @symbols AND timestamp IN '$now-1h..$now';
+```
+
+The list is expanded into the `IN` when the query is parsed, so the first query
+above is exactly `symbol IN ('BTC-USDT', 'ETH-USDT')`. Each member keeps its
+own type, and every form of `IN` works as it does with a written-out list,
+including `NOT IN` and interval scans on the designated timestamp.
+
+- `IN @symbols` and `IN (@symbols)` are equivalent.
+- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
+- One list variable can be assigned to another: `@majors := @symbols`.
+- A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
+  `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
+  after the last member of a longer list.
+- A bracketed sub-query, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
+  sub-query and not a list.
+
+### Lists of timestamps
+
+A list of timestamps follows the rules of a written-out `IN`, which depend on
+the list's length:
+
+- With two or more members, each member is one instant.
+  `('2026-01-05', '2026-01-12')` matches only rows at midnight on those days,
+  not the whole days.
+- A list of one is an interval, like a single string. `('2026-01-05',)`
+  matches the whole day.
+
+So a view parameter that a caller overrides with one date instead of two
+changes from instants to a whole day. To match whole days, declare a
+[TICK](/docs/query/operators/tick/) date list, which is a single string:
+
+```questdb-sql title="Rows on three days"
+DECLARE @days := '[2026-01-05,2026-01-12,2026-01-19]'
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE timestamp IN @days;
+```
+
+### Lists of bind variables
+
+Members can be bind variables:
+
+```questdb-sql title="A list of bind variables"
+DECLARE @symbols := ($1, $2)
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+```
+
+The statement text fixes the number of members: `($1, $2)` always takes two
+values, and a single bind variable needs the trailing comma, `($1,)`. To filter
+on a varying number of values, prepare one statement for each count. On a
+`SYMBOL`, `VARCHAR` or `STRING` column, a PostgreSQL wire client can instead
+bind one text array of any length, as in `symbol IN $1`. An `AUDITED` view
+parameter cannot hold an array, so it needs the fixed-length form.
+
+### Lists in views
+
+In a [view](/docs/concepts/views/#parameterized-views), an `OVERRIDABLE` list
+can be overridden with a list of a different length:
+
+```questdb-sql title="A list parameter in a view"
+CREATE VIEW trades_for AS (
+  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
+);
+
+DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for;
+```
+
+### Errors
+
+A list has no value of its own, so it can only be used on the right-hand side
+of `IN`. These fail:
+
+| Query                                                  | Error                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------- |
+| `SELECT @symbols`, `WHERE symbol = @symbols`           | `declared list can only be used on the right-hand side of IN` |
+| `OVER (PARTITION BY @symbols)`                         | `declared list can only be used on the right-hand side of IN` |
+| `@all := (@symbols, 'SOL-USDT')`                       | `declared list can only be used on the right-hand side of IN` |
+| `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`         | `nested lists are not supported, list members have to be values` |
+| `@x := ()`                                             | `value expected in list`                                  |
+
+To combine a list with more values, write both in the `IN`:
+`symbol IN (@symbols, 'SOL-USDT')`.
+
 ## Limitations
 
 Most basic expressions are supported, and we provide examples later in this document.

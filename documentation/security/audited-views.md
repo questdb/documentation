@@ -2,8 +2,8 @@
 title: Audited views
 sidebar_label: Audited views
 description:
-  Record every read of a QuestDB Enterprise view in sys.view_audit, with the
-  principal, the time, and the parameter values each read resolved to.
+  Keep an audit trail of reads of a QuestDB Enterprise view in sys.view_audit,
+  with the principal, the time, and the parameter values each read ran with.
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -12,17 +12,21 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   Record who read a view, when, and with which parameters.
 </EnterpriseNote>
 
-An audited view records every read of it in the `sys.view_audit` table: the
-principal that ran the query, when the read finished, how long it took, and the
-values its parameters resolved to. Use it where you have to answer who looked
-at which data, for example a view that exposes trades or positions for a symbol
-and time range that the caller chooses.
+An audited view keeps an audit trail of its reads in the `sys.view_audit`
+table: the principal that ran the query, when the read finished, how long it
+took, and the values its parameters resolved to. Use it where you have to
+answer who looked at which data, for example a view that exposes trades or
+positions for a symbol and time range that the caller chooses. Recording is
+asynchronous and best-effort: a read never waits for its row, and under
+overload a row can be lost. See [Delivery](#delivery).
 
-A view created `WITH AUDIT` records one row per read. Each of its
+A view created `WITH AUDIT` records a row for each read. Each of its
 [`DECLARE`](/docs/query/sql/declare/) variables marked `AUDITED` adds its
 resolved value to the row's `params` column, as JSON. A caller's override, a
 bind variable, or a default built on `now()` is recorded as the value that read
-actually ran with, so the trail describes the data each read covered.
+actually ran with, so the trail records the parameter values each read ran
+with. It does not record the query text, the caller's own filters, columns or
+`LIMIT`, how many rows the read returned, or the view's body at the time.
 
 ## Quick start
 
@@ -35,6 +39,17 @@ CREATE VIEW trades_by_symbol AS (
   FROM trades
   WHERE symbol IN @symbols AND timestamp >= @since
 ) WITH AUDIT;
+```
+
+Creating it needs `CREATE VIEW` and `AUDIT VIEW`, which the built-in admin
+holds. Grant them to another principal with
+`GRANT CREATE VIEW, AUDIT VIEW TO view_owner;`.
+
+Readers need `SELECT` on the view only. Do not grant them the table it reads,
+so that the view is their only way to the data:
+
+```questdb-sql title="Let analyst read the view"
+GRANT SELECT ON trades_by_symbol TO analyst;
 ```
 
 ```questdb-sql title="Read it, overriding the symbols"
@@ -60,7 +75,7 @@ read.
 ## Syntax
 
 ```questdb-sql title="Create an audited view"
-CREATE VIEW [ IF NOT EXISTS ] viewName AS ( query )
+CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] viewName AS ( query )
     WITH AUDIT [ OWNED BY ownerName ]
 ```
 
@@ -78,8 +93,53 @@ DECLARE [ OVERRIDABLE ] [ AUDITED ] @variable := expression
   `AUDITED is only allowed in the top-level DECLARE block`. In the block that
   opens a statement, or the body of a view created without `WITH AUDIT`, it is
   accepted and has no effect.
-- A view created `WITH AUDIT` with no `AUDITED` variables still records every
+- A view created `WITH AUDIT` with no `AUDITED` variables still records each
   read, with `{}` in `params`.
+
+A view's auditing is set when it is created:
+
+- `ALTER VIEW` and `CREATE OR REPLACE VIEW` over an existing view keep it. To
+  audit an existing view, or to stop auditing one, drop it and create it again.
+- `CREATE OR REPLACE VIEW ... WITH AUDIT` over an audited view is accepted: the
+  body is replaced as usual, the view stays audited, and `WITH AUDIT` adds
+  nothing. So a deploy script that creates the view this way can run again,
+  unless it uses `OWNED BY`, which `CREATE OR REPLACE VIEW` over an existing
+  view rejects. Over a view that is not audited, it fails with
+  `cannot audit an existing view, drop and re-create it WITH AUDIT`.
+- `ALTER VIEW` does not accept `WITH AUDIT`.
+
+:::warning
+
+`CREATE VIEW IF NOT EXISTS ... WITH AUDIT` does nothing when a view of that
+name exists, even one that is not audited, and reports success. A deploy script
+that uses it can leave an existing view unaudited.
+[Check](#check-that-a-view-is-audited) the view after it runs.
+
+:::
+
+### Check that a view is audited
+
+[`SHOW CREATE VIEW`](/docs/query/sql/show/#show-create-view) shows `WITH AUDIT`
+after the body of an audited view:
+
+```questdb-sql title="Show the view's definition"
+SHOW CREATE VIEW trades_by_symbol;
+```
+
+```questdb-sql title="Result"
+CREATE VIEW 'trades_by_symbol' AS (
+DECLARE
+    OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
+    AUDITED @since := dateadd('h', -1, now())
+  SELECT timestamp, symbol, side, price, amount
+  FROM trades
+  WHERE symbol IN @symbols AND timestamp >= @since
+) WITH AUDIT
+OWNED BY 'admin';
+```
+
+[`views()`](/docs/query/functions/meta/#views) does not report whether a view is
+audited.
 
 ## Choose what a read records
 
@@ -102,6 +162,10 @@ DECLARE @symbols := ($1, $2)
 SELECT * FROM trades_by_symbol;
 ```
 
+The statement text fixes the number of members: `($1, $2)` always takes two
+values, so prepare one statement for each list length. An `AUDITED` list cannot
+take one array bind variable instead, because `params` cannot hold an array.
+
 :::tip
 
 Record resolved values rather than text that resolves later. A
@@ -111,56 +175,14 @@ trail, declare the bounds as timestamps, as `@since` does above.
 
 :::
 
-## The audit table
-
-The server creates `sys.view_audit` at startup, and a replica promoted to
-primary creates it if it does not have it yet. No client can create a table or
-view of that name.
-The `sys.` prefix follows
-[`cairo.system.table.prefix`](/docs/configuration/cairo-engine/#cairosystemtableprefix).
-It is a WAL table partitioned by day, with this schema:
-
-| Column           | Type        | Description                                                                                                  |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
-| `ts`             | `TIMESTAMP` | When the read finished and the row was recorded. The designated timestamp.                                   |
-| `principal`      | `SYMBOL`    | The user or service account the read ran as, taken when the read starts. After `ASSUME SERVICE ACCOUNT`, it is the service account. |
-| `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
-| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
-| `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds.                                      |
-| `status`         | `SYMBOL`    | `ok`, or `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). |
-| `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id.          |
-
-Reads that stream page frames, such as Parquet export, record the row when the
-read starts, so their `latency_micros` covers only opening the read.
-
-### The params column
-
-`params` is canonical JSON, so two reads with the same values produce the same
-text and a report can group on the column directly:
-
-- Keys are the variable names without the `@`, sorted by name.
-- A declared list renders as a JSON array, in the order it was written. Declare
-  a one-member list with a trailing comma, `('SOL-USDT',)`, so that the value
-  stays an array. Without the comma it is a scalar.
-- A `NULL` value renders as JSON `null`.
-
-| SQL type                                          | JSON                                                                   |
-| ------------------------------------------------- | ---------------------------------------------------------------------- |
-| `BOOLEAN`                                         | `true` or `false`                                                      |
-| `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE` | Number                                                                 |
-| `DECIMAL`                                         | Number at the type's scale, every digit written out: `150.00m` is `150.00` |
-| `CHAR`, `STRING`, `SYMBOL`, `VARCHAR`             | String                                                                 |
-| `TIMESTAMP`                                       | ISO 8601 string, in the timestamp's own precision (micro or nanosecond) |
-| `DATE`                                            | ISO 8601 string, with microseconds                                     |
-| `UUID`, `IPv4`                                    | String                                                                 |
-
 ### Values that cannot be audited
 
 A read fails, rather than record a row that misstates it, when an `AUDITED`
 variable:
 
-- Resolves to a type the table above does not list, such as an array. The error
-  is `audited view parameter has a type that cannot be audited`.
+- Resolves to a type that [`params`](#the-params-column) cannot hold, such as
+  an array. The error is
+  `audited view parameter has a type that cannot be audited`.
 - Holds a sub-query anywhere in its value, such as
   `(SELECT max(timestamp) FROM trades)`. The error is the same, with the type
   `CURSOR`.
@@ -196,14 +218,88 @@ The same happens when a read's `params` would be larger than
 parameter with a very long value. The error is
 `view audit parameters are too large to record, the read is refused`.
 
+## The audit table
+
+The server creates `sys.view_audit` at startup, and a replica promoted to
+primary creates it if it does not have it yet. No client can create a table or
+view of that name.
+The `sys.` prefix follows
+[`cairo.system.table.prefix`](/docs/configuration/cairo-engine/#cairosystemtableprefix).
+It is a WAL table partitioned by day, with this schema:
+
+| Column           | Type        | Description                                                                                                  |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `ts`             | `TIMESTAMP` | When the read finished and the row was recorded. The designated timestamp.                                   |
+| `principal`      | `SYMBOL`    | The user or service account the read ran as, taken when the read starts. After `ASSUME SERVICE ACCOUNT`, it is the service account. |
+| `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
+| `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
+| `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds. For a read served as page frames, only the open: see below. |
+| `status`         | `SYMBOL`    | `ok`, or `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). A read served as page frames records `ok` once it opens. |
+| `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id. `ALTER VIEW` keeps the id. |
+
+A read served as page frames records its row when the read opens, not when it
+finishes: `latency_micros` covers only the open, and a failure after that still
+shows `ok`. QWP queries, Parquet export and `COPY TO` read a view this way when
+its query allows it, as a plain scan of one table does.
+
+### The params column
+
+`params` is deterministic JSON: the same values, written the same way, produce
+the same text.
+
+- Keys are the variable names without the `@`, sorted by name.
+- A declared list renders as a JSON array, in the order it was written,
+  duplicates included. Declare a one-member list with a trailing comma,
+  `('SOL-USDT',)`, so that the value stays an array. Without the comma it is a
+  scalar, and a caller who overrides a list that way records a scalar.
+- A value renders by the type the read gave it. A caller who passes a timestamp
+  as text records that text: `'2026-10-01T00:00:00Z'` and
+  `'2026-10-01T00:00:00Z'::timestamp` render differently. Cast an extracted
+  value, as in `json_extract(params, '$.since')::timestamp`, to compare them.
+- A `NULL` value renders as JSON `null`.
+
+So group a report on the values it is about, extracted from `params`, rather
+than on the whole column. See [Query the trail](#query-the-trail).
+
+| SQL type                                          | JSON                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------- |
+| `BOOLEAN`                                         | `true` or `false`                                                      |
+| `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE` | Number                                                                 |
+| `DECIMAL`                                         | Number at the type's scale, every digit written out: `150.00m` is `150.00` |
+| `CHAR`, `STRING`, `SYMBOL`, `VARCHAR`             | String                                                                 |
+| `TIMESTAMP`                                       | ISO 8601 string, in the timestamp's own precision (micro or nanosecond) |
+| `DATE`                                            | ISO 8601 string, with microseconds                                     |
+| `UUID`, `IPv4`                                    | String                                                                 |
+
 ### Query the trail
 
-```questdb-sql title="Reads per principal and parameter set, today"
-SELECT principal, view_name, params, count() AS reads
+The examples read the trail of the [Quick start](#quick-start) view. Its
+`since` differs on every read, so group on the parameters a report is about,
+not on the whole `params` column.
+
+```questdb-sql title="Reads per principal and symbol list, today"
+SELECT principal, json_extract(params, '$.symbols') AS symbols,
+       count() AS reads
 FROM 'sys.view_audit'
-WHERE ts IN '$today'
-GROUP BY principal, view_name, params
+WHERE view_name = 'trades_by_symbol' AND ts IN '$today'
+GROUP BY principal, symbols
 ORDER BY reads DESC;
+```
+
+To answer who read a given symbol, unnest the list. The `CASE` turns a scalar,
+recorded when a caller overrides the list without the trailing comma, into an
+array of one, which [`UNNEST`](/docs/query/sql/unnest/) needs:
+
+```questdb-sql title="Reads per principal and symbol, today"
+SELECT a.principal, u.symbol, count() AS reads
+FROM 'sys.view_audit' a, UNNEST(
+    CASE WHEN json_extract(a.params, '$.symbols') LIKE '[%'
+         THEN json_extract(a.params, '$.symbols')
+         ELSE '["' || json_extract(a.params, '$.symbols') || '"]'
+    END::varchar COLUMNS(symbol VARCHAR)
+) u
+WHERE a.view_name = 'trades_by_symbol' AND a.ts IN '$today'
+GROUP BY a.principal, u.symbol;
 ```
 
 ```questdb-sql title="Extract one parameter"
@@ -220,9 +316,22 @@ syntax.
 The table is created with the storage policy that
 [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
 sets, `TO PARQUET 1d` by default, so older partitions of the trail move to
-Parquet. The setting applies only when the server creates the table. After
-that, change the policy with
-[`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
+Parquet. That default never deletes a row. The setting applies only when the
+server creates the table. After that, change the policy with
+[`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/),
+for example to keep a fixed window of the trail:
+
+```questdb-sql title="Keep 90 days of trail on every node"
+ALTER TABLE 'sys.view_audit'
+    SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
+```
+
+- `SET STORAGE POLICY` replaces the whole policy, so restate every stage you
+  want to keep.
+- A policy set on the primary applies on every node, replicas included.
+- `TRUNCATE TABLE` and partition operations act only on the node that runs
+  them, and a replica refuses them. A storage policy is the way to prune a
+  replica's trail.
 
 A policy can convert and drop local partitions, but cannot move the trail to
 object storage: `TO REMOTE` and `DROP REMOTE` are refused with
@@ -461,19 +570,24 @@ changes what it records, or releases it: creating, redefining and dropping an
 audited view. A new body can remove the view's `AUDITED` declarations, or keep
 a variable `OVERRIDABLE` while no longer recording it, so without the
 permission a principal who can alter a view, or drop and recreate it, could
-shed its auditing unremarked.
+shed its auditing unremarked. See [Syntax](#syntax) for how each statement
+treats a view's auditing.
 
-A view's auditing is set when it is created. `ALTER VIEW` and
-`CREATE OR REPLACE VIEW` over an existing view keep it. To audit an existing
-view, or to stop auditing one, drop it and create it again.
+:::note
 
-`CREATE OR REPLACE VIEW ... WITH AUDIT` over an existing audited view is
-accepted: the body is replaced as usual, the view stays audited, and
-`WITH AUDIT` adds nothing. So a deploy script that creates the view this way can
-run again, unless it uses `OWNED BY`, which `CREATE OR REPLACE VIEW` over an
-existing view rejects. Over a view that is not audited, it fails with
-`cannot audit an existing view, drop and re-create it WITH AUDIT`. `ALTER VIEW`
-does not accept `WITH AUDIT`.
+`GRANT ALL` expands to individual permissions at the moment it is granted. A
+principal granted `ALL` before upgrading to a version with audited views does
+not acquire `AUDIT VIEW`, and no migration backfills it, so it cannot create,
+alter or drop audited views. Grant it explicitly to existing administrators:
+`GRANT AUDIT VIEW TO admins;`.
+
+:::
+
+Grant readers `SELECT` on the audited view and not on the tables it reads. A
+principal who can read those tables, directly or through a view that is not
+audited, reads the same data with no audit row. Under the
+[definer model](/docs/concepts/views/#definer-security-model-enterprise),
+`SELECT` on the view is all a reader needs.
 
 Grant `SELECT` on `sys.view_audit` to the people who review the trail, and the
 permissions that remove its rows only to the operators who manage its
@@ -485,11 +599,13 @@ holds: see [Protection](#protection).
 
 Every node records the reads it serves, replicas included, into its own
 `sys.view_audit`. The rows are not replicated between nodes, so the complete
-trail is the union of the tables on all nodes.
+trail is the union of the tables on all nodes. The rows carry no node
+identifier, so tag each node's rows with its name when you merge them.
 
-A replica does not create `sys.view_audit` itself. The table's definition, and
-its storage policy, reach the replica from the primary, and the replica writes
-the reads it serves into that table. Until the definition arrives, the replica
+A replica does not create `sys.view_audit` itself. The table's definition
+reaches the replica from the primary, and the replica writes the reads it
+serves into that table. The table's storage policy, and any later change to
+it, reach the replica the same way. Until the definition arrives, the replica
 keeps its audit rows in the queue, and a read whose row finds the queue full
 goes unrecorded, as in [Delivery](#delivery). This matters only for a replica
 that starts before its primary has created the table, such as when replicas
@@ -498,13 +614,19 @@ creates the table itself, with
 [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy).
 
 A [backup](/docs/operations/backup/) includes the node's `sys.view_audit`, and
-restoring it onto an empty node brings that table back. Restoring a newer
-backup onto a node that was restored before keeps the node's own table, with
-the reads it recorded since. A node restored from a backup taken before audited
-views existed creates the table at startup without a storage policy, and logs
-an advisory with the `ALTER TABLE ... SET STORAGE POLICY` statement that
-applies it. Run that statement once you no longer restore newer backups onto
-the node: until then, the storage policy tables belong to the backup.
+restoring it onto an empty node brings that table back. Back up every node
+whose trail you need to keep: a backup of the primary holds only the reads the
+primary served.
+
+A replica [created from a backup](/docs/operations/backup/#create-a-replica-from-a-backup)
+of the primary starts with a copy of the primary's rows, up to the time of the
+backup, and records its own reads after them. Those rows are also in the
+primary's table, so leave them out of the replica's rows when you merge the
+trails, or they count twice.
+
+A node restored from a backup taken before audited views existed creates the
+table at startup without a storage policy, and logs an advisory with the
+`ALTER TABLE ... SET STORAGE POLICY` statement that applies it.
 
 An instance started with `readonly=true` cannot write the trail, so it refuses
 reads of audited views with
@@ -513,6 +635,10 @@ audited are unaffected.
 
 ## Limitations
 
+- **Only reads through the audited view are recorded.** A principal with
+  `SELECT` on the tables the view reads, or on a view over them that is not
+  audited, reads the same rows with no audit row. Grant readers `SELECT` on the
+  audited view and not on its tables, as in [Permissions](#permissions).
 - **A materialized view over an audited view is not audited.** Its refreshes
   record nothing, reads of the materialized view are not audited, and
   `CREATE MATERIALIZED VIEW` records nothing either. A principal who can read an

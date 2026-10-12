@@ -24,6 +24,9 @@ SELECT 5 IN (1, 2, 7, 5, 8)
 | ------ |
 | true   |
 
+The list can also be a declared variable, `X IN @list`. See
+[value lists](/docs/query/sql/declare/#value-lists).
+
 ## `=` Equals
 
 `(value1) = (value2)` - returns true if the two values are the same.

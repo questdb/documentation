@@ -17,6 +17,15 @@ writes them, and the storage policy the table is created with.
 The server checks the values at startup, and refuses to start, naming the
 property, when one is out of range.
 
+For example, to absorb longer bursts of audited reads and keep 90 days of the
+trail:
+
+```ini title="server.conf"
+view.audit.queue.capacity=16384
+view.audit.queue.params.max.size=256M
+view.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 90d
+```
+
 For details, see [Audited views](/docs/security/audited-views/).
 
 ## view.audit.params.max.size
@@ -72,18 +81,26 @@ always fits an empty queue.
 - **Reloadable**: no
 
 [Storage policy](/docs/concepts/storage-policy/) that `sys.view_audit` is
-created with. The default converts each daily partition to Parquet one day
-after the partition ends. An audit trail is append-only and read cold, and
-every partition converts once whatever the threshold, so a longer one keeps
-native files around without saving any work.
+created with. The value is the list of stages written inside
+`SET STORAGE POLICY(...)`, separated by commas, such as
+`TO PARQUET 1d, DROP LOCAL 90d`. The default converts each daily partition to
+Parquet one day after the partition ends, and never deletes a row. An audit
+trail is append-only and read cold, and every partition converts once whatever
+the threshold, so a longer one keeps native files around without saving any
+work.
 
-The setting applies only when the server creates the table at startup, which
-a primary does and a replica does not: a replica takes the table, and its
-policy, from the primary. It does not change the policy of a table that already
-exists: use
-[`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
-for that. Set the property to an empty value to create the table with no
-storage policy. If the server rejects the policy, it logs the error and creates
-the table without one. A policy with `TO REMOTE` or `DROP REMOTE` is always
-rejected, because each node keeps its own trail under the same table name: see
-[Retention](/docs/security/audited-views/#retention).
+- The setting applies only when a server creates the table: a primary at
+  startup, or a replica promoted to primary before the table reached it. A
+  replica otherwise takes the table, and its policy, from the primary.
+- A node restored from a backup taken before audited views existed creates the
+  table without a policy, whatever this setting says, and logs the statement
+  that applies it.
+- It does not change the policy of a table that already exists. Use
+  [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
+  for that.
+- Set the property to an empty value to create the table with no storage
+  policy. If the server rejects the policy, it logs the error and creates the
+  table without one.
+- A policy with `TO REMOTE` or `DROP REMOTE` is always rejected, because each
+  node keeps its own trail under the same table name: see
+  [Retention](/docs/security/audited-views/#retention).
