@@ -81,6 +81,7 @@ valid again.
 | ----- | ----- |
 | `view does not exist [view=name]` | View doesn't exist and `IF EXISTS` not specified |
 | `Access denied [DROP VIEW on view_name]` | User lacks `DROP VIEW` permission (Enterprise) |
+| `Access denied [AUDIT VIEW]` | The view is audited and the user lacks the `AUDIT VIEW` permission (Enterprise) |
 
 ## Permissions (Enterprise)
 

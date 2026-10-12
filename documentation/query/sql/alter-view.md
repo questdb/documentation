@@ -153,6 +153,8 @@ Altering a view requires:
 
 1. `ALTER VIEW` permission on the view
 2. `SELECT` permission on all tables referenced in the **new** definition
+3. For an [audited view](/docs/security/audited-views/), the database-level
+   `AUDIT VIEW` permission
 
 ```questdb-sql
 -- Grant ALTER VIEW permission

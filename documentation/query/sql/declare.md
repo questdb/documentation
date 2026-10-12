@@ -30,8 +30,16 @@ SELECT ...
 ```
 
 ```questdb-sql title="Value list, for the right-hand side of IN"
-DECLARE @variable := ( value [, value ...] [,] )
+DECLARE @variable := ( expression , [ expression [, expression ...] [,] ] )
 ```
+
+```questdb-sql title="Use a value list"
+WHERE column [ NOT ] IN { @variable | ( item [, item ...] ) }
+```
+
+A value list has at least one comma. Its members are expressions, including
+bind variables, but not lists or list variables. In `IN`, an `item` is a value
+or a list variable.
 
 The `OVERRIDABLE` keyword only takes effect inside a
 [view definition](/docs/query/sql/create-view/#declare-with-overridable). It
@@ -77,8 +85,9 @@ You should see an error message like this:
 
 The above example declares a single binding, which states that the variable `@x` is replaced with the constant integer `5`.
 
-The variables are resolved at parse-time, meaning that the variable is no longer present
-when the query is compiled.
+The variables are substituted at parse time: each reference is replaced by the
+variable's expression, so the variable is no longer present when the query is
+compiled.
 
 So the above example reduces to this simple query:
 
@@ -219,7 +228,7 @@ FROM second;
 does not perform syntax validation that rejects the `DECLARE` syntax:
 
 ```questdb-sql
-DECLARE @x := ?, @y := ?
+DECLARE @x := $1, @y := $2
 SELECT @x::int + @y::int;
 
 -- Then bind the following values: (1, 2)
@@ -229,7 +238,11 @@ SELECT @x::int + @y::int;
 |--------|
 | 3      |
 
-This can be useful to minimise repeated bind variables.
+Write bind variables as `$1`, `$2`, and so on. JDBC rewrites `?` placeholders
+to that form before it sends the query, but the server does not accept a raw
+`?`.
+
+`DECLARE` can also minimise repeated bind variables.
 
 For example, rather than passing the same value to multiple positional arguments,
 you could instead use a declared variable and send a single bind variable:
@@ -237,18 +250,20 @@ you could instead use a declared variable and send a single bind variable:
 
 ```questdb-sql
 -- instead of this:
-SELECT ? as name, id FROM users WHERE name = ?;
+SELECT $1 as name, id FROM users WHERE name = $2;
 
 -- do this:
-DECLARE @name := ?
+DECLARE @name := $1
 SELECT @name as name, id FROM users WHERE name = @name;
 ```
-Or for repeating columns:
+
+A bind variable carries a value, not a column name. To repeat a column, declare
+the column itself, and bind only the values:
 
 ```questdb-sql
 DECLARE
-    @col = ?,
-    @symbol = ?
+    @col := price,
+    @symbol := $1
 SELECT avg(@col), min(@col), max(@col)
 FROM trades
 WHERE symbol = @symbol;
@@ -284,8 +299,8 @@ including `NOT IN` and interval scans on the designated timestamp.
 - A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
   `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
   after the last member of a longer list.
-- A bracketed sub-query, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
-  sub-query and not a list.
+- A bracketed subquery, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
+  subquery and not a list.
 
 ### Lists of timestamps
 
@@ -344,13 +359,13 @@ DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for;
 A list has no value of its own, so it can only be used on the right-hand side
 of `IN`. These fail:
 
-| Query                                                  | Error                                                     |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| `SELECT @symbols`, `WHERE symbol = @symbols`           | `declared list can only be used on the right-hand side of IN` |
-| `OVER (PARTITION BY @symbols)`                         | `declared list can only be used on the right-hand side of IN` |
-| `@all := (@symbols, 'SOL-USDT')`                       | `declared list can only be used on the right-hand side of IN` |
-| `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`         | `nested lists are not supported, list members have to be values` |
-| `@x := ()`                                             | `value expected in list`                                  |
+- `SELECT @symbols`, `WHERE symbol = @symbols`, `OVER (PARTITION BY @symbols)`
+  or `@all := (@symbols, 'SOL-USDT')`:<br/>
+  `declared list can only be used on the right-hand side of IN`
+- `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`:<br/>
+  `nested lists are not supported, list members have to be values`
+- `@x := ()`:<br/>
+  `value expected in list`
 
 To combine a list with more values, write both in the `IN`:
 `symbol IN (@symbols, 'SOL-USDT')`.

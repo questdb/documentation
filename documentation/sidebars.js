@@ -725,14 +725,14 @@ module.exports = {
           label: "Role-Based Access Control (RBAC)",
         },
         {
-          id: "security/audited-views",
-          type: "doc",
-          label: "Audited views",
-        },
-        {
           id: "security/oidc",
           type: "doc",
           label: "OpenID Connect (OIDC)",
+        },
+        {
+          id: "security/audited-views",
+          type: "doc",
+          label: "Audited views",
         },
         {
           type: "doc",

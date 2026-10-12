@@ -8,6 +8,17 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### New
+
+- [Audited views](/docs/security/audited-views/) - QuestDB Enterprise views created `WITH AUDIT` keep a best-effort audit trail of their reads in `sys.view_audit`: who read the view, when, and with which `AUDITED` parameter values, plus the [`view.audit.*` settings](/docs/configuration/audited-views/)
+- [Declared value lists](/docs/query/sql/declare/#value-lists) - `DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')` names the values of an `IN` filter once, including lists of bind variables and list parameters in views
+
+### Reference
+
+- Added the `WITH AUDIT` clause of [CREATE VIEW](/docs/query/sql/create-view/#with-audit-enterprise), the `AUDITED` modifier of [DECLARE](/docs/query/sql/declare/), and the [`AUDIT VIEW`](/docs/security/audited-views/#permissions) permission
+
 ## September 2026
 
 ### QuestDB Enterprise Releases
@@ -16,8 +27,6 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
-- [Audited views](/docs/security/audited-views/) - QuestDB Enterprise views created `WITH AUDIT` keep a best-effort audit trail of their reads in `sys.view_audit`, with the principal, the time, and the resolved values of the view's `AUDITED` parameters, covering the `params` JSON format, what counts as a read (including `EXPLAIN`), audited views read through other audited views, what the audit table refuses, the `AUDIT VIEW` permission, replication and backups, and limitations, plus the [`view.audit.*` settings](/docs/configuration/audited-views/) for the parameter size cap, the queue, and the storage policy
-- [Declared value lists](/docs/query/sql/declare/#value-lists) - `DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')` names the values of an `IN` filter once, including lists of bind variables and list parameters in views
 - [Memory limits](/docs/configuration/cairo-engine/#memory-limits) - New section covering the per-query, materialized view refresh, WAL apply, and live view refresh memory limits, what counts toward them, and what happens on a breach, plus the previously undocumented [`cairo.mat.view.max.refresh.retries`](/docs/configuration/materialized-views/#cairomatviewmaxrefreshretries), [`cairo.mat.view.refresh.busy.retry.limit`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrylimit), [`cairo.mat.view.refresh.busy.retry.timeout`](/docs/configuration/materialized-views/#cairomatviewrefreshbusyretrytimeout), [`cairo.write.back.off.timeout.on.mem.pressure`](/docs/configuration/cairo-engine/#cairowritebackofftimeoutonmempressure), [`ram.usage.limit.bytes`](/docs/configuration/cairo-engine/#ramusagelimitbytes), and [`ram.usage.limit.percent`](/docs/configuration/cairo-engine/#ramusagelimitpercent) keys
 - [RBAC memory limits](/docs/security/rbac/#memory-limits) - Per-user, per-group, and per-service-account query memory limits in QuestDB Enterprise: `SET MEMORY LIMIT` on `ALTER USER`, `ALTER GROUP`, and `ALTER SERVICE ACCOUNT`, how limits resolve, the `SET MEMORY LIMIT` permission, and the upgrade migration
 - [ALTER GROUP](/docs/query/sql/acl/alter-group/) - New reference page covering `SET MEMORY LIMIT` and external alias mapping

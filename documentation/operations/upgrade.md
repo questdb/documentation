@@ -92,6 +92,12 @@ store. If a replica running an older version encounters metadata it does not
 recognize, it will error. Upgrading replicas first ensures they can handle any
 new metadata the primary produces after its upgrade.
 
+A replica upgraded to a version with
+[audited views](/docs/security/audited-views/) before its primary keeps its
+audit rows in memory until the primary creates `sys.view_audit`, and drops rows
+once that queue is full. See
+[Replication, backups, and read-only instances](/docs/security/audited-views/#replication-backups-and-read-only-instances).
+
 When upgrading to 4.0.0 or later, grant the `SWITCH ROLE` permission only after
 every node runs the new version. The permission is stored in a form older
 versions cannot read, and a `GRANT ALL` issued before the upgrade does not

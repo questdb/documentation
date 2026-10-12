@@ -13,8 +13,8 @@ documentation.
 ## Syntax
 
 ```questdb-sql
-CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] view_name AS ( query )
-    [ WITH AUDIT ] [ OWNED BY owner_name ]
+CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] viewName AS ( query )
+    [ WITH AUDIT ] [ OWNED BY ownerName ]
 ```
 
 ## Parameters
@@ -23,7 +23,7 @@ CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] view_name AS ( query )
 | --------- | ----------- |
 | `IF NOT EXISTS` | Prevents error if view already exists |
 | `OR REPLACE` | Replaces existing view or creates new one |
-| `view_name` | Name of the view (case-insensitive, Unicode supported) |
+| `viewName` | Name of the view (case-insensitive, Unicode supported) |
 | `query` | SELECT statement defining the view |
 | `WITH AUDIT` | Enterprise only. Records each read of the view in an audit trail. See [WITH AUDIT](#with-audit-enterprise) |
 | `OWNED BY` | Enterprise only. Assigns the view's owner. See [OWNED BY](#owned-by-enterprise) |
@@ -201,6 +201,9 @@ CREATE VIEW with_timestamp AS (
 | `Invalid column` | Column in query doesn't exist |
 | `circular dependency detected` | View would create circular reference |
 | `variable is not overridable` | Attempted to override a non-`OVERRIDABLE` DECLARE variable |
+| `Access denied [AUDIT VIEW]` | `WITH AUDIT`, or a replacement of an audited view, without the `AUDIT VIEW` permission (Enterprise) |
+| `cannot audit an existing view, drop and re-create it WITH AUDIT` | `CREATE OR REPLACE VIEW ... WITH AUDIT` over a view that is not audited (Enterprise) |
+| `unexpected token [WITH]` | `WITH AUDIT` on QuestDB Open Source, which does not support audited views |
 
 ## View naming
 
@@ -238,14 +241,16 @@ OWNED BY 'analysts';
 each read of it records a row in `sys.view_audit`, with the principal, the
 time, and the resolved values of the variables the view declares `AUDITED`.
 Recording is best-effort, so under overload a row can be lost: see
-[Delivery](/docs/security/audited-views/#delivery).
+[Delivery guarantees](/docs/security/audited-views/#delivery).
 
 ```questdb-sql title="Create an audited view"
 CREATE VIEW trades_by_symbol AS (
-  DECLARE OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT')
-  SELECT timestamp, symbol, price, amount
+  DECLARE
+    OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
+    AUDITED @since := dateadd('h', -1, now())
+  SELECT timestamp, symbol, side, price, amount
   FROM trades
-  WHERE symbol IN @symbols
+  WHERE symbol IN @symbols AND timestamp >= @since
 ) WITH AUDIT;
 ```
 

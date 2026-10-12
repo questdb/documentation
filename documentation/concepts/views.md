@@ -469,13 +469,20 @@ best-effort audit trail of access to sensitive data:
 
 ```questdb-sql
 CREATE VIEW trades_by_symbol AS (
-  DECLARE OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT')
-  SELECT timestamp, symbol, price, amount FROM trades WHERE symbol IN @symbols
+  DECLARE
+    OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
+    AUDITED @since := dateadd('h', -1, now())
+  SELECT timestamp, symbol, side, price, amount
+  FROM trades
+  WHERE symbol IN @symbols AND timestamp >= @since
 ) WITH AUDIT;
 ```
 
 See [Audited views](/docs/security/audited-views/) for what a read records, the
-audit table, permissions, and limitations.
+audit table, permissions, and limitations. A
+[materialized view](/docs/concepts/materialized-views/) over an audited view is
+not audited, so a principal who can create one can copy the view's data out of
+the trail's reach. Grant `CREATE MATERIALIZED VIEW` with that in mind.
 
 ## Performance considerations
 
