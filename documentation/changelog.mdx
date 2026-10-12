@@ -8,6 +8,24 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### New
+
+- [ALTER LIVE VIEW RESUME WAL](/docs/query/sql/alter-live-view-resume-wal/) - New reference page for resuming a live view whose own WAL was suspended after an error, how to find suspended live views through `wal_tables()`, and why `SUSPEND WAL` does not pause a live view
+
+### Reference
+
+- Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views no longer share the materialized view refresh pool
+- Added the `checkpoint_seal_failures` column to [`live_views()`](/docs/query/functions/meta/#live_views) and corrected the `lag_seqtxn`, `last_processed_seqtxn`, `lag_micros`, and `writer_stall_micros` descriptions
+- Corrected the defaults of [`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/#matviewrefreshworkercount) and [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount), and documented that `mat.view.refresh.worker.count=0` disables materialized view refresh
+
+### Updated
+
+- [Live views](/docs/concepts/live-views/) - Corrected the [supported window functions](/docs/concepts/live-views/#supported-window-functions) to match QuestDB 10.0.1: the statistical functions, EMA, and VWEMA run only in anchored windows, `ksum` does not support `RANGE` frames, `lag` needs a bounded frame or an anchor, and `VARCHAR`, `UUID`, `LONG256`, and `DECIMAL` partition keys are rejected. Added a [rolling standard deviation](/docs/concepts/live-views/#rolling-standard-deviation) recipe for Bollinger bands, rewrote [Freshness](/docs/concepts/live-views/#freshness) to reflect that interval-filtered reads, aggregates, and `ASOF JOIN` see unflushed rows while `LATEST ON` does not, and added the `UPDATE` and `REBASE WAL` invalidation triggers, base WAL retention, and replica freshness
+- [CREATE LIVE VIEW](/docs/query/sql/create-live-view/) - Fixed the `OWNED BY` example, which requires a parenthesized query, documented the designated-timestamp projection requirement and the remaining anchored-window rules, and expanded the error reference with verified messages
+- [Live view configuration](/docs/configuration/live-views/) - Corrected the descriptions of the in-memory buffer growth budget, partition compaction threshold, flush retry budgets, and refresh memory limit
+
 ## September 2026
 
 ### QuestDB Enterprise Releases

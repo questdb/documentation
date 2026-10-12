@@ -72,18 +72,22 @@ has no effect; deferred out-of-memory retries use this backoff.
 
 ## mat.view.refresh.worker.affinity
 
-- **Default**: equal to the CPU core count
+- **Default**: none
 - **Reloadable**: no
 
-Comma-separated list of numerical CPU core indexes.
+Comma-separated list of numerical CPU core indexes, one per refresh worker.
 
 ## mat.view.refresh.worker.count
 
-- **Default**: `0`
+- **Default**: same as
+  [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount)
 - **Reloadable**: no
 
-Number of dedicated worker threads assigned to refresh materialized views.
-When `0`, uses the shared worker pool.
+Number of dedicated worker threads assigned to refresh materialized views. A
+value of `0` disables materialized view refresh: `CREATE MATERIALIZED VIEW`
+still succeeds, but nothing refreshes the view. Live views use their own pool,
+sized by
+[`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount).
 
 ## mat.view.refresh.worker.haltOnError
 

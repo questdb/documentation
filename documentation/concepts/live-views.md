@@ -34,7 +34,7 @@ serve different query shapes:
 | Aspect | Live view | [Materialized view](/docs/concepts/materialized-views/) |
 | ------ | --------- | --------------------- |
 | Query shape | Window functions (`OVER`) | `SAMPLE BY` / time-based `GROUP BY` |
-| Output cardinality | One row per base row | One row per time bucket |
+| Output cardinality | One row per base row that passes `WHERE` | One row per time bucket |
 | Typical use | Running totals, moving averages, rankings | OHLC bars, downsampled summaries |
 | Base tables | A single WAL-backed table | One or more tables (JOINs allowed) |
 | Freshness / durability | `FLUSH EVERY`, `IN MEMORY` | `REFRESH` strategy |
@@ -83,10 +83,8 @@ SELECT * FROM trades_ma;
 ```
 
 The view updates incrementally as new rows arrive in `trades`. Each new trade
-produces one output row carrying its moving average. A direct `SELECT` of the
-full output rows sees data as soon as it is refreshed. Filtering a read to a
-timestamp interval (for example `WHERE timestamp IN '$today'`) is served from the
-disk tier and can trail by up to one `FLUSH EVERY` interval; see
+produces one output row carrying its moving average. Queries see new rows as
+soon as they are refreshed, without waiting for a flush; see
 [Freshness](#freshness).
 
 ## How live views work
@@ -105,24 +103,33 @@ Reads combine both tiers. Recent rows are served from the in-memory tier and the
 older prefix from disk, so a query sees the freshest computed rows without
 waiting for a flush.
 
+Views over [deduplicated](/docs/concepts/deduplication/) base tables, and every
+live view on a QuestDB Enterprise read-only replica, work differently: they
+refresh and flush together on the `FLUSH EVERY` cadence, with no in-memory rows
+ahead of the disk tier.
+
 ```questdb-sql title="Show the live view definition"
 SHOW CREATE LIVE VIEW trades_ma;
 ```
 
 ### Freshness
 
-Because refresh publishes to the in-memory tier ahead of flush, a direct
-`SELECT` that reads the full output rows sees data as soon as it is refreshed.
-This is independent of `FLUSH EVERY`, which is a durability and
-write-amplification control, not a freshness control.
+Because refresh publishes to the in-memory tier ahead of flush, queries see
+refreshed rows without waiting for `FLUSH EVERY`, which is a durability and
+write-amplification control, not a freshness control. This covers full-row
+reads, projections and aggregates over the view, `WHERE` filters including
+designated-timestamp intervals, and a live view used as the right-hand side of
+an [`ASOF JOIN`](/docs/query/sql/asof-join/) or `LT JOIN`.
 
-Some read shapes are served from the disk tier only and therefore trail by up to
+The following reads are served from the disk tier only and can trail by up to
 one `FLUSH EVERY` interval:
 
-- Reads that project or aggregate the view's columns rather than reading full
-  output rows
-- Reads filtered to a timestamp interval
-- A live view used as the right-hand side of an [`ASOF JOIN`](/docs/query/sql/asof-join/)
+- [`LATEST ON`](/docs/query/sql/latest-on/) queries over the view
+- Any read of a view over a deduplicated base table, or of a view on an
+  Enterprise read-only replica, because these views have no in-memory rows
+  ahead of disk
+- Occasionally, a query that races a flush, which falls back to the disk tier
+  for that query only
 
 Keep `FLUSH EVERY` small (for example `1s`) so this lag stays negligible.
 
@@ -137,31 +144,122 @@ interpret lag and detect a view that cannot keep up.
 ## Supported window functions
 
 Live views maintain window functions whose result can be computed incrementally
-in a single forward pass and whose state can be checkpointed:
+in a single forward pass and whose state can be checkpointed. Whether a function
+is accepted depends on the window it runs over: a bounded frame such as
+`ROWS 300 PRECEDING` or `RANGE '1' HOUR PRECEDING`, or an
+[anchored window](#anchored-windows) that accumulates from a reset boundary.
 
-- **Anchored ranking**: `row_number`, `rank`, `dense_rank`
-- **Bounded or anchored aggregates**: `sum`, `avg`, `count`, `min`, `max`,
-  `ksum`, `first_value`, `last_value`, `nth_value`
-- **Offset**: `lag`
-- **Statistics**: `variance`, `stddev`, covariance, correlation, EMA, and VWEMA
+| Function | Bounded `ROWS` | Bounded `RANGE` | Anchored |
+| -------- | -------------- | --------------- | -------- |
+| `avg`, `count`, `first_value`, `max`, `min`, `nth_value`, `sum` | Yes | Yes | Yes |
+| `ksum` | Yes | No | Yes |
+| `last_value` | Yes | Yes | Yes, except with `IGNORE NULLS` |
+| `lag` | Yes | Yes | Yes |
+| `dense_rank`, `rank`, `row_number` | No | No | Yes |
+| `corr`, `covar_pop`, `covar_samp` | No | No | Yes |
+| `stddev`, `stddev_pop`, `stddev_samp`, `var_pop`, `var_samp`, `variance` | No | No | Yes |
+| EMA and VWEMA, `avg(value, kind, param [, volume])` | No | No | Yes |
 
-Stateful window functions must have a `PARTITION BY` clause. Both bounded `ROWS`
-and bounded `RANGE` frames are supported. Ranking functions must use an anchored
-window because an out-of-order row would otherwise change every later rank.
+The statistical functions, EMA, and VWEMA run only in an anchored window, so
+they return a cumulative value since the last anchor boundary, such as a
+session-to-date standard deviation. Over a bounded frame, the statistical
+functions fail with
+`incremental snapshot is not supported for this function yet`, and EMA and VWEMA
+do not accept a frame clause at all. For a rolling standard deviation, see
+[Rolling standard deviation](#rolling-standard-deviation).
 
-String, `VARCHAR`, `BINARY`, `ARRAY`, and `SYMBOL` columns can appear as
-pass-through output columns and as `count` arguments, but there are no string-
-or array-valued window functions.
+```questdb-sql title="Session-to-date volatility per symbol"
+CREATE LIVE VIEW trades_session_stats
+FLUSH EVERY 1s
+START FROM NOW
+AS
+SELECT
+  timestamp,
+  symbol,
+  price,
+  avg(price) OVER w AS session_avg,
+  stddev_samp(price) OVER w AS session_stddev
+FROM trades
+WINDOW w AS (
+  PARTITION BY symbol
+  ORDER BY timestamp
+  ANCHOR DAILY '00:00'
+);
+```
 
-The following shapes cannot be maintained by an append-only incremental refresh
-and are rejected at creation time:
+The following rules also apply:
 
-- Multi-pass or look-ahead functions: `percent_rank`, `cume_dist`, `ntile`,
-  `lead`
-- Stateful window functions without `PARTITION BY`
-- Unanchored ranking functions
-- Frames that start at `UNBOUNDED PRECEDING`, except stateless `last_value`
-  shapes
+- **`PARTITION BY` is required.** Every window function needs a `PARTITION BY`
+  clause. The only exception is a `last_value` without `IGNORE NULLS` whose
+  frame ends at `CURRENT ROW`, which keeps no state.
+- **Partition keys must be checkpointable.** `VARCHAR`, `UUID`, `LONG256`,
+  `DECIMAL`, `BINARY`, and array keys are rejected with
+  `incremental snapshot is not supported for this function yet`. In a bounded
+  window, cast a `VARCHAR` key to `SYMBOL` or `STRING`, for example
+  `PARTITION BY venue::symbol`. An anchored window must partition by base
+  columns directly.
+- **Frames must not start at `UNBOUNDED PRECEDING`.** A window without a frame
+  clause, such as `OVER (PARTITION BY symbol ORDER BY timestamp)`, defaults to a
+  frame that starts at `UNBOUNDED PRECEDING`. Such windows are rejected unless
+  they are anchored. `last_value` without `IGNORE NULLS` is the only exception.
+- **`RANGE` frames share one domain.** A `RANGE` frame must order by the
+  designated timestamp ascending, and all `RANGE` window functions in one view
+  must use the same `PARTITION BY` and `ORDER BY`.
+- **`lag` needs a frame or an anchor.** `lag` ignores the frame, but a bare
+  `OVER (PARTITION BY ... ORDER BY ...)` counts as unbounded, so give it an
+  explicit bounded frame or an anchored window. In an anchored window, `lag`
+  returns `NULL` for the first row after each boundary. `lag(value, 0)` and
+  `lag` over a `DECIMAL` with precision above 18 are rejected.
+- **No look-ahead or multi-pass functions.** `lead`, `percent_rank`,
+  `cume_dist`, and `ntile` are rejected.
+
+Columns of any type, including `VARCHAR`, `BINARY`, and arrays, can appear as
+pass-through output columns. `count` also accepts `STRING`, `VARCHAR`, and
+`SYMBOL` arguments, but not `BINARY` or arrays. Window function results can be
+combined in projection expressions.
+
+### Rolling standard deviation
+
+Because the statistical functions run only in anchored windows, compute a
+rolling standard deviation from bounded averages instead. The population
+standard deviation is the square root of `avg(x * x) - avg(x) * avg(x)`, which a
+live view can maintain over any bounded frame. This view keeps 20-trade
+Bollinger bands per symbol:
+
+```questdb-sql title="Rolling 20-trade Bollinger bands"
+CREATE LIVE VIEW trades_bollinger
+FLUSH EVERY 1s
+START FROM NOW
+AS
+SELECT
+  timestamp,
+  symbol,
+  price,
+  avg(price) OVER w AS sma20,
+  sqrt(greatest(
+    avg(price * price) OVER w - avg(price) OVER w * avg(price) OVER w,
+    0
+  )) AS stddev20
+FROM trades
+WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS 19 PRECEDING);
+```
+
+```questdb-sql title="Read the bands"
+SELECT
+  timestamp,
+  symbol,
+  price,
+  sma20 - 2 * stddev20 AS lower_band,
+  sma20 + 2 * stddev20 AS upper_band
+FROM trades_bollinger
+WHERE symbol = 'BTC-USDT'
+LIMIT -10;
+```
+
+`greatest(..., 0)` guards against tiny negative values from floating-point
+rounding when prices are flat. For the sample standard deviation that
+`stddev_samp` returns, multiply the variance by `n / (n - 1)`, where `n` is
+`count(price) OVER w`.
 
 ## Anchored windows
 
@@ -192,9 +290,11 @@ time is interpreted in UTC; add an IANA time zone such as `'America/New_York'`
 when the boundary follows local civil time.
 
 An anchored window must be a named window, must partition by base-table columns,
-must order by the designated timestamp ascending, and cannot use a bounded
-frame. A live view supports at most one anchored window. An anchor expression
-must be deterministic and return `TIMESTAMP`, `LONG`, or `INT`.
+must order by the designated timestamp ascending, and must use the default
+frame: an explicit `ROWS` frame or a bounded `RANGE` frame is rejected. A live
+view supports at most one anchored window, and at least one window function must
+reference it directly with `OVER w`. An anchor expression must be deterministic
+and return `TIMESTAMP`, `LONG`, or `INT`.
 
 ## Start boundary and historical data
 
@@ -206,8 +306,12 @@ lower bound for its rows:
 - `START FROM 'timestamp'` includes rows at or after the specified timestamp.
 
 The boundary is inclusive and is evaluated against the base table's designated
-timestamp, not commit time. If qualifying rows already exist when the view is
-created, QuestDB seeds them before switching to continuous refresh.
+timestamp, not commit time. Rows below the boundary neither appear in the view
+nor contribute to window state, and late out-of-order rows below it are dropped
+and counted in the `o3_rejected_count` column of
+[`live_views()`](/docs/query/functions/meta/#live_views). If qualifying rows
+already exist when the view is created, QuestDB seeds them before switching to
+continuous refresh.
 
 ```questdb-sql title="Include all existing history"
 CREATE LIVE VIEW trades_ma
@@ -229,26 +333,39 @@ designated timestamps are at or above the resolved creation-time boundary.
 ## Base table lifecycle
 
 A live view is tied to a single WAL-backed base table and tracks the exact set of
-base columns its query references:
+base columns its query references, including columns used only in its `WHERE`
+filter:
 
 - Changes to columns the view does not reference pass through transparently and
   the view keeps refreshing.
 - Dropping, renaming, or changing the type of a referenced column invalidates the
   view.
 - Renaming or dropping the base table invalidates the view.
+- An [`UPDATE`](/docs/query/sql/update/) that changes base-table rows
+  invalidates the view.
+- [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/) on the
+  base table invalidates the view.
 - Exceeding
   [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
   during a refresh invalidates the view. Before setting that limit, measure
   what a refresh needs as described in
   [Sizing a limit](/docs/configuration/cairo-engine/#sizing-a-limit).
-- `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
-  rows and the view continues forward from where it was.
+- Refresh failures that exhaust the
+  [`cairo.live.view.flush.retry.max`](/docs/configuration/live-views/#cairoliveviewflushretrymax)
+  retry budget invalidate the view.
+- `DROP PARTITION`, `TRUNCATE`, and base TTL eviction keep the view valid. Rows
+  the view already emitted for the removed data stay in the view. Window state
+  is not reset, so later rows can still reflect values from removed rows, and a
+  later out-of-order commit can recompute emitted rows above the removed range
+  from the remaining base data.
 
 An invalidated view keeps serving its existing data and reports the reason in
-[`live_views()`](/docs/query/functions/meta/#live_views). It stops refreshing.
-Invalidation is permanent: reversing the schema change does not automatically
-revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
-suspended WAL writer.
+[`live_views()`](/docs/query/functions/meta/#live_views), for example
+`drop column operation [column=price]` or `update operation`. It stops
+refreshing. Invalidation is permanent: reversing the schema change does not
+automatically revalidate the view, and
+[`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/) only
+recovers a suspended WAL writer.
 
 To recover, inspect `invalidation_reason`, repair the base-table schema or
 raise
@@ -267,8 +384,8 @@ source history is no longer retained by the base table.
 
 Live views over [deduplicated](/docs/concepts/deduplication/) base tables are
 supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
-in the view. A view over a deduplicated base is one `FLUSH EVERY` cycle behind
-rather than sub-cycle fresh, because its refresh is coupled to base apply.
+in the view, and later rows are recomputed. Such a view has no in-memory rows
+ahead of disk, so it trails the base table by up to one `FLUSH EVERY` cycle.
 
 ## Monitoring
 
@@ -281,11 +398,14 @@ SELECT view_name, base_table_name, view_status, lag_seqtxn, lag_micros
 FROM live_views();
 ```
 
-`lag_seqtxn` is the number of committed base-table WAL transactions beyond the
+`lag_seqtxn` is the number of transactions applied to the base table beyond the
 view's durable processed watermark. It counts transactions, not rows: one
 transaction may contain one row or millions. A value of `0` means that the
-durable tier is caught up. A temporary non-zero value is expected between
-`FLUSH EVERY` cycles, especially when ingestion produces many small commits.
+durable tier has caught up with the base table. A temporary non-zero value is
+expected between `FLUSH EVERY` cycles, especially when ingestion produces many
+small commits. Base commits that are not yet applied to the base table are not
+counted, so when the base table itself lags or is suspended, check
+[`wal_tables()`](/docs/query/functions/meta/#wal_tables) too.
 
 There is no universal acceptable non-zero value. Sample the metric over time and
 compare it with the view's normal flush-cycle baseline. A bounded sawtooth that
@@ -297,17 +417,20 @@ up.
 flush-activity indicator, not the timestamp difference between base and view
 rows, and can continue growing while an idle view has `lag_seqtxn = 0`.
 
-When lag grows persistently, check `view_status` and `writer_stall_micros` for a
-failed or blocked flush. Also verify CPU and I/O capacity, reduce the number or
-cost of maintained views, or increase the shared
-[`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/)
-setting.
+When lag grows persistently, check `view_status` and `invalidation_reason` for an
+invalidated view, and `writer_stall_micros` for long-running queries that keep
+the in-memory tier from publishing. Also verify CPU and I/O capacity, reduce the
+number or cost of maintained views, or increase
+[`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount).
+A single view is refreshed by one worker at a time, so more workers help only
+when several views are busy.
 
 For out-of-order repair cost, compare `o3_replay_scan_rows`,
 `o3_resume_replay_rows`, and `o3_boundary_replay_rows`. The first counts base
 rows scanned; the other two split rows emitted by the resume-from-checkpoint and
 rebuild paths. `checkpoint_repair_plan` reports whether the view has a finite
-`range`, `rows`, or `anchor` repair plan. The last disposition and denial
+`range`, `rows`, or `anchor` repair plan, or `none` when every out-of-order row
+below the head rebuilds the view's history. The last disposition and denial
 columns show which path actually ran and why a local rebuild was not selected.
 These counters reset on restart.
 
@@ -315,7 +438,9 @@ The `checkpoint_timeline_*` columns describe the persistent timeline used for
 restart and out-of-order repair. In particular,
 `checkpoint_timeline_sharing_ratio` shows how effectively checkpoint state is
 shared, while `checkpoint_gc_lag_generations` and
-`checkpoint_obsolete_segment_bytes` can expose delayed cleanup. See
+`checkpoint_obsolete_segment_bytes` can expose delayed cleanup. A growing
+`checkpoint_seal_failures` value means the view keeps serving correct results
+while its restart-recovery state goes stale. See
 [`live_views()`](/docs/query/functions/meta/#live_views) for the complete
 catalog.
 
@@ -333,7 +458,7 @@ outside it are rejected at creation time with a specific error:
 | Live view         | Regular view      | Yes                                   |
 | Live view         | Materialized view | No                                    |
 | Live view         | Live view         | No                                    |
-| Regular view      | Live view         | No; a regular view is not a WAL table |
+| Regular view      | Live view         | No; the view query must read a base table directly |
 | Materialized view | Live view         | Yes                                   |
 
 A full rebuild of a materialized view invalidates a live view that uses it as
@@ -343,6 +468,8 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **Single base table only.** No JOINs, subqueries, or CTEs in the view query.
 - **Explicit output columns only.** `SELECT *` and other wildcard projections
   are rejected because the output schema is fixed when the view is created.
+- **Designated timestamp in the output.** The query must select the base
+  table's designated timestamp as a plain column under its own name.
 - **No pre-aggregation.** `SAMPLE BY` and `GROUP BY` are not allowed between the
   base table and the window functions. A view like "5-minute candles with a
   rolling VWAP" must pre-aggregate upstream.
@@ -353,19 +480,26 @@ in [Base table lifecycle](#base-table-lifecycle).
   the `WHERE` filter, and window-function arguments.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Size retention on the base table instead.
+- **No direct writes.** `INSERT`, `UPDATE`, `TRUNCATE`, and structural
+  `ALTER` statements on a live view are rejected with `cannot modify live view`.
 
 ## Tradeoffs
 
 - **Storage grows with output.** The computed rows are stored on the live view's
   disk tier in addition to the base table's rows. For wide projections or long
   retention the view's footprint can exceed the base table.
+- **Base WAL is retained for the view.** Base-table WAL segments are kept until
+  every valid live view on the table has consumed them and covered them with a
+  checkpoint, so a lagging view increases the base table's WAL disk usage.
+  Invalidated and dropped views release this hold.
 - **No admission control.** A view that cannot keep up with ingestion stays
   correct but stale, with no automatic throttle or drop.
 - **Per-partition state for partitioned windows grows with distinct partition
   cardinality.** A base table with high-cardinality partition keys (UUIDs,
   session ids) holds state per key. Use
   [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
-  to bound the per-view refresh footprint. The `in_mem_bytes` column in
+  to cap the per-view refresh footprint; a view that exceeds the cap is
+  invalidated, not throttled. The `in_mem_bytes` column in
   [`live_views()`](/docs/query/functions/meta/#live_views) separately reports
   the peak-sticky capacity of the recent-row tier.
 
@@ -379,11 +513,16 @@ views.
 Two dedicated permissions govern live-view DDL, modelled on the materialized-view
 permissions:
 
-- `CREATE LIVE VIEW` is a database-level permission.
+- `CREATE LIVE VIEW` is a database-level permission. Creating a view also
+  requires `SELECT` on the base-table columns the view reads; a table-level
+  `SELECT` grant covers them.
 - `DROP LIVE VIEW` is checked against the target view.
 
-Querying a live view uses the standard table-level `SELECT` permission, since a
-live view is a regular table token. See
+The creator, or the `OWNED BY` principal when one is given, receives all
+permissions on the new view with the `GRANT` option. Querying a live view uses
+the standard table-level `SELECT` permission, since a live view is a regular
+table token. [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/)
+requires the `RESUME WAL` permission on the view. See
 [Role-based access control](/docs/security/rbac/) for the full permission model.
 
 ### Replication
@@ -395,6 +534,13 @@ refreshes and flushes its own node-local live-view table:
 - A read-only replica refreshes from its locally applied copy of the base table.
 - Live-view WAL is not uploaded or transferred between nodes.
 
+`CREATE LIVE VIEW` and `DROP LIVE VIEW` run on the primary, and a dropped view
+is removed from replicas too. A replica keeps no in-memory rows ahead of disk,
+so its live views trail by up to one `FLUSH EVERY` interval plus base-table
+replication and apply lag. Refresh state and checkpoints are also node-local,
+so a view invalidated on one node, for example by a memory limit breach, stays
+valid on the others.
+
 A role switch continues the local refresh state; it does not reconstruct or
 transfer the former primary's live-view rows. Replica freshness therefore also
 depends on base-table replication and apply lag.
@@ -402,14 +548,17 @@ depends on base-table replication and apply lag.
 ### Backup and restore
 
 A live view is captured by the object-store backup like a materialized view: its
-table data rides the standard table path and its definition sidecars are carried
-in the backup manifest. After restore, unflushed rows are re-derived from the
-base table.
+table data and definition files are backed up with the table. The checkpoint
+timeline is not backed up. After restore, window state is rebuilt from the
+restored base table, and rows that were not yet flushed at backup time are
+re-derived from it.
 
 ## Related documentation
 
 - **SQL commands**
   - [`CREATE LIVE VIEW`](/docs/query/sql/create-live-view/): Create a live view
+  - [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/):
+    Resume a suspended live view
   - [`DROP LIVE VIEW`](/docs/query/sql/drop-live-view/): Remove a live view
 
 - **Related concepts**

@@ -198,13 +198,13 @@ Returns a `table` with the following columns:
 | `in_mem_rows`                                  | LONG      | Live row count in the published in-memory tier                                                                         |
 | `o3_rejected_count`                            | LONG      | Late out-of-order rows rejected below the view lower bound; resets on restart                                          |
 | `below_lower_bound_count`                      | LONG      | In-order rows dropped below the view lower bound; resets on restart                                                    |
-| `lag_seqtxn`                                   | LONG      | Committed base WAL transactions beyond `last_processed_seqtxn`                                                         |
-| `lag_micros`                                   | LONG      | Microseconds since the last successful flush                                                                           |
-| `last_processed_seqtxn`                        | LONG      | Last base transaction processed by the refresh worker                                                                  |
+| `lag_seqtxn`                                   | LONG      | Base transactions applied to the base table beyond `last_processed_seqtxn`                                             |
+| `lag_micros`                                   | LONG      | Microseconds since the last successful flush; `NULL` until the first flush after creation or restart                   |
+| `last_processed_seqtxn`                        | LONG      | Last base transaction whose output was flushed to the view; the in-memory tier can be ahead of it                      |
 | `applied_watermark`                            | LONG      | Last base transaction durably applied to the view's disk tier                                                          |
 | `lv_consumed_seqtxn`                           | LONG      | Base WAL purge floor held by this view                                                                                 |
 | `view_lower_bound_timestamp`                   | TIMESTAMP | Resolved `START FROM` boundary; `NULL` for `BEGINNING`                                                                 |
-| `writer_stall_micros`                          | LONG      | Current uninterrupted flush-writer stall duration, or `0`                                                              |
+| `writer_stall_micros`                          | LONG      | How long the in-memory tier has been unable to publish because readers pin both buffer slots, or `0`                   |
 | `seed_target_seqtxn`                           | LONG      | Target base transaction during initial seeding; otherwise `NULL`                                                       |
 | `o3_resume_replay_rows`                        | LONG      | Rows emitted by repairs resumed from a checkpoint; resets on restart                                                   |
 | `o3_boundary_replay_rows`                      | LONG      | Rows emitted by rebuild repairs; resets on restart                                                                     |
@@ -236,6 +236,7 @@ Returns a `table` with the following columns:
 | `checkpoint_repair_plan`                       | STRING    | Available localized plan: `range`, `rows`, `anchor`, a `+` combination, `none`, or `NULL` before compilation           |
 | `checkpoint_repair_last_disposition`           | STRING    | Last executor used: `localized rebuild`, `boundary rebuild`, or `resume from anchor`                                   |
 | `checkpoint_repair_last_denial`                | STRING    | Reason the last repair did not use a localized rebuild; otherwise `NULL`                                               |
+| `checkpoint_seal_failures`                     | LONG      | Failed checkpoint seals; growth means restart-recovery state is going stale; resets on restart                         |
 
 The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes`
 is the peak-sticky arena footprint that does not shrink after a burst, while
@@ -243,12 +244,15 @@ is the peak-sticky arena footprint that does not shrink after a burst, while
 `IN MEMORY` window. Together they distinguish a view actively buffering rows
 from one holding capacity retained from a past burst.
 
-`lag_seqtxn` counts transactions, not rows. A value of `0` means the durable
-tier is caught up; a temporary non-zero value is expected between `FLUSH EVERY`
-cycles. Alert on a value that remains above its normal flush-cycle baseline or
-keeps increasing across samples rather than on a universal fixed threshold.
-`lag_micros` measures flush activity and may grow while an idle view has
-`lag_seqtxn = 0`.
+`lag_seqtxn` counts transactions, not rows. A value of `0` means the view's
+durable tier has caught up with every transaction applied to the base table; a
+temporary non-zero value is expected between `FLUSH EVERY` cycles. Base commits
+that are not yet applied to the base table are not counted, so when the base
+table itself lags or is suspended, check
+[`wal_tables()`](#wal_tables) as well. Alert on a value that remains above its
+normal flush-cycle baseline or keeps increasing across samples rather than on a
+universal fixed threshold. `lag_micros` measures flush activity and may grow
+while an idle view has `lag_seqtxn = 0`.
 
 The checkpoint columns describe the current persistent timeline, its storage and
 lookup cost, and out-of-order repair activity. Timeline fields are `NULL` before
