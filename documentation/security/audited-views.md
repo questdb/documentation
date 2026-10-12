@@ -45,14 +45,23 @@ CREATE VIEW trades_by_symbol AS (
 ) WITH AUDIT;
 ```
 
-Creating it needs `CREATE VIEW` and `AUDIT VIEW`, which the built-in admin
-holds. Grant them to another principal with
-`GRANT CREATE VIEW, AUDIT VIEW TO view_owner;`.
+Creating it needs `CREATE VIEW`, `AUDIT VIEW`, and `SELECT` on the tables it
+reads, which the built-in admin holds. To let another principal create it:
 
-Readers need `SELECT` on the view only. Do not grant them the table it reads,
-so that the view is their only way to the data:
+```questdb-sql title="Let view_owner create the view"
+GRANT CREATE VIEW, AUDIT VIEW TO view_owner;
+GRANT SELECT ON trades TO view_owner;
+```
+
+The owner keeps that `SELECT`, so it can read `trades` with no audit row. Use
+an owner that nobody reads data as.
+
+Readers need `SELECT` on the view, plus an endpoint permission, such as `HTTP`
+or `PGWIRE`, to connect. Do not grant them the table it reads, so that the view
+is their only way to the data:
 
 ```questdb-sql title="Let analyst read the view"
+GRANT HTTP, PGWIRE TO analyst;
 GRANT SELECT ON trades_by_symbol TO analyst;
 ```
 
@@ -178,8 +187,17 @@ SELECT * FROM trades_by_symbol;
 ```
 
 The statement text fixes the number of members: `($1, $2)` always takes two
-values, so prepare one statement for each list length. An `AUDITED` list cannot
-take one array bind variable instead, because `params` cannot hold an array.
+values, so prepare one statement for each list length. A single member needs
+the trailing comma, `($1,)`. With a client that sends parameters untyped, such
+as psql `\bind`, it also needs a cast, `($1::varchar,)`: untyped, `($1,)` is
+taken as one array bind variable for the whole list.
+
+An `AUDITED` parameter cannot hold an array, so the
+[text array bind](/docs/query/sql/declare/#lists-of-bind-variables) that passes
+a list of any length to other views is refused here. Both cases fail with
+`audited view parameter has a type that cannot be audited`, for example
+`[view=trades_by_symbol, parameter=@symbols, type=unknown]` for an untyped
+bind.
 
 :::tip
 
@@ -220,12 +238,15 @@ rules, so a view whose default values break one is refused when it is defined.
 The size limit below is not checked there: a view whose default values are too
 large to record is created, and every read that uses those defaults fails.
 
-A read also fails when an `AUDITED` value cannot be evaluated, for example when
-a caller's override makes a function raise an error. This holds even when the
-query never uses the variable, such as one that only feeds a column the query
-does not select. The read returns the error without reading any data, and
-records a row with status `error` and `NULL` in `params`. The trail cannot show
-what such a read was given, so the read does not run.
+A read also fails when an `AUDITED` value cannot be evaluated as the read
+starts, for example when a value bound to a bind variable makes a function
+raise an error. This holds even when the query never uses the variable, such as
+one that only feeds a column the query does not select. The read returns the
+error without reading any data, and records a row with status `error` and
+`NULL` in `params`. The trail cannot show what such a read was given, so the
+read does not run. A constant value, including a caller's literal override, is
+evaluated when the read compiles instead, so its failure records no row, as
+with the rules above.
 
 The same happens when a read's `params` would be larger than
 [`view.audit.params.max.size`](/docs/configuration/audited-views/#viewauditparamsmaxsize),
@@ -249,8 +270,13 @@ Its schema:
 | `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
 | `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
 | `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds. For a read served as page frames, only the open: see below. |
-| `status`         | `SYMBOL`    | `ok`, or `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). A read served as page frames records `ok` once it opens. |
+| `status`         | `SYMBOL`    | `ok` when the read opened and ran, which does not mean it completed: see below. `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). |
 | `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id. `ALTER VIEW` keeps the id. |
+
+`ok` does not mean the client received every row. A failure while computing a
+selected column of a row the read has already produced, such as a cast or a
+string function raising an error, returns the error to the client and still
+records `ok`. The read reached that row.
 
 A read served as page frames records its row when the read opens, not when it
 finishes: `latency_micros` covers only the open, and a failure after that still
@@ -307,7 +333,7 @@ recorded when a caller overrides the list without the trailing comma, into an
 array of one, which [`UNNEST`](/docs/query/sql/unnest/) needs:
 
 ```questdb-sql title="Reads per principal and symbol, today"
-SELECT a.principal, u.symbol, count() AS reads
+SELECT a.principal, u.symbol, count_distinct(a.ts) AS reads
 FROM 'sys.view_audit' a, UNNEST(
     CASE WHEN json_extract(a.params, '$.symbols') LIKE '[%'
          THEN json_extract(a.params, '$.symbols')
@@ -315,8 +341,15 @@ FROM 'sys.view_audit' a, UNNEST(
     END::varchar COLUMNS(symbol VARCHAR)
 ) u
 WHERE a.view_name = 'trades_by_symbol' AND a.ts IN '$today'
+  AND a.params IS NOT NULL
 GROUP BY a.principal, u.symbol;
 ```
+
+The `params IS NOT NULL` filter leaves out `error` rows whose parameters could
+not be recorded, which would otherwise count as a read of an empty symbol.
+`count_distinct(a.ts)` counts a read once even when its list repeats a symbol.
+Both reports count the other `error` rows as reads. Filter on `status` to tell
+them apart.
 
 ```questdb-sql title="Extract one parameter"
 SELECT ts, principal, json_extract(params, '$.since')::timestamp AS since
@@ -345,9 +378,13 @@ ALTER TABLE 'sys.view_audit'
 - `SET STORAGE POLICY` replaces the whole policy, so restate every stage you
   want to keep.
 - A policy set on the primary applies on every node, replicas included.
-- `TRUNCATE TABLE` and partition operations act only on the node that runs
-  them, and a replica refuses them. A storage policy is the way to prune a
-  replica's trail.
+- `TRUNCATE TABLE`, partition operations and `SET TTL` act only on the node
+  that runs them, and a replica refuses them. A storage policy is the way to
+  prune a replica's trail.
+- Use a storage policy rather than a TTL. Enterprise accepts `SET TTL` on
+  system tables such as the trail, but while a TTL is set, `SET STORAGE POLICY`
+  fails with `Cannot set storage policy, please, remove TTL settings`. Clear it
+  first with `ALTER TABLE 'sys.view_audit' SET TTL 0 HOURS`.
 
 A policy can convert and drop local partitions, but cannot move the trail to
 object storage: `TO REMOTE` and `DROP REMOTE` are
@@ -402,7 +439,10 @@ table. Nothing records that they ran.
 - [`TRUNCATE TABLE`](/docs/query/sql/truncate/)
 - [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
   [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
-- [`SET TTL`](/docs/query/sql/alter-table-set-ttl/)
+- [`SET TTL`](/docs/query/sql/alter-table-set-ttl/). Enterprise rejects a TTL
+  on other tables, but accepts it on system tables such as the trail. A TTL
+  acts only on the node that runs it, and blocks `SET STORAGE POLICY` until it
+  is cleared with `SET TTL 0 HOURS`: see [Retention](#retention).
 - A [storage policy](/docs/query/sql/alter-table-set-storage-policy/) with a
   `DROP LOCAL` stage
 
@@ -587,7 +627,7 @@ Lost rows show in the server log only. No metric reports them.
 
 | Action                                                              | Permissions                                               |
 | ------------------------------------------------------------------- | --------------------------------------------------------- |
-| Create a view `WITH AUDIT`                                          | `CREATE VIEW` and `AUDIT VIEW`                            |
+| Create a view `WITH AUDIT`                                          | `CREATE VIEW` and `AUDIT VIEW`, and `SELECT` on the tables it reads |
 | Drop an audited view, with `DROP VIEW` or `DROP ALL TABLES`         | `DROP VIEW` on the view and `AUDIT VIEW`                  |
 | Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`                 |
 | Read an audited view                                                | `SELECT` on the view, as for any [view](/docs/concepts/views/#definer-security-model-enterprise) |
@@ -605,11 +645,12 @@ treats a view's auditing.
 
 :::note
 
-`GRANT ALL` expands to individual permissions at the moment it is granted. A
-principal granted `ALL` before upgrading to a version with audited views does
-not acquire `AUDIT VIEW`, and no migration backfills it, so it cannot create,
-alter or drop audited views. Grant it explicitly to existing administrators:
-`GRANT AUDIT VIEW TO admins;`.
+A database-level `GRANT ALL` includes `DATABASE ADMIN`, which also covers
+permissions added in later versions. So a principal granted `ALL` before the
+upgrade to audited views holds `AUDIT VIEW`, and can create, alter and drop
+audited views. A principal that holds individual permissions without
+`DATABASE ADMIN` needs it granted explicitly:
+`GRANT AUDIT VIEW TO view_admins;`.
 
 :::
 
@@ -617,7 +658,14 @@ Grant readers `SELECT` on the audited view and not on the tables it reads. A
 principal who can read those tables, directly or through a view that is not
 audited, reads the same data with no audit row. Under the
 [definer model](/docs/concepts/views/#definer-security-model-enterprise),
-`SELECT` on the view is all a reader needs.
+`SELECT` on the view, plus an endpoint permission such as `HTTP` or `PGWIRE` to
+connect, is all a reader needs.
+
+`SELECT ON ALL TABLES` covers `sys.view_audit` and every table an audited view
+reads. Its holder bypasses auditing, and can read the whole trail, with every
+principal's `params`. Give readers of audited views `SELECT` on the views
+instead, and check existing grants, such as the analyst roles in
+[RBAC](/docs/security/rbac/#read-only-analyst), for this one.
 
 Grant `SELECT` on `sys.view_audit` to the people who review the trail, and the
 permissions that remove its rows only to the operators who manage its
@@ -646,13 +694,30 @@ creates the table itself, with
 A [backup](/docs/operations/backup/) includes the node's `sys.view_audit`, and
 restoring it onto an empty node brings that table back. Back up every node
 whose trail you need to keep: a backup of the primary holds only the reads the
-primary served.
+primary served. Scheduled backups run on the primary only, so back up a replica
+with a manual `BACKUP DATABASE`. See
+[Schedules on a replica](/docs/operations/backup/#schedules-on-a-replica).
 
 A replica [created from a backup](/docs/operations/backup/#create-a-replica-from-a-backup)
 of the primary starts with a copy of the primary's rows, up to the time of the
 backup, and records its own reads after them. Those rows are also in the
-primary's table, so leave them out of the replica's rows when you merge the
-trails, or they count twice.
+primary's table, so when you merge the trails, take only the replica's rows
+recorded after the backup, or they count twice. Any instant between the end of
+the backup and the replica's first start is a safe cutoff, such as the backup's
+`end_ts` in [`backups()`](/docs/operations/backup/#monitor-and-abort) on the
+primary: every copied row is older, and every read the replica records itself
+is newer.
+
+```questdb-sql title="On a replica created from a backup: only its own reads"
+SELECT 'replica-1' AS node, *
+FROM 'sys.view_audit'
+WHERE ts > '2026-10-01T12:00:00.000000Z'; -- after the backup it came from
+```
+
+Run a query like this on each node, with the cutoff only on a replica created
+from a backup, then combine the results outside QuestDB, for example by
+exporting each with
+[`/exp`](/docs/connect/compatibility/rest-api/#exp---export-data).
 
 A node restored from a backup taken before audited views existed creates the
 table at startup without a storage policy, and logs an advisory with the
@@ -667,8 +732,10 @@ audited are unaffected.
 
 - **Only reads through the audited view are recorded.** A principal with
   `SELECT` on the tables the view reads, or on a view over them that is not
-  audited, reads the same rows with no audit row. Grant readers `SELECT` on the
-  audited view and not on its tables, as in [Permissions](#permissions).
+  audited, reads the same rows with no audit row. This includes the view's
+  owner, which needs `SELECT` on those tables to create the view: use an owner
+  that nobody reads data as. Grant readers `SELECT` on the audited view and not
+  on its tables, as in [Permissions](#permissions).
 - **A materialized view over an audited view is not audited.** Its refreshes
   record nothing, reads of the materialized view are not audited, and
   `CREATE MATERIALIZED VIEW` records nothing either. A principal who can read an

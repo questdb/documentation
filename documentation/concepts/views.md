@@ -190,7 +190,11 @@ DECLARE @limit := 50 SELECT * FROM mixed_params
 
 A parameter can hold a list of values for an `IN` filter. Each statement that
 reads the view can override it with a list of any length. In a prepared
-statement, the length is fixed by its text: `($1, $2)` always takes two values.
+statement, a list of bind variables has the length its text gives it: `($1, $2)`
+always takes two values. To pass any number of values with one statement, bind
+one text array instead, `DECLARE @symbols := $1`, which works on a view that is
+not [audited](/docs/security/audited-views/). See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
 
 ```questdb-sql
 CREATE VIEW trades_for AS (

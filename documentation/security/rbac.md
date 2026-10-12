@@ -118,6 +118,10 @@ GRANT SELECT ON aapl_trades TO aapl_analyst;
 The user `aapl_analyst` can only see AAPL trades. They have no access to the
 underlying `trades` table.
 
+To also record who read the view, and with which parameters, create it as an
+[audited view](/docs/security/audited-views/). A `SELECT ON ALL TABLES` grant
+bypasses it: see [its permissions](/docs/security/audited-views/#permissions).
+
 ## Common scenarios
 
 ### Read-only analyst
@@ -129,6 +133,12 @@ CREATE USER analyst WITH PASSWORD 'pwd';
 GRANT HTTP, PGWIRE TO analyst;
 GRANT SELECT ON ALL TABLES TO analyst;
 ```
+
+`SELECT ON ALL TABLES` also covers the tables behind
+[audited views](/docs/security/audited-views/), and their audit trail, so its
+holder reads that data with no audit row. Where audited views guard data, grant
+`SELECT` on those views instead. See
+[Audited views permissions](/docs/security/audited-views/#permissions).
 
 ### Application service account
 
@@ -816,7 +826,7 @@ SELECT * FROM all_permissions();
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
-| AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions). Not part of an `ALL` granted before the upgrade to audited views |
+| AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
 | CREATE TABLE              | Database                            | Create tables                           |

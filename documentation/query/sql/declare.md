@@ -326,7 +326,23 @@ WHERE timestamp IN @days;
 
 ### Lists of bind variables
 
-Members can be bind variables:
+To filter a `SYMBOL`, `VARCHAR` or `STRING` value on any number of values with
+one prepared statement, bind one text array over the PostgreSQL wire protocol.
+Bind it directly, as `symbol IN $1`, or through a variable:
+
+```questdb-sql title="Bind one text array for any number of values"
+DECLARE @symbols := $1
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+-- bind $1 as a text array, such as {BTC-USDT,ETH-USDT,SOL-USDT}
+```
+
+With JDBC, bind `connection.createArrayOf("varchar", symbols)`. With psql,
+`\bind '{BTC-USDT,ETH-USDT,SOL-USDT}'`. The same works for a parameter of a
+[view](/docs/concepts/views/#list-parameters), but not of an audited view.
+
+Members of a list can also be bind variables. Reads of an
+[audited view](/docs/security/audited-views/) need this form, because an
+`AUDITED` parameter cannot hold an array:
 
 ```questdb-sql title="A list of bind variables"
 DECLARE @symbols := ($1, $2)
@@ -334,11 +350,12 @@ SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
 ```
 
 The statement text fixes the number of members: `($1, $2)` always takes two
-values, and a single bind variable needs the trailing comma, `($1,)`. To filter
-on a varying number of values, prepare one statement for each count. On a
-`SYMBOL`, `VARCHAR` or `STRING` column, a PostgreSQL wire client can instead
-bind one text array of any length, as in `symbol IN $1`. An `AUDITED` view
-parameter cannot hold an array, so it needs the fixed-length form.
+values, so prepare one statement for each count. A single bind variable needs
+the trailing comma, `($1,)`. With a client that sends parameters untyped, such
+as psql `\bind`, it also needs a cast, `($1::varchar,)`: untyped, `($1,)` is
+taken as one array bind variable for the whole list. An audited view refuses
+both an array and an untyped `($1,)` with
+`audited view parameter has a type that cannot be audited`.
 
 ### Lists in views
 

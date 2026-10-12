@@ -139,6 +139,10 @@ SELECT * FROM trades
 WHERE timestamp IN '$now-1h..$now' AND symbol IN @symbols;
 ```
 
+To pass a list of any length in a prepared statement, bind one text array,
+`symbol IN $1`. See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
+
 ## Numeric
 
 QuestDB can filter numeric values based on equality, inequality, comparison, and

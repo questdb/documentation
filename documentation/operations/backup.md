@@ -594,7 +594,10 @@ more recent than the oldest available WAL data.
    The new replica's `sys.view_audit` starts as a copy of the primary's, up to
    the time of the backup. When you merge the trails of
    [audited views](/docs/security/audited-views/#replication-backups-and-read-only-instances)
-   across nodes, leave those rows out of the replica's, or they count twice.
+   across nodes, take only the replica's rows with a `ts` after the backup, or
+   the copied rows count twice. The backup's `end_ts` in
+   [`backups()`](#monitor-and-abort), or any later instant before the replica
+   first started, is a safe cutoff.
 
 :::note
 
