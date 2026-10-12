@@ -188,7 +188,7 @@ Returns a `table` with the following columns:
 | `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                            |
 | `base_table_name`                              | STRING    | Base table name                                                                                                        |
 | `view_sql`                                     | STRING    | Query used to maintain the view                                                                                        |
-| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
+| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable`. A suspended WAL on the view still shows `active`; check [`wal_tables()`](#wal_tables) |
 | `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                     |
 | `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                           |
 | `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                |
@@ -1282,8 +1282,8 @@ and `errorMessage` of a suspended table.
 :::
 
 `wal_tables()` returns the WAL status for all
-[WAL tables](/docs/concepts/write-ahead-log/) or materialized views in the
-database.
+[WAL tables](/docs/concepts/write-ahead-log/), materialized views, and live
+views in the database.
 
 **Arguments:**
 
@@ -1293,7 +1293,7 @@ database.
 
 Returns a `table` including the following information:
 
-- `name` - table or materialized view name
+- `name` - table, materialized view, or live view name
 - `suspended` - suspended status flag
 - `writerTxn` - the last committed transaction in TableWriter (equivalent to `table_txn` in `tables()`)
 - `bufferedTxnSize` - the number of transactions that are kept invisible when

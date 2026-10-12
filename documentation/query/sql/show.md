@@ -222,7 +222,8 @@ SHOW CREATE LIVE VIEW trades_ma;
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
 `IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause populated with the current user.
+output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`,
+not necessarily the view's owner.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -319,7 +320,7 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
+[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause naming the user running `SHOW CREATE`, not necessarily the table's owner.
 
 For example,
 

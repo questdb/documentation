@@ -60,10 +60,13 @@ The view creator automatically receives this permission with the `GRANT` option.
 
 ## Errors
 
+Messages are shown by their stable prefix. The server may append details, such
+as `[name=trades_ma]`.
+
 | Error | Cause |
 | ----- | ----- |
-| `live view name expected [name=<name>]` | The name refers to a table or view that is not a live view, even with `IF EXISTS` |
-| `live view does not exist [name=<name>]` | The view does not exist and `IF EXISTS` was not specified |
+| `live view name expected` | The name refers to a table or view that is not a live view, even with `IF EXISTS` |
+| `live view does not exist` | The view does not exist and `IF EXISTS` was not specified |
 | `Access denied for <user> [DROP LIVE VIEW on <view>]` | Missing `DROP LIVE VIEW` permission (Enterprise) |
 
 ## See also

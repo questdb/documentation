@@ -2,7 +2,8 @@
 title: ALTER LIVE VIEW RESUME WAL
 sidebar_label: RESUME WAL
 description:
-  Documentation for the ALTER LIVE VIEW RESUME WAL SQL keyword in QuestDB.
+  ALTER LIVE VIEW RESUME WAL restarts WAL apply on a live view suspended after an
+  error such as a full disk. Find suspended live views with wal_tables().
 ---
 
 Restarts [WAL](/docs/concepts/write-ahead-log/) apply on a
@@ -21,13 +22,16 @@ ALTER LIVE VIEW viewName RESUME WAL
 | Parameter | Description |
 | --------- | ----------- |
 | `viewName` | Name of the live view to resume |
-| `FROM TRANSACTION` | Optional starting transaction number (defaults to the failed transaction) |
+| `FROM TRANSACTION` or `FROM TXN` | Optional transaction to resume from. Defaults to the failed transaction |
+| `sequencerTxn` | A transaction number of the view's own WAL, as reported by `wal_tables()`, not a base-table transaction |
 
 ## When to use
 
 A live view writes its output to its own WAL-backed table. If applying one of
 the view's WAL transactions fails, QuestDB suspends the view's WAL like that of
-any other WAL table, and the view can serve stale rows until you resume it.
+any other WAL table. The view's next flush after a base-table commit retries
+the apply and clears the suspension if the cause is gone, but a view whose base
+table is idle stays suspended until you resume it.
 [`live_views()`](/docs/query/functions/meta/#live_views) still reports
 `view_status = 'active'` for a suspended view, so check
 [`wal_tables()`](/docs/query/functions/meta/#wal_tables) instead:
@@ -66,11 +70,14 @@ GRANT RESUME WAL ON trades_ma TO user1;
 
 ## Errors
 
+Messages are shown by their stable prefix. The server may append details, such
+as `[name=trades_ma]`.
+
 | Error | Cause |
 | ----- | ----- |
 | `live view name expected` | The name refers to a table or view that is not a live view |
 | `table does not exist` | No table or view with this name exists |
-| `'resume' or 'suspend' expected` | The statement uses an unsupported `ALTER LIVE VIEW` operation, such as `SET TTL` or `ADD COLUMN` |
+| `'resume' or 'suspend' expected` | The statement uses an unsupported `ALTER LIVE VIEW` operation, such as `SET TTL` or `ADD COLUMN`. Only `RESUME WAL` is supported |
 
 ## See also
 

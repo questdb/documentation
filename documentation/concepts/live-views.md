@@ -9,9 +9,9 @@ description:
 
 A live view is a QuestDB table that stores the incrementally maintained result
 of a window-function query over a single base table. As new rows arrive in the
-base table, the window functions run once per new row and the output is appended
-to the view. Querying the live view then scans precomputed rows instead of
-reprocessing the base table on every read.
+base table, the window functions run once per new row and the results are
+written to the view. Querying the live view then scans precomputed rows instead
+of reprocessing the base table on every read.
 
 Live views target workloads where the same window aggregate is read frequently
 against high-rate ingestion: rolling VWAP, cumulative volume, running ranks, or
@@ -56,7 +56,8 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-Create a live view that keeps a 300-row moving average of price per symbol:
+Create a live view that keeps a moving average of price per symbol over each
+trade and the 300 trades before it:
 
 ```questdb-sql title="Live view with a moving average"
 CREATE LIVE VIEW trades_ma
@@ -91,8 +92,8 @@ soon as they are refreshed, without waiting for a flush; see
 
 A live view is its own WAL-backed table maintained by a background refresh
 worker. The worker reads new committed rows from the base table and runs the
-view's window functions over them, appending the output. Two independent
-cadences govern how that output becomes visible and durable:
+view's window functions over them, writing the output to the view. Two
+independent cadences govern how that output becomes visible and durable:
 
 - **Refresh** runs continuously. As the worker computes output rows, it appends
   them to an in-memory tier. This is what keeps the view fresh.
@@ -103,14 +104,17 @@ Reads combine both tiers. Recent rows are served from the in-memory tier and the
 older prefix from disk, so a query sees the freshest computed rows without
 waiting for a flush.
 
+The view is not append-only. When a base row arrives out of order, with a
+timestamp below rows the view has already emitted, QuestDB recomputes and
+replaces the view's rows at or after that timestamp. A consumer that polls the
+view only for rows newer than the last timestamp it has seen misses these
+corrections. If the base table receives out-of-order data, re-read a trailing
+time range that covers how late base rows can arrive.
+
 Views over [deduplicated](/docs/concepts/deduplication/) base tables, and every
 live view on a QuestDB Enterprise read-only replica, work differently: they
 refresh and flush together on the `FLUSH EVERY` cadence, with no in-memory rows
 ahead of the disk tier.
-
-```questdb-sql title="Show the live view definition"
-SHOW CREATE LIVE VIEW trades_ma;
-```
 
 ### Freshness
 
@@ -196,8 +200,8 @@ The following rules also apply:
   `DECIMAL`, `BINARY`, and array keys are rejected with
   `incremental snapshot is not supported for this function yet`. In a bounded
   window, cast a `VARCHAR` key to `SYMBOL` or `STRING`, for example
-  `PARTITION BY venue::symbol`. An anchored window must partition by base
-  columns directly.
+  `PARTITION BY venue::symbol` for a `VARCHAR` column `venue`. An anchored
+  window must partition by base columns directly.
 - **Frames must not start at `UNBOUNDED PRECEDING`.** A window without a frame
   clause, such as `OVER (PARTITION BY symbol ORDER BY timestamp)`, defaults to a
   frame that starts at `UNBOUNDED PRECEDING`. Such windows are rejected unless
@@ -257,9 +261,22 @@ LIMIT -10;
 ```
 
 `greatest(..., 0)` guards against tiny negative values from floating-point
-rounding when prices are flat. For the sample standard deviation that
-`stddev_samp` returns, multiply the variance by `n / (n - 1)`, where `n` is
-`count(price) OVER w`.
+rounding when prices are flat.
+
+For the sample standard deviation that `stddev_samp` returns, multiply the
+variance by `n / (n - 1)`, where `n` is `count(price) OVER w`. Write the
+denominator as `n - 1.0`: QuestDB divides integers as integers, so `n / (n - 1)`
+evaluates to `1` and leaves the population value unchanged.
+
+```questdb-sql title="Sample standard deviation over the same window"
+sqrt(greatest(
+  (avg(price * price) OVER w - avg(price) OVER w * avg(price) OVER w)
+    * count(price) OVER w / (count(price) OVER w - 1.0),
+  0
+)) AS stddev20_samp
+```
+
+The first row of each symbol reads `0` here, where `stddev_samp` returns `NULL`.
 
 ## Anchored windows
 
@@ -336,13 +353,14 @@ A live view is tied to a single WAL-backed base table and tracks the exact set o
 base columns its query references, including columns used only in its `WHERE`
 filter:
 
-- Changes to columns the view does not reference pass through transparently and
-  the view keeps refreshing.
+- Schema changes to columns the view does not reference pass through
+  transparently and the view keeps refreshing.
 - Dropping, renaming, or changing the type of a referenced column invalidates the
   view.
 - Renaming or dropping the base table invalidates the view.
 - An [`UPDATE`](/docs/query/sql/update/) that changes base-table rows
-  invalidates the view.
+  invalidates the view, even when it changes only columns the view does not
+  reference.
 - [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/) on the
   base table invalidates the view.
 - Exceeding
@@ -377,8 +395,21 @@ dropping the view:
 SHOW CREATE LIVE VIEW trades_ma;
 ```
 
-Then drop and recreate the live view. Use `START FROM BEGINNING` or an explicit
-timestamp if it must include history that is still present in the base table.
+Then drop and recreate the live view. Review the saved statement before
+replaying it:
+
+- `START FROM NOW` is saved as written, so replaying it starts the new view at
+  the time of the replay. To keep the original boundary, replace it with the
+  `view_lower_bound_timestamp` value from
+  [`live_views()`](/docs/query/functions/meta/#live_views), or use
+  `START FROM BEGINNING` to include all history still present in the base table.
+- If the view was created with a trailing `;`, the saved query keeps it inside
+  `AS ( ... )` and replaying fails with `')' expected`. Remove that `;`.
+- On QuestDB Enterprise, the saved `OWNED BY` names the user running
+  `SHOW CREATE`, not necessarily the view's owner, and dropping the view
+  removes its grants. Set `OWNED BY` to the intended owner and grant
+  permissions on the new view again.
+
 Dropping the invalid view removes its materialized rows, including rows whose
 source history is no longer retained by the base table.
 
@@ -390,22 +421,41 @@ ahead of disk, so it trails the base table by up to one `FLUSH EVERY` cycle.
 ## Monitoring
 
 The [`live_views()`](/docs/query/functions/meta/#live_views) function exposes
-the state, refresh lag, in-memory footprint, and seed progress of every live
-view:
+the state, refresh lag, in-memory footprint, and out-of-order repair counters of
+every live view:
 
 ```questdb-sql title="List all live views"
 SELECT view_name, base_table_name, view_status, lag_seqtxn, lag_micros
 FROM live_views();
 ```
 
+Check `view_status` before reading lag. `seeding` means the view is still
+processing the base rows that existed when it was created, and `invalid` means
+it has stopped refreshing; see [Base table lifecycle](#base-table-lifecycle).
+The lag columns are meaningful only for an `active` view: during the seed,
+`lag_seqtxn` reads `0` while the view is still empty.
+
+`view_status` does not show a suspended WAL on the view itself: a view whose own
+WAL apply failed still reports `active`. QuestDB retries the apply on the view's
+next flush after a base commit, so a view whose base table is idle stays
+suspended. Find suspended live views with
+[`tables()`](/docs/query/functions/meta/#tables), or with
+[`wal_tables()`](/docs/query/functions/meta/#wal_tables) for the error details,
+and resume them with
+[`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/):
+
+```questdb-sql title="Find live views with a suspended WAL"
+SELECT table_name FROM tables() WHERE table_type = 'L' AND table_suspended;
+```
+
 `lag_seqtxn` is the number of transactions applied to the base table beyond the
 view's durable processed watermark. It counts transactions, not rows: one
-transaction may contain one row or millions. A value of `0` means that the
-durable tier has caught up with the base table. A temporary non-zero value is
-expected between `FLUSH EVERY` cycles, especially when ingestion produces many
-small commits. Base commits that are not yet applied to the base table are not
-counted, so when the base table itself lags or is suspended, check
-[`wal_tables()`](/docs/query/functions/meta/#wal_tables) too.
+transaction may contain one row or millions. For an `active` view, a value of
+`0` means that the durable tier has caught up with the base table. A temporary
+non-zero value is expected between `FLUSH EVERY` cycles, especially when
+ingestion produces many small commits. Base commits that are not yet applied to
+the base table are not counted, so when the base table itself lags or is
+suspended, check [`wal_tables()`](/docs/query/functions/meta/#wal_tables) too.
 
 There is no universal acceptable non-zero value. Sample the metric over time and
 compare it with the view's normal flush-cycle baseline. A bounded sawtooth that
@@ -465,7 +515,8 @@ A full rebuild of a materialized view invalidates a live view that uses it as
 its base. Recreate the live view after the rebuild, following the recovery steps
 in [Base table lifecycle](#base-table-lifecycle).
 
-- **Single base table only.** No JOINs, subqueries, or CTEs in the view query.
+- **Single base table only.** No JOINs, subqueries, CTEs, or regular views in
+  `FROM`.
 - **Explicit output columns only.** `SELECT *` and other wildcard projections
   are rejected because the output schema is fixed when the view is created.
 - **Designated timestamp in the output.** The query must select the base
@@ -479,7 +530,9 @@ in [Base table lifecycle](#base-table-lifecycle).
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
-  Size retention on the base table instead.
+  Base-table retention does not shrink the view, because `DROP PARTITION`,
+  `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.
+  The only way to reclaim the space is to drop and recreate the view.
 - **No direct writes.** `INSERT`, `UPDATE`, `TRUNCATE`, and structural
   `ALTER` statements on a live view are rejected with `cannot modify live view`.
 
@@ -495,8 +548,8 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **No admission control.** A view that cannot keep up with ingestion stays
   correct but stale, with no automatic throttle or drop.
 - **Per-partition state for partitioned windows grows with distinct partition
-  cardinality.** A base table with high-cardinality partition keys (UUIDs,
-  session ids) holds state per key. Use
+  cardinality.** A view that partitions by a high-cardinality key, such as a
+  `SYMBOL` column of account or order ids, holds state per key. Use
   [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
   to cap the per-view refresh footprint; a view that exceeds the cap is
   invalidated, not throttled. The `in_mem_bytes` column in
@@ -542,8 +595,7 @@ so a view invalidated on one node, for example by a memory limit breach, stays
 valid on the others.
 
 A role switch continues the local refresh state; it does not reconstruct or
-transfer the former primary's live-view rows. Replica freshness therefore also
-depends on base-table replication and apply lag.
+transfer the former primary's live-view rows.
 
 ### Backup and restore
 

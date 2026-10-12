@@ -1,6 +1,8 @@
 ---
 title: Live views
-description: Configuration settings for live views in QuestDB.
+description:
+  "Live view server settings: refresh worker pool size, per-view memory limit,
+  in-memory tier buffers, checkpoints, and out-of-order repair budgets."
 ---
 
 These settings control live view SQL support, the refresh worker pool, and the
@@ -159,8 +161,9 @@ Threshold for the sweep that drops anchored-window partition state left behind
 the previous anchor boundary. The sweep runs only when all of the following
 hold: the anchor map has more partitions than this value, at least this many of
 them are reclaimable, and the reclaimable partitions make up at least half of
-the map. A view whose anchor value is not monotonic, or is `NULL`, never
-compacts.
+the map. Only anchors that return `TIMESTAMP` and advance with the designated
+timestamp compact. An anchor value that is not monotonic or is `NULL`, and any
+`ANCHOR EXPRESSION` that returns `LONG` or `INT`, never compacts.
 
 ## cairo.live.view.refresh.memory.limit.bytes
 

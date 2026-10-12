@@ -2,7 +2,8 @@
 title: CREATE LIVE VIEW
 sidebar_label: CREATE LIVE VIEW
 description:
-  Documentation for the CREATE LIVE VIEW SQL keyword in QuestDB.
+  "CREATE LIVE VIEW syntax for incrementally maintained window-function views:
+  FLUSH EVERY, IN MEMORY, START FROM, anchored windows, query rules, and errors."
 ---
 
 Creates a live view that incrementally maintains the result of a window-function
@@ -24,18 +25,20 @@ rejected at creation time.
 CREATE LIVE VIEW [ IF NOT EXISTS ] viewName
 FLUSH EVERY duration
 [ IN MEMORY duration ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) ]
-START FROM ( NOW | BEGINNING | 'timestamp' )
-AS [ ( ] query [ ) ]
-[ OWNED BY ownerName ]
+[ PARTITION BY { YEAR | MONTH | WEEK | DAY | HOUR } ]
+START FROM { NOW | BEGINNING | 'startTimestamp' }
+AS { query | ( query ) [ OWNED BY ownerName ] }
 ```
 
 Where:
 
 - `duration`: a single token with a lowercase unit of `ms`, `s`, `m`, `h`, or
   `d`, for example `100ms`, `5s`, or `30m`.
+- `startTimestamp`: a quoted timestamp literal, such as
+  `'2026-04-01T00:00:00.000000Z'` or the date-only `'2026-04-01'`.
 - `query`: a `SELECT` over one WAL-backed base table whose projection contains
-  [window functions](/docs/query/functions/window-functions/overview/).
+  [window functions](/docs/query/functions/window-functions/overview/). It may
+  declare an [anchored window](#anchored-windows).
 
 `FLUSH EVERY` is required and must come first. `START FROM` is also required and
 may appear in any order with the optional `IN MEMORY` and `PARTITION BY`
@@ -163,11 +166,14 @@ FROM trades;
 ## Anchored windows
 
 An anchored window resets its functions on a boundary. Declare it in a named
-`WINDOW` with one of these forms:
+`WINDOW` clause of the view query, with `ANCHOR` as the last item:
 
-```questdb-sql
-ANCHOR DAILY 'HH:MM' [ 'timezone' ]
-ANCHOR EXPRESSION expression
+```questdb-sql title="Anchored named window"
+WINDOW windowName AS (
+    PARTITION BY columnName [, columnName ...]
+    ORDER BY timestampColumn [ ASC ]
+    ANCHOR { DAILY 'HH:MM' [ 'timeZone' ] | EXPRESSION anchorExpression }
+)
 ```
 
 `ANCHOR DAILY` requires a quoted 24-hour time. An optional time zone, either an
@@ -222,7 +228,9 @@ A live view supports at most one anchored window, which several window
 functions can share alongside other, bounded windows. An `ANCHOR EXPRESSION`
 must be deterministic, non-constant, and return `TIMESTAMP`, `LONG`, or `INT`.
 It cannot contain aggregates, subqueries, or bind variables, and it can only
-reference base columns that the query already selects or filters on.
+reference base columns that the rest of the query already reads: in the
+projection, the `WHERE` filter, a window-function argument, or a
+`PARTITION BY`. Otherwise it fails with `Invalid column: <column>`.
 
 ## Query constraints
 
@@ -239,7 +247,9 @@ The view query is validated at creation time and must:
   [Supported window functions](/docs/concepts/live-views/#supported-window-functions).
 - Give every stateful window function a `PARTITION BY` clause on a supported key
   type. `VARCHAR`, `UUID`, `LONG256`, `DECIMAL`, `BINARY`, and array keys are
-  rejected.
+  rejected. In a bounded window, cast a `VARCHAR` key to `SYMBOL` or `STRING`,
+  for example `PARTITION BY venue::symbol`; an anchored window must partition
+  by base columns directly.
 - Use a bounded `ROWS` or `RANGE` frame, or a named anchored window. Ranking
   functions (`row_number`, `rank`, and `dense_rank`) must be anchored. A window
   without a frame clause, and any frame starting at `UNBOUNDED PRECEDING`, is
@@ -257,7 +267,9 @@ The view query is validated at creation time and must:
   `systimestamp()`, or `rnd_*()`.
 - Not read another live view.
 
-## Complete example
+## Examples
+
+The examples use this base table:
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
@@ -268,6 +280,8 @@ CREATE TABLE trades (
   timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
+
+### Fully specified live view
 
 ```questdb-sql title="Fully specified live view"
 CREATE LIVE VIEW IF NOT EXISTS trades_ma
@@ -294,7 +308,68 @@ This creates a view that:
 - Keeps 5 seconds of recent rows in RAM for fresh reads (`IN MEMORY 5s`)
 - Partitions its disk tier by hour (`PARTITION BY HOUR`)
 - Includes all existing history in `trades` (`START FROM BEGINNING`)
-- Keeps a 300-row moving average of price per symbol
+- Keeps a moving average of price per symbol over each trade and the 300 trades
+  before it
+
+### Rolling VWAP with a filter
+
+This view uses a time-based `RANGE` frame and a `WHERE` filter. It keeps a
+one-hour volume-weighted average price per symbol over buy trades only; sell
+trades neither appear in the view nor contribute to the window.
+
+```questdb-sql title="Rolling 1-hour VWAP of buy trades"
+CREATE LIVE VIEW trades_buy_vwap_1h
+FLUSH EVERY 1s
+START FROM NOW
+AS
+SELECT
+  timestamp,
+  symbol,
+  price,
+  sum(price * amount) OVER w / sum(amount) OVER w AS vwap_1h
+FROM trades
+WHERE side = 'buy'
+WINDOW w AS (
+  PARTITION BY symbol
+  ORDER BY timestamp
+  RANGE '1' HOUR PRECEDING
+);
+```
+
+### Session statistics from the market open
+
+This view resets an anchored window at 09:30 New York time, following
+daylight-saving transitions. The trade sequence number, running volume, EMA,
+VWEMA, and price change all restart at each open, and `lag` returns `NULL` for
+the first trade of each session. The bounded `sma20` window runs alongside the
+anchored one and does not reset.
+
+```questdb-sql title="Session stats from the New York open"
+CREATE LIVE VIEW trades_ny_session
+FLUSH EVERY 1s
+START FROM NOW
+AS
+SELECT
+  timestamp,
+  symbol,
+  price,
+  row_number() OVER s AS trade_seq,
+  sum(amount) OVER s AS session_volume,
+  avg(price, 'period', 20) OVER s AS ema20,
+  avg(price, 'period', 20, amount) OVER s AS vwema20,
+  price - lag(price) OVER s AS price_change,
+  avg(price) OVER (
+    PARTITION BY symbol
+    ORDER BY timestamp
+    ROWS 19 PRECEDING
+  ) AS sma20
+FROM trades
+WINDOW s AS (
+  PARTITION BY symbol
+  ORDER BY timestamp
+  ANCHOR DAILY '09:30' 'America/New_York'
+);
+```
 
 ## Metadata
 
@@ -342,13 +417,17 @@ AS (
 OWNED BY analysts;
 ```
 
-External users must specify `OWNED BY`, and the creator must be a member of the
-group named as the owner.
+The example works as written for the built-in admin, which can name any
+existing user, group, or service account as the owner. Any other creator can
+name only themselves or a group they are a member of; naming another group fails
+with `<user> is not part of group <group>`. External users must specify
+`OWNED BY` and can name only one of their groups.
 
 ## Errors
 
-Errors that end in a bracketed detail, such as `[name=trades]`, are shown
-without it.
+Messages are shown by their stable prefix. The server may append details, such
+as `[name=trades]`, the configured limit in parentheses, or a hint on how to fix
+the query.
 
 ### Statement errors
 
@@ -377,7 +456,7 @@ without it.
 | `live views are not allowed as base tables in V1` | The base object is another live view |
 | `live view requires a single base table in FROM clause` | `FROM` contains a subquery, a CTE, or a regular view |
 | `live view select must be a simple scan of a single WAL base table; ...` | The query joins tables or uses `LATEST ON` |
-| `live view select must be a plain windowed scan of the base table; ...` | The query uses `LIMIT` or `DISTINCT` |
+| `live view select must be a plain windowed scan of the base table; ...` | The query uses `LIMIT`, `DISTINCT`, or a top-level `ORDER BY` on a column other than the designated timestamp |
 | `live view select must contain at least one window function` | The projection has no window function |
 | `live view select must project the base table's designated timestamp` | The designated timestamp is missing from the projection or computed |
 | `live view select cannot override the designated timestamp` | The designated timestamp is aliased |
@@ -390,19 +469,21 @@ without it.
 | Error | Cause |
 | ----- | ----- |
 | `live view select cannot use window function <fn>(); incremental snapshot is not supported for this function yet` | The function does not support this frame, has no `PARTITION BY`, or partitions by an unsupported key type |
-| `live view select may only use window functions that support incremental refresh` | The function needs look-ahead or multiple passes (`percent_rank`, `cume_dist`, `ntile`), or a window or top-level `ORDER BY` is not the designated timestamp ascending |
+| `live view select may only use window functions that support incremental refresh` | The function needs look-ahead or multiple passes (`percent_rank`, `cume_dist`, `ntile`), an inline `OVER (...)` window does not order by the designated timestamp ascending, or the top-level `ORDER BY` is on the designated timestamp descending |
 | `lead() is not supported in live views; use lag() for lookback` | The query uses `lead` |
-| `live view unbounded window must have an ANCHOR clause` | A window without a frame clause is not anchored |
-| `live view select cannot use <fn>() over a frame starting at UNBOUNDED PRECEDING` | An explicit frame starts at `UNBOUNDED PRECEDING` and is not anchored |
+| `live view unbounded window must have an ANCHOR clause` | The window uses the default frame (no frame clause, or an explicit `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`) and is not anchored |
+| `live view select cannot use <fn>() over a frame starting at UNBOUNDED PRECEDING` | Another frame starting at `UNBOUNDED PRECEDING`, such as `ROWS UNBOUNDED PRECEDING`, is not anchored |
 | `live view select cannot use <fn>() without an anchored WINDOW` | A ranking function is not anchored |
 | `live view RANGE window functions must use the same PARTITION BY and ORDER BY domain` | Two `RANGE` windows partition or order differently |
-| `live view named WINDOW must ORDER BY <timestamp> ASC` | A named window does not order by the designated timestamp ascending |
+| `live view named WINDOW must ORDER BY <timestamp>` | A named window does not order by the designated timestamp ascending |
+| `avg() does not support framing; remove ROWS/RANGE clause` | An EMA or VWEMA call, `avg(value, kind, param [, volume])`, has a frame clause |
 | `ANCHOR is only supported on named WINDOW clauses` | `ANCHOR` appears in an inline `OVER (...)` |
 | `ANCHOR is incompatible with bounded frames` | An anchored window has an explicit frame |
 | `live view anchored WINDOW requires PARTITION BY` | An anchored window has no `PARTITION BY` |
 | `live view ANCHOR currently requires PARTITION BY to reference base columns directly` | An anchored window partitions by an expression |
 | `live view supports at most one anchored WINDOW in V1` | The query declares more than one anchored window |
 | `live view anchored WINDOW '<name>' is not referenced by any window function` | No window function uses the anchored window directly |
+| `Invalid column: <column>` | An `ANCHOR EXPRESSION` references a base column that the rest of the query does not read |
 
 ## See also
 

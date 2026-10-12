@@ -6,8 +6,9 @@ description:
 ---
 
 These settings control materialized view SQL support and the background refresh
-job. Materialized views can use dedicated worker threads or share the server's
-common pool.
+job. Materialized views refresh on a dedicated worker pool sized by
+[`mat.view.refresh.worker.count`](#matviewrefreshworkercount); `0` disables
+refresh.
 
 To cap the native memory a single refresh may allocate, see
 [`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
@@ -79,8 +80,10 @@ Comma-separated list of numerical CPU core indexes, one per refresh worker.
 
 ## mat.view.refresh.worker.count
 
-- **Default**: same as
-  [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount)
+- **Default**: `2` on hosts with up to 8 CPU cores, `3` on up to 32 cores, `4`
+  on larger hosts. This is the same CPU-based default as
+  [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount);
+  setting that key does not change this one.
 - **Reloadable**: no
 
 Number of dedicated worker threads assigned to refresh materialized views. A
