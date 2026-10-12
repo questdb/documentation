@@ -56,14 +56,6 @@ ALTER LIVE VIEW trades_ma RESUME WAL FROM TRANSACTION 5;
 Resuming from a later transaction skips the earlier ones. Fix the underlying
 issue and resume from the failed transaction where possible.
 
-:::note
-
-`ALTER LIVE VIEW viewName SUSPEND WAL` is also accepted, but it does not pause
-a live view: the view's next refresh applies its pending WAL and clears the
-suspension. No other `ALTER LIVE VIEW` operations are supported.
-
-:::
-
 ## Permissions (Enterprise)
 
 Resuming WAL on a live view requires the `RESUME WAL` permission on the view:
@@ -78,7 +70,7 @@ GRANT RESUME WAL ON trades_ma TO user1;
 | ----- | ----- |
 | `live view name expected` | The name refers to a table or view that is not a live view |
 | `table does not exist` | No table or view with this name exists |
-| `'resume' or 'suspend' expected` | The statement uses an operation other than `RESUME WAL` or `SUSPEND WAL` |
+| `'resume' or 'suspend' expected` | The statement uses an unsupported `ALTER LIVE VIEW` operation, such as `SET TTL` or `ADD COLUMN` |
 
 ## See also
 
