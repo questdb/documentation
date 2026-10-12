@@ -207,7 +207,7 @@ Set a firm memory budget with equal request and limit. A CPU limit is optional:
 
 ```yaml
 spec:
-  image: registry.distribution.questdb.io/questdb:4.0.0-enterprise
+  image: registry.distribution.questdb.io/questdb:4.0.1-enterprise
   imagePullSecrets:
     - name: questdb-registry
   resources:
