@@ -53,11 +53,7 @@ The `AUDITED` keyword only takes effect inside the definition of an
 [audited view](/docs/security/audited-views/), a QuestDB Enterprise feature. It
 marks a variable whose resolved value each read of the view records in the
 audit trail. It is independent of `OVERRIDABLE`, and the two may appear in
-either order. It is allowed only in the `DECLARE` block that opens a view body
-or a statement: in a subquery, a CTE, or a set-operation branch after the
-first, it fails with `AUDITED is only allowed in the top-level DECLARE block`.
-In a statement's own block, or in a view that is not audited, it is accepted
-and has no effect.
+either order.
 
 ## Mechanics
 
@@ -296,8 +292,7 @@ including `NOT IN` and interval scans on the designated timestamp.
 - A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
 - One list variable can be assigned to another: `@majors := @symbols`.
 - A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
-  `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
-  after the last member of a longer list.
+  `('BTC-USDT')` is a parenthesised value.
 - A bracketed subquery, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
   subquery and not a list.
 

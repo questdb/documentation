@@ -484,10 +484,7 @@ CREATE VIEW trades_by_symbol AS (
 ```
 
 See [Audited views](/docs/security/audited-views/) for what a read records, the
-audit table, permissions, and limitations. A
-[materialized view](/docs/concepts/materialized-views/) over an audited view is
-not audited, so a principal who can create one can copy the view's data out of
-the trail's reach. Grant `CREATE MATERIALIZED VIEW` with that in mind.
+audit table, permissions, and limitations.
 
 ## Performance considerations
 

@@ -99,9 +99,7 @@ Both singular and plural forms are accepted.
   first; otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage
   policy, please, remove TTL settings`. On Enterprise tables, any non-zero
   `SET TTL` value is itself rejected with `TTL is not supported on Enterprise
-  tables; use a storage policy instead`. System tables, such as
-  `sys.view_audit`, are exempt, and Enterprise accepts `SET TTL` on them. See
-  [Audited views](/docs/security/audited-views/#retention)
+  tables; use a storage policy instead`
 - `ENABLE` and `DISABLE` require a policy to exist on the table; both return an
   error otherwise
 

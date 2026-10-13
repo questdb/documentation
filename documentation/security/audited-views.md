@@ -113,12 +113,9 @@ DECLARE [ OVERRIDABLE ] [ AUDITED ] @variable := expression
 - `WITH AUDIT` and `OWNED BY` may appear in either order. `WITH AUDIT` requires
   the [`AUDIT VIEW`](#permissions) permission.
 - `AUDITED` and `OVERRIDABLE` are independent and may appear in either order.
-- `AUDITED` takes effect only in the `DECLARE` block that opens the body of a
-  view created `WITH AUDIT`. In a subquery, a CTE, or a set-operation branch
-  after the first, it fails with
-  `AUDITED is only allowed in the top-level DECLARE block`. In the block that
-  opens a statement, or the body of a view created without `WITH AUDIT`, it is
-  accepted and has no effect.
+- `AUDITED` belongs in the `DECLARE` block that opens the view's body. In a
+  subquery or a CTE, it fails with
+  `AUDITED is only allowed in the top-level DECLARE block`.
 - A view created `WITH AUDIT` with no `AUDITED` variables still records each
   read, with `{}` in `params`.
 
@@ -175,10 +172,7 @@ Mark a variable `AUDITED` when its value describes which data a read covered:
   caller's value, or the view's default when the caller sets nothing.
 - **`AUDITED` only**: a parameter the caller cannot change. Worth recording when
   its value changes between reads, such as a window built on `now()`, because
-  the trail is otherwise the only place that value is kept. When another
-  audited view reads this one and
-  [covers it](#audited-views-that-read-other-audited-views), the value is not
-  recorded.
+  the trail is otherwise the only place that value is kept.
 
 Only the view's own declarations count. A caller cannot add a parameter to the
 row, or remove one, by declaring variables of their own, `AUDITED` or not.
@@ -201,17 +195,12 @@ SELECT * FROM trades_by_symbol;
 
 The statement text fixes the number of members: `($1, $2)` always takes two
 values, so prepare one statement for each list length. A single member needs
-the trailing comma, `($1,)`. With a client that sends parameters untyped, such
-as psql `\bind`, it also needs a cast, `($1::varchar,)`: untyped, `($1,)` is
-taken as one array bind variable for the whole list. With JDBC, write `?` in
-place of each `$n`.
+the trailing comma, `($1,)`. With JDBC, write `?` in place of each `$n`.
 
 An `AUDITED` parameter cannot hold an array, so the
 [text array bind](/docs/query/sql/declare/#lists-of-bind-variables) that passes
-a list of any length to other views is refused here. Both cases fail with
-`audited view parameter has a type that cannot be audited`, for example
-`[view=trades_by_symbol, parameter=@symbols, type=unknown]` for an untyped
-bind.
+a list of any length to other views fails here with
+`audited view parameter has a type that cannot be audited`.
 
 :::tip
 
@@ -233,47 +222,30 @@ variable:
 - Holds a subquery anywhere in its value, such as
   `(SELECT max(timestamp) FROM trades)`. The error is the same, with the type
   `CURSOR`.
-- Refers to a column, such as `price` or `price * 2`. An `AUDITED` value is
-  evaluated once per read, apart from the rows the read returns, so it cannot
-  use a column. The error is `Invalid column: price`. The same declaration
-  without `AUDITED` is accepted.
+- Refers to a column, such as `price`. An `AUDITED` value is evaluated once
+  per read, not per row. The error is `Invalid column: price`.
 - Is an aggregate function, such as `count()`. The error is
-  `audited view parameter cannot be an aggregate function`. An aggregate over a
-  column, such as `max(price)`, fails on the column first, with
-  `Invalid column: price`.
+  `audited view parameter cannot be an aggregate function`.
 - Can change while the query runs, such as `rnd_int()` or `systimestamp()`. The
   error is `audited view parameter has a value that can change during the query`.
   A value built on `now()` is fixed for the whole query, and is recorded.
 
-These rules are checked when the read compiles, so a read refused by one of them
-records no row. `CREATE VIEW ... WITH AUDIT`, `ALTER VIEW` and
-`CREATE OR REPLACE VIEW` check the view's own declarations against the same
-rules, so a view whose default values break one is refused when it is defined.
-The size limit below is not checked there: a view whose default values are too
-large to record is created, and every read that uses those defaults fails.
+`CREATE VIEW ... WITH AUDIT`, `ALTER VIEW` and `CREATE OR REPLACE VIEW` check
+the view's own default values against the same rules.
 
-A read also fails when an `AUDITED` value cannot be evaluated as the read
-starts, for example when a value bound to a bind variable makes a function
-raise an error. This holds even when the query never uses the variable, such as
-one that only feeds a column the query does not select. The read returns the
-error without reading any data, and records a row with status `error` and
-`NULL` in `params`. The trail cannot show what such a read was given, so the
-read does not run. A constant value, including a caller's literal override, is
-evaluated when the read compiles instead, so its failure records no row, as
-with the rules above.
-
-The same happens when a read's `params` would be larger than
+A read also fails, without reading any data, when an `AUDITED` value raises an
+error, for example a function given a bad bind value, even if the query does
+not use the variable. The same applies when a read's `params` would be larger
+than
 [`view.audit.params.max.size`](/docs/configuration/audited-views/#viewauditparamsmaxsize),
-1 MiB by default, for example when a caller overrides a list or a text
-parameter with a very long value. The error is
-`view audit parameters are too large to record, the read is refused`.
+1 MiB by default, for example after a very long override of a list. The error
+is `view audit parameters are too large to record, the read is refused`.
 
 ## The sys.view_audit table {#the-audit-table}
 
 `sys.view_audit` is a WAL table, partitioned by day, that holds the audit
-trail. The server creates it at startup, and a replica promoted to primary
-creates it if it does not have it yet. No client can create a table or view of
-that name. The `sys.` prefix follows
+trail. The server creates it at startup. No client can create a table or view
+of that name. The `sys.` prefix follows
 [`cairo.system.table.prefix`](/docs/configuration/cairo-engine/#cairosystemtableprefix).
 Its schema:
 
@@ -283,19 +255,12 @@ Its schema:
 | `principal`      | `SYMBOL`    | The user or service account the read ran as, taken when the read starts. After `ASSUME SERVICE ACCOUNT`, it is the service account. |
 | `view_name`      | `SYMBOL`    | The name of the audited view.                                                                                |
 | `params`         | `VARCHAR`   | The resolved values of the view's `AUDITED` variables, as a JSON object. `NULL` when they could not be evaluated or were too large to record. |
-| `latency_micros` | `LONG`      | How long the read took, from opening it to closing it, in microseconds. For a read served as page frames, only the open: see below. |
-| `status`         | `SYMBOL`    | `ok` when the read opened and ran, which does not mean it completed: see below. `error` when a compiled read failed or was cancelled. A statement refused while it compiles, such as a read by a principal without `SELECT` on the view, records no row: see [What counts as a read](#what-counts-as-a-read). |
+| `latency_micros` | `LONG`      | How long the read took, in microseconds. For QWP queries, Parquet export and `COPY TO`, it can cover only the start of the read. |
+| `status`         | `SYMBOL`    | `ok` when the read ran, `error` when it failed or was cancelled. A statement refused while it compiles records no row: see [What counts as a read](#what-counts-as-a-read). |
 | `view_id`        | `INT`       | The view's internal id. A view that is dropped and created again under the same name gets a new id. `ALTER VIEW` keeps the id. |
 
-`ok` does not mean the client received every row. A failure while computing a
-selected column of a row the read has already produced, such as a cast or a
-string function raising an error, returns the error to the client and still
-records `ok`. The read reached that row.
-
-A read served as page frames records its row when the read opens, not when it
-finishes: `latency_micros` covers only the open, and a failure after that still
-shows `ok`. QWP queries, Parquet export and `COPY TO` read a view this way when
-its query allows it, as a plain scan of one table does.
+`ok` does not guarantee that the client received every row: some failures after
+the read has started still record `ok`.
 
 ### The params column
 
@@ -453,10 +418,8 @@ table. Nothing records that they ran.
 - [`TRUNCATE TABLE`](/docs/query/sql/truncate/)
 - [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
   [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
-- [`SET TTL`](/docs/query/sql/alter-table-set-ttl/). Enterprise rejects a TTL
-  on other tables, but accepts it on system tables such as the trail. A TTL
-  acts only on the node that runs it, and blocks `SET STORAGE POLICY` until it
-  is cleared with `SET TTL 0 HOURS`: see [Retention](#retention).
+- [`SET TTL`](/docs/query/sql/alter-table-set-ttl/), which Enterprise accepts
+  on the trail: see [Retention](#retention)
 - A [storage policy](/docs/query/sql/alter-table-set-storage-policy/) with a
   `DROP LOCAL` stage
 
@@ -465,83 +428,42 @@ These remain available too: `SELECT`, other partition operations such as
 local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended trail
 without losing a row.
 
-Structural changes to the table are refused because each node keeps its own
-table, so such a change would stay on the node that made it, and because the
-server stops writing the trail when a column it writes is missing or retyped.
-See [Delivery guarantees](#delivery).
-
-The write and `SET TYPE` refusals are made by access control, so they do not
-apply when it is turned off with
-[`acl.enabled=false`](/docs/configuration/iam/#aclenabled). The other refusals
-always apply, and `ALTER TABLE ADD COLUMN` is then refused with
-`cannot change the structure of the view audit table`.
+With access control turned off,
+[`acl.enabled=false`](/docs/configuration/iam/#aclenabled), writes to the trail
+and `SET TYPE` are not refused.
 
 ## What counts as a read
 
 A read is one execution of a statement that reads rows through an audited view:
 `SELECT`, `INSERT INTO ... SELECT`, `CREATE TABLE AS SELECT`, an `UPDATE` of a
-non-WAL table that reads the view in its `FROM` clause or in a subquery, or an
-[`EXPLAIN`](/docs/query/sql/explain/) of a `SELECT`, `INSERT INTO ... SELECT`
-or `CREATE TABLE AS SELECT`. Each execution records its own rows, including
-every execution of a cached or prepared statement.
-
-`EXPLAIN` counts because it opens the plan it prints. That runs the plan's
-subqueries, and the printed plan can show values they read, such as a scalar
-subquery's result used as an interval bound.
-
-A [`PIVOT ... FOR ... IN (SELECT ...)`](/docs/query/sql/pivot/) subquery runs
-when the statement compiles, to find the pivot's columns. When it reads an
-audited view, it records a row at that point, even if the statement is only
-prepared or fails later. Executing the statement then records another.
-
-When one statement mentions the same view more than once, in a join, a union,
-or a subquery, the view records one row for each distinct set of parameter
-values. References that resolve to the same values are one read and share a
-row. Values are compared as rendered, so `1` and `1.0` count as different
-values.
+non-WAL table, or an [`EXPLAIN`](/docs/query/sql/explain/) of a query, which
+runs the plan's subqueries. Each execution of a prepared statement records its
+own row. When one statement reads the same view more than once, it records one
+row for each distinct set of parameter values.
 
 These record nothing:
 
-- A statement refused before it runs: a syntax error, an unknown column or
-  function, an `AUDITED` value that
-  [cannot be audited](#values-that-cannot-be-audited), or a principal without
-  `SELECT` on the view. Access is checked when the statement compiles, so a
-  denied attempt to read an audited view is usually not in the trail. The
-  exception is a cached or prepared plan, which is checked again when it runs:
-  a refusal there records a row with status `error`. The plan can come from an
-  earlier execution of the same SQL text, or from a statement prepared before a
-  `REVOKE`.
+- A statement refused when it compiles: a syntax error, an unknown column, an
+  `AUDITED` value that [cannot be audited](#values-that-cannot-be-audited), or
+  a principal without `SELECT` on the view.
 - `CREATE VIEW`, `CREATE MATERIALIZED VIEW`, `ALTER VIEW` and
-  `CREATE OR REPLACE VIEW` whose query reads an audited view, when the check
-  passes. Each opens its query only to check it, and hands no rows to anyone. A
-  check that fails while it runs records a row with status `error`, like any
-  read that fails, because its error message can carry values from the rows it
-  read.
-- Reads the database runs on its own behalf: materialized view refreshes, WAL
-  apply, and view compilation, including
-  [`COMPILE VIEW`](/docs/query/sql/compile-view/). No principal is reading data
-  there.
-- An attempt that fails before it reads anything, because its plan went stale
-  when a view or table changed after it compiled, or because a reader pool was
-  full. The server recompiles and retries a stale plan, and the retry records
-  the read.
+  `CREATE OR REPLACE VIEW` whose query reads an audited view. They check the
+  query, but return no rows.
+- Reads the database runs on its own behalf, such as materialized view
+  refreshes and [`COMPILE VIEW`](/docs/query/sql/compile-view/).
 - An `UPDATE` of a WAL table. See [Limitations](#limitations).
 
 ## Audited views that read other audited views
 
-An audited view read inside the body of another audited view records no row of
-its own when the outer view's row covers it. The outer view covers the inner
-one when every variable the inner view declares `OVERRIDABLE AUDITED` is also
-declared `AUDITED` in the outer view, by name, overridable or not. Those are the
-only values a caller can change through the outer view, so the outer row then
-shows everything the caller chose.
+When an audited view reads another audited view, both record a row, unless the
+outer view also declares as `AUDITED` every variable that the inner view
+declares `OVERRIDABLE AUDITED`. Then only the outer view records a row, which
+shows every value the caller could set, and the inner view's other `AUDITED`
+values are not recorded. An inner view with no `OVERRIDABLE AUDITED` variables
+records no row of its own.
 
-An inner view with no `OVERRIDABLE AUDITED` variables is always covered. So an
-audited view that unions several audited views with fixed or no audited
-parameters records one row, for itself.
-
-An inner view that is not covered keeps its row, because a caller's value can
-reach it through the outer view without appearing on the outer row:
+Here the caller's `@sym` reaches the inner view through the outer one, so both
+record a row:
 
 ```questdb-sql title="The inner view has a parameter the caller can set"
 CREATE VIEW symbol_trades AS (
@@ -580,23 +502,10 @@ The same read now records one row, `buy_trades` with `{"sym":"ETH-USDT"}`.
 Declare it `AUDITED` without `OVERRIDABLE` instead to fix the value for every
 caller.
 
-The rule in full:
-
-- Coverage is checked against the outermost audited view around the read,
-  through any views between them, audited or not.
-- A view that is not audited never covers another. An audited view read
-  through a plain view always records its row.
-- A reference to the inner view outside the outer view, in the same statement,
-  records as usual. If it resolves the same values as an inner read that is not
-  covered, the two share one row.
-- When an inner view is covered, its `AUDITED` variables that are not
-  `OVERRIDABLE` are not recorded. Read directly, the view records them.
-- Coverage depends only on the view definitions, so a given statement always
-  records the same set of views.
-
-A view that an audited view reads, and that is not audited itself, can be
-changed without `AUDIT VIEW`. That changes what the audited view returns while
-its rows record the same values: see [Permissions](#permissions).
+An audited view read through a plain view always records its own row. A plain
+view that an audited view reads can be changed without `AUDIT VIEW`, which
+changes what the audited view returns while its rows record the same values:
+see [Permissions](#permissions).
 
 ## Delivery guarantees {#delivery}
 
@@ -620,22 +529,11 @@ A read goes unrecorded when:
 
 - **The queue is full when the read finishes**: it has no free slot, or no room
   left for the row's `params`, because audited reads outpace the job. The
-  server logs `view audit queue is full, dropping rows` with a running total,
-  on the first drop and every 1024th after that. Raise the capacity if this
-  appears during bursts of audited reads, or the size limit if the reads carry
-  large parameters.
-- **The read cannot copy its row into the queue**, for example when the heap is
-  exhausted. The server logs `could not record view audit row`.
+  server logs `view audit queue is full, dropping rows`. Raise the capacity if
+  this appears during bursts of audited reads, or the size limit if the reads
+  carry large parameters.
 - **The job fails to write a batch.** The batch, up to 1024 rows, is lost, and
   the server logs `could not write view audit rows` with the number lost.
-- **The audit table cannot take rows**: a column is missing or has the wrong
-  type, `ts` is not its designated timestamp, or it is not a WAL table. This
-  happens only to a table of that name that predates the upgrade to audited
-  views, or, with access control off, to one converted to non-WAL: the server
-  creates the table in the right shape, and [SQL cannot change](#protection)
-  its columns. The server logs the reason once, and discards audit rows until
-  it restarts with the table repaired. Convert a non-WAL table with
-  [`ALTER TABLE SET TYPE WAL`](/docs/query/sql/alter-table-set-type/).
 - **The server stops or crashes with rows still in the queue.** The queue is
   held in memory only.
 
@@ -654,11 +552,7 @@ Lost rows show in the server log only. No metric reports them.
 
 `AUDIT VIEW` is a database-level permission, included in `DATABASE ADMIN`. It
 guards every statement that binds a view to the trail, changes what it records,
-or releases it: creating, redefining and dropping an audited view. A new body
-can remove the view's `AUDITED` declarations, or keep a variable `OVERRIDABLE`
-while no longer recording it, so without the permission a principal who can
-alter a view, or drop and recreate it, could shed its auditing unremarked. See
-[Syntax](#syntax) for how each statement treats a view's auditing.
+or releases it: creating, redefining and dropping an audited view.
 
 `AUDIT VIEW` guards the audited view's own definition, not the views it reads.
 A principal who can alter, drop or replace a view that an audited view reads
@@ -703,12 +597,7 @@ Every node records the reads it serves, replicas included, into its own
 trail is the union of the tables on all nodes. The rows carry no node
 identifier, so tag each node's rows with its name when you merge them.
 
-A replica does not create `sys.view_audit` itself. The table's definition
-reaches the replica from the primary, and the replica writes the reads it
-serves into that table. The table's storage policy, and any later change to
-it, reach the replica the same way. A replica promoted to primary before the
-table reached it creates the table itself, with
-[`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy).
+The table's definition and storage policy replicate from the primary.
 
 A [backup](/docs/operations/backup/) includes the node's `sys.view_audit`, and
 restoring it onto an empty node brings that table back. Back up every node
@@ -738,10 +627,6 @@ from a backup, then combine the results outside QuestDB, for example by
 exporting each with
 [`/exp`](/docs/connect/compatibility/rest-api/#exp---export-data).
 
-A node restored from a backup taken before audited views existed creates the
-table at startup without a storage policy, and logs an advisory with the
-`ALTER TABLE ... SET STORAGE POLICY` statement that applies it.
-
 An instance started with `readonly=true` cannot write the trail, so it refuses
 reads of audited views with
 `cannot read an audited view on a read-only instance`. Views that are not
@@ -760,12 +645,8 @@ audited are unaffected.
   readable with no audit row. Grant `CREATE MATERIALIZED VIEW` with that in
   mind. A [live view](/docs/concepts/live-views/) cannot be defined over a
   view, so it cannot be used this way.
-- **An `UPDATE` of a WAL table records nothing** when it reads an audited view,
-  because its read runs during WAL apply, on every node, rather than in the
-  session that submitted it. Such an `UPDATE` is rare: a WAL table's `UPDATE`
-  cannot join or read another table, so it can read an audited view only in a
-  subquery, and only one whose query reads the updated table alone. The same
-  statement on a non-WAL table is recorded.
+- **An `UPDATE` of a WAL table records nothing** when it reads an audited view
+  in a subquery. The same statement on a non-WAL table is recorded.
 - **Denied reads are usually not recorded.** Access to a view is checked when a
   statement compiles, and a statement refused there records no row. So the trail
   is not a record of failed access attempts: see

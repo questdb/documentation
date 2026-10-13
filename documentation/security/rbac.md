@@ -119,8 +119,7 @@ The user `aapl_analyst` can only see AAPL trades. They have no access to the
 underlying `trades` table.
 
 To also record who read the view, and with which parameters, create it as an
-[audited view](/docs/security/audited-views/). A `SELECT ON ALL TABLES` grant
-bypasses it: see [its permissions](/docs/security/audited-views/#permissions).
+[audited view](/docs/security/audited-views/).
 
 ## Common scenarios
 

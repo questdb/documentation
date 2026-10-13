@@ -18,10 +18,6 @@ before attaching a storage policy. See
 [Storage Policy](/docs/concepts/storage-policy/) for the Enterprise
 replacement.
 
-System tables, such as `sys.view_audit`, are exempt, and Enterprise accepts
-`SET TTL` on them. See
-[Audited views](/docs/security/audited-views/#retention).
-
 :::
 
 Refer to the [section on TTL](/docs/concepts/ttl/) for a conceptual overview.

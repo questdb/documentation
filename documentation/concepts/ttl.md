@@ -19,11 +19,9 @@ Parquet, then drop) and are the recommended retention primitive for Enterprise
 users. Materialized views are the exception: they continue to use `TTL` for
 retention on Enterprise (set via
 [`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/)).
-System tables, such as `sys.view_audit`, are exempt too, and Enterprise accepts
-`SET TTL` on them. See
-[Audited views](/docs/security/audited-views/#retention). The rest of this page
-describes TTL behavior on QuestDB Open Source (and the `SET TTL 0 HOURS` case
-on Enterprise, used to clear an older TTL before attaching a storage policy).
+The rest of this page describes TTL behavior on QuestDB Open Source (and the
+`SET TTL 0 HOURS` case on Enterprise, used to clear an older TTL before
+attaching a storage policy).
 
 :::
 
