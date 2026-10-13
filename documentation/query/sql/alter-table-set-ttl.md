@@ -10,13 +10,16 @@ Sets the time-to-live (TTL) period on a table.
 
 **QuestDB Enterprise: TTL is superseded by
 [Storage Policy](/docs/concepts/storage-policy/).** Enterprise rejects any
-non-zero `SET TTL` with
+non-zero `SET TTL` on a user table with
 `TTL is not supported on Enterprise tables; use a storage policy instead`. Use
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
 instead. `SET TTL 0 HOURS` is still accepted, for clearing a pre-existing TTL
 before attaching a storage policy. See
 [Storage Policy](/docs/concepts/storage-policy/) for the Enterprise
 replacement.
+
+System tables, such as `sys.view_audit`, accept a non-zero TTL: see
+[Retention](/docs/security/audited-views/#retention).
 
 :::
 

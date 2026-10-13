@@ -12,7 +12,7 @@ window - no cron jobs or manual cleanup required.
 
 **QuestDB Enterprise: TTL is superseded by
 [Storage Policy](/docs/concepts/storage-policy/).** Enterprise rejects any
-non-zero `SET TTL` with
+non-zero `SET TTL` on a user table with
 `TTL is not supported on Enterprise tables; use a storage policy instead`.
 Storage policies extend TTL with graduated lifecycle management (convert to
 Parquet, then drop) and are the recommended retention primitive for Enterprise

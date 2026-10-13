@@ -195,7 +195,10 @@ SELECT * FROM trades_by_symbol;
 
 The statement text fixes the number of members: `($1, $2)` always takes two
 values, so prepare one statement for each list length. A single member needs
-the trailing comma, `($1,)`. With JDBC, write `?` in place of each `$n`.
+the trailing comma, `($1,)`. With a client that sends parameters untyped, such
+as psql `\bind`, cast it, `($1::varchar,)`: untyped, `($1,)` is taken as one
+array bind, which an `AUDITED` parameter refuses. With JDBC, write `?` in place
+of each `$n`.
 
 An `AUDITED` parameter cannot hold an array, so the
 [text array bind](/docs/query/sql/declare/#lists-of-bind-variables) that passes
@@ -312,7 +315,7 @@ recorded when a caller overrides the list without the trailing comma, into an
 array of one, which [`UNNEST`](/docs/query/sql/unnest/) needs:
 
 ```questdb-sql title="Reads per principal and symbol, today"
-SELECT a.principal, u.symbol, count_distinct(a.ts) AS reads
+SELECT a.principal, u.symbol, count() AS reads
 FROM 'sys.view_audit' a, UNNEST(
     CASE WHEN json_extract(a.params, '$.symbols') LIKE '[%'
          THEN json_extract(a.params, '$.symbols')
@@ -326,7 +329,7 @@ GROUP BY a.principal, u.symbol;
 
 The `params IS NOT NULL` filter leaves out `error` rows whose parameters could
 not be recorded, which would otherwise count as a read of an empty symbol.
-`count_distinct(a.ts)` counts a read once even when its list repeats a symbol.
+A read whose list repeats a symbol counts once for each repeat.
 Both reports count the other `error` rows as reads. Filter on `status` to tell
 them apart.
 
@@ -430,7 +433,10 @@ without losing a row.
 
 With access control turned off,
 [`acl.enabled=false`](/docs/configuration/iam/#aclenabled), writes to the trail
-and `SET TYPE` are not refused.
+and `SET TYPE` are not refused. With ILP over TCP authentication turned off,
+[`line.tcp.acl.enabled=false`](/docs/configuration/iam/#linetcpaclenabled),
+ILP over TCP writes are not refused: any ILP over TCP client can then add rows
+to the trail.
 
 ## What counts as a read
 

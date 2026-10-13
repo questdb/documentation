@@ -97,9 +97,11 @@ Both singular and plural forms are accepted.
 - Storage policies do not apply to materialized views at all, local stages included. `SET STORAGE POLICY` on one is rejected with `storage policy is not supported for materialized views`
 - If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0 HOURS`
   first; otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage
-  policy, please, remove TTL settings`. On Enterprise tables, any non-zero
-  `SET TTL` value is itself rejected with `TTL is not supported on Enterprise
-  tables; use a storage policy instead`
+  policy, please, remove TTL settings`. On an Enterprise user table, any
+  non-zero `SET TTL` value is itself rejected with `TTL is not supported on
+  Enterprise tables; use a storage policy instead`. System tables, such as
+  `sys.view_audit`, accept a non-zero TTL: see
+  [Retention](/docs/security/audited-views/#retention)
 - `ENABLE` and `DISABLE` require a policy to exist on the table; both return an
   error otherwise
 
