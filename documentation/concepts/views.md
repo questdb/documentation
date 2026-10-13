@@ -191,10 +191,13 @@ DECLARE @limit := 50 SELECT * FROM mixed_params
 A parameter can hold a list of values for an `IN` filter. Each statement that
 reads the view can override it with a list of any length. In a prepared
 statement, a list of bind variables has the length its text gives it: `($1, $2)`
-always takes two values. To pass any number of values with one statement, bind
-one text array instead, `DECLARE @symbols := $1`. That works when the view uses
-the parameter as the whole `IN` list, as `symbol IN @symbols` does below, and
-the parameter is not `AUDITED`. See
+always takes two values.
+
+To pass any number of values with one statement, bind one text array instead,
+`DECLARE @symbols := $1`. That works when the view uses the parameter as the
+whole `IN` list, as `symbol IN @symbols` does below. `AUDITED` parameters support
+literal lists and lists of scalar bind variables, such as `($1, $2)`, but cannot
+take the entire list as one text-array bind. See
 [lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
 
 ```questdb-sql
