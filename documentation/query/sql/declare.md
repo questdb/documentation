@@ -37,10 +37,10 @@ DECLARE @variable := ( expression , [ expression [, expression ...] [,] ] )
 WHERE expression [ NOT ] IN { @variable | $n | ( item [, item ...] ) }
 ```
 
-A value list has at least one comma. Its members are expressions, including
+A [value list](#value-lists) declares the set of values an `IN` filter tests
+against. It has at least one comma. Its members are expressions, including
 bind variables, but not lists or list variables. In `IN`, an `item` is a value
-or a list variable. A `$n` that holds a text array, directly or through a
-variable, must be the whole list: see
+or a list variable. A `$n` bound to a text array must be the whole list: see
 [Lists of bind variables](#lists-of-bind-variables).
 
 The `OVERRIDABLE` keyword only takes effect inside a
@@ -58,9 +58,6 @@ or a statement: in a subquery, a CTE, or a set-operation branch after the
 first, it fails with `AUDITED is only allowed in the top-level DECLARE block`.
 In a statement's own block, or in a view that is not audited, it is accepted
 and has no effect.
-
-A [value list](#value-lists) declares the set of values an `IN` filter tests
-against.
 
 ## Mechanics
 
@@ -296,8 +293,7 @@ own type, and every form of `IN` works as it does with a written-out list,
 including `NOT IN` and interval scans on the designated timestamp.
 
 - `IN @symbols` and `IN (@symbols)` are equivalent.
-- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`. A variable
-  that holds an [array bind](#lists-of-bind-variables) does not.
+- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
 - One list variable can be assigned to another: `@majors := @symbols`.
 - A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
   `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
@@ -330,30 +326,38 @@ WHERE timestamp IN @days;
 ### Lists of bind variables
 
 To filter a `SYMBOL`, `VARCHAR` or `STRING` value on any number of values with
-one prepared statement, bind one text array over the PostgreSQL wire protocol.
-Bind it directly, as `symbol IN $1`, or through a variable:
+one prepared statement, bind one text array over the PostgreSQL wire protocol:
 
 ```questdb-sql title="Bind one text array for any number of values"
-DECLARE @symbols := $1
-SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN $1;
 -- bind $1 as a text array, such as {BTC-USDT,ETH-USDT,SOL-USDT}
 ```
 
-With JDBC, bind `connection.createArrayOf("varchar", symbols)`. With psql,
-`\bind '{BTC-USDT,ETH-USDT,SOL-USDT}'`. The same works for a parameter of a
-[view](/docs/concepts/views/#list-parameters), but not of an audited view.
+The array can also be bound through a variable:
 
-A bind variable that holds an array, directly or through a variable, must be
-the whole `IN` list: `IN $1`, `IN ($1)` or `NOT IN $1`. It cannot be mixed with
-other values, as in `IN ('ETH-USDT', $1)`. A typed array bind, as from JDBC,
-fails there with `STRING constant expected`. An untyped one, as from psql
-`\bind`, is not refused: it is taken as one string, such as
-`'{SOL-USDT,BTC-USDT}'`, which matches no row, so the query returns only the
-rows of the other values.
+```questdb-sql title="The same, through a variable"
+DECLARE @symbols := $1
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+```
 
-Members of a list can also be bind variables. Reads of an
-[audited view](/docs/security/audited-views/) need this form, because an
-`AUDITED` parameter cannot hold an array:
+With JDBC, write `?` in place of `$1`, and bind
+`ps.setArray(1, connection.createArrayOf("varchar", symbols))`. With psql,
+`\bind '{BTC-USDT,ETH-USDT,SOL-USDT}'`.
+
+The array must be the whole `IN` list: `IN $1`, `IN ($1)` or `NOT IN $1`. It
+cannot be mixed with other values, as in `IN ('ETH-USDT', $1)`: put those
+values in the array instead. A typed array bind, as from JDBC, fails there with
+`STRING constant expected`. An untyped one, as from psql `\bind`, is taken as
+one string, such as `'{SOL-USDT,BTC-USDT}'`, so the query silently returns
+wrong results.
+
+A [view parameter](#lists-in-views) can take an array bind too, but only when
+the view's body uses it as the whole list, as `symbol IN @symbols` does.
+Otherwise, bind a list of bind variables, as below.
+
+Members of a list can also be bind variables. An `AUDITED` parameter of an
+[audited view](/docs/security/audited-views/) needs this form, because it
+cannot hold an array:
 
 ```questdb-sql title="A list of bind variables"
 DECLARE @symbols := ($1, $2)
@@ -396,8 +400,7 @@ of `IN`. These fail:
   `value expected in list`
 
 To combine a list with more values, write both in the `IN`:
-`symbol IN (@symbols, 'SOL-USDT')`. This does not work for an array bind: add
-the values to the array instead.
+`symbol IN (@symbols, 'SOL-USDT')`.
 
 ## Limitations
 

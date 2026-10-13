@@ -147,7 +147,7 @@ upgraded to Enterprise, or if it is a system table. Clear that TTL with
 `ALTER TABLE SET TTL 0 HOURS` before setting a storage policy; otherwise
 `SET STORAGE POLICY` is rejected with
 `Cannot set storage policy, please, remove TTL settings`. On Enterprise tables
-`SET TTL 0 HOURS` is the only accepted `SET TTL` value; any non-zero value is
+only a zero TTL, such as `SET TTL 0 HOURS`, is accepted; any non-zero value is
 rejected with
 `TTL is not supported on Enterprise tables; use a storage policy instead`.
 System tables, such as `sys.view_audit`, are exempt, and Enterprise accepts

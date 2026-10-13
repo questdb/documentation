@@ -126,12 +126,10 @@ ALTER VIEW trades_filtered AS (
 
 ### Definer permissions transfer (Enterprise)
 
-When a user alters a view, the view's **definer permissions** transfer to that
-user. This means:
-
-- The view now runs with the permissions of the user who performed the ALTER
-- Other users querying the view can access data the new definer has access to
-- The original creator's permissions no longer apply to the view
+When a user alters a view, the new body is checked against that user's
+permissions: they need `SELECT` on every table it reads, and they become the
+view's **definer**. Readers need only `SELECT` on the view, and later changes to
+the definer's own permissions do not affect them.
 
 ```questdb-sql title="Definer transfer example"
 -- UserA creates view on table1 (UserA has SELECT on table1)
@@ -142,8 +140,8 @@ CREATE VIEW my_view AS (SELECT * FROM table1);
 -- UserB becomes the new "definer"
 ALTER VIEW my_view AS (SELECT * FROM table2);
 
--- UserC (with SELECT on my_view) now sees table2 data
--- using UserB's permissions
+-- UserC (with SELECT on my_view) now sees table2 data,
+-- without SELECT on table2
 SELECT * FROM my_view;
 ```
 

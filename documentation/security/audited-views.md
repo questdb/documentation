@@ -34,7 +34,21 @@ default and keeps 24 hours of queries.
 
 ## Quick start
 
-```questdb-sql title="Create an audited view"
+The steps run as three principals: the built-in admin, `view_owner` and
+`analyst`.
+
+As the admin, let `view_owner` create the view. That needs `CREATE VIEW`,
+`AUDIT VIEW`, `SELECT` on the tables the view reads, and an endpoint permission
+such as `HTTP` to connect:
+
+```questdb-sql title="Admin: let view_owner create the view"
+GRANT HTTP, CREATE VIEW, AUDIT VIEW TO view_owner;
+GRANT SELECT ON trades TO view_owner;
+```
+
+As `view_owner`, create the view:
+
+```questdb-sql title="view_owner: create an audited view"
 CREATE VIEW trades_by_symbol AS (
   DECLARE
     OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
@@ -45,37 +59,28 @@ CREATE VIEW trades_by_symbol AS (
 ) WITH AUDIT;
 ```
 
-Creating it needs `CREATE VIEW`, `AUDIT VIEW`, and `SELECT` on the tables it
-reads, which the built-in admin holds. To let another principal create it,
-grant those, plus an endpoint permission such as `HTTP` to connect:
+As the admin, revoke the owner's `SELECT` on `trades`, so that it cannot read
+the table unaudited, and grant it again only when the owner changes the view.
+Then grant `analyst` the view, and not the table:
 
-```questdb-sql title="Let view_owner create the view"
-GRANT HTTP, CREATE VIEW, AUDIT VIEW TO view_owner;
-GRANT SELECT ON trades TO view_owner;
-```
-
-Reads of the view check only `SELECT` on the view, so the owner needs `SELECT`
-on `trades` only while it creates or changes the view. Once the view exists,
-revoke it, so that the owner cannot read `trades` unaudited either:
-
-```questdb-sql title="Close the owner's unaudited path"
+```questdb-sql title="Admin: close the owner's unaudited path, let analyst read"
 REVOKE SELECT ON trades FROM view_owner;
-```
-
-Grant it again before an `ALTER VIEW` or `CREATE OR REPLACE VIEW`.
-
-Readers need `SELECT` on the view, plus an endpoint permission, such as `HTTP`
-or `PGWIRE`, to connect. Do not grant them the table it reads, so that the view
-is their only way to the data:
-
-```questdb-sql title="Let analyst read the view"
 GRANT HTTP, PGWIRE TO analyst;
 GRANT SELECT ON trades_by_symbol TO analyst;
 ```
 
-```questdb-sql title="Read it, overriding the symbols"
+As `analyst`, read the view:
+
+```questdb-sql title="analyst: read it, overriding the symbols"
 DECLARE @symbols := ('SOL-USDT',)
 SELECT * FROM trades_by_symbol;
+```
+
+As the admin, or a principal granted `SELECT` on the trail, inspect it. Quote
+the table name, in a `GRANT` too:
+
+```questdb-sql title="Admin: let auditors read the trail"
+GRANT SELECT ON 'sys.view_audit' TO auditors;
 ```
 
 ```questdb-sql title="Inspect the trail"
@@ -198,7 +203,8 @@ The statement text fixes the number of members: `($1, $2)` always takes two
 values, so prepare one statement for each list length. A single member needs
 the trailing comma, `($1,)`. With a client that sends parameters untyped, such
 as psql `\bind`, it also needs a cast, `($1::varchar,)`: untyped, `($1,)` is
-taken as one array bind variable for the whole list.
+taken as one array bind variable for the whole list. With JDBC, write `?` in
+place of each `$n`.
 
 An `AUDITED` parameter cannot hold an array, so the
 [text array bind](/docs/query/sql/declare/#lists-of-bind-variables) that passes
@@ -459,7 +465,7 @@ These remain available too: `SELECT`, other partition operations such as
 local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended trail
 without losing a row.
 
-Changes to the table's columns are refused because each node keeps its own
+Structural changes to the table are refused because each node keeps its own
 table, so such a change would stay on the node that made it, and because the
 server stops writing the trail when a column it writes is missing or retyped.
 See [Delivery guarantees](#delivery).
@@ -646,30 +652,28 @@ Lost rows show in the server log only. No metric reports them.
 | Read the trail                                                      | `SELECT` on `sys.view_audit`                              |
 | Remove rows from the trail                                          | Any of `TRUNCATE TABLE`, `DROP PARTITION`, `DETACH PARTITION`, `SET TABLE PARAM` (for `SET TTL`) or `SET STORAGE POLICY` (for a `DROP LOCAL` stage), on `sys.view_audit` or `ON ALL TABLES` |
 
-`AUDIT VIEW` is a database-level permission, included in `ALL` and
-`DATABASE ADMIN`. It guards every statement that binds a view to the trail,
-changes what it records, or releases it: creating, redefining and dropping an
-audited view. A new body can remove the view's `AUDITED` declarations, or keep
-a variable `OVERRIDABLE` while no longer recording it, so without the
-permission a principal who can alter a view, or drop and recreate it, could
-shed its auditing unremarked. See [Syntax](#syntax) for how each statement
-treats a view's auditing.
+`AUDIT VIEW` is a database-level permission, included in `DATABASE ADMIN`. It
+guards every statement that binds a view to the trail, changes what it records,
+or releases it: creating, redefining and dropping an audited view. A new body
+can remove the view's `AUDITED` declarations, or keep a variable `OVERRIDABLE`
+while no longer recording it, so without the permission a principal who can
+alter a view, or drop and recreate it, could shed its auditing unremarked. See
+[Syntax](#syntax) for how each statement treats a view's auditing.
 
 `AUDIT VIEW` guards the audited view's own definition, not the views it reads.
 A principal who can alter, drop or replace a view that an audited view reads
 can change what the audited view returns, with no change to the trail: the
 rows keep recording the same parameter values, and nothing records the change.
-Restrict `ALTER VIEW`, `DROP VIEW` and `CREATE VIEW` on those views to the
-principals that hold `AUDIT VIEW`, or have audited views read tables directly.
+Have audited views read tables or other audited views. If one reads a plain
+view, revoke `ALTER VIEW` and `DROP VIEW` on that view from every principal
+without `AUDIT VIEW`, including the view's creator, which receives both when
+it creates the view.
 
 :::note
 
-A database-level `GRANT ALL` granted on Enterprise 2.3.1 or later includes
-`DATABASE ADMIN`, which also covers permissions added in later versions. So a
-principal granted such an `ALL` before the upgrade to audited views holds
-`AUDIT VIEW`, and can create, alter and drop audited views. A principal that
-holds individual permissions without `DATABASE ADMIN`, or `ALL` granted before
-2.3.1, needs it granted explicitly: `GRANT AUDIT VIEW TO view_admins;`. See
+A principal granted a database-level `GRANT ALL` on Enterprise 2.3.1 or later
+holds `DATABASE ADMIN`, and so `AUDIT VIEW`. Others need it granted explicitly,
+as in `GRANT AUDIT VIEW TO view_admins;`. See
 [Database administrator](/docs/security/rbac/#database-administrator).
 
 :::
@@ -682,10 +686,9 @@ audited, reads the same data with no audit row. Under the
 connect, is all a reader needs.
 
 `SELECT ON ALL TABLES` covers `sys.view_audit` and every table an audited view
-reads. Its holder bypasses auditing, and can read the whole trail, with every
-principal's `params`. Give readers of audited views `SELECT` on the views
-instead, and check existing grants, such as the analyst roles in
-[RBAC](/docs/security/rbac/#read-only-analyst), for this one.
+reads, so its holder bypasses auditing and can read the whole trail, with every
+principal's `params`. Check existing grants for it, such as the analyst roles
+in [RBAC](/docs/security/rbac/#read-only-analyst).
 
 Grant `SELECT` on `sys.view_audit` to the people who review the trail, and the
 permissions that remove its rows only to the operators who manage its
@@ -703,12 +706,8 @@ identifier, so tag each node's rows with its name when you merge them.
 A replica does not create `sys.view_audit` itself. The table's definition
 reaches the replica from the primary, and the replica writes the reads it
 serves into that table. The table's storage policy, and any later change to
-it, reach the replica the same way. Until the definition arrives, the replica
-keeps its audit rows in the queue, and a read whose row finds the queue full
-goes unrecorded, as in [Delivery guarantees](#delivery). This matters only for
-a replica that starts before its primary has created the table, such as when
-replicas are upgraded first. A replica promoted to primary before the table reached it
-creates the table itself, with
+it, reach the replica the same way. A replica promoted to primary before the
+table reached it creates the table itself, with
 [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy).
 
 A [backup](/docs/operations/backup/) includes the node's `sys.view_audit`, and
@@ -751,12 +750,9 @@ audited are unaffected.
 ## Limitations
 
 - **Only reads through the audited view are recorded.** A principal with
-  `SELECT` on the tables the view reads, or on a view over them that is not
-  audited, reads the same rows with no audit row. This includes the principal
-  that creates or changes the view, while it holds `SELECT` on those tables.
-  Revoke it once the view exists, as in [Quick start](#quick-start). Grant
-  readers `SELECT` on the audited view and not on its tables, as in
-  [Permissions](#permissions).
+  `SELECT` on its tables, including the view's creator while it holds that
+  grant, or on a plain view over them, reads the same rows with no audit row:
+  see [Permissions](#permissions).
 - **A materialized view over an audited view is not audited.** Its refreshes
   record nothing, reads of the materialized view are not audited, and
   `CREATE MATERIALIZED VIEW` records nothing either. A principal who can read an

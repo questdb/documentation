@@ -231,12 +231,13 @@ GRANT DATABASE ADMIN TO dba;
 
 :::
 
-A database-level `GRANT ALL` includes `DATABASE ADMIN` (since Enterprise
-2.3.1), so it covers permissions added in later versions, such as
-`SWITCH ROLE`, `SET MEMORY LIMIT` and `AUDIT VIEW`. `ALL` expands to individual
-permissions at the moment it is granted, and no migration backfills it. A
-principal that holds individual permissions, or `ALL` granted before 2.3.1,
-needs each new permission granted explicitly.
+Since Enterprise 2.3.1, a database-level `GRANT ALL` includes
+`DATABASE ADMIN`, so the warning above applies to it, and it covers permissions
+added in later versions, such as `SWITCH ROLE`, `SET MEMORY LIMIT` and
+`AUDIT VIEW`. A principal granted `ALL` before 2.3.1, or individual permissions
+without `DATABASE ADMIN`, needs each new permission granted explicitly: no
+migration adds them. To check a principal, look for `DATABASE ADMIN` in its
+`SHOW PERMISSIONS` output.
 
 ### Failover operator
 

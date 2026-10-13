@@ -17,7 +17,7 @@ writes them, and the storage policy the table is created with.
 
 None of these settings are reloadable: changing any of them requires a restart.
 The server checks the values at startup, and refuses to start, naming the
-property, when one is out of range.
+property, when a numeric value is out of range.
 
 For example, to absorb longer bursts of audited reads and keep 90 days of the
 trail:
