@@ -240,7 +240,10 @@ constant for each row coming from `PageFrame`.
 
 To minimize resource usage, the `EXPLAIN` command does not execute the
 statement, to avoid paying a potentially large upfront cost for certain queries
-(especially those involving hash join or sort).
+(especially those involving hash join or sort). It does open the plan, which
+runs the plan's subqueries, so in QuestDB Enterprise an `EXPLAIN` of a query
+that reads an [audited view](/docs/security/audited-views/#what-counts-as-a-read)
+counts as a read of it.
 
 `EXPLAIN` provides a useful indication of the query execution, but it does not
 guarantee to show the actual execution plan. This is because elements determined

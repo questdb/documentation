@@ -8,6 +8,17 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### New
+
+- [Audited views](/docs/security/audited-views/) - QuestDB Enterprise views created `WITH AUDIT` keep a best-effort audit trail of their reads in `sys.view_audit`: who read the view, when, and with which `AUDITED` parameter values, plus the [`view.audit.*` settings](/docs/configuration/audited-views/)
+- [Declared value lists](/docs/query/sql/declare/#value-lists) - `DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')` names the values of an `IN` filter once, including lists of bind variables and list parameters in views
+
+### Reference
+
+- Added the `WITH AUDIT` clause of [CREATE VIEW](/docs/query/sql/create-view/#with-audit-enterprise), the `AUDITED` modifier of [DECLARE](/docs/query/sql/declare/), and the [`AUDIT VIEW`](/docs/security/audited-views/#permissions) permission
+
 ## September 2026
 
 ### QuestDB Enterprise Releases

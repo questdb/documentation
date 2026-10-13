@@ -21,6 +21,8 @@ a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
 - **Role-based access control (RBAC)** with users, groups, permissions, and
   per-principal query memory limits
 - **Single Sign-On (SSO)** via OpenID Connect
+- **[Audited views](/docs/security/audited-views/)** that record who read a view,
+  when, and with which parameter values
 - **Database replication** for high availability
 - **[Storage policies](/docs/concepts/storage-policy/)** for automated partition
   lifecycle management (convert to Parquet, then drop on a schedule)

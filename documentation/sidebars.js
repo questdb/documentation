@@ -688,6 +688,7 @@ module.exports = {
           type: "doc",
           label: "Overview",
         },
+        "configuration/audited-views",
         "configuration/cairo-engine",
         "configuration/cold-storage",
         "configuration/copy-settings",
@@ -727,6 +728,11 @@ module.exports = {
           id: "security/oidc",
           type: "doc",
           label: "OpenID Connect (OIDC)",
+        },
+        {
+          id: "security/audited-views",
+          type: "doc",
+          label: "Audited views",
         },
         {
           type: "doc",
