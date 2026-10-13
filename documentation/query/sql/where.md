@@ -139,8 +139,8 @@ SELECT * FROM trades
 WHERE timestamp IN '$now-1h..$now' AND symbol IN @symbols;
 ```
 
-To pass a list of any length in a prepared statement, bind one text array,
-`symbol IN $1`. See
+To pass a list of any length in a prepared statement, bind one text array as
+the whole list, `symbol IN $1`, not mixed with other values. See
 [lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
 
 ## Numeric

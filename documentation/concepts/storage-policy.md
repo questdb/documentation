@@ -143,11 +143,16 @@ ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
 :::note
 
 A table can carry a TTL only if it was created in QuestDB Open Source and later
-upgraded to Enterprise. Clear that legacy TTL with `ALTER TABLE SET TTL 0`
-before setting a storage policy; otherwise `SET STORAGE POLICY` is rejected with
+upgraded to Enterprise, or if it is a system table. Clear that TTL with
+`ALTER TABLE SET TTL 0 HOURS` before setting a storage policy; otherwise
+`SET STORAGE POLICY` is rejected with
 `Cannot set storage policy, please, remove TTL settings`. On Enterprise tables
-`SET TTL 0` is the only accepted `SET TTL` value; any non-zero value is rejected
-with `TTL is not supported on Enterprise tables; use a storage policy instead`.
+`SET TTL 0 HOURS` is the only accepted `SET TTL` value; any non-zero value is
+rejected with
+`TTL is not supported on Enterprise tables; use a storage policy instead`.
+System tables, such as `sys.view_audit`, are exempt, and Enterprise accepts
+`SET TTL` on them. See
+[Audited views](/docs/security/audited-views/#retention).
 
 :::
 

@@ -95,11 +95,13 @@ Both singular and plural forms are accepted.
 - The table must have a designated timestamp and partitioning enabled
 - `TO REMOTE` and `DROP REMOTE` additionally require [cold storage](/docs/concepts/cold-storage/) to be enabled and a WAL-enabled table. They are rejected on non-WAL tables
 - Storage policies do not apply to materialized views at all, local stages included. `SET STORAGE POLICY` on one is rejected with `storage policy is not supported for materialized views`
-- If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0` first;
-  otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage policy,
-  please, remove TTL settings`. On Enterprise tables, any non-zero `SET TTL`
-  value is itself rejected with `TTL is not supported on Enterprise tables; use
-  a storage policy instead`
+- If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0 HOURS`
+  first; otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage
+  policy, please, remove TTL settings`. On Enterprise tables, any non-zero
+  `SET TTL` value is itself rejected with `TTL is not supported on Enterprise
+  tables; use a storage policy instead`. System tables, such as
+  `sys.view_audit`, are exempt, and Enterprise accepts `SET TTL` on them. See
+  [Audited views](/docs/security/audited-views/#retention)
 - `ENABLE` and `DISABLE` require a policy to exist on the table; both return an
   error otherwise
 

@@ -500,7 +500,7 @@ To move a legacy table from `TTL` to a storage policy:
    policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
-   ALTER TABLE trades SET TTL 0;
+   ALTER TABLE trades SET TTL 0 HOURS;
    ```
 
 2. **Attach a storage policy** that reproduces — and ideally extends — the

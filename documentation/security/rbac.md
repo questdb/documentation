@@ -231,6 +231,13 @@ GRANT DATABASE ADMIN TO dba;
 
 :::
 
+A database-level `GRANT ALL` includes `DATABASE ADMIN` (since Enterprise
+2.3.1), so it covers permissions added in later versions, such as
+`SWITCH ROLE`, `SET MEMORY LIMIT` and `AUDIT VIEW`. `ALL` expands to individual
+permissions at the moment it is granted, and no migration backfills it. A
+principal that holds individual permissions, or `ALL` granted before 2.3.1,
+needs each new permission granted explicitly.
+
 ### Failover operator
 
 A service account that can move the primary role between nodes, for an external
@@ -637,11 +644,12 @@ non-admin who holds it can raise its own ceiling above
 `cairo.query.memory.limit.bytes`. The built-in admin is exempt only as a
 target: its limit cannot be set at all.
 
-`GRANT ALL` expands to individual permissions at the moment it is granted. A
-principal granted `ALL` before upgrading to a version with this feature does
-not acquire `SET MEMORY LIMIT`; only grants issued after the upgrade include it,
-and no migration backfills it. Grant it explicitly to existing administrators:
-`GRANT SET MEMORY LIMIT TO admins;`.
+A database-level `GRANT ALL` issued on Enterprise 2.3.1 or later includes
+`DATABASE ADMIN`, and so `SET MEMORY LIMIT`. A principal that holds individual
+permissions without `DATABASE ADMIN`, or `ALL` granted before 2.3.1, does not
+acquire it, and no migration backfills it. Grant it explicitly to such
+administrators: `GRANT SET MEMORY LIMIT TO admins;`. See
+[Database administrator](#database-administrator).
 
 :::
 
@@ -893,7 +901,7 @@ SELECT * FROM all_permissions();
 
 | Permission     | Description                                                           |
 | -------------- | --------------------------------------------------------------------- |
-| ALL            | All permissions at the granted level (database/table/column)          |
+| ALL            | All permissions at the granted level (database/table/column). At database level, includes `DATABASE ADMIN` since Enterprise 2.3.1: see [Database administrator](#database-administrator) |
 | DATABASE ADMIN | All permissions including future ones; can assume any service account |
 
 A few operations are reserved for database administrators and are not grantable as permissions at all:

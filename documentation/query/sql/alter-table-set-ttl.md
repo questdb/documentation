@@ -13,9 +13,14 @@ Sets the time-to-live (TTL) period on a table.
 non-zero `SET TTL` with
 `TTL is not supported on Enterprise tables; use a storage policy instead`. Use
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
-instead. `SET TTL 0` is still accepted, for clearing a pre-existing TTL before
-attaching a storage policy. See [Storage Policy](/docs/concepts/storage-policy/)
-for the Enterprise replacement.
+instead. `SET TTL 0 HOURS` is still accepted, for clearing a pre-existing TTL
+before attaching a storage policy. See
+[Storage Policy](/docs/concepts/storage-policy/) for the Enterprise
+replacement.
+
+System tables, such as `sys.view_audit`, are exempt, and Enterprise accepts
+`SET TTL` on them. See
+[Audited views](/docs/security/audited-views/#retention).
 
 :::
 

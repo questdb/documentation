@@ -255,9 +255,13 @@ CREATE VIEW trades_by_symbol AS (
 ```
 
 Creating a view `WITH AUDIT` requires the `AUDIT VIEW` permission in addition
-to `CREATE VIEW`. The view stays audited through `ALTER VIEW` and
-`CREATE OR REPLACE VIEW`, which also require `AUDIT VIEW` over an audited view.
-To audit an existing view, drop it and create it again.
+to `CREATE VIEW` and `SELECT` on the tables the view reads. The view stays
+audited through `ALTER VIEW` and `CREATE OR REPLACE VIEW`, which also require
+`AUDIT VIEW` over an audited view, and `SELECT` on the tables the new body
+reads. Reads of the view need only `SELECT` on the view, so the creator's
+`SELECT` on the tables can be revoked once the view exists: see
+[Audited views](/docs/security/audited-views/#quick-start). To audit an
+existing view, drop it and create it again.
 
 Over an existing view, `CREATE OR REPLACE VIEW` accepts `WITH AUDIT` only when
 the view is already audited. There the body is replaced as usual, the view

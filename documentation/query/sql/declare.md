@@ -34,12 +34,14 @@ DECLARE @variable := ( expression , [ expression [, expression ...] [,] ] )
 ```
 
 ```questdb-sql title="Use a value list"
-WHERE column [ NOT ] IN { @variable | ( item [, item ...] ) }
+WHERE expression [ NOT ] IN { @variable | $n | ( item [, item ...] ) }
 ```
 
 A value list has at least one comma. Its members are expressions, including
 bind variables, but not lists or list variables. In `IN`, an `item` is a value
-or a list variable.
+or a list variable. A `$n` that holds a text array, directly or through a
+variable, must be the whole list: see
+[Lists of bind variables](#lists-of-bind-variables).
 
 The `OVERRIDABLE` keyword only takes effect inside a
 [view definition](/docs/query/sql/create-view/#declare-with-overridable). It
@@ -294,7 +296,8 @@ own type, and every form of `IN` works as it does with a written-out list,
 including `NOT IN` and interval scans on the designated timestamp.
 
 - `IN @symbols` and `IN (@symbols)` are equivalent.
-- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
+- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`. A variable
+  that holds an [array bind](#lists-of-bind-variables) does not.
 - One list variable can be assigned to another: `@majors := @symbols`.
 - A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
   `('BTC-USDT')` is a parenthesised value. A trailing comma is also accepted
@@ -339,6 +342,14 @@ SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
 With JDBC, bind `connection.createArrayOf("varchar", symbols)`. With psql,
 `\bind '{BTC-USDT,ETH-USDT,SOL-USDT}'`. The same works for a parameter of a
 [view](/docs/concepts/views/#list-parameters), but not of an audited view.
+
+A bind variable that holds an array, directly or through a variable, must be
+the whole `IN` list: `IN $1`, `IN ($1)` or `NOT IN $1`. It cannot be mixed with
+other values, as in `IN ('ETH-USDT', $1)`. A typed array bind, as from JDBC,
+fails there with `STRING constant expected`. An untyped one, as from psql
+`\bind`, is not refused: it is taken as one string, such as
+`'{SOL-USDT,BTC-USDT}'`, which matches no row, so the query returns only the
+rows of the other values.
 
 Members of a list can also be bind variables. Reads of an
 [audited view](/docs/security/audited-views/) need this form, because an
@@ -385,7 +396,8 @@ of `IN`. These fail:
   `value expected in list`
 
 To combine a list with more values, write both in the `IN`:
-`symbol IN (@symbols, 'SOL-USDT')`.
+`symbol IN (@symbols, 'SOL-USDT')`. This does not work for an array bind: add
+the values to the array instead.
 
 ## Limitations
 

@@ -46,15 +46,23 @@ CREATE VIEW trades_by_symbol AS (
 ```
 
 Creating it needs `CREATE VIEW`, `AUDIT VIEW`, and `SELECT` on the tables it
-reads, which the built-in admin holds. To let another principal create it:
+reads, which the built-in admin holds. To let another principal create it,
+grant those, plus an endpoint permission such as `HTTP` to connect:
 
 ```questdb-sql title="Let view_owner create the view"
-GRANT CREATE VIEW, AUDIT VIEW TO view_owner;
+GRANT HTTP, CREATE VIEW, AUDIT VIEW TO view_owner;
 GRANT SELECT ON trades TO view_owner;
 ```
 
-The owner keeps that `SELECT`, so it can read `trades` with no audit row. Use
-an owner that nobody reads data as.
+Reads of the view check only `SELECT` on the view, so the owner needs `SELECT`
+on `trades` only while it creates or changes the view. Once the view exists,
+revoke it, so that the owner cannot read `trades` unaudited either:
+
+```questdb-sql title="Close the owner's unaudited path"
+REVOKE SELECT ON trades FROM view_owner;
+```
+
+Grant it again before an `ALTER VIEW` or `CREATE OR REPLACE VIEW`.
 
 Readers need `SELECT` on the view, plus an endpoint permission, such as `HTTP`
 or `PGWIRE`, to connect. Do not grant them the table it reads, so that the view
@@ -580,6 +588,10 @@ The rule in full:
 - Coverage depends only on the view definitions, so a given statement always
   records the same set of views.
 
+A view that an audited view reads, and that is not audited itself, can be
+changed without `AUDIT VIEW`. That changes what the audited view returns while
+its rows record the same values: see [Permissions](#permissions).
+
 ## Delivery guarantees {#delivery}
 
 Auditing is lossy by design, and there is no lossless mode. Recording a read
@@ -629,7 +641,7 @@ Lost rows show in the server log only. No metric reports them.
 | ------------------------------------------------------------------- | --------------------------------------------------------- |
 | Create a view `WITH AUDIT`                                          | `CREATE VIEW` and `AUDIT VIEW`, and `SELECT` on the tables it reads |
 | Drop an audited view, with `DROP VIEW` or `DROP ALL TABLES`         | `DROP VIEW` on the view and `AUDIT VIEW`                  |
-| Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`                 |
+| Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`, and `SELECT` on the tables the new body reads |
 | Read an audited view                                                | `SELECT` on the view, as for any [view](/docs/concepts/views/#definer-security-model-enterprise) |
 | Read the trail                                                      | `SELECT` on `sys.view_audit`                              |
 | Remove rows from the trail                                          | Any of `TRUNCATE TABLE`, `DROP PARTITION`, `DETACH PARTITION`, `SET TABLE PARAM` (for `SET TTL`) or `SET STORAGE POLICY` (for a `DROP LOCAL` stage), on `sys.view_audit` or `ON ALL TABLES` |
@@ -643,14 +655,22 @@ permission a principal who can alter a view, or drop and recreate it, could
 shed its auditing unremarked. See [Syntax](#syntax) for how each statement
 treats a view's auditing.
 
+`AUDIT VIEW` guards the audited view's own definition, not the views it reads.
+A principal who can alter, drop or replace a view that an audited view reads
+can change what the audited view returns, with no change to the trail: the
+rows keep recording the same parameter values, and nothing records the change.
+Restrict `ALTER VIEW`, `DROP VIEW` and `CREATE VIEW` on those views to the
+principals that hold `AUDIT VIEW`, or have audited views read tables directly.
+
 :::note
 
-A database-level `GRANT ALL` includes `DATABASE ADMIN`, which also covers
-permissions added in later versions. So a principal granted `ALL` before the
-upgrade to audited views holds `AUDIT VIEW`, and can create, alter and drop
-audited views. A principal that holds individual permissions without
-`DATABASE ADMIN` needs it granted explicitly:
-`GRANT AUDIT VIEW TO view_admins;`.
+A database-level `GRANT ALL` granted on Enterprise 2.3.1 or later includes
+`DATABASE ADMIN`, which also covers permissions added in later versions. So a
+principal granted such an `ALL` before the upgrade to audited views holds
+`AUDIT VIEW`, and can create, alter and drop audited views. A principal that
+holds individual permissions without `DATABASE ADMIN`, or `ALL` granted before
+2.3.1, needs it granted explicitly: `GRANT AUDIT VIEW TO view_admins;`. See
+[Database administrator](/docs/security/rbac/#database-administrator).
 
 :::
 
@@ -732,10 +752,11 @@ audited are unaffected.
 
 - **Only reads through the audited view are recorded.** A principal with
   `SELECT` on the tables the view reads, or on a view over them that is not
-  audited, reads the same rows with no audit row. This includes the view's
-  owner, which needs `SELECT` on those tables to create the view: use an owner
-  that nobody reads data as. Grant readers `SELECT` on the audited view and not
-  on its tables, as in [Permissions](#permissions).
+  audited, reads the same rows with no audit row. This includes the principal
+  that creates or changes the view, while it holds `SELECT` on those tables.
+  Revoke it once the view exists, as in [Quick start](#quick-start). Grant
+  readers `SELECT` on the audited view and not on its tables, as in
+  [Permissions](#permissions).
 - **A materialized view over an audited view is not audited.** Its refreshes
   record nothing, reads of the materialized view are not audited, and
   `CREATE MATERIALIZED VIEW` records nothing either. A principal who can read an
