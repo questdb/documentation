@@ -134,6 +134,17 @@ The remote stages behave differently from the local ones. [Cold storage](/docs/c
 
 See [Operating cold storage](/docs/operations/cold-storage/) for the manager handoff procedure and its preconditions.
 
+## Resource groups in a replicated cluster
+
+[Resource group](/docs/concepts/resource-groups/) policies and their principal
+mappings live in a WAL-backed system catalog, so they replicate to every
+instance through the same pipeline as user data. Enforcement then runs locally
+on each instance, against the catalog snapshot that instance holds.
+
+What that means while a replica is behind, including why a lagging replica
+cannot be promoted, is covered in
+[Replication and catalog lag](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
+
 ## Bring Your Own Cloud (BYOC)
 
 QuestDB Enterprise can be self-managed or operated by QuestDB's team under the

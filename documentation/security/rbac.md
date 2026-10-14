@@ -601,9 +601,10 @@ default. Per-principal limits are available since QuestDB Enterprise 4.0.2; the
 server-wide [workload limits](/docs/configuration/cairo-engine/#memory-limits)
 they override are available since QuestDB 10.0.0.
 
-Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
-[`ALTER GROUP`](/docs/query/sql/acl/alter-group/), or
-[`ALTER SERVICE ACCOUNT`](/docs/query/sql/acl/alter-service-account/):
+Set a limit with
+[`ALTER USER`](/docs/query/sql/acl/alter-user-set-memory-limit/),
+[`ALTER GROUP`](/docs/query/sql/acl/alter-group-set-memory-limit/), or
+[`ALTER SERVICE ACCOUNT`](/docs/query/sql/acl/alter-service-account-set-memory-limit/):
 
 ```questdb-sql
 ALTER USER john SET MEMORY LIMIT 512M;
@@ -838,6 +839,7 @@ SELECT * FROM all_permissions();
 | REMOVE STORAGE POLICY     | Database &#124; Table               | Remove storage policies                 |
 | RENAME COLUMN             | Database &#124; Table &#124; Column | Rename columns                          |
 | RENAME TABLE              | Database &#124; Table               | Rename tables                           |
+| RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, read `resource_groups()` |
 | RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
 | SELECT                    | Database &#124; Table &#124; Column | Read data                               |
 | SET STORAGE POLICY        | Database &#124; Table               | Set storage policies                    |
@@ -900,9 +902,32 @@ replication role, is an ordinary grantable permission.
 ## SQL commands reference
 
 - [ADD USER](/docs/query/sql/acl/add-user/)
-- [ALTER GROUP](/docs/query/sql/acl/alter-group/)
-- [ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/)
-- [ALTER USER](/docs/query/sql/acl/alter-user/)
+- ALTER GROUP
+  - [DROP EXTERNAL ALIAS](/docs/query/sql/acl/alter-group-drop-external-alias/)
+  - [SET MEMORY LIMIT](/docs/query/sql/acl/alter-group-set-memory-limit/)
+  - [SET RESOURCE GROUP](/docs/query/sql/acl/alter-group-set-resource-group/)
+  - [UNSET RESOURCE GROUP](/docs/query/sql/acl/alter-group-unset-resource-group/)
+  - [WITH EXTERNAL ALIAS](/docs/query/sql/acl/alter-group-with-external-alias/)
+- ALTER SERVICE ACCOUNT
+  - [CREATE TOKEN](/docs/query/sql/acl/alter-service-account-create-token/)
+  - [DISABLE](/docs/query/sql/acl/alter-service-account-disable/)
+  - [DROP TOKEN](/docs/query/sql/acl/alter-service-account-drop-token/)
+  - [ENABLE](/docs/query/sql/acl/alter-service-account-enable/)
+  - [SET MEMORY LIMIT](/docs/query/sql/acl/alter-service-account-set-memory-limit/)
+  - [SET RESOURCE GROUP](/docs/query/sql/acl/alter-service-account-set-resource-group/)
+  - [UNSET RESOURCE GROUP](/docs/query/sql/acl/alter-service-account-unset-resource-group/)
+  - [WITH NO PASSWORD](/docs/query/sql/acl/alter-service-account-with-no-password/)
+  - [WITH PASSWORD](/docs/query/sql/acl/alter-service-account-with-password/)
+- ALTER USER
+  - [CREATE TOKEN](/docs/query/sql/acl/alter-user-create-token/)
+  - [DISABLE](/docs/query/sql/acl/alter-user-disable/)
+  - [DROP TOKEN](/docs/query/sql/acl/alter-user-drop-token/)
+  - [ENABLE](/docs/query/sql/acl/alter-user-enable/)
+  - [SET MEMORY LIMIT](/docs/query/sql/acl/alter-user-set-memory-limit/)
+  - [SET RESOURCE GROUP](/docs/query/sql/acl/alter-user-set-resource-group/)
+  - [UNSET RESOURCE GROUP](/docs/query/sql/acl/alter-user-unset-resource-group/)
+  - [WITH NO PASSWORD](/docs/query/sql/acl/alter-user-with-no-password/)
+  - [WITH PASSWORD](/docs/query/sql/acl/alter-user-with-password/)
 - [ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/assume-service-account/)
 - [CREATE GROUP](/docs/query/sql/acl/create-group/)
 - [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/)
