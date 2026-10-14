@@ -94,7 +94,7 @@ Once connected, you can explore QuestDB tables:
 :::tip
 QuestDB's `SAMPLE BY` queries work well for downsampling high-frequency
 time-series data before visualizing it in Metabase. See the
-[SAMPLE BY documentation](/docs/query/sample-by/) for details.
+[SAMPLE BY documentation](/docs/query/sql/sample-by/) for details.
 :::
 
 ## Next steps
