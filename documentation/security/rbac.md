@@ -575,6 +575,27 @@ ALTER USER username DROP TOKEN TYPE REST 'token_value_here';  -- Drop specific t
 Removing all authentication methods (password and tokens) effectively disables
 the user - they can no longer connect to the database.
 
+In QuestDB Enterprise 4.0.2 and later, an HTTP session ends with the
+credential that opened it, or the one that it checked last: when the password
+is changed or removed, when the REST token is dropped or expires, or when the
+user or service account is disabled or dropped, even if the client sends only
+the session cookie. A session of the built-in admin ends when a configuration
+reload changes `acl.admin.password`. A request that carries a credential that
+QuestDB rejects fails with `401 Unauthorized`, and ends the session whose
+cookie it carries. A replica ends the sessions of a disabled or dropped user or
+service account only when they are next used, so a session that is not used
+while the user is disabled survives if the user is enabled again.
+
+The Web Console logs in with the password, then sends a REST token that it
+creates at login with every later request. The token is valid for one day, and
+is extended while in use. A password change ends the session of the Web
+Console, but not the token, which opens a new session. To log a user out of
+the Web Console, drop the user's REST tokens with
+`ALTER USER username DROP TOKEN TYPE REST`, which also drops the REST tokens
+that the user's other clients use. To cut the user off from every client,
+disable the user. For external users, see
+[Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access).
+
 ### Viewing information
 
 ```questdb-sql

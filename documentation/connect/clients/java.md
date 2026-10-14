@@ -234,14 +234,16 @@ a pool of each client type — [`Sender`](#data-ingestion)s for ingestion and
 query clients for SQL — plus a background housekeeper thread that closes idle
 and over-age connections.
 
-The interface has exactly five members:
+The interface has these members:
 
 | Method | Returns | Purpose |
 |--------|---------|---------|
 | `connect(String)` | `QuestDB` | Static factory. One connect string drives both ingress and egress (schema must be `ws`/`wss`). |
+| `connect(String, HttpTokenProvider)` | `QuestDB` | Static factory with a provider that supplies the bearer token, such as a `RefreshingTokenProvider`. See [Rotating tokens](#rotating-tokens). |
 | `builder()` | `QuestDBBuilder` | Pool sizes and timeouts. |
 | `borrowSender()` | `Sender` | Lease a sender from the pool; `close()` flushes and returns it. |
 | `borrowQuery()` | `Query` | Lease a query handle from the pool; `close()` returns it. |
+| `health()` | `ConnectionHealth.Aggregate` | Connection health of every pooled sender and query client. See [Connection health](#connection-health). |
 | `close()` | `void` | Shut down pools and disconnect every underlying client. Idempotent. |
 
 A `QuestDB` instance is safe to share across threads. Borrows and query
@@ -335,6 +337,7 @@ Builder methods:
 | `errorHandler(SenderErrorHandler)` | — | Async ingest rejections from across the whole sender pool, delivered on the senders' I/O threads. |
 | `connectionListener(SenderConnectionListener)` | — | Connect and disconnect events across the sender pool. |
 | `drainerListener(BackgroundDrainerListener)` | — | Store-and-forward background drainer events. |
+| `httpTokenProvider(HttpTokenProvider)` | — | Supplies the bearer token of every connection, such as from a `RefreshingTokenProvider`. Cannot be combined with `token`, `username`/`password`, or `token_provider` in the configuration. See [Rotating tokens](#rotating-tokens). |
 
 `fromConfig(...)` is required; `build()` throws
 `IllegalStateException("configuration is required; call fromConfig()")` without
@@ -395,7 +398,149 @@ try (QuestDB db = QuestDB.connect(
 
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on
 both the ingress and egress WebSocket upgrades. It is mutually exclusive with
-`username`/`password`.
+`username`/`password`. The client sends the same token on every connection that
+it opens, so once the token expires, new connections, reconnects, and
+failovers fail. For tokens that expire, use a
+[token provider](#rotating-tokens).
+
+### Rotating tokens
+
+The tokens of an identity provider expire, for example after one to 24 hours
+with Microsoft Entra ID. A **token provider** requests tokens from the identity
+provider instead of a fixed `token`, caches them, and renews them in the
+background at about half of their lifetime, so every connection, reconnect,
+and failover presents a valid token. A connection that is already open is not
+authenticated again.
+
+#### Microsoft Entra ID
+
+Add the `questdb-client-azure` artifact, at the same version as
+`questdb-client`. It brings the Azure Identity library, and registers
+`token_provider=azure`:
+
+<Tabs defaultValue="maven" values={[ { label: "Maven", value: "maven" },
+{ label: "Gradle", value: "gradle" }, ]}
+
+>   <TabItem value="maven">
+
+    <InterpolateJavaClientVersion renderText={(release) => (
+      <CodeBlock className="language-xml">
+        {`<dependency>
+  <groupId>org.questdb</groupId>
+  <artifactId>questdb-client-azure</artifactId>
+  <version>${release.name}</version>
+</dependency>`}
+      </CodeBlock>
+    )} />
+  </TabItem>
+  <TabItem value="gradle">
+    <InterpolateJavaClientVersion renderText={(release) => (
+      <CodeBlock className="language-text">
+        {`implementation 'org.questdb:questdb-client-azure:${release.name}'`}
+      </CodeBlock>
+    )} />
+  </TabItem>
+</Tabs>
+
+```java
+try (QuestDB db = QuestDB.connect(
+        "wss::addr=db.example.com:9000;"
+        + "token_provider=azure;"
+        + "azure_resource=api://<QuestDB application ID>;"
+        + "azure_credential=managed_identity;")) {
+    // ...
+}
+```
+
+| Key | Description |
+|-----|-------------|
+| `token_provider` | `azure`. Requires the `wss` schema. Cannot be combined with `token`, `username`/`password`, or a provider passed to `httpTokenProvider(...)`. |
+| `azure_resource` | Required. The Application ID URI, such as `api://<application ID>`, or the application ID of the QuestDB application in Entra ID. The client requests the scope `<azure_resource>/.default`. |
+| `azure_credential` | The Azure credential that requests the token: `default` (the default), `managed_identity`, `workload_identity`, or `environment`. |
+| `azure_client_id` | The client ID of a user-assigned managed identity or of a workload identity. Cannot be combined with `azure_credential=environment`. |
+
+`azure_credential=default` uses `DefaultAzureCredential`, a discovery chain
+meant for development: a service principal configured in environment
+variables, a workload identity, a managed identity, then developer tools, such
+as the Azure CLI. The chain checks the managed identity endpoint once, without
+retrying, so at startup, an outage of that endpoint looks like a host without
+a credential. The client logs a warning about this when it starts. In
+production, name the credential: `managed_identity`, `workload_identity`, or `environment`, a
+service principal configured with `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and
+`AZURE_CLIENT_SECRET` or a certificate. A managed identity named this way
+retries an unreachable endpoint, and fails fast when the identity is not
+assigned to the host.
+
+The connect string holds no secret, so it is safe to log, and to keep in
+`QDB_CLIENT_CONF`. Every sender, query client, and pooled connection built from
+equivalent connect strings shares one provider in a process: one thread that
+renews the token, and one request to Entra ID at a time. For the Entra ID
+setup and the QuestDB configuration, see
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+
+#### Other identity providers
+
+Wrap a `TokenSource`, the function that requests a token from your identity
+provider, in a `RefreshingTokenProvider`, and pass the provider to
+`QuestDB.connect(String, HttpTokenProvider)`,
+`QuestDB.builder().httpTokenProvider(...)`,
+`Sender.builder(...).httpTokenProvider(...)`, or
+`QwpQueryClient.withBearerTokenProvider(...)`. The application owns the
+provider: close it after the clients that use it.
+
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.cutlass.auth.ExpiringToken;
+import io.questdb.client.cutlass.auth.RefreshingTokenProvider;
+
+RefreshingTokenProvider tokens = RefreshingTokenProvider.builder(() -> {
+    // runs on the provider's own thread: request a token from your
+    // identity provider, such as with the client credentials grant
+    MyToken token = requestToken();
+    return new ExpiringToken(token.value(), token.expiresAtEpochMillis());
+}).build();
+try (QuestDB db = QuestDB.connect("wss::addr=db.example.com:9000;", tokens)) {
+    // ...
+} finally {
+    tokens.close();
+}
+```
+
+`requestToken()` and `MyToken` stand for your own code. `ExpiringToken` takes
+the token, without the `Bearer ` prefix, and the time when it expires, in
+milliseconds since the epoch. The provider requests its first token as soon as
+it is built, and `awaitReady(timeoutMillis)` returns `true` once it holds a
+valid one, so an application can wait for it at startup.
+
+A source reports a failure by throwing `TokenUnavailableException.retryable(...)`
+for network trouble, throttling, or a `5xx` response, or
+`TokenUnavailableException.permanent(...)` for a missing or wrong
+configuration. Any other exception counts as retryable. Don't put a token or a
+raw response body into the message. The provider keeps retrying with backoff,
+and keeps handing out the current token while it is still valid.
+
+The provider hands out a token only while more than 60 seconds of its lifetime
+are left. A token that arrives with less counts as a failed request, whose
+error names `handout_floor`. If your identity provider issues tokens that
+short, lower the floor with `handoutFloorMillis(...)` on the builder.
+
+#### How the client handles token failures
+
+- When QuestDB rejects a token with `401`, the client asks the provider for a
+  new token, and when it gets a different one, retries the same server once,
+  immediately. A `403` does not trigger a retry.
+- At startup, with `initial_connect_retry=off`, the default, the client fails
+  when it cannot get a token. With `on`, it retries a retryable failure of the
+  provider within `reconnect_max_duration_millis`, and fails at once on a
+  permanent one. With `async`, it keeps retrying in the background.
+- Once a sender has connected, it keeps retrying when it cannot get a token or
+  QuestDB rejects one, buffers rows in [store-and-forward](#store-and-forward)
+  meanwhile, and reports each failure to the error handler and in its
+  [connection health](#connection-health). It never fails on its own: an
+  application that prefers a hard failure watches the error handler or the
+  connection health, and closes the sender itself.
+- A query whose client has to connect, and cannot get a token, fails. The next
+  query tries again.
 
 ### HTTP basic auth
 
@@ -1320,7 +1465,13 @@ What is and isn't carried on `onError`:
 
 - **Authentication failure**: `401`/`403` HTTP response before the WebSocket
   upgrade completes. Terminal across all endpoints. The borrow that
-  triggered the connect rethrows `LineSenderException`.
+  triggered the connect rethrows `LineSenderException`. With a
+  [token provider](#rotating-tokens), a `401` first makes the client request
+  a new token and retry the same endpoint once.
+- **Credential unavailable**: the [token provider](#rotating-tokens) cannot
+  supply a token, for example because the identity provider is unreachable.
+  The client contacts no endpoint, and handles the failure as described in
+  [How the client handles token failures](#how-the-client-handles-token-failures).
 - **Malformed frames**: `QwpDecodeException` or WebSocket close with a
   terminal code.
 - **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
@@ -1422,7 +1573,11 @@ client and gives you a fresh one on your next query.
 ### Which failures are retried
 
 - **Authentication failures** (a bad token or wrong credentials) stop
-  immediately on every host — retrying cannot help.
+  immediately on every host, because retrying cannot help. With a
+  [token provider](#rotating-tokens), a `401` first makes the client request a
+  new token and retry the same host once. A sender that has already connected
+  keeps retrying instead, as described in
+  [How the client handles token failures](#how-the-client-handles-token-failures).
 - **Network and availability failures** (connection refused, TLS errors, a
   `5xx` from the server, a mid-query drop) are treated as temporary and fed into
   the reconnect and failover loops.
@@ -1467,6 +1622,42 @@ For the full list of connect-string keys, see the
 [reconnect](/docs/connect/clients/connect-string#reconnect-keys) and
 [multi-host failover](/docs/connect/clients/connect-string#failover-keys)
 sections of the connect string reference.
+
+### Connection health
+
+A sender rides out an outage, such as an unreachable cluster or a token that
+QuestDB rejects, and keeps accepting rows while it retries. To find out that it
+has not reached the server, check its connection health. Reading it never
+blocks, and never contains a credential, so it can back a health endpoint:
+
+```java
+import io.questdb.client.ConnectionHealth;
+
+// every pooled sender and query client of the handle
+ConnectionHealth.Aggregate health = db.health();
+if (health.count(ConnectionHealth.State.RECONNECTING) > 0) {
+    long since = health.getOldestOutageSinceEpochMillis();
+    ConnectionHealth.Failure failure = health.getLastFailure();
+    System.err.printf("QuestDB unreachable since %d: %s%n", since, failure);
+}
+```
+
+`Sender.health()` and `QwpQueryClient.health()` return the `ConnectionHealth`
+of one client. Only the WebSocket (QWP) sender tracks it; the other transports
+throw `UnsupportedOperationException`.
+
+| Accessor | Description |
+|----------|-------------|
+| `getState()` | `CONNECTING` (no successful connect yet), `CONNECTED`, `RECONNECTING` (the connection was lost, and the client is connecting again; for a query client, the last connect failed, and the next query tries again), `FAILED` (terminal), or `CLOSED`. |
+| `getLastConnectedAtEpochMillis()` | Time of the last successful connect, or `ConnectionHealth.NONE` (`-1`). |
+| `getOutageSinceEpochMillis()` | Start of the current outage, or `NONE` while connected. |
+| `getFailedRounds()` | Failed connect rounds, walks over the endpoints in `addr` that ended without a connection, since the outage started. |
+| `getLastFailure()` | The last failed connect round, kept after the connection recovers, or `null`. `getFailureClass()` returns `CREDENTIAL_UNAVAILABLE`, `AUTH_REJECTED` (with the status in `getStatusCode()`), `ROLE_REJECTED`, `TRANSPORT`, or `OTHER`, and `getMessage()` and `getEpochMillis()` return the message and the time. |
+
+`ConnectionHealth.Aggregate` counts the connections in each state with
+`count(State)`, and returns the oldest outage with
+`getOldestOutageSinceEpochMillis()` and the most recent failure with
+`getLastFailure()`.
 
 ## Concurrency
 
@@ -1592,6 +1783,7 @@ Common WebSocket-specific options:
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`, `auto`). |
 | `compression_level` | `1` | Egress zstd level (`1`–`22`, clamped server-side to `1`–`9`). |
 | `client_id` | unset | Egress client label, sent as the `X-QWP-Client-Id` header; set in production so support can correlate sessions. |
+| `token_provider` | unset | Bearer-token provider that requests and renews the token, `wss` only: `azure`, with `azure_resource`, `azure_credential`, and `azure_client_id`. See [Rotating tokens](#rotating-tokens). |
 
 Pool keys (read by the `QuestDB` facade; the two clients accept and ignore them):
 

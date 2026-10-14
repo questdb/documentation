@@ -167,6 +167,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Enable TLS                                        | both      | `addr` with `wss` schema               | `tls_verify`, `tls_roots`, `tls_roots_password`                                             |
 | Basic-auth credentials                            | both      | `username`, `password`                 | `auth_timeout_ms`                                                                           |
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
+| Entra ID tokens that the client renews (Java)     | both      | `token_provider=azure`, `azure_resource` | `azure_credential`, `azure_client_id`                                                     |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
@@ -234,6 +235,46 @@ certificate against a trust store but cannot present a client certificate;
 the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
 `token=<token>` or `username=` / `password=` for client authentication.
+
+### Token providers {#token-providers}
+
+*Applies to: ingress and egress. Java client only.*
+
+A token provider requests bearer tokens from an identity provider, caches
+them, and renews them in the background before they expire, so every
+connection, reconnect, and failover presents a valid token. Use it instead of
+a fixed `token` for tokens that expire, such as the tokens of a Microsoft Entra
+ID managed identity or service principal:
+
+```
+wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
+```
+
+- `token_provider`: the provider. `azure` requests tokens from Microsoft Entra
+  ID through the Azure Identity library, and needs the `questdb-client-azure`
+  artifact. Requires the `wss` schema. Cannot be combined with `token`,
+  `username` / `password`, or a token provider that the application passes to
+  the client.
+- `azure_resource`: required with `token_provider=azure`. The Application ID
+  URI, such as `api://<application ID>`, or the application ID of the QuestDB
+  application in Entra ID. The client requests the scope
+  `<azure_resource>/.default`.
+- `azure_credential`: the Azure credential that requests the token. `default`,
+  the default, is `DefaultAzureCredential`, a discovery chain meant for
+  development. `managed_identity`, `workload_identity`, and `environment`, a
+  service principal configured with the `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+  and `AZURE_CLIENT_SECRET` environment variables or a certificate, use that
+  credential alone, which is recommended in production.
+- `azure_client_id`: the client ID of a user-assigned managed identity or of a
+  workload identity. Cannot be combined with `azure_credential=environment`.
+
+The keys hold no secret, so a connect string that uses them is safe to log, and
+to keep in `QDB_CLIENT_CONF`. Clients built from equivalent connect strings
+share one provider in a process. See
+[Rotating tokens](/docs/connect/clients/java/#rotating-tokens) in the Java
+client reference, and
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)
+for the Entra ID setup.
 
 ## TLS {#tls}
 
@@ -857,6 +898,9 @@ description and behaviour notes.
 | `auto_flush_bytes`                      | size                          | Java `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)                    |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
+| `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
+| `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
 | `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
@@ -916,6 +960,7 @@ description and behaviour notes.
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
+| `token_provider`                        | enum (`azure`)                | unset                         | [Token providers](#token-providers) (Java only)               |
 | `transaction`                           | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `user`                                  | string                        | unset                         | [Authentication](#auth) (alias of `username`)                 |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |

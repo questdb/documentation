@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
-description: "Configure OIDC in QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience, and principal and groups claims with fallback lists."
+description: "Configure OIDC in QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience and issuer, and principal and groups claims with fallback lists."
 ---
 
 :::note
@@ -33,8 +33,8 @@ the client ID, so another value makes Web Console logins fail. See
 [Token validation](/docs/security/oidc/#token-validation).
 
 With `acl.oidc.groups.encoded.in.token=false`, QuestDB does not use this
-setting: it accepts any access token that the provider's User Info endpoint
-accepts, whatever its audience.
+setting. It treats the access token as opaque, even when it is a JWT, and
+leaves its validation to the provider's User Info endpoint.
 
 ### acl.oidc.client.id
 
@@ -53,8 +53,10 @@ URL where the OpenID Provider's configuration information can be loaded in
 JSON format. Should always end with `/.well-known/openid-configuration`.
 
 QuestDB downloads the document when it starts, and takes the provider's
-endpoints from it. QuestDB does not start when it cannot download or parse the
-document. The error starts with
+endpoints from it. Since QuestDB Enterprise 4.0.2, it also takes the expected
+issuer of the tokens from the `issuer` field of the document, unless
+[`acl.oidc.issuer`](#acloidcissuer) is set. QuestDB does not start when it
+cannot download or parse the document. The error starts with
 `Unable to download OIDC provider configuration from` or
 `Unable to parse OIDC provider configuration`. To let QuestDB start while the
 provider is unreachable, set [`acl.oidc.host`](#acloidchost) and the
@@ -80,12 +82,76 @@ settings cannot be combined: QuestDB refuses to start when both are set. With
 `acl.oidc.host`, QuestDB starts even when the provider is unreachable, and only
 OIDC logins fail until the provider is reachable again.
 
+Without a discovery document, QuestDB has no issuer of the tokens to read. With
+`acl.oidc.groups.encoded.in.token=true`, QuestDB Enterprise 4.0.2 and later
+therefore refuse to start unless [`acl.oidc.issuer`](#acloidcissuer) is set, or
+[`acl.oidc.issuer.validation.enabled`](#acloidcissuervalidationenabled) is
+`false`.
+
 ### acl.oidc.http.timeout
 
 - **Default**: `30000`
 - **Reloadable**: no
 
 OIDC provider HTTP request timeout in milliseconds.
+
+### acl.oidc.issuer
+
+- **Default**: none (the `issuer` of the discovery document)
+- **Reloadable**: no
+
+The issuer that the `iss` claim of a token must equal when
+`acl.oidc.groups.encoded.in.token` is `true`, in QuestDB Enterprise 4.0.2 and
+later. The comparison is exact and case-sensitive, and includes the path and
+any trailing slash. When not set, QuestDB uses the `issuer` field of the
+discovery document that it downloads from
+[`acl.oidc.configuration.url`](#acloidcconfigurationurl). When set, it takes
+precedence over the discovery document.
+
+Set it when:
+
+- QuestDB uses [`acl.oidc.host`](#acloidchost) and the endpoint settings,
+  which provide no issuer.
+- The discovery document names a template instead of an issuer, such as
+  `https://login.microsoftonline.com/{tenantid}/v2.0`. Set the issuer of your
+  tenant, not a template or a wildcard.
+- The discovery document names another issuer than the tokens, because the
+  provider puts the host name of each request into the issuer, such as
+  Keycloak without a fixed hostname, and QuestDB reaches the provider through
+  another URL than the clients. Set the issuer that the tokens carry.
+
+With issuer validation enabled, QuestDB refuses to start when it has no
+expected issuer:
+
+```text
+required to set acl.oidc.issuer or provide an issuer in the OIDC discovery document when acl.oidc.groups.encoded.in.token and acl.oidc.issuer.validation.enabled are true
+```
+
+Not used with `acl.oidc.groups.encoded.in.token=false`, or with
+[`acl.oidc.issuer.validation.enabled=false`](#acloidcissuervalidationenabled).
+See [The expected issuer](/docs/security/oidc/#the-expected-issuer).
+
+### acl.oidc.issuer.validation.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Whether QuestDB checks the `iss` claim of a token when
+`acl.oidc.groups.encoded.in.token` is `true`, in QuestDB Enterprise 4.0.2 and
+later. When `false`, QuestDB neither requires the `iss` claim nor compares it,
+even when [`acl.oidc.issuer`](#acloidcissuer) is set or the discovery document
+provides an issuer, and starts without an expected issuer. It still checks the
+signature, the audience, the expiry, and the subject of the token, and logs an
+advisory at startup.
+
+Without the check, QuestDB accepts the tokens of any issuer or tenant that the
+provider signs with the same keys for the expected audience. Keep the default,
+unless the provider issues tokens without an `iss` claim.
+
+Accepts `true` or `false`, in any letter case. QuestDB refuses to start with
+any other value, an empty value included, even when OIDC is disabled:
+`invalid configuration value [key=acl.oidc.issuer.validation.enabled, value=...]`.
+See [The expected issuer](/docs/security/oidc/#the-expected-issuer).
 
 ### acl.oidc.port
 
@@ -114,7 +180,9 @@ scope `openid` is mandatory and must always be included.
 The Web Console requests these scopes when the user logs in. Add
 `offline_access` if the provider issues a refresh token only for that scope,
 such as Microsoft Entra ID. Without a refresh token, the Web Console cannot
-renew its tokens, and does not log the user out when the user is disabled in
+renew its tokens: it logs the user out once QuestDB stops accepting the token
+of the login, for example when the token expires, about an hour after the login
+with Microsoft Entra ID. This can be later than when the user is disabled in
 the provider. See
 [Credentials received](/docs/security/oidc/#6-credentials-received) in the
 OIDC guide.
@@ -281,6 +349,18 @@ ROPC flow, QuestDB caches the result of the login for this long, then requests
 a new token from the provider, so with either setting, changes take effect
 after this time.
 
+Since QuestDB Enterprise 4.0.2, this also sets how long an HTTP session reuses
+the check of a password that QuestDB verifies itself, the password of a
+database user or of the built-in admin, even when OIDC is disabled. A request
+that carries the session cookie and the same password is checked again once
+this time has passed since the session last checked it. Changing or removing
+the password ends the session at once, as described in
+[Managing authentication](/docs/security/rbac/#managing-authentication).
+QuestDB checks OIDC tokens, username and password logins through the ROPC flow,
+and REST tokens on every request, the OIDC ones through the cache described
+above. See
+[Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access).
+
 ### acl.oidc.groups.claim
 
 - **Default**: none
@@ -318,9 +398,11 @@ token itself, as described in
 [Token validation](/docs/security/oidc/#token-validation). Set to `true` if the
 OIDC Provider encodes group memberships directly into the token.
 
-Since QuestDB Enterprise 4.0.2, QuestDB also rejects expired tokens and tokens
-without an `exp` claim. Earlier versions do not check the `exp` claim of the
-token.
+Since QuestDB Enterprise 4.0.2, QuestDB also rejects expired tokens, tokens
+without an `exp` claim, and, unless
+[`acl.oidc.issuer.validation.enabled`](#acloidcissuervalidationenabled) is
+`false`, tokens whose `iss` claim is not the expected issuer. Earlier versions
+check neither the `exp` nor the `iss` claim of the token.
 
 ### acl.oidc.sub.claim
 

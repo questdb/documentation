@@ -73,7 +73,12 @@ when it cannot download or parse it. The error starts with
 provider is unreachable, set `acl.oidc.host` and the
 [endpoint settings](/docs/configuration/oidc/#endpoints) instead: QuestDB then
 starts without the provider, and only OIDC logins fail until the provider is
-reachable again. QuestDB refuses to start when both
+reachable again. Without a discovery document, QuestDB has no issuer of the
+tokens to read, so with `acl.oidc.groups.encoded.in.token=true`, QuestDB
+Enterprise 4.0.2 and later refuse to start unless
+[`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) is set or issuer
+validation is disabled, as described in
+[The expected issuer](#the-expected-issuer). QuestDB refuses to start when both
 `acl.oidc.configuration.url` and `acl.oidc.host` are set.
 
 For all OIDC-related configuration options of QuestDB, see
@@ -93,8 +98,9 @@ sends and what QuestDB checks:
 | Claims come from | the provider's User Info response for the token | the payload of a JWT: the ID token for Web Console and ROPC logins, or the token that a client sends |
 | The Web Console sends | the access token | the ID token |
 | Other clients send | an access token | for a user, an ID token requested with QuestDB's client ID; for a service, an access token whose `aud` contains `acl.oidc.audience` |
-| The token is validated by | the provider's User Info endpoint | QuestDB: signature, `aud`, `exp` (QuestDB Enterprise 4.0.2 and later), and `sub` |
+| The token is validated by | the provider's User Info endpoint | QuestDB: signature, `aud`, `sub`, and in QuestDB Enterprise 4.0.2 and later, `exp` and `iss` |
 | `acl.oidc.audience` | not used | must be in the `aud` claim |
+| `acl.oidc.issuer` | not used | the `iss` claim must equal it; defaults to the issuer of the discovery document (4.0.2 and later) |
 | A change to the groups applies | after `acl.oidc.cache.ttl` | when the client presents a new token |
 | Suits providers that | return the groups from the User Info endpoint, such as PingFederate | put the groups into the tokens, such as Microsoft Entra ID, and issue tokens that services request for themselves |
 
@@ -138,9 +144,7 @@ the _client_, and it is assigned an identifier: the **Client Id**.
 Each application which integrates via OIDC should be given a different **Client
 Id**, except clients that send ID tokens to QuestDB: they request them with
 QuestDB's client ID, as described in
-[Non-interactive clients](#non-interactive-clients). With the User Info
-endpoint, the default, separate client IDs do not restrict which access tokens
-QuestDB accepts; see [Token validation](#token-validation).
+[Non-interactive clients](#non-interactive-clients).
 
 ### OIDC Provider
 
@@ -302,18 +306,23 @@ such as Microsoft Entra ID, issue it only when the Web Console requests the
 [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) sets.
 
 Before it sends a query, the Web Console uses the refresh token to request new
-tokens when the access token expires within 30 seconds. With
-`acl.oidc.groups.encoded.in.token=true`, it sends QuestDB the ID token rather
-than the access token, and the ID token can expire first, as described in
-[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
+tokens when the token that it sends QuestDB expires within 30 seconds: the
+access token or, with `acl.oidc.groups.encoded.in.token=true`, the ID token. It
+reads the expiry of the ID token from the token's `exp` claim, and the expiry
+of the access token from the `expires_in` field of the token response.
+
 When the provider refuses to issue new tokens, for example because the user is
-disabled, the Web Console logs the user out.
+disabled, the Web Console logs the user out. When it cannot reach the provider,
+or the provider answers with `429` or a `5xx` status, the Web Console keeps
+sending the current token, warns the user, and tries again with a growing
+delay of up to 30 seconds. If the token expires and the Web Console still
+cannot get new tokens, it logs the user out.
 
 Without a refresh token, the Web Console never requests new tokens. Once QuestDB
-stops accepting the tokens of the login, it accepts the requests of the Web
-Console through its HTTP session, until the session expires and the Web Console
-logs the user out, as described in
-[Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
+stops accepting the token of the login, for example when the token expires, it
+rejects the requests of the Web Console with `401 Unauthorized` and ends its
+HTTP session, and the Web Console logs the user out, as described in
+[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 The validity of the tokens are configurable inside the OIDC Provider.
 
@@ -651,7 +660,9 @@ client for ingesting data. It is practical to manage their credentials via an
 OAuth2 provider too. Such a client requests a token from the provider itself,
 and sends it to QuestDB as a bearer token, for example in the
 [`token` setting](/docs/connect/clients/connect-string/#auth) of the client's
-configuration string, over ILP/HTTP or QWP.
+configuration string, over ILP/HTTP or QWP. The Java client can also request
+the token and renew it by itself, with a
+[token provider](/docs/connect/clients/java/#rotating-tokens).
 
 Which token to send depends on where QuestDB reads the user information from,
 and on who the client authenticates as:
@@ -676,7 +687,9 @@ and on who the client authenticates as:
     credentials grant, send the access token that the provider issues to it
     for QuestDB. Configure the provider so that the `aud` claim of the token
     contains the value of `acl.oidc.audience`, which defaults to QuestDB's
-    client ID. For Microsoft Entra ID, see
+    client ID, and so that its `iss` claim is the expected issuer, as
+    described in [The expected issuer](#the-expected-issuer). For Microsoft
+    Entra ID, see
     [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 Tokens that the provider issues to a service often carry the principal and the
@@ -719,7 +732,7 @@ A service that authenticates as itself requests an access token with the
 client credentials grant, using its own client ID and secret, and sends the
 token to QuestDB. This example assumes `acl.oidc.groups.encoded.in.token=true`,
 and a provider that issues the token as a JWT whose `aud` claim contains the
-value of `acl.oidc.audience`:
+value of `acl.oidc.audience`, and whose `iss` claim is the expected issuer:
 
 ```python
 import os
@@ -857,7 +870,13 @@ connection of a client's pool, authenticates with the token again, and fails
 once QuestDB stops accepting the token, as described in
 [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
-A long-running client must therefore switch to a new token before the old one
+The [Java client](/docs/connect/clients/java/#rotating-tokens) can renew the
+token by itself instead: with a token provider, such as `token_provider=azure`
+for Microsoft Entra ID, it requests a new token in the background before the
+current one expires, and presents it on every connection that it opens after
+that.
+
+Any other long-running client must switch to a new token before the old one
 expires: request a new token, create a new client with it, wait until the old
 client has delivered what it sent, then close the old client. A QWP client that
 is closed discards the rows that QuestDB has not acknowledged within
@@ -903,9 +922,11 @@ it, not from the username field. Send the token that an HTTP client would send:
 - With the User Info endpoint, the default, an access token.
 - With `acl.oidc.groups.encoded.in.token=true`, for a user, an ID token
   requested with QuestDB's client ID, and for a service, an access token whose
-  `aud` claim contains `acl.oidc.audience`. QuestDB rejects a token for another
+  `aud` claim contains `acl.oidc.audience`, and whose `iss` claim is the
+  [expected issuer](#the-expected-issuer). QuestDB rejects a token for another
   audience, such as a user's access token for another API, and logs
-  `InvalidAudience`.
+  `InvalidAudience`, or `InvalidIssuer` when the token also comes from another
+  issuer.
 
 See [Non-interactive clients](#non-interactive-clients). Like a password, the
 token crosses the network in the clear unless the connection uses
@@ -1064,22 +1085,57 @@ outlives the token:
 
 - Connections that are already open, such as PGWire and QWP connections, stay
   open when their token expires, and keep running with the groups of the last
-  token that QuestDB accepted for the user.
-- The HTTP session that the Web Console opens at login is not tied to the
-  token. When QuestDB rejects the token of a request that carries a valid
-  session cookie, for example because the user is disabled or because the
-  token no longer carries a group, it accepts the request through the session.
-  The session ends when the Web Console logs the user out, or after it has
-  been idle for `http.session.timeout`, 30 minutes by default. Every request
-  restarts the idle timer, so a session in use does not expire. The Web
-  Console logs the user out, and ends the session, when the provider refuses
-  to refresh its tokens, for example after the user is disabled. It refreshes
-  them only with a refresh token, as described in
-  [step 6](#6-credentials-received): without one, a disabled user keeps
-  working through the session for as long as they stay active. A session that
-  the Web Console does not end, for example because the browser was closed,
-  stays valid for any client that reuses its cookie, for as long as that
+  token that QuestDB accepted for the user. A WebSocket connection that a
+  browser opened with the cookie of an HTTP session also stays open when the
+  session ends.
+- An HTTP session, such as the one that the Web Console opens at login,
+  accepts the requests that carry its cookie without a token. QuestDB checks
+  an OIDC token only when a request carries it, so it does not end such a
+  session when the token expires. The session ends when the Web Console logs
+  the user out, or after it has been idle for `http.session.timeout`, 30
+  minutes by default. Every request that QuestDB accepts restarts the idle
+  timer, so a session in use does not expire. A session that the Web Console
+  does not end, for example because the browser was closed, stays valid for
+  any client that reuses its cookie without a token, for as long as that
   client stays active.
+
+The Web Console itself sends its token with every query, so its session lasts
+only as long as QuestDB accepts the token. QuestDB checks the token of every
+request that carries one, and reuses the result of a check for up to
+`acl.oidc.cache.ttl`, as described in
+[When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
+When it rejects the token, for example because the token has expired, because
+the provider rejects it, or because the user information no longer carries a
+group, QuestDB rejects the request with `401 Unauthorized` and ends the
+session, and the Web Console logs the user out. The Web Console also logs the
+user out when the provider refuses to refresh its tokens, for example after
+the user is disabled. It refreshes them only with a refresh token, as described
+in [step 6](#6-credentials-received): without one, a disabled user keeps
+working until QuestDB stops accepting the token of the login, when the token
+expires or, with the User Info endpoint, when the provider rejects it.
+Versions before 4.0.2 accept a request with a rejected token through its
+session instead, as described in [Versions before 4.0.2](#versions-before-402).
+
+QuestDB also rejects a token that it cannot check because the provider cannot
+be reached or answers with an error, so an outage of the provider can log users
+out of the Web Console:
+
+- With the User Info endpoint, QuestDB asks the provider about a token again
+  once `acl.oidc.cache.ttl` has passed since it last did. During an outage, it
+  then rejects the token, and the Web Console logs the user out.
+- With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates tokens with
+  the signing keys that it has already downloaded, so during an outage, it
+  rejects only the tokens signed with a key that it has not downloaded yet.
+  The Web Console cannot renew its tokens during the outage, and logs the user
+  out once the ID token has expired, as described in
+  [step 6](#6-credentials-received).
+- With either setting, username and password logins through the
+  [ROPC flow](#enable-ropc) fail during an outage once `acl.oidc.cache.ttl`
+  has passed since QuestDB last checked them, because QuestDB checks them with
+  the provider's token endpoint.
+
+Versions before 4.0.2 accept a request that carries such a token through its
+HTTP session instead.
 
 To cut off access immediately, revoke the permissions of the QuestDB groups
 that the user's groups map to. This takes effect at once for every session and
@@ -1309,28 +1365,95 @@ itself before it reads any claim:
   [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience), which
   defaults to the client ID. The setting takes a single value. A token whose
   `aud` claim is a list is accepted when the list contains that value.
+- Its `iss` claim must be the expected issuer, by default the issuer of the
+  provider's discovery document. Versions before 4.0.2 do not check `iss`. See
+  [The expected issuer](#the-expected-issuer).
 - It must carry an `exp` claim that has not passed. QuestDB allows 60 seconds
   of clock skew. Versions before 4.0.2 do not check `exp`. See
   [Versions before 4.0.2](#versions-before-402).
 - It must carry a non-empty `sub` claim, whatever claims `acl.oidc.sub.claim`
   lists.
 
-QuestDB does not check the issuer (`iss`) or the tenant of the token. It
-accepts any token that the provider's keys sign for the expected audience, so
-make sure that no one outside your organization can obtain tokens for the
-QuestDB application. With Microsoft Entra ID, register the application as
-single-tenant, as described in
-[Set up the client application in Entra ID](/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id).
-
-With `acl.oidc.groups.encoded.in.token=false`, QuestDB sends the token to the
-provider's User Info endpoint, which validates it, and checks nothing else.
-QuestDB does not check the audience of the token or the client that it was
-issued to, and does not use `acl.oidc.audience`: it accepts any access token
-that the User Info endpoint accepts. Any application that can obtain such a
-token for a user, from the same provider, can therefore call QuestDB as that
-user. With `acl.oidc.groups.encoded.in.token=true`, QuestDB checks the `aud`
-claim instead, as described above. See
+With `acl.oidc.groups.encoded.in.token=false`, the default, QuestDB expects an
+access token, and treats it as opaque, even when it is a JWT: QuestDB does not
+decode the token, and leaves its validation to the provider. It sends the token
+to the provider's User Info endpoint, which validates it and returns the user
+information. `acl.oidc.audience` and `acl.oidc.issuer` do not apply. See
 [Find user information](#8-find-user-information).
+
+### The expected issuer
+
+In QuestDB Enterprise 4.0.2 and later, with
+`acl.oidc.groups.encoded.in.token=true`, QuestDB accepts tokens from a single
+issuer, the expected issuer:
+
+- [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer), when it is
+  set.
+- Otherwise, the `issuer` field of the discovery document that QuestDB
+  downloads from `acl.oidc.configuration.url` at startup. QuestDB does not
+  derive the issuer from the URL.
+
+The `iss` claim of a token must be a single string that equals the expected
+issuer exactly. The comparison is case-sensitive, and includes the path and any
+trailing slash. QuestDB rejects a token without an `iss` claim, or with another
+issuer, like a token that fails any other check, and logs the reason, as
+described in [Troubleshooting OIDC logins](#troubleshooting-oidc-logins). A
+provider that serves several tenants, such as Microsoft Entra ID, puts the
+tenant into the issuer, so QuestDB accepts only the tokens of the tenant that
+the expected issuer names.
+
+Set `acl.oidc.issuer` when:
+
+- QuestDB uses `acl.oidc.host` and the endpoint settings instead of a
+  discovery document. QuestDB then has no issuer to read, and refuses to start
+  with this error, which also stops QuestDB when the discovery document has no
+  issuer:
+
+  ```text
+  required to set acl.oidc.issuer or provide an issuer in the OIDC discovery document when acl.oidc.groups.encoded.in.token and acl.oidc.issuer.validation.enabled are true
+  ```
+
+- The discovery document names a template instead of an issuer, such as
+  `https://login.microsoftonline.com/{tenantid}/v2.0` in the discovery
+  documents of the `common` and `organizations` endpoints of Microsoft Entra
+  ID. No token carries a template, so QuestDB rejects every token. Set the
+  issuer of your tenant instead.
+- The provider puts the host name of each request into the issuer, such as
+  Keycloak without a fixed hostname, and QuestDB reaches the provider through
+  another URL than the clients, such as an internal one. The discovery document
+  that QuestDB downloads then names another issuer than the tokens. Set the
+  issuer that the tokens carry.
+
+The setting takes a single value, so every token that QuestDB accepts must
+carry the same issuer. The issuer can depend on the kind of token, not just on
+the provider. Microsoft Entra ID puts
+`https://login.microsoftonline.com/<tenant ID>/v2.0` into v2.0 tokens, and
+`https://sts.windows.net/<tenant ID>/` into v1.0 tokens. With the v2.0
+discovery URL of the
+[Entra ID guide](/docs/security/oidc/entra-id/#questdb-configuration), the ID
+tokens of Web Console users are v2.0 tokens, but the access tokens for the
+QuestDB application are v1.0 tokens, unless its manifest requests v2.0 access
+tokens. To accept both the ID tokens of
+Web Console users and the access tokens of services, make the provider issue
+access tokens with the issuer of its ID tokens. For Entra ID, see
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+
+For a provider that issues tokens without an `iss` claim, turn the check off
+with
+[`acl.oidc.issuer.validation.enabled=false`](/docs/configuration/oidc/#acloidcissuervalidationenabled).
+QuestDB then ignores the `iss` claim, needs no expected issuer to start, and
+still checks the signature, the audience, the expiry, and the subject. It logs
+this advisory at startup:
+
+```text
+OIDC JWT issuer validation is disabled; tokens from other issuers or tenants may authenticate when signing keys and audience are shared
+```
+
+Without the check, QuestDB accepts any token that the provider's keys sign for
+the expected audience, so make sure that no one outside your organization can
+obtain tokens for the QuestDB application. With Microsoft Entra ID, register
+the application as single-tenant, as described in
+[Set up the client application in Entra ID](/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id).
 
 ### When QuestDB stops accepting a token
 
@@ -1350,27 +1473,30 @@ by default:
 
 Some access outlives the token. A PGWire or WebSocket connection, such as a QWP
 connection, that is already open stays open when its token expires, and an HTTP
-request that also carries a valid session cookie, such as a request of the Web
-Console, is accepted through the session. See
+session accepts the requests that carry its cookie without a token. A request
+that carries a token that QuestDB no longer accepts fails, even with a valid
+session cookie, and ends the session. See
 [Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
 For what a client must do before its token expires, see
 [Token lifetime](#token-lifetime).
 
-The Web Console requests new tokens when the access token expires within 30
-seconds, but with `acl.oidc.groups.encoded.in.token=true`, it sends the ID
-token. When the provider issues ID tokens that expire before its access tokens,
-the Web Console keeps sending the ID token after it has expired, until it
-requests new tokens. Microsoft Entra ID issues such tokens by default: ID
-tokens are valid for one hour, and access tokens for a random 60 to 90 minutes.
+With a refresh token, the Web Console requests new tokens before the token that
+it sends QuestDB expires, the ID token with
+`acl.oidc.groups.encoded.in.token=true`, as described in
+[step 6](#6-credentials-received). When the clock of the browser is behind,
+QuestDB can still reject the token as expired first: the Web Console then
+renews its tokens and sends the request again.
+
 Without a refresh token, the Web Console never requests new tokens, and keeps
-sending the expired token. QuestDB Enterprise 4.0.2 and later then reject the
-ID token, log
-`Failed to decode JWT token Error(ExpiredSignature)`, and accept the request
-through the session of the Web Console, which keeps the groups of the last
-token that QuestDB accepted. When the session has expired too, for example
-because the Web Console sent no request for longer than
-`http.session.timeout`, QuestDB rejects the request, and the Web Console logs
-the user out.
+sending the token of the login after it has expired. QuestDB Enterprise 4.0.2
+and later then reject the expired ID token, log
+`Failed to decode JWT token Error(ExpiredSignature)`, reject the request with
+`401 Unauthorized`, and end the session of the Web Console. The Web Console
+logs the user out, and the user has to log in again. With Microsoft Entra ID,
+whose ID tokens are valid for one hour by default, this happens about an hour
+after the login, unless
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) includes
+`offline_access`, the scope that Entra ID issues refresh tokens for.
 
 ## Troubleshooting OIDC logins
 
@@ -1408,23 +1534,43 @@ example:
 
 ```text
 Request failed [errorMsg=Failed to decode JWT token Error(InvalidAudience)]
+Request failed [errorMsg=Failed to decode JWT token Error(InvalidIssuer)]
+Request failed [errorMsg=Failed to decode JWT token Error(MissingRequiredClaim("iss"))]
 Request failed [errorMsg=Failed to decode JWT token Error(ExpiredSignature)]
 Request failed [errorMsg=Unable to find public key with key id [...]]
 ```
 
 `InvalidAudience` usually means that the token was requested for another API,
-or that Entra ID issued a v1.0 access token. See
+or, with issuer validation disabled, that Entra ID issued a v1.0 access token.
+
+`InvalidIssuer` means that the `iss` claim of the token is not the expected
+issuer, and `MissingRequiredClaim("iss")` that the token carries no `iss`
+claim, as described in [The expected issuer](#the-expected-issuer). QuestDB
+checks the expiry before the issuer, and the issuer before the audience, and
+logs the first check that fails. With Microsoft Entra ID, `InvalidIssuer`
+usually means a v1.0 access token, whose issuer is
+`https://sts.windows.net/<tenant ID>/`, or a token of another tenant. When
+every login fails with it, compare the `iss` claim of a token with the
+expected issuer: `acl.oidc.issuer`, or the `issuer` field of the discovery
+document. If the discovery document names a template rather than your tenant,
+or another host than the `iss` claim of the tokens, set `acl.oidc.issuer`.
+
+For a v1.0 access token of Entra ID, make the application issue v2.0 tokens, as
+described in
 [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
-Don't set `acl.oidc.audience` to the Application ID URI to work around it: the
-setting takes a single value, and the ID tokens of Web Console users carry the
-application ID, so their logins would fail.
+Don't set `acl.oidc.audience` to the Application ID URI, or `acl.oidc.issuer`
+to the issuer of v1.0 tokens, to work around it: each setting takes a single
+value, and the ID tokens of Web Console users carry the application ID and the
+v2.0 issuer, so their logins would fail.
 
 `ExpiredSignature` means that the token has expired. A client configured with a
 fixed token must switch to a new token before then, as described in
-[Token lifetime](#token-lifetime). For Web Console users, the error can also
-mean that the Web Console still sends an ID token that has expired, which it
-does with Microsoft Entra ID. QuestDB then accepts the requests through the
-session of the Web Console. See
+[Token lifetime](#token-lifetime). For Web Console users, it usually means that
+the Web Console has no refresh token, because
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) does not include the
+scope that the provider issues refresh tokens for, such as `offline_access`
+with Microsoft Entra ID. QuestDB then rejects the requests, and the Web Console
+logs the user out once the ID token of the login has expired. See
 [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 
 `Unable to find public key with key id` means that none of the signing keys
@@ -1473,7 +1619,13 @@ QuestDB Enterprise versions before 4.0.2 differ as follows:
 - With `acl.oidc.groups.encoded.in.token=true`, they reject any token that does
   not carry a `groups` array, whatever `acl.oidc.groups.claim` names. They do
   not check the `exp` claim, so they accept expired tokens and tokens without
-  an `exp` claim.
+  an `exp` claim. They do not check the `iss` claim either, so they accept the
+  tokens of any issuer that the provider's keys sign for the expected
+  audience, such as the tokens of another Microsoft Entra ID tenant.
+- When an HTTP request carries a session cookie and a token that they reject,
+  or cannot check because the provider is unreachable, they accept the request
+  through the session. The Web Console keeps working with a token that they no
+  longer accept, until its session expires.
 - They read a `null` claim as the value `null`. Every account whose principal
   claim is `null` logs in as the same principal, `null`, and `null` and empty
   group names count as groups.
@@ -1487,10 +1639,27 @@ When you upgrade from an earlier version:
 - With `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects expired tokens
   and tokens without an `exp` claim. A client that keeps using a token after it
   expires, such as a client configured with a fixed token, must request a new
-  token before the old one expires. With Microsoft Entra ID, the server log
-  also shows `ExpiredSignature` errors for Web Console users, whose ID tokens
-  expire before the Web Console requests new tokens. See
+  token before the old one expires. The Web Console renews the ID token before
+  it expires, but only with a refresh token: without one, it logs the user out
+  when the ID token of the login expires, about an hour after the login with
+  Microsoft Entra ID, where earlier versions accept the expired ID token. To
+  keep users logged in, add the scope that the provider issues refresh tokens
+  for, such as `offline_access` with Entra ID, to
+  [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). See
   [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
+- With `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects tokens whose
+  `iss` claim is missing or is not the expected issuer, and refuses to start
+  when it has no expected issuer, such as with `acl.oidc.host`: set
+  `acl.oidc.issuer`. With Microsoft Entra ID, it rejects v1.0 access tokens.
+  For a provider that issues tokens without an `iss` claim, set
+  `acl.oidc.issuer.validation.enabled=false`. See
+  [The expected issuer](#the-expected-issuer).
+- A request that carries a session cookie and a token that QuestDB rejects, or
+  cannot check because the provider is unreachable, fails with
+  `401 Unauthorized`, and ends the session, instead of running through the
+  session. An outage of the provider can therefore log users out of the Web
+  Console, as described in
+  [Group changes, sessions, and revoking access](#group-changes-sessions-and-revoking-access).
 - QuestDB refuses to start with an empty `acl.oidc.sub.claim`, or with a claim
   that is listed twice or in both settings. See
   [Startup validation](#startup-validation).
