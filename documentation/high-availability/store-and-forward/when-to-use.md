@@ -57,7 +57,10 @@ Unacked frames are written to mmap'd files under
 Both modes share the same wire behaviour, the same failover loop, and
 the same connect-string keys for everything other than storage. You can
 switch between them without changing application code — only the connect
-string.
+string. On the Node.js client, a sender in default memory mode, without
+`sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, also gives up
+after `reconnect_max_duration_millis` of outage; see
+[Differences from other clients](/docs/connect/clients/nodejs/#differences-from-other-clients).
 
 ## Comparison at a glance
 
@@ -100,17 +103,26 @@ GCS, or NFS).
 - WAL-local durability on the primary is sufficient.
 - You want minimum steady-state disk usage.
 - You are running OSS or a build that does not support durable-ack.
-  (The handshake fails loudly if you opt in but the server cannot
-  deliver — see below.)
+  Opting in makes those connection attempts fail; see [Caveats](#caveats) for
+  the clients that keep retrying.
 
 ### Caveats
 
 - **Server support is required.** The client sends
   `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
-  back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
-  uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
-  that never arrive would let the SF disk fill up.
+  back `X-QWP-Durable-Ack: enabled`. Without it, for example on an OSS build
+  or an uninitialised primary, the connection attempt is rejected. In most
+  clients this is terminal. The exceptions follow.
+- **Senders that keep retrying.** The Java client retries after a sender's
+  first successful connection. Node.js senders with a background start
+  (`initial_connect_retry=async` or `lazy_connect=on`) retry from startup,
+  even with `sf_dir`. With `sf_dir` and a foreground start, the first
+  connection fails but later mismatches are retried after a successful
+  connection. Retrying Node.js senders emit `durable-ack-unavailable`
+  [connection events](/docs/connect/clients/nodejs/#connection-events).
+  Monitor retrying senders and their buffer usage: continued buffering can
+  fill the journal or memory queue even though startup succeeded. See
+  [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 - **Idle keepalive.** The OSS server only flushes pending durable-ack
   frames during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
@@ -142,6 +154,11 @@ spawn background drainers to clear them.
 - You prefer "automatic eventual delivery" over "operator manually
   reattaches the slot."
 
+On the Node.js client, both a restarted process and a drainer recover a
+crashed sender's slot only if they can reclaim its lock, which fails in a
+replaced container or in a container restarted in place. Clear such locks
+with [Node.js lock recovery](/docs/high-availability/store-and-forward/operating-and-tuning/#nodejs-lock-recovery).
+
 ### Leave it off when
 
 - Each `sender_id` is statically pinned to a specific process — there
@@ -170,7 +187,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
-| Cluster-wide ordering | Best-effort | Best-effort | FSN-driven, server-deduplicated |
+| Cluster-wide ordering | Best-effort | Best-effort | FSN-ordered; replay is at least once, so use `DEDUP UPSERT KEYS` |
 
 The transition is application-transparent — `Sender.fromConfig` accepts
 a `ws::` or `wss::` connect string and the public builder API is the

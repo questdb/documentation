@@ -1,11 +1,11 @@
-:::caution Replay is at-least-once — enable DEDUP
+:::caution Replay is at-least-once — use DEDUP for exactly-once outcomes
 
 After a reconnect or a sender restart, the client replays frames the server
 may have accepted but not yet acknowledged. Without
-[DEDUP](/docs/concepts/deduplication/) on the target table, replay produces
-duplicate rows. Tables ingested over a reconnecting or multi-host connection
-**must** declare `DEDUP UPSERT KEYS(...)` covering row identity. See
-[Delivery semantics](/docs/concepts/delivery-semantics/) for the full
-at-least-once / exactly-once model.
+[DEDUP](/docs/concepts/deduplication/) on the target table, replay can produce
+duplicate rows. If your application requires exactly-once outcomes, declare
+`DEDUP UPSERT KEYS(...)` covering row identity. Applications that tolerate
+occasional duplicates can skip DEDUP; see
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the full model.
 
 :::

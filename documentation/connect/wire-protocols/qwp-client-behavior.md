@@ -76,7 +76,9 @@ Why each line matters:
 It bounds only the **blocking** initial connect (`initial_connect_retry=on` /
 `sync`). Once a sender is running, the reconnect loop never consults it and
 retries a transport outage forever. Setting a large value here does nothing for
-a running producer. See [Reconnect and outage handling](#reconnect-and-outage-handling).
+a running producer. The exception is a Node.js sender in default memory
+mode, which applies it to every outage. See
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 :::
 
@@ -106,9 +108,10 @@ Why each line matters:
 
 - `target=replica` is required to avoid binding a primary/standalone server.
   The default `target=any` will accept any role.
-- `failover=on` is the default. It does **not** affect startup; it only governs
-  reconnect+replay after a query connection that was already established later
-  fails during `execute()`.
+- `failover=on` is the default. In the Java reference client it does **not**
+  affect startup; it only governs reconnect+replay after an established query
+  connection fails during `execute()`. Node.js also uses explicit failover
+  settings for initial query retries; see the [mental model](#mental-model).
 
 ---
 
@@ -125,9 +128,22 @@ share a startup model. You must hold all three in mind:
 | Query client initial connect | (no mode; always synchronous) | always blocking |
 | Facade prewarm (how many of each connect at `build()`) | `sender_pool_min`, `query_pool_min` | eager if `min>0`, lazy if `min=0` |
 
-`failover=on` (query default) is **not** a startup setting — it only affects
-query execution after a connection exists. This naming trips people up
+In Java, `failover=on` (query default) is **not** a startup setting: it only
+affects query execution after a connection exists
 ([sharp edge #3](#known-sharp-edges)).
+
+:::note Node.js query startup
+
+Node.js also retries initial query connections when `failover=on` is explicitly
+set, a `failover_*` tuning key is supplied without `failover=off`, or an
+`egressSession.reconnect` options object is supplied. Retries apply only to
+retryable failures and stay within the failover budget. With no explicit policy,
+failover is enabled for established query connections but initial connection
+attempts are not retried. `failover=off` disables the reconnect wrapper; an
+explicit `egressSession.reconnect` value overrides the connect-string policy.
+See [Node.js connection events](/docs/connect/clients/nodejs/#connection-events).
+
+:::
 
 ### Ingest initial-connect modes
 
@@ -183,17 +199,17 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
-| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
-| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
+| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** (Node.js default memory mode: every outage) |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
-| `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Go/Node.js) |
+| `connect_timeout` | unset (Node.js: `15000`, also bounding DNS and TLS) — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
-| `poison_min_escalation_window_millis` | `5000` |
+| `poison_min_escalation_window_millis` | `5000` (Node.js: `300000`; Go: not supported, its window is `reconnect_max_duration_millis`) |
 
 ### Query client
 
@@ -210,8 +226,8 @@ callers block up to `acquire_timeout_ms` then throw.
 
 There is no "retry forever" setting to look for on the reconnect keys — a
 running sender already does. `reconnect_max_duration_millis` applies only to a
-blocking initial connect; see
-[Reconnect and outage handling](#reconnect-and-outage-handling).
+blocking initial connect, except on a Node.js sender in default memory mode;
+see [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ---
 
@@ -281,9 +297,9 @@ here.
 | --- | --- | --- |
 | 1 | `initial_connect_retry` is implicitly promoted to `SYNC` when any `reconnect_*` knob is set — a resilience knob silently makes startup block. | Candidate |
 | 2 | `reconnect_max_duration_millis` is named as if it governs reconnection, but a running sender never consults it — it bounds only the blocking initial connect. | Candidate (naming) |
-| 3 | `failover` sounds like it covers startup but only affects post-connect query `execute()`. Queries have no async/lazy initial connect at all. | Candidate |
+| 3 | In Java, `failover` sounds like it covers startup but only affects post-connect query `execute()`. Java queries have no async/lazy initial connect. For the Node.js exception, see the [mental model](#mental-model). | Candidate |
 | 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`, or use `lazy_connect=true`. | Candidate |
-| 5 | A single endpoint returning `401`/`403` is treated as cluster-wide terminal and aborts the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. | Intended (documented), revisit |
+| 5 | A single endpoint returning `401`/`403` aborts the whole endpoint walk, even if other endpoints would accept the credentials. Some clients retry after a sender's first connection; see [Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide). | Intended (documented), revisit |
 | 6 | Query `serverInfoTimeoutMs` has no config key, so a facade query client cannot tune it. | Candidate |
 | 7 | The simplest API (`fromConfig` + async) has the worst error visibility — terminal async failures surface only on later producer calls or at `close()`. | Candidate |
 | 8 | `SenderProgressHandler` has no builder setter on either surface; it must be installed post-construction via `QwpWebSocketSender.setProgressHandler`. | Candidate |
@@ -312,8 +328,8 @@ here.
 - Multiple independent senders sharing one `sf_dir` must use distinct
   `sender_id` values, else the second fails because the slot lock is held.
 - In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
-  pooled senders never collide. The minted name is client-specific: Java uses
-  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
+  pooled senders never collide. The minted name is client-specific: Java and
+  Node.js use `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
   `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
   unacknowledged frames; acknowledged/truncated frames are not replayed.
@@ -344,20 +360,41 @@ With `initial_connect_retry=async`:
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
-A sender in async mode does not give up because time passed. What ends it is a
-**terminal** condition — authentication rejection, a durable-ack capability
-mismatch, or the poison-frame detector — or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
+A sender in async mode does not give up because time passed. What stops it is
+a terminal condition: a server rejection with a terminal policy (by default
+`SCHEMA_MISMATCH`, `PARSE_ERROR`, `SECURITY_ERROR`, and `PROTOCOL_VIOLATION`;
+see [Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames)),
+poison-frame escalation at any time, and an authentication rejection or
+durable-ack capability mismatch before its first successful connection. After
+that first connection, the Java reference client
+retries authentication and durable-ack rejections instead, so a credential or
+capability change on the cluster cannot stop the producer. The Rust, C, C++,
+Python, Go, and .NET clients treat them as terminal. Producer calls can also
+fail when the buffer reaches `sf_max_total_bytes` and exhausts
+`sf_append_deadline_millis` on `append()`.
+
+The Node.js client retries authentication rejections after the first
+connection only in senders with `sf_dir` or in background memory mode
+(`initial_connect_retry=async` or `lazy_connect=on`); see
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+For unsupported durable acknowledgement, Node.js senders with a background
+start (`initial_connect_retry=async` or `lazy_connect=on`) keep retrying from
+startup and emit `durable-ack-unavailable`, even with `sf_dir`. With a
+foreground start and `sf_dir`, the first connection fails but later mismatches
+are retried after a successful connection. Monitor these
+[connection events](/docs/connect/clients/nodejs/#connection-events) and buffer
+usage; see [Node.js durable acknowledgement](/docs/connect/clients/nodejs/#durable-acknowledgement).
 
 ### Reconnect and outage handling
 
-**A running sender retries a transport outage indefinitely.** There is no
-wall-clock give-up and no budget-exhaustion event. Backoff grows from
+**A running sender retries a transport outage indefinitely**, except the
+Node.js senders described in the note below. There is no wall-clock give-up
+and no budget-exhaustion event. Backoff grows from
 `reconnect_initial_backoff_millis` to `reconnect_max_backoff_millis` and stays
 there; the loop rotates through the endpoints in `addr` as it goes.
 
-`reconnect_max_duration_millis` has exactly two consumers, neither of which is
-the steady-state loop:
+In the Java reference client, `reconnect_max_duration_millis` has exactly two
+consumers, neither of which is the steady-state loop:
 
 1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
    which gives up and throws when the budget expires.
@@ -374,7 +411,13 @@ has outlasted your configuration.
 :::note Alignment
 
 This is the behaviour of the Java reference client and the .NET client. Other
-clients are aligned to it. If you are implementing a new client, the contract
+clients are aligned to it, except a Node.js sender in default memory mode,
+without `sf_dir`, `initial_connect_retry=async`, or `lazy_connect=on`, which
+gives up after `reconnect_max_duration_millis`; see the
+[Node.js client](/docs/connect/clients/nodejs/#ingestion-reconnect) and its
+[other differences](/docs/connect/clients/nodejs/#differences-from-other-clients).
+If you
+are implementing a new client, the contract
 is: retry transport failures forever, surface only genuine terminal conditions,
 and apply back-pressure to the producer rather than dropping data.
 
@@ -389,8 +432,8 @@ and apply back-pressure to the producer rather than dropping data.
 | TLS session/certificate failure | transport error; try next endpoint |
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
-| `401` / `403` auth failure | **terminal**; do not try later endpoints ⚠ |
-| durable-ack requested but unsupported | terminal mismatch |
+| `401` / `403` auth failure | never try later endpoints; **terminal** before the first successful connection, then client-specific: [Java and some Node.js senders retry](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) ⚠ |
+| durable-ack requested but unsupported | terminal mismatch, except that Java senders retry after their first successful connection. Node.js senders retry from startup with a background start (with or without `sf_dir`); with foreground startup and `sf_dir`, they retry only after a first successful connection ([details](/docs/connect/clients/nodejs/#durable-acknowledgement)) |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |
@@ -555,5 +598,12 @@ source states the contract directly:
 > converts it into the durable-ack capability-gap budget. Neither bounds this
 > loop's steady-state reconnect.
 
-`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
-are terminal across all endpoints. Everything else is retried.
+`QwpAuthFailedException`, `WebSocketUpgradeException`, and
+`QwpDurableAckMismatchException` raised inside the loop are terminal across
+all endpoints before the sender's first successful connection, and in an
+orphan drainer. After a first successful connection, the loop reports each one
+to the error handler as `RETRIABLE` (`SECURITY_ERROR` for an authentication or
+upgrade rejection, `PROTOCOL_VIOLATION` for a durable-ack mismatch) and keeps
+retrying; see
+[Authentication is cluster-wide](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide).
+Everything else is retried.
