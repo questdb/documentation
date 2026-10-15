@@ -121,7 +121,7 @@ WHERE timestamp IN '$today';
 - NULL values are skipped; the previous EMA value is preserved
 - The first non-NULL value initializes the EMA
 - Works with both `TIMESTAMP` and `TIMESTAMP_NS` precision
-- EMA ignores the frame clause and operates cumulatively from the first row
+- EMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 #### Volume-Weighted Exponential Moving Average (VWEMA)
@@ -180,7 +180,7 @@ WHERE timestamp IN '$today';
 :::note VWEMA behavior
 - Rows with NULL price, NULL volume, or zero volume are skipped
 - When timestamps are identical (Δt = 0), the row is skipped in time-weighted mode
-- VWEMA ignores the frame clause and operates cumulatively from the first row
+- VWEMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 ---

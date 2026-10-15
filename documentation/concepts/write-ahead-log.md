@@ -88,6 +88,11 @@ If WAL transactions are suspended (rare), resume them:
 ALTER TABLE prices RESUME WAL;
 ```
 
+For a suspended materialized view or live view, use
+[`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/query/sql/alter-mat-view-resume-wal/)
+or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/)
+instead.
+
 ## How WAL works
 
 When data is written to a WAL table:
