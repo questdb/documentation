@@ -16,7 +16,7 @@ standalone process configured with TOML and handles subscriptions, table
 creation, batching, and recovery.
 
 Each **task** reads one Databento dataset, such as `EQUS.MINI`. Its
-**subscriptions** select schemas and symbols, and choose the destination tables.
+**subscriptions** select schemas and symbols and choose the destination tables.
 Multiple tasks can share a QuestDB connection pool in the same process.
 
 ## Quick start
@@ -133,9 +133,10 @@ using the configuration above.
 Mount `connector.toml` read-only and keep each task's `state_dir` under the
 persistent volume at `/var/lib/databento-questdb`. Use a QuestDB address
 reachable from the container: a service name on a shared Docker network, or
-`host.docker.internal` on Docker Desktop. Allow at least 60 seconds for
-`docker stop` to drain output and save checkpoints; increase this if you raise
-the drain timeout.
+`host.docker.internal` on Docker Desktop. Docker gives a container 10 seconds to
+stop by default. Allow at least 60 seconds to drain output and save checkpoints,
+with `docker stop --time 60` or `stop_grace_period: 60s` in Docker Compose, and
+increase it if you raise [`shutdown_timeout_ms`](#batching-and-backpressure).
 
 ## Configuration
 
@@ -156,12 +157,12 @@ Each entry in `tasks.subscriptions` selects one source schema:
 | `use_snapshot` | Request an initial MBO snapshot. Live only; cannot be combined with `start`. Defaults to `false`.                         |
 | `replay_dedup` | Filter previously confirmed records during Live replay. Defaults to `false`; see [Duplicate records](#duplicate-records). |
 
-Each schema can appear once per task. A Live task can combine `mbp-1` with
-`tbbo` when their source settings and `replay_dedup` values match. One MBP-1
-subscription then feeds both tables.
+Each schema can appear at most once per task. A Live task can combine `mbp-1`
+with `tbbo` when their source settings and `replay_dedup` values match. One
+`mbp-1` subscription then feeds both tables.
 
 Use separate tasks when the same schema needs different symbols, start times, or
-tables. A matching saved checkpoint takes precedence over the initial start.
+tables. A matching saved checkpoint takes precedence over `start`.
 
 ### Multiple datasets
 
@@ -192,10 +193,10 @@ The pool accepts a QuestDB
 read it from an environment variable, or use `conf` for an inline value. Specify
 one, not both.
 
-For a TLS-enabled Enterprise cluster, for example:
+For example, for a TLS-enabled Enterprise cluster:
 
 ```shell
-export QDB_CLIENT_CONF='wss::addr=node-a.example.com:9000,node-b.example.com:9000;token=<your-token>;target=primary;request_durable_ack=on;'
+export QDB_CLIENT_CONF='wss::addr=node-a.example.com:9000,node-b.example.com:9000;token=<your-token>;request_durable_ack=on;'
 ```
 
 `wss::` enables TLS. The addresses identify the cluster nodes, and
@@ -213,7 +214,7 @@ resolution. It accepts `connect_timeout_ms`, `request_timeout_ms`, `proxy_url`
 or `proxy_url_env`, and `ca_cert_file`. Relative certificate and state paths
 resolve from the configuration file's directory.
 
-## Tables and field mapping
+## Tables and column mapping
 
 Each schema has fixed columns and a configurable table name. Use separate tables
 for different schemas, including across tasks and processes. Configuration
@@ -279,10 +280,10 @@ dated before the requested range.
 
 ### Order book arrays
 
-Quotes store `bids` and `asks` as `DOUBLE[][]` arrays of shape `[2, N]`, with
-the best level first. The first row contains prices; the second contains sizes.
-`N` is 10 for `mbp-10` and 1 for top-of-book schemas. QuestDB array indices
-start at 1.
+Quote tables store `bids` and `asks` as `DOUBLE[][]` arrays of shape `[2, N]`,
+with the best level first. The first row contains prices; the second contains
+sizes. `N` is 10 for `mbp-10` and 1 for top-of-book schemas. QuestDB array
+indices start at 1.
 
 ```questdb-sql
 SELECT ts_recv, symbol,
@@ -367,11 +368,11 @@ identify every trade or order event.
 
 The optional subscription setting `replay_dedup = true` applies
 [Databento's time-and-count filtering](https://databento.com/docs/api-reference-live#recovering-after-a-disconnection).
-It requires nondecreasing recovery timestamps per instrument and stable order
-for records sharing a timestamp: `ts_recv` for BBO/CBBO, `ts_event` for other
-schemas. Enabling it when those assumptions do not hold can discard unseen
-records. It is disabled by default and does not guarantee exactly-once delivery
-across crashes.
+It assumes that, per instrument, the recovery timestamp (`ts_recv` for BBO and
+CBBO, `ts_event` for other schemas) never decreases, and that records sharing a
+timestamp always arrive in the same order. Enabling it when those assumptions do
+not hold can discard unseen records. It is disabled by default and does not
+guarantee exactly-once delivery across crashes.
 
 ### Replay availability
 
@@ -391,19 +392,19 @@ fails. To recover:
 
 For checkpointed tasks, obtain the recovery boundary from either source:
 
-- **Saved metrics:** Enable [metrics](#logs-and-metrics) and retain scrapes
-  before a failure. `databento_questdb_disk_resume_start_timestamp_seconds`
-  reports the saved boundary in Unix seconds, labeled by `connector` and
-  `schema`. Metrics are disabled by default, and the endpoint is unavailable
-  after process exit.
+- **Saved metrics:** This works only if [metrics](#logs-and-metrics) were
+  enabled and scraped before the failure.
+  `databento_questdb_disk_resume_start_timestamp_seconds` reports the saved
+  boundary in Unix seconds, labeled by `connector` and `schema`. Metrics are
+  disabled by default, and the endpoint is unavailable after process exit.
 - **Recovery logs:** On restart with the original configuration and `state_dir`,
   the `recovering source subscription` message reports the attempted boundary as
   `start_ns`, in Unix nanoseconds. Match its `connector` and `schema` fields;
   this message requires info-level logging (`RUST_LOG=info`).
 
 Use the recovery boundary, rather than the last displayed record, to choose the
-backfill start. Convert it to UTC RFC 3339: divide `start_ns` by `1,000,000,000`
-to get Unix seconds. For example, `1789482600000000000` nanoseconds and
+backfill start. Convert it to UTC RFC 3339: divide `start_ns` by one billion to
+get Unix seconds. For example, `1789482600000000000` nanoseconds and
 `1789482600` seconds both represent `2026-09-15T14:30:00Z`. When using metrics,
 start one second earlier to allow for timestamp rounding.
 
@@ -417,32 +418,32 @@ or restart.
 
 ### Failures and shutdown
 
-Transient source failures retry with exponential backoff. Under
+Transient source failures are retried with exponential backoff. Under
 `tasks.source_retry`, `initial_backoff_ms` defaults to `1000`, `max_backoff_ms`
 to `30000`, and `max_elapsed_ms` to `300000`. Permanent errors fail the task.
 
-A Live `SymbolResolutionFailed` means Databento could not resolve a requested
-symbol. The connector stops the whole task, including its valid symbols. To
-recover:
+A `SymbolResolutionFailed` error from the Live gateway means Databento could not
+resolve a requested symbol. The connector stops the whole task, including its
+valid symbols. To recover:
 
 1. Read the gateway message and check `dataset`, `stype_in`, and `symbols`. Fix
    misspelled symbols and replace or remove contracts that are invalid for the
    requested period.
-2. For a checkpointed task, restart changed subscriptions with a new
-   `state_dir`. Keep the original directory and set each subscription's `start`
-   from its [saved recovery boundary](#replay-availability) to cover the
-   interruption; use Historical backfill if replay has expired.
+2. For a checkpointed task, restart the task with a new `state_dir`. Keep the
+   original directory and set each subscription's `start` from its
+   [saved recovery boundary](#replay-availability) to cover the interruption;
+   use a Historical backfill if replay has expired.
 
 The top-level `on_task_failure` setting controls what happens next:
 
-| Value      | Behavior                                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `exit`     | Stop the other tasks normally and exit nonzero, allowing a service supervisor to restart the process. Used in the quick start. |
-| `continue` | Keep other tasks running and retain the failed task in logs and metrics. This is the default.                                  |
+| Value      | Behavior                                                                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exit`     | Stop the other tasks normally and exit with a nonzero status, allowing a service supervisor to restart the process. Used in the quick start. |
+| `continue` | Keep other tasks running and retain the failed task in logs and metrics. This is the default.                                                |
 
 A failed task is not restarted in-process. Ctrl+C or SIGTERM requests a normal
 stop: drain pending output, then persist the final checkpoint. The default drain
-timeout is 30 seconds; final checkpoint persistence is awaited separately.
+timeout is 30 seconds; saving the final checkpoint is not counted against it.
 
 ### Logs and metrics
 
@@ -471,7 +472,7 @@ latency or available memory requires it:
 | ------------------------ | ---------- | ------------------------------------------------ |
 | `batch_rows`             | `1000`     | Maximum source records per batch.                |
 | `batch_bytes`            | `1048576`  | Estimated bytes per batch.                       |
-| `flush_interval_ms`      | `20`       | Send partial batches regularly.                  |
+| `flush_interval_ms`      | `20`       | Maximum wait before a partial batch is sent.     |
 | `queue_max_bytes`        | `67108864` | Estimated buffered input budget.                 |
 | `queue_max_batches`      | `64`       | Number of batches the writer queue can hold.     |
 | `max_inflight_batches`   | `64`       | Published batches waiting for confirmation.      |
@@ -480,7 +481,7 @@ latency or available memory requires it:
 | `shutdown_timeout_ms`    | `30000`    | Time allowed to drain pending output.            |
 
 Smaller batches reduce latency but increase write overhead. When bounded queues
-fill, the connector pauses source reads while continuing writes and processing
+fill, the connector pauses source reads while it keeps writing and processing
 acknowledgements. Reads resume when capacity becomes available. These byte
 budgets do not cap total process memory.
 
