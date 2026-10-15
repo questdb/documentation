@@ -1001,6 +1001,7 @@ Durable acknowledgement (status code 0x02) is available in QuestDB Enterprise
 with primary replication configured. Open source QuestDB returns OK (0x00) or
 error responses only.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 A standard OK confirms the batch was committed to the server's local WAL. To
@@ -1172,6 +1173,7 @@ Key behaviors:
 
 Multi-host failover with automatic reconnect requires QuestDB Enterprise.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 ## Examples

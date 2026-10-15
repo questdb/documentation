@@ -409,6 +409,11 @@ It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
 
 ## Time-series joins
 
+Time-series joins match rows by how their timestamps relate instead of by
+equality. For a guide to choosing between ASOF, WINDOW, HORIZON, LT and SPLICE,
+with a query for each that runs on the demo, see
+[Which time-series join?](/blog/questdb-time-series-joins-guide/)
+
 ### ASOF JOIN
 
 ASOF JOIN matches each row in a time-series table with the most recent row in
@@ -616,8 +621,9 @@ need additional filtering on the two tables, the `ON` clause can also be used.
 ### HORIZON JOIN
 
 HORIZON JOIN is a specialized time-series join for markout analysis and event
-impact studies. It combines ASOF JOIN matching with a set of time offsets,
-computing aggregations at each offset in a single pass.
+impact studies. For each left row, it runs an ASOF JOIN match at a set of time
+offsets in a single pass. Combined with aggregate functions, it produces one
+result per offset, such as an average markout curve.
 
 It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
 

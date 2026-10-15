@@ -75,7 +75,7 @@ width={300}
 ### 2. Distant matching
 
 In this case, the matching row is in the more distant past, earlier than the
-previous left-hand row. The scanning ranges now ovelap, and we end up scanning
+previous left-hand row. The scanning ranges now overlap, and we end up scanning
 almost the entire right-hand dataset. If we do a separate scan for each
 left-hand row, we'll end up going over the same rows many times. In the diagram,
 this shows up as more intensely red regions in the right-hand table.
@@ -157,7 +157,7 @@ This hint enables [Memoized](#memoized-algo), a variant of the
 as in `left ASOF JOIN right ON (symbol)`. It helps when there's a mix of
 localized and distant matches by reusing the results of earlier backward scans.
 
-```questdb-sql title="Appling the query hint for the Memoized algorithm"
+```questdb-sql title="Applying the query hint for the Memoized algorithm"
 SELECT /*+ asof_memoized(orders md) */
     orders.timestamp, orders.symbol, orders.price
 FROM orders
@@ -328,7 +328,7 @@ needed.
 
 As expected for distant matching, the Fast and Memoized algos had to touch the
 most rows. Especially, when matching row 15, Fast algo had to scan backward to
-row 4, and Memoized did only slighly better, scanning until row 6.
+row 4, and Memoized did only slightly better, scanning until row 6.
 
 Light algo had to initially scan all the history (rows 1 to 6), but from then
 on, it only needed to touch the additional rows that came into scope as the LHS
@@ -336,7 +336,7 @@ timestamp was moving on.
 
 Dense algo had the same advantage as Light, but it didn't have to scan all the
 history. It scanned only as far back into history as needed to find the most
-recent occurence of a symbol not yet seen in the forward scan.
+recent occurrence of a symbol not yet seen in the forward scan.
 
 ### RAM considerations
 
