@@ -925,8 +925,12 @@ it, not from the username field. Send the token that an HTTP client would send:
 
 See [Non-interactive clients](#non-interactive-clients). Like a password, the
 token crosses the network in the clear unless the connection uses
-[TLS](/docs/security/tls/#enabling-tls-for-pgwire), so require TLS on the
-client:
+[TLS](/docs/security/tls/#enabling-tls-for-pgwire), so require TLS and verify
+the server's identity on the client. Use `sslmode=verify-full` to check both
+the certificate chain and that the certificate matches the `host` name.
+`sslmode=require` encrypts the connection but does not require hostname
+verification. Set `sslrootcert` to a trusted CA certificate bundle on the
+client, including your private CA if the server uses one:
 
 ```python
 import psycopg as pg
@@ -936,7 +940,8 @@ token = "token_requested_from_the_oauth2_provider"
 
 conn_str = (
     f"user=_sso password={token} host=questdb.example.com port=8812 "
-    "dbname=qdb sslmode=require"
+    "dbname=qdb sslmode=verify-full "
+    "sslrootcert=/path/to/trusted-ca.pem"
 )
 with pg.connect(conn_str, autocommit=True) as connection:
     with connection.cursor() as cur:
@@ -1512,6 +1517,12 @@ access token from the `expires_in` field of the token response. It does not
 renew a token whose expiry it does not know. When the clock of the browser is
 behind, QuestDB can reject the token as expired first: the Web Console then
 renews its tokens and sends the request again.
+
+In token mode, every refresh response must include an `id_token`, even if it
+contains a new access token. If the ID token is missing, the Web Console logs
+the user out with **Missing ID token** instead of keeping the previous ID
+token. Configure the provider to issue ID tokens for the refresh-token grant,
+and ensure `acl.oidc.scope` includes `openid`.
 
 - When the provider refuses to issue new tokens, for example because the user
   is disabled or the refresh token has expired, the Web Console logs the user

@@ -14,7 +14,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [User and group claims](/docs/security/oidc/#user-and-group-claims) - Fallback claim lists of QuestDB Enterprise 4.0.2, how QuestDB picks a claim, and the startup checks
 - [Token validation](/docs/security/oidc/#token-validation) - What QuestDB checks in a token, the expected issuer, and when QuestDB stops accepting an expired token
-- [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, and when it logs the user out
+- [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, the ID-token requirement in token mode, and when it logs the user out
 - [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins) - The log lines of rejected logins and what they mean
 - [Upgrade to 4.0.2](/docs/security/oidc/#upgrade-to-402) - How earlier versions differ, and what to check when you upgrade
 - [Where QuestDB reads the user information](/docs/security/oidc/#where-questdb-reads-the-user-information) - The User Info endpoint compared with reading the claims from the token
@@ -44,6 +44,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [OpenID Connect (OIDC)](/docs/security/oidc/) - Split into an overview and provider guides, with a minimal configuration and an upgrade warning for QuestDB Enterprise 4.0.2
 - [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected that a login without groups is rejected, and added the endpoint permission of each interface
 - [Non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Which token each client sends, with client credentials and password grant examples over QWP
+- [OIDC for PGWire](/docs/security/oidc/#oidc-for-the-pgwire-endpoint) - Require certificate and hostname verification in the bearer-token example, with a trusted CA certificate bundle
 - [Managing authentication](/docs/security/rbac/#managing-authentication) - HTTP sessions of QuestDB Enterprise 4.0.2 end with the credential that opened them
 - [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error policies, and that the `QuestDB` handle accepts an error handler
 - [Java token providers](/docs/connect/clients/java/#rotating-tokens) - Clarified certificate credential configuration, query authentication exceptions, token-wait budgets, which `401` responses trigger refresh, and which connection-string settings must be redacted before logging
