@@ -21,8 +21,10 @@ the Identity Provider map to.
 
 Start with the [minimal configuration](#configuration-options), then choose
 [where QuestDB reads the user information](#where-questdb-reads-the-user-information):
-the provider's User Info endpoint, or the token that the client sends. To
-accept user and service tokens with one configuration, see
+the provider's User Info endpoint, or the token that the client sends. Then
+[map the provider's groups to QuestDB groups](#mapping-user-permissions) and
+grant endpoint and table permissions before testing access. To accept user
+and service tokens with one configuration, see
 [Fallback claim lists](#fallback-claim-lists). For rejected logins, see
 [Troubleshooting OIDC logins](#troubleshooting-oidc-logins). For step-by-step
 setup, see the guides for [Microsoft Entra ID](/docs/security/oidc/entra-id/),
@@ -1462,7 +1464,9 @@ be reached or answers with an error:
   asked the provider about the token.
 - In token mode, only a token signed with a key that QuestDB has not
   downloaded yet: QuestDB validates tokens with the signing keys that it has
-  already downloaded.
+  already downloaded. These keys are retained if a refresh fails, but
+  refreshing can delay authentication; see
+  [JWKS refresh behavior](/docs/configuration/oidc/#acloidcpublickeysexpiry).
 - Username and password logins through the [ROPC flow](#enable-ropc) fail in
   both modes once `acl.oidc.cache.ttl` has passed since QuestDB last checked
   them, because QuestDB checks them with the provider's token endpoint.

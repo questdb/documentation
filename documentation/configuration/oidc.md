@@ -268,10 +268,18 @@ work for the Ping Identity Platform.
 - **Default**: `120000`
 - **Reloadable**: no
 
-How long QuestDB uses the public keys that it downloaded from the JWKS
-endpoint, in milliseconds, before it downloads them again. QuestDB also
-downloads the keys again when a token names a key ID that it does not know,
-such as a key that the OIDC Provider has just started to use. See
+The interval, in milliseconds, before QuestDB refreshes the signing keys
+that it downloaded from the JWKS endpoint. After startup, QuestDB refreshes
+the keys during authentication, not on a background timer. It also refreshes
+them when a token names a key ID that it does not know, such as a key that
+the OIDC Provider has just started to use.
+
+This is a refresh interval, not a hard lifetime for cached keys. If a refresh
+fails, QuestDB retains its previously downloaded keys and can still validate
+tokens signed with them. The authentication request that performs the
+refresh may wait for a slow or unreachable provider until the HTTP request
+timeout, [`acl.oidc.http.timeout`](#acloidchttptimeout), expires, even when
+its signing key is already cached. The timeout is 30 seconds by default. See
 [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins).
 
 ### acl.oidc.token.endpoint
