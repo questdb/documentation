@@ -59,7 +59,8 @@ SHOW { COLUMNS FROM tableName
 - `SHOW SERVICE ACCOUNTS` lists all service accounts with their enabled flag and
   memory limit, or those a user or group can assume with the grant option
   (enterprise-only)
-- `SHOW TABLES` returns all the tables.
+- `SHOW TABLES` returns all tables, including views, materialized views, and
+  live views.
 - `SHOW USER` shows user secret (enterprise-only)
 - `SHOW USERS` lists all users with their enabled flag and memory limit
   (enterprise-only)
@@ -101,7 +102,7 @@ SHOW CREATE DATABASE
 An optional `INCLUDE` or `EXCLUDE` clause selects which object categories to
 dump. Each `category` is one of:
 
-- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`.
+- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`, `LIVE_VIEWS`.
 - **Access control** (Enterprise only): `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`,
   `PERMISSIONS`.
 - **Umbrellas**: `SCHEMA` (all schema objects), `ACL` (all access control
@@ -221,7 +222,8 @@ SHOW CREATE LIVE VIEW trades_ma;
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
 `IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause identifying the view's owner.
+output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`,
+not necessarily the view's owner.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -318,7 +320,7 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
+[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause naming the user running `SHOW CREATE`, not necessarily the table's owner.
 
 For example,
 

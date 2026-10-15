@@ -83,14 +83,15 @@ too high may cause excessive memory usage and increase latency.
 
 ## wal.apply.worker.affinity
 
-- **Default**: equal to the CPU core count
+- **Default**: none
 - **Reloadable**: no
 
-Comma-separated list of CPU core indexes.
+Comma-separated list of CPU core indexes, one per WAL apply worker.
 
 ## wal.apply.worker.count
 
-- **Default**: equal to the CPU core count
+- **Default**: `2` on hosts with up to 8 CPU cores, `3` on up to 32 cores, `4`
+  on larger hosts
 - **Reloadable**: no
 
 Number of dedicated worker threads assigned to handle WAL table data.
