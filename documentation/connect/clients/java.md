@@ -841,6 +841,7 @@ borrow (see [Ingestion errors](#ingestion-errors)).
 Durable acknowledgement requires QuestDB Enterprise with primary replication
 configured.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 By default, the server confirms a batch when it is committed to the local
@@ -1333,6 +1334,7 @@ What is and isn't carried on `onError`:
 Failing over across multiple QuestDB hosts requires QuestDB Enterprise — the
 replicas you fail over to come from Enterprise replication.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 A `QuestDB` handle keeps working across server restarts and network blips: the

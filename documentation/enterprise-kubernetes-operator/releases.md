@@ -3,8 +3,8 @@ title: Kubernetes Operator releases
 description: Release history for the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.3.0 (b215e4b84ecda400969e9c386f2c86ebafa5f2a3).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.0 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.3.1 (6e6eb55a58d21a5f480eed6a9324b1cd8cdf6580).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.1 -->
 # Changelog
 
 Notable changes to the QuestDB Enterprise Operator are documented here.
@@ -12,20 +12,20 @@ Notable changes to the QuestDB Enterprise Operator are documented here.
 <!-- generated latest operator artifacts: start -->
 ## Latest operator artifacts
 
-Latest stable release: **0.3.0**
+Latest stable release: **0.3.1**
 
 ### Operator images
 
 **AWS ECR**
 
 ```text
-695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.3.0
+695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.3.1
 ```
 
 **Non-AWS mirror**
 
 ```text
-registry.distribution.questdb.io/questdb-enterprise-operator:0.3.0
+registry.distribution.questdb.io/questdb-enterprise-operator:0.3.1
 ```
 
 Both references require the registry access supplied by QuestDB.
@@ -37,10 +37,58 @@ Both references require the registry access supplied by QuestDB.
 ```sh
 helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
   --namespace questdb-operator-system --create-namespace \
-  --version 0.3.0
+  --version 0.3.1
 ```
 
 <!-- generated latest operator artifacts: end -->
+## [0.3.1] - 2026-09-28
+
+### Upgrade notes
+
+- `helm upgrade` removes nine ClusterRoles the chart used to ship for
+  convenience (`questdb-operator-questdb{cluster,objectstore,promotion}-{admin,editor,viewer}-role`).
+  The operator never used them. If you bound users to them, recreate the roles
+  yourself before upgrading.
+- If you manage CRDs yourself (`crd.enable=false`), apply this release's CRDs
+  before upgrading the operator. With the old CRDs in place, changing
+  `spec.coldStorage.manager` makes the operator stop managing that cluster
+  until the CRDs are updated.
+
+### Changed
+
+- A restore from backup now reports its progress and any setup problem on the
+  `Recovered` condition. A failed restore sets the cluster phase to `Degraded`.
+- The `Recovered` condition becomes `True` once the restored primary has stayed
+  Ready for 60 seconds.
+- When the primary is not Ready, the `Available` and `Progressing` conditions
+  say why: a Pending PVC, a waiting container, or a Pod that cannot be
+  scheduled.
+- A `spec.auth.adminSecret` that names a missing Secret or key is reported as
+  `ConfigRejected` instead of failing later.
+- Changing `spec.coldStorage.manager` to move cold-storage duty to another
+  instance no longer raises a Warning or marks the cluster `Degraded` while the
+  move is in progress. A failed move still does, with reason
+  `ManagerSwitchFailed`.
+- The operator's webhook permissions are narrower. Set `webhook.configName` if
+  you need a different name for the webhook configuration.
+- QuestDB Enterprise 4.0.1 is the tested image.
+
+### Fixed
+
+- A spec fix now reaches crash-looping Pods without deleting them by hand,
+  including when several Pods are failing at once.
+- Moving cold-storage duty with `spec.coldStorage.manager` no longer stalls on
+  an idle replica, during a stuck promotion, or on a slow switch. If no
+  instance is doing cold-storage duty, the operator assigns it to the selected
+  instance on its own.
+- Adding `spec.coldStorage` to a cluster that is already running now takes
+  effect. Before, the cluster went `Degraded` and its Pods were never updated.
+- Losing the cold-storage `QuestDBObjectStore` or its Secret no longer stops
+  the rest of the cluster from being managed.
+- Deleting the primary's PVC while a Planned promotion is starting no longer
+  deletes the primary Pod.
+- A brief API error no longer fails a promotion or restarts its drain wait.
+
 ## [0.3.0] - 2026-09-14
 
 ### Added

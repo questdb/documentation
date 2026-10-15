@@ -3,8 +3,8 @@ title: Kubernetes Operator API reference
 description: Custom resources provided by the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.3.0 (b215e4b84ecda400969e9c386f2c86ebafa5f2a3).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.0 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.3.1 (6e6eb55a58d21a5f480eed6a9324b1cd8cdf6580).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.1 -->
 # API Reference
 
 Packages:
@@ -3676,9 +3676,26 @@ reached at least one intended live Pod.<br/>
         <td><b>handoffSource</b></td>
         <td>string</td>
         <td>
-          handoffSource is operator transition state identifying the manager whose
-demotion started the active handoff. Unlike currentManager, it is not a live
-engine-role observation. It is cleared after a stable manager is observed.<br/>
+          handoffSource is the endpoint durably fenced for an active handoff. It is written
+before demotion SQL, so during Demoting it identifies an uncertain transition;
+TargetAuthorized is the later proof that its demotion completed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>handoffStage</b></td>
+        <td>enum</td>
+        <td>
+          handoffStage records which cold-manager ownership change is durably authorized.<br/>
+          <br/>
+            <i>Enum</i>: Demoting, TargetAuthorized<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>handoffTarget</b></td>
+        <td>string</td>
+        <td>
+          handoffTarget is the target locked after source demotion was proven. It is empty
+while the handoff is Demoting and remains immutable until the handoff completes.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4108,7 +4125,7 @@ QuestDBObjectStore is the Schema for the questdbobjectstores API.
         </td>
         <td>true</td>
       </tr><tr>
-        <td><b><a href="#questdbobjectstorestatus">status</a></b></td>
+        <td><b>status</b></td>
         <td>object</td>
         <td>
           status defines the observed state of QuestDBObjectStore<br/>
@@ -4522,35 +4539,6 @@ almost certainly wrong.
 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
           <br/>
             <i>Default</i>: <br/>
-        </td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-### QuestDBObjectStore.status
-<sup><sup>[↩ Parent](#questdbobjectstore)</sup></sup>
-
-
-
-status defines the observed state of QuestDBObjectStore
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>observedGeneration</b></td>
-        <td>integer</td>
-        <td>
-          observedGeneration is the most recent .metadata.generation observed.<br/>
-          <br/>
-            <i>Format</i>: int64<br/>
         </td>
         <td>false</td>
       </tr></tbody>

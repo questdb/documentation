@@ -336,6 +336,11 @@ module.exports = {
                 },
                 {
                   type: "category",
+                  label: "ALTER LIVE VIEW",
+                  items: ["query/sql/alter-live-view-resume-wal"],
+                },
+                {
+                  type: "category",
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
                     {

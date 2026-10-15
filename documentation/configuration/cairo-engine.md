@@ -931,8 +931,7 @@ edit `server.conf` and call
 materialized view refreshes, and WAL apply batches use the updated limits; work
 already running keeps its original limit. A live view acquires its limit when it
 is first compiled and keeps it across refreshes, so a reloaded value reaches an
-existing view only after a full teardown: invalidation, recreation, or a server
-restart.
+existing view only after the view is recreated or the server restarts.
 
 When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
@@ -1051,7 +1050,9 @@ you can reproduce as a plain query and measure the same way:
   the view retains between refreshes: the `IN MEMORY` tier, whose capacity
   [`live_views()`](/docs/query/functions/meta/#live_views) reports in its
   `in_mem_bytes` column, and the window state. Add these to the transient
-  figure, and keep the limit above the
+  figure. Window state grows with the number of distinct partition keys the
+  view has seen and does not shrink when keys go quiet, so leave headroom for
+  key growth, and keep the limit above the
   [allocation floor](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
   described with the key.
 
