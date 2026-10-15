@@ -24,7 +24,7 @@ Two methods for sending ILP data from Ruby:
 
 ## Using the InfluxDB v2 Ruby client
 
-The InfluxDB v2 client provides a convenient Point builder API that works with QuestDB.
+The InfluxDB v2 client provides a convenient `Point` builder API that works with QuestDB.
 
 ### Installation
 
