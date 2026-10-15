@@ -5,6 +5,7 @@ description: "Configure OIDC in QuestDB Enterprise: Web Console SSO, token authe
 ---
 
 import Screenshot from "@theme/Screenshot";
+import Link from "@docusaurus/Link";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
@@ -1462,11 +1463,17 @@ be reached or answers with an error:
   both modes once `acl.oidc.cache.ttl` has passed since QuestDB last checked
   them, because QuestDB checks them with the provider's token endpoint.
 
-In QuestDB Enterprise 4.0.2 and later, a request that carries a token that
-QuestDB rejects, or cannot check, fails with `401 Unauthorized`, even with a
-valid session cookie, and ends the HTTP session. An outage of the provider can
-therefore log users out of the Web Console. Versions before 4.0.2 accept such
-a request through its session instead.
+For ordinary HTTP requests in QuestDB Enterprise 4.0.2 and later, a token
+that QuestDB rejects, or cannot check, causes `401 Unauthorized`, even with a
+valid session cookie, and ends that HTTP session. An outage of the provider
+can therefore log users out of the Web Console. Versions before 4.0.2 accept
+such a request through its session instead.
+
+A browser QWP WebSocket upgrade that supplies a credential through the
+WebSocket credential subprotocol is handled separately: a rejected credential
+fails the upgrade without falling back to the session cookie. This path does
+not create, rotate, or destroy an HTTP session, so the failed upgrade does not
+end an existing cookie session.
 
 Some access outlives the token:
 
@@ -1685,14 +1692,15 @@ versions behave, and what to check when you upgrade.
   provider whose tokens carry no `iss` claim,
   `acl.oidc.issuer.validation.enabled=false`. See
   [The expected issuer](#the-expected-issuer).
-- **HTTP sessions.** When a request carries a session cookie and a token that
-  they reject, or cannot check because the provider is unreachable, earlier
-  versions accept the request through the session, so the Web Console keeps
-  working with a token that they no longer accept, until its session expires.
-  QuestDB Enterprise 4.0.2 rejects the request with `401 Unauthorized` and ends
-  the session, so an outage of the provider can log users out of the Web
-  Console. See
-  [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
+- **HTTP sessions.** When an ordinary HTTP request carries a session cookie
+  and a token that they reject, or cannot check because the provider is
+  unreachable, earlier versions accept the request through the session, so
+  the Web Console keeps working with a token that they no longer accept,
+  until its session expires. QuestDB Enterprise 4.0.2 rejects the request with
+  `401 Unauthorized` and ends the session, so an outage of the provider can log
+  users out of the Web Console. A browser QWP upgrade using the credential
+  subprotocol instead fails without using or destroying the cookie session.
+  See [When QuestDB stops accepting a token](#when-questdb-stops-accepting-a-token).
 - **Claim lists.** Earlier versions read the whole value of each setting as a
   single claim name, so a claim list makes every OIDC login fail. In a
   replicated cluster, upgrade every node before you change a setting to a
@@ -1724,9 +1732,93 @@ The [Microsoft Entra ID guide](/docs/security/oidc/entra-id/) sets up single
 sign-on for the Web Console, and app-only tokens for Azure services that run as
 a managed identity or a service principal.
 
+Continue with a setup step:
+
+- <Link
+    id="set-up-the-client-application-in-entra-id"
+    to="/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id"
+  >
+    Set up the client application in Entra ID
+  </Link>
+- <Link
+    id="questdb-configuration"
+    to="/docs/security/oidc/entra-id/#questdb-configuration"
+  >
+    QuestDB configuration
+  </Link>
+- <Link
+    id="map-groups-and-grant-permissions"
+    to="/docs/security/oidc/entra-id/#map-groups-and-grant-permissions"
+  >
+    Map groups and grant permissions
+  </Link>
+- <Link
+    id="confirm-group-mappings-and-login"
+    to="/docs/security/oidc/entra-id/#confirm-group-mappings-and-login"
+  >
+    Confirm group mappings and login
+  </Link>
+
 ### PingFederate
 
 The [PingFederate guide](/docs/security/oidc/pingfederate/) sets up single
 sign-on for the Web Console, with PingFederate authenticating users against an
 Active Directory domain, such as Microsoft Entra Domain Services, over secure
 LDAP.
+
+Continue with a setup step:
+
+- <Link
+    id="set-up-pingfederate-client"
+    to="/docs/security/oidc/pingfederate/#set-up-pingfederate-client"
+  >
+    Set up PingFederate client
+  </Link>
+- <Link
+    id="access-token-manager-settings"
+    to="/docs/security/oidc/pingfederate/#access-token-manager-settings"
+  >
+    Access Token Manager settings
+  </Link>
+- <Link
+    id="authorization-server-settings"
+    to="/docs/security/oidc/pingfederate/#authorization-server-settings"
+  >
+    Authorization Server settings
+  </Link>
+- <Link
+    id="set-up-a-microsoft-entra-id-data-source"
+    to="/docs/security/oidc/pingfederate/#set-up-a-microsoft-entra-id-data-source"
+  >
+    Set up an Active Directory data source
+  </Link>
+- <Link
+    id="set-up-a-password-credential-validator"
+    to="/docs/security/oidc/pingfederate/#set-up-a-password-credential-validator"
+  >
+    Set up a Password Credential Validator
+  </Link>
+- <Link
+    id="set-up-an-identity-provider"
+    to="/docs/security/oidc/pingfederate/#set-up-an-identity-provider"
+  >
+    Set up an Identity Provider
+  </Link>
+- <Link
+    id="add-groups-to-oidc-policy-management"
+    to="/docs/security/oidc/pingfederate/#add-groups-to-oidc-policy-management"
+  >
+    Add groups to OIDC policy management
+  </Link>
+- <Link
+    id="enable-resource-owner-password-credentials-ropc-flow"
+    to="/docs/security/oidc/pingfederate/#enable-resource-owner-password-credentials-ropc-flow"
+  >
+    Enable Resource Owner Password Credentials (ROPC) flow
+  </Link>
+- <Link
+    id="confirm-questdb-mappings-and-login"
+    to="/docs/security/oidc/pingfederate/#confirm-questdb-mappings-and-login"
+  >
+    Confirm QuestDB mappings and login
+  </Link>

@@ -717,153 +717,163 @@ first one, the additional connections of its pool, and the connections that
 replace a failed one. Shortly after the token expires, QuestDB rejects these
 new connections, as described in
 [When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
-A long-running
-service must therefore switch to a new token before the old one expires: it
-connects with the new token, then closes the old handle.
-`token.expires_on` is a Unix timestamp.
+A long-running service must therefore switch to a new token before the old
+one expires. `token.expires_on` is a Unix timestamp.
+
+The short example above keeps its store-and-forward queue in memory. Closing
+that handle can discard unacknowledged rows, so replacing an in-memory handle
+does not guarantee lossless recovery across an outage and token expiry. For
+pending rows to survive handle replacement, use
+[`sf_dir`](/docs/connect/clients/connect-string/#sf-keys) and retain the same
+`sender_id`. Two handles cannot hold the same disk slot: release every sender
+lease and close the old handle before opening its replacement. The new handle
+replays the rows left on disk.
 
 The credential caches the token in memory, and requests a new one when the
 cached token expires within 5 minutes, or earlier when the token's refresh
-time has passed, so calling `get_token()` often is cheap. The following example
-looks for a new token in the last 10 minutes of the old one. When it cannot get
-a new token or connect with it, it keeps the old token and handle, and tries
-again with the next batch:
+time has passed, so calling `get_token()` often is cheap. The following
+single-producer example looks for a new token in the last 10 minutes of the
+old one. It retries token acquisition and transient connection failures,
+including at startup. While token acquisition or reconnection is retrying,
+it pauses ingestion.
 
-```python title="Keep ingesting across token expiry"
+After publishing a batch once with `flush()`, the example calls `wait(5000)`.
+This is a five-second no-progress timeout, not a wall-clock deadline. On
+`FailoverRetry`, the rows stay queued; the example returns to the outer loop
+so that renewal remains reachable. It does not submit the timed-out batch
+again. If the old token expires during the wait and the connection fails with
+`AuthError`, it releases the lease and replaces the handle with a current
+token. Other authentication errors and terminal server rejections stop the
+example instead of being retried indefinitely.
+
+```python title="Rotate tokens with disk-backed store-and-forward"
 import time
 
 import questdb
 from azure.core.exceptions import AzureError
 from azure.identity import DefaultAzureCredential
-from questdb import QuestDBError, TimestampNanos
+from questdb import QuestDBError, QuestDBErrorCode, TimestampNanos
 
 SCOPE = "api://8de84b90-1ea5-4e41-9e84-dba860aa01a6/.default"
 ADDR = "questdb.example.com:9000"
-# look for a new token when the old one expires within this many seconds
+SF_CONF = "sf_dir=/var/lib/fx-ingest/sf;sender_id=fx-ingest;"
 REFRESH_MARGIN_SECONDS = 600
+RETRY_SECONDS = 5
+WAIT_TIMEOUT_MILLIS = 5000
+TRANSIENT_CONNECT_ERRORS = {
+    QuestDBErrorCode.CouldNotResolveAddr,
+    QuestDBErrorCode.SocketError,
+    QuestDBErrorCode.ConnectTimeout,
+    QuestDBErrorCode.FailoverRetry,
+}
 
 credential = DefaultAzureCredential()
 
 
 def on_rejection(error):
-    # every rejection; a terminal one, such as a missing grant, also
-    # raises QuestDBServerRejectionError from flush(wait=True)
     print("rejected:", error.category.tag, error.message)
 
 
-def connect(token):
-    conf = f"wss::addr={ADDR};token={token.token};"
-    return questdb.connect(conf, error_handler=on_rejection)
+def get_token_with_retry():
+    while True:
+        try:
+            return credential.get_token(SCOPE)
+        except AzureError as e:
+            print("token request failed, retrying:", e)
+            time.sleep(RETRY_SECONDS)
+
+
+def connect_with_retry():
+    while True:
+        # Obtain a current token on every attempt: the outage may outlast it.
+        token = get_token_with_retry()
+        conf = (
+            f"wss::addr={ADDR};token={token.token};{SF_CONF}"
+            "sender_pool_min=1;sender_pool_max=1;query_pool_min=0;"
+            "auto_flush=off;close_flush_timeout_millis=1000;"
+        )
+        try:
+            return token, questdb.connect(conf, error_handler=on_rejection)
+        except QuestDBError as e:
+            expired = time.time() >= token.expires_on
+            if e.code not in TRANSIENT_CONNECT_ERRORS and not (
+                e.code is QuestDBErrorCode.AuthError and expired
+            ):
+                raise
+            print("connect failed, retrying:", e)
+            time.sleep(RETRY_SECONDS)
 
 
 def renew(token, db):
-    # returns the token and the handle to use from now on
-    try:
-        new_token = credential.get_token(SCOPE)
-        # the credential returns the cached token until it renews it
-        if new_token.token == token.token:
-            return token, db
-        new_db = connect(new_token)
-    except (AzureError, QuestDBError) as e:
-        # keep the old token and handle, and try again with the next batch
-        print("token renewal failed:", e)
+    new_token = get_token_with_retry()
+    if new_token.token == token.token:
         return token, db
+    # No sender lease is held here. Release the slot before reopening it.
     db.close()
-    return new_token, new_db
+    return connect_with_retry()
 
 
 def next_trades():
-    # replace with your source of trades
+    # Replace with your source of trades and its acknowledgement policy.
     time.sleep(1)
     return [("EURUSD", "buy", 1.0842, 100000.0)]
 
 
-token = credential.get_token(SCOPE)
-db = connect(token)
+token, db = connect_with_retry()
 try:
     while True:
-        trades = next_trades()
         if time.time() > token.expires_on - REFRESH_MARGIN_SECONDS:
             token, db = renew(token, db)
+        replace_handle = False
         with db.sender() as sender:
-            for symbol, side, price, quantity in trades:
+            for symbol, side, price, quantity in next_trades():
                 sender.row(
                     "fx_trades",
                     symbols={"symbol": symbol, "side": side},
                     columns={"price": price, "quantity": quantity},
                     at=TimestampNanos.now(),
                 )
-            sender.flush(wait=True)
+            # Publish once. Do not rebuild this batch after a wait timeout.
+            sender.flush()
+            try:
+                sender.wait(WAIT_TIMEOUT_MILLIS)
+            except QuestDBError as e:
+                if e.code is QuestDBErrorCode.FailoverRetry:
+                    print("no acknowledgement progress; rows remain on disk")
+                elif (
+                    e.code is QuestDBErrorCode.AuthError
+                    and time.time() >= token.expires_on
+                ):
+                    replace_handle = True
+                else:
+                    raise
+        if replace_handle:
+            # The lease has been returned; the replacement replays its rows.
+            db.close()
+            token, db = connect_with_retry()
 finally:
     db.close()
 ```
 
-A terminal rejection raises `QuestDBServerRejectionError` from
-`flush(wait=True)` and ends the loop, and the `finally` block closes the
-handle. To keep the service running instead, catch the error around the batch,
-and decide whether to retry or drop the batch: a batch fails the same way
-until you fix the cause of the rejection, such as a missing grant.
+After a wait timeout, the example can queue later batches while the server is
+unreachable. Store-and-forward is bounded: if the disk queue fills,
+publication can fail, and this example stops. Size and monitor the queue for
+your outage budget. Store-and-forward protects only rows already accepted by
+the local queue; a real trade source also needs a policy for retaining and
+acknowledging records not yet published to it. See
+[Delivery and durability](/docs/connect/clients/python/#delivery-and-durability).
 
-With store-and-forward on disk, described next, the client keeps the rejected
-batch instead: it stays in the slot, and the next connection that takes over
-the slot, in this handle or a new one, sends it again before any later batch.
-Later batches then fail the same way until QuestDB accepts the rejected batch,
-for a missing grant once you grant it, so don't send the batch again.
+A terminal rejection raises `QuestDBServerRejectionError` and ends the loop;
+the `finally` block closes the handle. The rejected batch stays on disk and
+is replayed before later batches when the service restarts with the same
+`sender_id`. Fix the cause, such as a missing grant, before restarting. Do not
+submit the rejected batch again.
 
-The example keeps its store-and-forward data in memory, the default. With
-[`sf_dir`](/docs/connect/clients/connect-string/#sf-keys), the client keeps the
-rows that QuestDB has not acknowledged on disk, in a slot named after its
-`sender_id`, and two handles cannot hold the same slot. `connect()` with the
-new token then raises `QuestDBError`, because the old handle still holds the
-slot, so `renew()` above never switches to the new token, and the service fails
-once it has to open a new connection after QuestDB stops accepting the old
-token. Close the old handle first instead, then connect with the new token and
-the same `sender_id`: the new handle takes over the slot, and replays what the
-old one left on disk. The old handle is closed by then, so when the new
-connection fails, retry it instead of falling back to the old handle. With
-`sf_dir`, replace `connect()` and `renew()` in the example with:
-
-```python title="Switch to a new token with store-and-forward on disk"
-# the store-and-forward slot of the service
-SF_CONF = "sf_dir=/var/lib/fx-ingest/sf;sender_id=fx-ingest;"
-
-
-def connect(token):
-    conf = f"wss::addr={ADDR};token={token.token};{SF_CONF}"
-    return questdb.connect(conf, error_handler=on_rejection)
-
-
-def renew(token, db):
-    # returns the token and the handle to use from now on
-    try:
-        new_token = credential.get_token(SCOPE)
-    except AzureError as e:
-        # keep the old token and handle, and try again with the next batch
-        print("token renewal failed:", e)
-        return token, db
-    # the credential returns the cached token until it renews it
-    if new_token.token == token.token:
-        return token, db
-    # release the slot; the rows that QuestDB has not acknowledged stay on disk
-    db.close()
-    while True:
-        try:
-            # the new handle takes over the slot and replays its rows
-            return new_token, connect(new_token)
-        except QuestDBError as e:
-            # the old handle is closed, so retry instead of falling back to it
-            print("connect failed, retrying in 5 seconds:", e)
-        time.sleep(5)
-        try:
-            # an outage can outlast the token, so get a current one
-            new_token = credential.get_token(SCOPE)
-        except AzureError as e:
-            print("token renewal failed:", e)
-```
-
-Replay is at-least-once, so the table can receive rows that it has already
-stored. For the rules that apply to every client, including how to avoid
-duplicates with `DEDUP UPSERT KEYS`, see
+Keep `sf_dir` on storage that survives service or container replacement. The
+Python client's disk queue protects against a client-process crash, not a
+host crash or power loss. Replay is at-least-once, so the table can receive
+rows that it has already stored. For the rules that apply to every client,
+including how to avoid duplicates with `DEDUP UPSERT KEYS`, see
 [Token lifetime](/docs/security/oidc/#token-lifetime).
 
 See [Authentication and TLS](/docs/connect/clients/python/#authentication-and-tls)
@@ -916,11 +926,12 @@ REVOKE HTTP FROM fxIngest;
 ```
 
 After the revoke, QuestDB rejects the next batch of the service. In the Python
-examples above, `flush(wait=True)` raises `QuestDBServerRejectionError`, and
-the examples stop. Without `sf_dir`, the rejected rows are lost. With `sf_dir`,
-they stay on disk, and land once you grant the permissions again and the
-service connects with the same `sender_id`. In the Java client, the rejection
-reaches the error handler of the `QuestDB` handle as a terminal
+examples above, `flush(wait=True)` or `wait()` raises
+`QuestDBServerRejectionError`, and the examples stop. Without `sf_dir`, the
+rejected rows are lost. With `sf_dir`, they stay on disk, and land once you
+grant the permissions again and the service connects with the same
+`sender_id`. In the Java client, the rejection reaches the error handler of
+the `QuestDB` handle as a terminal
 `SECURITY_ERROR`, the next call on the borrowed sender throws
 `LineSenderServerException`, and the pool replaces the sender on its next
 borrow.

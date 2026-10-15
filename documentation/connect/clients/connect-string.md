@@ -687,10 +687,22 @@ architecture is that a producer survives an arbitrarily long outage.
 
 Auth failures during reconnect (authentication rejected, version mismatch,
 durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal: the loop does not retry them. The Java client is the exception for
-authentication, upgrade, and durable-ack rejections: it treats them as terminal
-only for the first connect of a sender and for orphan drainers, and a sender
-that has connected keeps retrying them, as described in
+terminal in clients other than Java: the loop does not retry them. In Java,
+a sender that has connected keeps retrying authentication, upgrade, and
+durable-ACK rejections. On the first connect, those rejections are terminal.
+
+Java orphan drainers have a separate policy:
+
+- Authentication rejection with a fixed credential, and non-retriable upgrade
+  rejection, fail immediately.
+- With a token provider, `401`/`403` rejections receive bounded retries with
+  fresh credentials before the drainer quarantines the slot.
+- A durable-ACK capability mismatch receives bounded retries to allow a
+  rolling upgrade to settle before the drainer quarantines the slot.
+- Role rejections while all reachable servers are replicas are transient:
+  the drainer keeps retrying rather than quarantining the slot.
+
+For the token-rejection thresholds and reporting, see
 [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
 
 ### Egress failover {#egress-failover}
@@ -819,14 +831,16 @@ explicit setter always wins over the string.
   (30 min).
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
-- `lazy_connect` — when `on`, the pool defers opening its first connection
-  until the first borrow, so construction succeeds against a server that is
-  down. This is the supported way to tolerate a server that starts after your
-  application, and in the Java client, an identity provider that is
-  unreachable when a token provider requests its first token. In the Java, C,
-  C++, Python, and Rust clients, it cannot be combined with `query_pool_min`
-  above `0`, or with an `initial_connect_retry` other than `async`: the client
-  rejects the configuration. Default: `off`.
+- `lazy_connect` — when `on`, construction does not wait for a connection,
+  so the application can start while the server is down. In the Java, C,
+  C++, Python, and Rust clients, senders connect asynchronously in the
+  background, while query connections open on first use. Networking can
+  therefore begin before the first borrow. In Java, this also lets the
+  application start while the identity provider is unreachable when a token
+  provider requests its first token. In these clients, `lazy_connect` cannot
+  be combined with `query_pool_min` above `0`, or with an
+  `initial_connect_retry` other than `async`: the client rejects the
+  configuration. Default: `off`.
 
 ## Error handling {#error-handling}
 
