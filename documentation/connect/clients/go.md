@@ -781,6 +781,8 @@ connect string reference.
 :::note Enterprise
 Durable acknowledgement requires QuestDB Enterprise with primary replication
 configured.
+
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 By default, the server confirms a batch when it is committed to the local
@@ -1234,6 +1236,8 @@ Once an error is yielded, no further batches arrive for that query.
 
 :::note Enterprise
 Multi-host failover with automatic reconnect requires QuestDB Enterprise.
+
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 Single-host applications need nothing from this section. The simple loops shown
