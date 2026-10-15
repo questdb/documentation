@@ -586,7 +586,7 @@ are left. A token that arrives with less counts as a failed request, whose
 error names `handout_floor`. If your identity provider issues tokens that
 short, lower the floor with `handoutFloorMillis(...)` on the builder. A
 connection that needs a token waits up to 30 seconds when the provider holds no
-usable token, set with `coldWaitMillis(...)`. After a `401`,
+usable token, set with `coldWaitMillis(...)`. After a refreshable `401`,
 `onTokenRejected()` waits up to 5 seconds for a refresh, set with
 `forcedWaitMillis(...)`. The client then calls `getToken()` again. If the cached
 token became unusable during the forced-refresh wait, this call can add the
@@ -595,12 +595,15 @@ excluding network time.
 
 #### How the client handles token failures
 
-- When QuestDB rejects a token with `401`, the client asks the provider for a
-  new token, and when it gets a different one, retries the same server once,
+- When QuestDB rejects a token with `401` and the response has no Bearer
+  `error` or has `error="invalid_token"`, the client asks the provider for a
+  new token. If it gets a different one, it retries the same server once,
   immediately. The provider requests a new token for a rejected one at most
   once every 30 seconds. With `token_provider=azure`, Azure Identity can
-  return the token that it has cached, and then the client does not retry. A
-  `403` does not trigger a retry.
+  return its cached token; an unchanged token does not earn this immediate
+  retry. A `403` or any other Bearer error, such as `insufficient_scope`,
+  does not trigger this refresh/retry. These rules govern the one-time
+  token refresh, not the established sender's reconnect loop described below.
 - At startup, a sender with `initial_connect_retry=off`, the default, fails
   when it cannot get a token within 30 seconds. With `on`, it retries a
   retryable failure of the provider within `reconnect_max_duration_millis`,

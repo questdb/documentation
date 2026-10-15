@@ -1159,15 +1159,23 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+- **Authentication rejections depend on the client and lifecycle.** In Java,
+  a token provider can retry a refreshable `401` once on the same host with a
+  different token. If that retry is unavailable or fails, authentication
+  rejection is terminal before the sender's first successful connection.
+  Once a foreground Java sender has connected, it instead keeps buffering
+  and retrying rejected credentials with backoff, even with a fixed
+  credential. Orphan drainers have a separate bounded policy. See
+  [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+  Other clients treat `401`/`403` rejections as terminal, including during
+  reconnect.
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
-- **All other upgrade errors are transient** and feed into the reconnect loop,
-  including `404`, `426`, `503`, generic 4xx/5xx, TCP/TLS failures,
-  mid-stream send/recv errors, and an upgrade response that advertises a QWP
-  version outside the client's supported range (per-endpoint, so a host on a
-  rolling upgrade does not lock the client out of compatible peers).
+- **Transport errors are transient**, including TCP/TLS failures and
+  mid-stream send/recv errors. For other HTTP upgrade rejections, version
+  mismatches, and durable-ACK capability rejections, the client and lifecycle
+  determine whether a failed endpoint round is terminal or retried. See
+  [Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys).
 
 :::note Enterprise
 

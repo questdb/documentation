@@ -225,7 +225,13 @@ and exits when the orphan's `ackedFsn ≥ publishedFsn`.
 
 - **Reconnect budget exhausted.** Drainer writes `.failed` with reason,
   releases the lock, exits.
-- **Auth-terminal upgrade error.** Same.
+- **Authentication rejection.** In Java, a fixed credential that is rejected
+  fails the drainer immediately. With a token provider, `401`/`403`
+  rejections receive bounded retries before the drainer writes `.failed`
+  and exits. This differs from an established foreground Java sender,
+  which keeps retrying. See
+  [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+  for the retry thresholds and reporting.
 - **Irrecoverable corruption.** Same.
 
 `.failed` slots are excluded from auto-drain on subsequent scans —

@@ -638,12 +638,15 @@ public class FxIngest {
 - The Azure provider keys contain no secret. You can keep the connect string in
   the `QDB_CLIENT_CONF` environment variable. Redact any other sensitive
   settings, such as `tls_roots_password`, before logging it.
-- When QuestDB rejects a token with `401`, the client asks Azure Identity for a
-  new token, at most once every 30 seconds, and when it gets a different one,
-  retries the same server once. Azure Identity can return the token that it
-  has cached, and then the client does not retry. A sender that has connected
-  keeps buffering rows while it cannot get a token or QuestDB rejects it, and
-  reports each failure to the error handler and in its
+- When QuestDB rejects a token with `401` and the response has no Bearer
+  `error` or has `error="invalid_token"`, the client asks Azure Identity for a
+  new token, at most once every 30 seconds. If it gets a different one, it
+  retries the same server once. Azure Identity can return its cached token;
+  an unchanged token does not earn this immediate retry. A `403` or any
+  other Bearer error, such as `insufficient_scope`, does not trigger this
+  refresh/retry. Independently of this one-time retry, a sender that has
+  connected keeps buffering rows while it cannot get a token or QuestDB
+  rejects it, and reports each failure to the error handler and in its
   [connection health](/docs/connect/clients/java/#connection-health).
 - When the handle starts, it waits up to 30 seconds for the first token, and
   fails when Entra ID cannot issue one. To start while Entra ID or QuestDB is

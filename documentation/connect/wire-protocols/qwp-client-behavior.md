@@ -137,11 +137,13 @@ query execution after a connection exists. This naming trips people up
 | `on` / `true` / `sync` | `SYNC` | retry loop on caller thread, bounded by `reconnect_max_duration_millis` (blocks) |
 | `async` | `ASYNC` | returns immediately; I/O thread retries in background |
 
-**Default resolution ⚠:** if you don't set `initial_connect_retry` explicitly but
-you *do* set any `reconnect_*` knob, the mode becomes `SYNC` — so a "resilience"
-knob silently turns startup into a multi-minute **blocking** retry. If no
-`reconnect_*` knob is set either, the mode is `OFF`. Always set
-`initial_connect_retry` explicitly to avoid this ([sharp edge #1](#known-sharp-edges)).
+**Default resolution ⚠:** in Java, setting any `reconnect_*` knob without an
+explicit `initial_connect_retry` promotes the mode to `SYNC`, so tuning
+reconnects can turn startup into a multi-minute **blocking** retry. In C, C++,
+Python, and Rust, this promotion applies to standalone senders only; their
+pooled facades require an explicit initial mode. With no promotion or explicit
+mode, the default is `OFF`. Set `initial_connect_retry` explicitly to avoid
+ambiguity ([sharp edge #1](#known-sharp-edges)).
 
 ### Facade prewarm
 
@@ -279,11 +281,11 @@ here.
 
 | # | Sharp edge | Status |
 | --- | --- | --- |
-| 1 | `initial_connect_retry` is implicitly promoted to `SYNC` when any `reconnect_*` knob is set — a resilience knob silently makes startup block. | Candidate |
+| 1 | Java and standalone C/C++/Python/Rust senders promote `initial_connect_retry` to `SYNC` when any `reconnect_*` knob is set; pooled C/C++/Python/Rust clients do not. Set the initial mode explicitly. | Candidate |
 | 2 | `reconnect_max_duration_millis` is named as if it governs reconnection, but a running sender never consults it — it bounds only the blocking initial connect. | Candidate (naming) |
 | 3 | `failover` sounds like it covers startup but only affects post-connect query `execute()`. Queries have no async/lazy initial connect at all. | Candidate |
 | 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`, or use `lazy_connect=true`. | Candidate |
-| 5 | A single endpoint returning `401`/`403` is treated as cluster-wide terminal and aborts the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. | Intended (documented), revisit |
+| 5 | Authentication rejection ends the current endpoint walk. Java startup, established senders, queries, and orphan drainers have different [recovery policies](#authentication-rejection-and-credential-recovery). | Intended; client- and lifecycle-specific |
 | 6 | Query `serverInfoTimeoutMs` has no config key, so a facade query client cannot tune it. | Candidate |
 | 7 | The simplest API (`fromConfig` + async) has the worst error visibility — terminal async failures surface only on later producer calls or at `close()`. | Candidate |
 | 8 | `SenderProgressHandler` has no builder setter on either surface; it must be installed post-construction via `QwpWebSocketSender.setProgressHandler`. | Candidate |
@@ -344,10 +346,14 @@ With `initial_connect_retry=async`:
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
-A sender in async mode does not give up because time passed. What ends it is a
-**terminal** condition — authentication rejection, a durable-ack capability
-mismatch, or the poison-frame detector — or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
+A sender in async mode does not give up because time passed. Before its first
+successful connection, authentication rejection (after any token-provider retry)
+or a durable-ack capability mismatch is terminal. Established Java senders
+instead retry these rejections; see
+[Authentication rejection and credential recovery](#authentication-rejection-and-credential-recovery).
+The poison-frame detector can still terminate a sender. If the buffer reaches
+`sf_max_total_bytes`, `append()` blocks and then throws after
+`sf_append_deadline_millis`; the sender itself keeps retrying.
 
 ### Reconnect and outage handling
 
@@ -356,13 +362,17 @@ wall-clock give-up and no budget-exhaustion event. Backoff grows from
 `reconnect_initial_backoff_millis` to `reconnect_max_backoff_millis` and stays
 there; the loop rotates through the endpoints in `addr` as it goes.
 
-`reconnect_max_duration_millis` has exactly two consumers, neither of which is
-the steady-state loop:
+`reconnect_max_duration_millis` bounds startup and specific Java orphan-recovery
+budgets, not the steady-state foreground loop:
 
-1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
-   which gives up and throws when the budget expires.
-2. The background drainer's **durable-ack capability-gap budget**, used when an
-   orphan slot repeatedly lands on a node that cannot serve durable acks.
+1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`)
+   gives up and throws when the budget expires.
+2. The Java background drainer uses it as a **durable-ack capability-gap budget**
+   when an orphan repeatedly lands on a node that cannot serve durable acks.
+3. With a token provider, the Java drainer also derives a bounded authentication
+   rejection window from it. See
+   [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+   for the time and attempt thresholds.
 
 The practical consequence: what bounds your tolerance of a long outage is
 **buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
@@ -380,6 +390,33 @@ and apply back-pressure to the producer rather than dropping data.
 
 :::
 
+### Authentication rejection and credential recovery
+
+The Java reference client separates a failed endpoint walk from the lifetime of
+the sender or query. A `401`/`403` stops the current walk rather than continuing
+to other hosts with the rejected credential.
+
+With a token provider, a `401` with no Bearer `error` or with
+`error="invalid_token"` can first receive one same-endpoint retry, but only if
+the provider supplies a different token. A `403` or another Bearer error, such
+as `insufficient_scope`, does not trigger this refresh/retry. Any remaining
+rejection follows these Java lifecycle rules:
+
+| Lifecycle | Authentication rejection behavior |
+| --- | --- |
+| Sender before its first successful connection | Terminal, including with `initial_connect_retry=async`. |
+| Established foreground sender | Retry with backoff indefinitely while retaining buffered rows, even with fixed credentials. Report the outage through connection health and the error handler. |
+| Query initial connect or execution-time reconnect | Terminal for that connection attempt or query; no continuation to later endpoints. |
+| Orphan drainer with fixed credentials | Quarantine the slot immediately behind a `.failed` file. |
+| Orphan drainer with a token provider | Retry under a bounded time/attempt policy, then quarantine if rejections persist. |
+
+Other language clients still treat authentication rejection as terminal even for
+established senders. See [Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys)
+for client differences, and
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+for Java refresh limits, orphan thresholds, and reporting. The established
+sender's reconnect loop is independent of the one-time token refresh.
+
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
 | Per-endpoint result | Sender behavior |
@@ -389,11 +426,11 @@ and apply back-pressure to the producer rather than dropping data.
 | TLS session/certificate failure | transport error; try next endpoint |
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
-| `401` / `403` auth failure | **terminal**; do not try later endpoints ⚠ |
-| durable-ack requested but unsupported | terminal mismatch |
+| `401` / `403` auth failure | End the current walk after any token-provider retry; Java recovery depends on [lifecycle](#authentication-rejection-and-credential-recovery). |
+| durable-ack requested but unsupported | Terminal at startup; established Java foreground senders retry, while orphan drainers use a bounded capability-gap budget. |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
-| all endpoints role-reject as replicas | `QwpRoleMismatchException` |
+| all endpoints role-reject as replicas | Initial connect throws `QwpRoleMismatchException`; the running sender retries. |
 
 ### Query client initial connect
 
@@ -417,7 +454,7 @@ Query initial-connect endpoint matrix:
 | --- | --- |
 | DNS / TCP / TLS failure | record transport error; try next endpoint |
 | HTTP upgrade timeout | transport error; try next endpoint |
-| HTTP `401` / `403` | **terminal** `QwpAuthFailedException`; do not try later ⚠ |
+| HTTP `401` / `403` | Java may first retry the same endpoint with a refreshed token; otherwise terminal `QwpAuthFailedException`, with no later endpoints tried. |
 | HTTP `421` + role header | role reject; try next endpoint |
 | upgrade ok but no `SERVER_INFO` before timeout | transport error; try next |
 | `SERVER_INFO` role ≠ `target` | role reject; try next endpoint |
@@ -439,7 +476,9 @@ With `failover=on`:
 - Bounded by `failover_max_attempts` (default `8`, incl. original) **and**
   `failover_max_duration_ms` (default `30000`; `0` disables the duration cap).
 - Backoff: `failover_backoff_initial_ms=50`, `failover_backoff_max_ms=1000`.
-- Auth failure during failover reconnect is terminal and reported to the handler.
+- Auth rejection during failover reconnect is terminal and reported to the
+  handler after any eligible same-endpoint token-provider retry. See
+  [Authentication rejection and credential recovery](#authentication-rejection-and-credential-recovery).
 
 With `failover=off`, a transport failure is reported to the handler with no
 reconnect/replay.
@@ -464,7 +503,7 @@ reconnect/replay.
 | server down, default mode | no `reconnect_*`, no async | one attempt; build throws |
 | server down, reconnect duration set, no mode | `reconnect_max_duration_millis=...` | **synchronous** retry; build blocks ⚠ |
 | server down, async | `initial_connect_retry=async` | build returns; I/O thread retries |
-| server returns `401`/`403` | any mode | terminal auth failure; no endpoint continuation |
+| server returns `401`/`403` | any mode | terminal at startup after any eligible same-endpoint token-provider retry; no continuation to later endpoints |
 | server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
 | server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
@@ -479,7 +518,7 @@ reconnect/replay.
 | upgrades but no `SERVER_INFO` | Yes | after `serverInfoTimeoutMs` (builder only) |
 | primary/standalone while `target=replica` | Yes | role mismatch |
 | `421` role reject | Yes | try next |
-| `401`/`403` | **No** | auth treated as cluster-wide terminal ⚠ |
+| `401`/`403` | **No** | Java may retry the same endpoint after eligible token refresh; a remaining rejection is terminal. |
 | broken shared TLS/trust store | No | every endpoint fails |
 | all endpoints down | No | `all QWP endpoints unreachable` |
 | reachable but none match `target` | No | `QwpRoleMismatchException` |
@@ -555,5 +594,9 @@ source states the contract directly:
 > converts it into the durable-ack capability-gap budget. Neither bounds this
 > loop's steady-state reconnect.
 
-`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
-are terminal across all endpoints. Everything else is retried.
+Before the first successful connection, `QwpAuthFailedException` (after any
+eligible token-provider retry) and non-role `WebSocketUpgradeException` failures
+are terminal. An established foreground sender instead retries these failures
+with backoff while retaining buffered data. Orphan drainers return control to
+their owner, which applies its separate quarantine policy. See
+[Authentication rejection and credential recovery](#authentication-rejection-and-credential-recovery).

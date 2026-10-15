@@ -187,7 +187,7 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are cluster-wide; retrying floods server logs without recovery. |
+| HTTP `401` / `403` during initial connect or query reconnect, after any token-provider retry | The rejected credential stops the endpoint walk. Established Java senders and orphan drainers have [different recovery policies](#authentication-is-cluster-wide). |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
 
 ### Topology — handled inside the round
@@ -232,14 +232,31 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is terminal — the client does not retry
-other hosts. The assumption is that auth credentials are configured
-identically across the cluster, so a credential failure against one node is
-a credential failure against all of them. Retrying would spam every peer's
-audit log without recovering.
+Credentials are assumed to be configured identically across the cluster.
+A `401` or `403` therefore ends the current endpoint walk rather than
+continuing to other hosts with the rejected credential. Whether the client
+retries later depends on the client and lifecycle:
 
-If your deployment has per-host credentials, that is unsupported and outside
-the failover model — split the workload into one connect string per credential.
+- With a token provider, Java can first retry the same host once when a
+  refreshable `401` produces a different token. A `403` or a Bearer error
+  other than `invalid_token` does not trigger that refresh/retry.
+- Before a Java sender's first successful connection, or when a query client
+  connects or reconnects, any remaining authentication rejection is terminal.
+- An established foreground Java sender instead keeps buffering rows and
+  retrying with backoff, even with a fixed credential. It reports the outage
+  through connection health and the error handler; applications that need a
+  hard failure must monitor these and close the sender themselves.
+- A Java orphan drainer fails immediately on a rejected fixed credential.
+  With a token provider, it retries under a bounded policy before
+  quarantining the slot behind a `.failed` file; the rows stay on disk.
+- Other clients treat authentication rejection as terminal even after the
+  first connection.
+
+See [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+for the refresh rules, drainer thresholds, and reporting.
+
+Per-host credentials are outside the failover model. Split such workloads
+into one connect string per credential.
 
 ## Next steps
 

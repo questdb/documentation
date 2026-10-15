@@ -147,16 +147,18 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;query_pool_min=0;initial_connect_retry=on;reconnect_max_duration_millis=120000;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. In the C, C++, Python, and Rust clients,
-this applies to a standalone sender only: their pooled facade honours only an
-explicit `initial_connect_retry`, and tolerates a server that is down at
-startup with [`lazy_connect=on`](#pool-keys). See
-[Ingress reconnect](#reconnect-keys).
+The sender retries its first connection synchronously for up to 2 minutes.
+The explicit `initial_connect_retry=on` also enables this in the pooled
+facade of the C, C++, Python, and Rust clients, where `reconnect_*` keys
+alone do not enable initial retries. `query_pool_min=0` prevents the query
+pool's separate, fail-fast startup connection, so this example configures
+ingest startup only. Once connected, the sender retries transport outages
+indefinitely; the 2-minute budget does not limit subsequent reconnects.
+For non-blocking pool startup, use [`lazy_connect=on`](#pool-keys) instead.
+See [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
 
@@ -182,8 +184,9 @@ caveats), follow the section links from the [Key index](#key-index).
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; pooled C/C++/Python/Rust clients need an explicit initial retry mode |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides implicit promotion where supported; see [Ingress reconnect](#reconnect-keys)       |
+| Retry initial ingest connection synchronously     | ingress   | `initial_connect_retry=on`             | `reconnect_max_duration_millis`; use `query_pool_min=0` to skip separate query startup         |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -652,16 +655,15 @@ architecture is that a producer survives an arbitrarily long outage.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
-  see below.
+  Default: `100`. See the implicit-promotion rules below for its effect on
+  initial connect.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
-  Default: `5000` (5 s). Setting this enables
-  `initial_connect_retry=on` implicitly; see below.
+  Default: `5000` (5 s). See the implicit-promotion rules below.
 - `reconnect_max_duration_millis` — time budget for the **blocking sync
   initial connect** (`initial_connect_retry=on`): once exceeded, the
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
-  Setting this enables `initial_connect_retry=on` implicitly; see below.
+  See the implicit-promotion rules below.
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -671,13 +673,16 @@ architecture is that a producer survives an arbitrarily long outage.
     the background indefinitely, surfacing only genuine terminal failures
     (auth reject, durable-ack mismatch) via the error inbox.
 
-  **Implicit promotion.** Setting any explicit `reconnect_*` key without
-  also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the budget also covers
-  the *first* connect attempt — without the promotion,
-  `reconnect_max_duration_millis` would be inert. To keep fail-fast
-  behaviour on the first connect while still tuning the backoff, set
-  `initial_connect_retry=off` explicitly; the explicit setting wins.
+  **Implicit promotion.** In Java, .NET, and Go, setting any explicit
+  `reconnect_*` key without also choosing an `initial_connect_retry` mode
+  promotes the initial mode to `on`. In C, C++, Python, and Rust, this
+  promotion applies only to a standalone sender, not to the pooled facade.
+  Set `initial_connect_retry=on` explicitly for blocking initial retries
+  in those pools, or use `lazy_connect=on` for non-blocking startup. Query
+  connections have separate fail-fast startup behavior; set
+  `query_pool_min=0` to skip their prewarm. An explicit
+  `initial_connect_retry=off` always wins over implicit promotion, letting
+  you tune reconnect backoff while retaining fail-fast sender startup.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
@@ -835,15 +840,20 @@ explicit setter always wins over the string.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
 - `lazy_connect` — when `on`, construction does not wait for a connection,
-  so the application can start while the server is down. In the Java, C,
-  C++, Python, and Rust clients, senders connect asynchronously in the
-  background, while query connections open on first use. Networking can
-  therefore begin before the first borrow. In Java, this also lets the
-  application start while the identity provider is unreachable when a token
-  provider requests its first token. In these clients, `lazy_connect` cannot
-  be combined with `query_pool_min` above `0`, or with an
-  `initial_connect_retry` other than `async`: the client rejects the
-  configuration. Default: `off`.
+  so the application can start while the server is down.
+  - Java can prewarm its configured minimum senders asynchronously before
+    the first borrow. This also lets the application start while the
+    identity provider is unreachable when a token provider requests its
+    first token.
+  - C, C++, Python, and Rust skip sender prewarming: a clean pool creates
+    senders on first borrow, then connects them asynchronously. Recovery
+    of existing disk-backed slots can start before the first borrow.
+  - In these clients, query connections open on first use, and
+    `lazy_connect` cannot be combined with `query_pool_min` above `0`, or
+    with an `initial_connect_retry` other than `async`: the client rejects
+    the configuration.
+
+  Default: `off`.
 
 ## Error handling {#error-handling}
 
