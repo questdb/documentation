@@ -430,7 +430,7 @@ sender's reconnect loop is independent of the one-time token refresh.
 | durable-ack requested but unsupported | Terminal at startup; established Java foreground senders retry, while orphan drainers use a bounded capability-gap budget. |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
-| all endpoints role-reject as replicas | Initial connect throws `QwpRoleMismatchException`; the running sender retries. |
+| all endpoints role-reject as replicas | OFF startup throws `QwpRoleMismatchException`; SYNC startup retries within its budget; ASYNC startup and running senders retry in the background. |
 
 ### Query client initial connect
 
