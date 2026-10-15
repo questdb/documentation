@@ -629,10 +629,17 @@ excluding network time.
   acknowledged.
 - An orphan drainer, enabled with `drain_orphans=on`, gives up instead. When
   QuestDB keeps rejecting its credential, it sets the slot aside behind a
-  `.failed` file and reports `DATA_LOSS`: at once with a fixed credential, and
-  with a token provider, once the rejections have lasted for
-  `reconnect_max_duration_millis`, at most 5 minutes, and at least six
-  attempts. The rows stay on disk.
+  `.failed` file and reports `DATA_LOSS`. With a fixed credential, this happens
+  at once. With a token provider, it happens when either condition is met:
+  - At least six authentication rejections have occurred, and the rejections
+    have persisted for at least the smaller of
+    `reconnect_max_duration_millis` and 5 minutes.
+  - There have been 256 authentication rejections in one episode without ACK
+    progress, regardless of the persistence interval.
+
+  ACK progress resets the episode, including the rejection count and
+  persistence clock. Intervening failures of another kind reset only the
+  persistence clock, not the count. The rows stay on disk.
 - A query whose client has to connect, and cannot get a token, fails. The next
   query tries again.
 
@@ -1095,27 +1102,51 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 
 `flush()` returns once the batch is handed to the send engine, not once the
 server has acknowledged it. ACKs arrive asynchronously on the I/O loop. To
-bridge between publish and acknowledgement, every published frame is assigned a
-frame sequence number (FSN). `flushAndGetSequence()` returns
-the highest FSN the call published, and `awaitAckedFsn(targetFsn,
-timeoutMillis)` blocks until the server has acknowledged up to that FSN:
+wait for all rows published by a QWP sender, call `drain(timeoutMillis)` while
+that sender is borrowed. It flushes any buffered rows, then waits for the
+server to acknowledge all published frames, including frames published by an
+earlier automatic flush:
+
+```java
+try (Sender sender = db.borrowSender()) {
+    sender.table("trades").doubleColumn("price", 42.0).atNow();
+    if (!sender.drain(10_000)) {
+        throw new IllegalStateException("Timed out waiting for QuestDB acknowledgements");
+    }
+}
+```
+
+A `false` result means the acknowledgement wait timed out, not that delivery
+succeeded. It does not cancel the published frames: the sender may still
+deliver them later.
+
+For per-call correlation, every published frame has a frame sequence number
+(FSN). `flushAndGetSequence()` returns the highest FSN published by that call,
+and `awaitAckedFsn(targetFsn, timeoutMillis)` waits for acknowledgement up to
+that FSN:
 
 ```java
 try (Sender sender = db.borrowSender()) {
     sender.table("trades").doubleColumn("price", 42.0).atNow();
     long fsn = sender.flushAndGetSequence();
     if (fsn >= 0 && !sender.awaitAckedFsn(fsn, 10_000)) {
-        // timed out waiting for the server ACK
+        throw new IllegalStateException("Timed out waiting for frame " + fsn);
     }
 }
 ```
+
+This FSN example waits only for frames published by its explicit flush. A
+return value of `-1` means that call published nothing; it does **not** mean
+previously auto-flushed rows were acknowledged. Use `drain()` for the
+all-published-rows barrier.
 
 Related accessors:
 
 | Method | Returns |
 |--------|---------|
-| `flushAndGetSequence()` | Highest FSN published by this call. `-1` if nothing was published. |
-| `getAckedFsn()` | Highest FSN the server has acknowledged. `-1` if no batch has been published yet. |
+| `drain(timeoutMillis)` | Flushes buffered rows and waits for all published frames. `true` if acknowledged, `false` on timeout. |
+| `flushAndGetSequence()` | Highest FSN published by this call. `-1` if nothing was published by this call. |
+| `getAckedFsn()` | Highest FSN the server has acknowledged. `-1` if no frame has been acknowledged yet. |
 | `awaitAckedFsn(fsn, timeoutMillis)` | Block until `getAckedFsn()` reaches `fsn`, or the timeout elapses. |
 
 When `request_durable_ack=on` is set, `getAckedFsn()` advances after the
@@ -1124,9 +1155,10 @@ FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
 rejected batches, so the value returned by `flushAndGetSequence()` is also
 the correlation key for async error reports.
 
-These methods are no-ops on transports that do not track frame sequence
-numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
-return `-1`, and `awaitAckedFsn()` returns immediately.
+On transports that do not track frame sequence numbers (HTTP, TCP, UDP),
+`flushAndGetSequence()` flushes and returns `-1`, `getAckedFsn()` returns `-1`,
+and `awaitAckedFsn()` returns immediately. On those transports, `drain()`
+flushes and returns `true` without a frame-acknowledgement wait.
 
 ## Querying with `Query` and `Completion`
 
@@ -1571,8 +1603,10 @@ What is and isn't carried on `onError`:
   rethrows `LineSenderException`. A sender that has connected before keeps
   retrying instead, as described in
   [How the client handles token failures](#how-the-client-handles-token-failures).
-  With a [token provider](#rotating-tokens), a `401` first makes the client
-  request a new token and retry the same endpoint once.
+  With a [token provider](#how-the-client-handles-token-failures), a `401` can
+  trigger a refresh only when the response has no Bearer `error` or has
+  `error="invalid_token"`. The client retries the same endpoint once only if
+  the provider returns a different token.
 - **Credential unavailable**: the [token provider](#rotating-tokens) cannot
   supply a token, for example because the identity provider is unreachable.
   The client contacts no endpoint, and handles the failure as described in
@@ -1680,10 +1714,12 @@ client and gives you a fresh one on your next query.
 
 - **Authentication failures** (a bad token or wrong credentials) stop
   immediately on every host for a query and for the first connect of a sender,
-  because retrying cannot help. With a [token provider](#rotating-tokens), a
-  `401` first makes the client request a new token and retry the same host
-  once. A sender that has already connected keeps retrying with any
-  credential, as described in
+  because retrying cannot help. With a
+  [token provider](#how-the-client-handles-token-failures), a `401` can trigger
+  a refresh only when the response has no Bearer `error` or has
+  `error="invalid_token"`. The client retries the same host once only if the
+  provider returns a different token. A sender that has already connected
+  keeps retrying with any credential, as described in
   [How the client handles token failures](#how-the-client-handles-token-failures).
 - **Network and availability failures** (connection refused, TLS errors, a
   `5xx` from the server, a mid-query drop) are treated as temporary and fed into

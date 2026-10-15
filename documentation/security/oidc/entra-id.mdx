@@ -660,9 +660,11 @@ connect string, such as `sf_dir=/var/lib/fx-ingest/sf;`, as described in
 [Store-and-forward](/docs/connect/clients/java/#store-and-forward). Closing a
 borrowed sender flushes its rows and returns it to the pool, and closing the
 handle waits up to `close_flush_timeout_millis`, 60 seconds by default, for
-QuestDB to acknowledge them. To confirm that a batch has reached QuestDB,
-wait for its acknowledgement, as described in
-[Awaiting acknowledgements](/docs/connect/clients/java/#awaiting-acknowledgements).
+QuestDB to acknowledge them. To confirm that all rows published by a sender
+have reached QuestDB, call `sender.drain(timeoutMillis)` while the sender is
+borrowed, and treat a `false` result as a timeout, not a delivery confirmation.
+This also waits for rows published by an earlier automatic flush, as described
+in [Awaiting acknowledgements](/docs/connect/clients/java/#awaiting-acknowledgements).
 
 #### With the Python client
 

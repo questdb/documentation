@@ -692,11 +692,18 @@ architecture is that a producer survives an arbitrarily long outage.
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Auth failures during reconnect (authentication rejected, version mismatch,
-durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal in clients other than Java: the loop does not retry them. In Java,
-a sender that has connected keeps retrying authentication, upgrade, and
-durable-ACK rejections. On the first connect, those rejections are terminal.
+Authentication rejection, durable-ACK mismatch, and a non-101 upgrade
+response without a role hint are immediately terminal during reconnect in
+clients other than Java: the loop does not retry them. In Java, a sender
+that has connected keeps retrying these rejections. On the first connect,
+these rejections are terminal, after any eligible
+[token-provider refresh and retry](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+
+In Java, a protocol-version mismatch is transient, including at startup.
+With `initial_connect_retry=on`, the client retries it within
+`reconnect_max_duration_millis`; with `async`, it retries in the background
+indefinitely. A sender that has already connected also retries version
+mismatches indefinitely, allowing a rolling upgrade to settle.
 
 Java orphan drainers have a separate policy:
 
