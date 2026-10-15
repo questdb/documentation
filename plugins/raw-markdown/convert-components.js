@@ -161,7 +161,7 @@ function convertDocButton(content) {
 }
 
 /**
- * Converts <Tabs> and <TabItem> to markdown table
+ * Converts <Tabs> and <TabItem> to labeled Markdown blocks
  */
 function convertTabs(content) {
   return replaceComponent(content, 'Tabs', (match) => {
@@ -195,8 +195,8 @@ function convertTabs(content) {
       tabItems.push({ value, content })
     }
 
-    // Convert to sections with headings instead of table
-    // This handles complex content better (nested tables, code blocks, etc.)
+    // Labels must not change the surrounding heading hierarchy: tabs can
+    // appear at any depth, with prose and sibling sections following them.
     let sections = "\n\n"
 
     for (const valueObj of valuesArray) {
@@ -204,7 +204,7 @@ function convertTabs(content) {
       const tabItem = tabItems.find(item => item.value === valueObj.value)
       const content = tabItem ? tabItem.content.trim() : ""
 
-      sections += `### ${label}\n\n${content}\n\n`
+      sections += `**${label}**\n\n${content}\n\n`
     }
 
     return sections

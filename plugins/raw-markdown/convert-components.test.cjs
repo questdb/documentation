@@ -93,3 +93,77 @@ test("OIDC raw Markdown preserves usable legacy provider-step links", async () =
   }
   assert.doesNotMatch(converted, /<\/?Link\b/)
 })
+
+test("nested dependency tabs preserve the surrounding heading hierarchy", async () => {
+  const { convertAllComponents, normalizeNewLines } = loadConverter()
+  const source = `### Request a token
+
+#### With the Java client
+
+<Tabs values={[{ label: "Maven", value: "maven" }, { label: "Gradle", value: "gradle" }]}>
+  <TabItem value="maven">
+
+\`\`\`xml
+<dependency>questdb-client-azure</dependency>
+\`\`\`
+
+  </TabItem>
+  <TabItem value="gradle">
+
+\`\`\`text
+implementation 'org.questdb:questdb-client-azure:1.3.10'
+\`\`\`
+
+  </TabItem>
+</Tabs>
+
+Java ingestion instructions.
+
+#### With the Python client
+
+Python ingestion instructions.
+`
+  const docsRoot = path.resolve(__dirname, "../../documentation")
+  const converted = normalizeNewLines(
+    await convertAllComponents(source, docsRoot, docsRoot),
+  )
+  assert.deepEqual(converted.match(/^#{1,6} .+$/gm), [
+    "### Request a token",
+    "#### With the Java client",
+    "#### With the Python client",
+  ])
+  assert.match(
+    converted,
+    /\*\*Maven\*\*\s+```xml\n<dependency>questdb-client-azure<\/dependency>\n```/,
+  )
+  assert.match(
+    converted,
+    /\*\*Gradle\*\*\s+```text\nimplementation 'org.questdb:questdb-client-azure:1\.3\.10'\n```/,
+  )
+  assert.match(converted, /Java ingestion instructions\./)
+  assert.match(converted, /Python ingestion instructions\./)
+  assert.doesNotMatch(converted, /<\/?(?:Tabs|TabItem)\b/)
+})
+
+for (const page of ["security/oidc/entra-id.mdx", "connect/clients/java.md"]) {
+  test(`${page} keeps dependency labels out of its Markdown outline`, async () => {
+    const { convertAllComponents } = loadConverter()
+    const docsRoot = path.resolve(__dirname, "../../documentation")
+    const filename = path.join(docsRoot, page)
+    const source = fs.readFileSync(filename, "utf8")
+    const converted = await convertAllComponents(
+      source,
+      path.dirname(filename),
+      docsRoot,
+    )
+    assert.deepEqual(
+      converted.match(/^#{1,6} .+$/gm),
+      source.match(/^#{1,6} .+$/gm),
+    )
+    assert.match(converted, /\*\*Maven\*\*/)
+    assert.match(converted, /\*\*Gradle\*\*/)
+    assert.match(converted, /<artifactId>questdb-client-azure<\/artifactId>/)
+    assert.match(converted, /<version>1\.3\.10<\/version>/)
+    assert.doesNotMatch(converted, /\$\{release\.name\}|<\/?(?:Tabs|TabItem)\b/)
+  })
+}

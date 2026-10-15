@@ -14,7 +14,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [User and group claims](/docs/security/oidc/#user-and-group-claims) - Fallback claim lists of QuestDB Enterprise 4.0.2, how QuestDB picks a claim, and the startup checks
 - [Token validation](/docs/security/oidc/#token-validation) - What QuestDB checks in a token, the expected issuer, and when QuestDB stops accepting an expired token
-- [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, the ID-token requirement in token mode, and when it logs the user out
+- [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, the ID-token requirement in token mode, how transient renewal failures pause queries without logging users out, and which errors end the session
 - [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins) - The log lines of rejected logins and what they mean
 - [Upgrade to 4.0.2](/docs/security/oidc/#upgrade-to-402) - How earlier versions differ, and what to check when you upgrade
 - [Where QuestDB reads the user information](/docs/security/oidc/#where-questdb-reads-the-user-information) - The User Info endpoint compared with reading the claims from the token

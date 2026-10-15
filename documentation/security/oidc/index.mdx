@@ -1531,11 +1531,15 @@ and ensure `acl.oidc.scope` includes `openid`.
 - When the provider refuses to issue new tokens, for example because the user
   is disabled or the refresh token has expired, the Web Console logs the user
   out, and the login page shows the reason that the provider gives.
-- When the Web Console cannot reach the provider, or the provider answers with
-  `429` or a `5xx` status, it keeps sending the current token while the token
-  is valid, warns the user, and tries again with a growing delay of up to 30
-  seconds. Once the token has expired, the Web Console stops sending queries
-  with it, and after three more failed attempts, it logs the user out.
+- When token renewal times out, the Web Console cannot reach the provider,
+  or the provider answers with `429` or a `5xx` status, the Web Console keeps
+  the login and warns the user. While the current token is valid, queries
+  continue to use it. Subsequent query attempts retry renewal with a growing
+  delay of up to 30 seconds between attempts. If the token expires before
+  renewal succeeds, the Web Console pauses queries instead of sending the
+  expired token. A query blocked by renewal is reported as not sent and has
+  not executed on the database. Transient failures do not log the user out,
+  however many attempts fail. Once renewal succeeds, queries can run again.
 
 Without a refresh token, the Web Console keeps sending the token of the login
 after it has expired. QuestDB Enterprise 4.0.2 and later then reject the token,
