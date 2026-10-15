@@ -62,7 +62,7 @@ services:
       - internal://redpanda-0:8082,external://localhost:18082
       - --schema-registry-addr
       - internal://0.0.0.0:8081,external://0.0.0.0:18081
-      # Redpanda brokers use the RPC API to communicate with eachother internally.
+      # Redpanda brokers use the RPC API to communicate with each other internally.
       - --rpc-addr
       - redpanda-0:33145
       - --advertise-rpc-addr
