@@ -5,7 +5,6 @@ description: "Configure OIDC in QuestDB Enterprise: Web Console SSO, token authe
 ---
 
 import Screenshot from "@theme/Screenshot";
-import Link from "@docusaurus/Link";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
@@ -887,7 +886,7 @@ example while QuestDB is unreachable, retry it instead of falling back to the
 old client, and request a current token for each attempt, because an outage
 can outlast the token.
 [Request a token in the service](/docs/security/oidc/entra-id/#request-a-token-in-the-service)
-shows both orders in Python.
+shows disk-backed token rotation in Python.
 
 Replay is at-least-once: after a reconnect or a switch to a new client,
 QuestDB can receive rows that it has already stored. To avoid duplicates,
@@ -1734,30 +1733,30 @@ a managed identity or a service principal.
 
 Continue with a setup step:
 
-- <Link
+- <a
     id="set-up-the-client-application-in-entra-id"
-    to="/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id"
+    href="/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id"
   >
     Set up the client application in Entra ID
-  </Link>
-- <Link
+  </a>
+- <a
     id="questdb-configuration"
-    to="/docs/security/oidc/entra-id/#questdb-configuration"
+    href="/docs/security/oidc/entra-id/#questdb-configuration"
   >
     QuestDB configuration
-  </Link>
-- <Link
+  </a>
+- <a
     id="map-groups-and-grant-permissions"
-    to="/docs/security/oidc/entra-id/#map-groups-and-grant-permissions"
+    href="/docs/security/oidc/entra-id/#map-groups-and-grant-permissions"
   >
     Map groups and grant permissions
-  </Link>
-- <Link
+  </a>
+- <a
     id="confirm-group-mappings-and-login"
-    to="/docs/security/oidc/entra-id/#confirm-group-mappings-and-login"
+    href="/docs/security/oidc/entra-id/#confirm-group-mappings-and-login"
   >
     Confirm group mappings and login
-  </Link>
+  </a>
 
 ### PingFederate
 
@@ -1768,57 +1767,57 @@ LDAP.
 
 Continue with a setup step:
 
-- <Link
+- <a
     id="set-up-pingfederate-client"
-    to="/docs/security/oidc/pingfederate/#set-up-pingfederate-client"
+    href="/docs/security/oidc/pingfederate/#set-up-pingfederate-client"
   >
     Set up PingFederate client
-  </Link>
-- <Link
+  </a>
+- <a
     id="access-token-manager-settings"
-    to="/docs/security/oidc/pingfederate/#access-token-manager-settings"
+    href="/docs/security/oidc/pingfederate/#access-token-manager-settings"
   >
     Access Token Manager settings
-  </Link>
-- <Link
+  </a>
+- <a
     id="authorization-server-settings"
-    to="/docs/security/oidc/pingfederate/#authorization-server-settings"
+    href="/docs/security/oidc/pingfederate/#authorization-server-settings"
   >
     Authorization Server settings
-  </Link>
-- <Link
+  </a>
+- <a
     id="set-up-a-microsoft-entra-id-data-source"
-    to="/docs/security/oidc/pingfederate/#set-up-a-microsoft-entra-id-data-source"
+    href="/docs/security/oidc/pingfederate/#set-up-a-microsoft-entra-id-data-source"
   >
     Set up an Active Directory data source
-  </Link>
-- <Link
+  </a>
+- <a
     id="set-up-a-password-credential-validator"
-    to="/docs/security/oidc/pingfederate/#set-up-a-password-credential-validator"
+    href="/docs/security/oidc/pingfederate/#set-up-a-password-credential-validator"
   >
     Set up a Password Credential Validator
-  </Link>
-- <Link
+  </a>
+- <a
     id="set-up-an-identity-provider"
-    to="/docs/security/oidc/pingfederate/#set-up-an-identity-provider"
+    href="/docs/security/oidc/pingfederate/#set-up-an-identity-provider"
   >
     Set up an Identity Provider
-  </Link>
-- <Link
+  </a>
+- <a
     id="add-groups-to-oidc-policy-management"
-    to="/docs/security/oidc/pingfederate/#add-groups-to-oidc-policy-management"
+    href="/docs/security/oidc/pingfederate/#add-groups-to-oidc-policy-management"
   >
     Add groups to OIDC policy management
-  </Link>
-- <Link
+  </a>
+- <a
     id="enable-resource-owner-password-credentials-ropc-flow"
-    to="/docs/security/oidc/pingfederate/#enable-resource-owner-password-credentials-ropc-flow"
+    href="/docs/security/oidc/pingfederate/#enable-resource-owner-password-credentials-ropc-flow"
   >
     Enable Resource Owner Password Credentials (ROPC) flow
-  </Link>
-- <Link
+  </a>
+- <a
     id="confirm-questdb-mappings-and-login"
-    to="/docs/security/oidc/pingfederate/#confirm-questdb-mappings-and-login"
+    href="/docs/security/oidc/pingfederate/#confirm-questdb-mappings-and-login"
   >
     Confirm QuestDB mappings and login
-  </Link>
+  </a>

@@ -46,7 +46,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [Non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Which token each client sends, with client credentials and password grant examples over QWP
 - [Managing authentication](/docs/security/rbac/#managing-authentication) - HTTP sessions of QuestDB Enterprise 4.0.2 end with the credential that opened them
 - [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error policies, and that the `QuestDB` handle accepts an error handler
-- [Java token providers](/docs/connect/clients/java/#rotating-tokens) - Clarified token-wait budgets, which `401` responses trigger refresh, and which connection-string settings must be redacted before logging
+- [Java token providers](/docs/connect/clients/java/#rotating-tokens) - Clarified certificate credential configuration, query authentication exceptions, token-wait budgets, which `401` responses trigger refresh, and which connection-string settings must be redacted before logging
 - [Client failover](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) - Distinguished authentication rejection during startup, established Java ingestion, query reconnects, and orphan recovery
 - [Connection strings](/docs/connect/clients/connect-string/#reconnect-keys) - Corrected pooled initial-retry settings and clarified when lazy pools begin connecting in Java, C/C++, Python, and Rust
 - [Python](/docs/connect/clients/python/#the-pool), [C/C++](/docs/connect/clients/c-and-cpp/#connecting), and [Rust](/docs/connect/clients/rust/#connecting) clients - Corrected that the pool connects when it is created, unless `lazy_connect=on`

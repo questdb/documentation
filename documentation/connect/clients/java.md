@@ -491,9 +491,10 @@ connect string reference. For the Entra ID setup and the QuestDB configuration,
 see
 [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
-To use an Azure credential that `azure_credential` cannot select, such as a
-certificate credential, wrap it in an `AzureTokenSource`, and pass it to a
-`RefreshingTokenProvider`, as described in
+Certificates configured through Azure's environment variables can use
+`azure_credential=environment`. To construct or customize an Azure credential
+in code instead, such as the certificate credential below, wrap it in an
+`AzureTokenSource`, and pass it to a `RefreshingTokenProvider`, as described in
 [Other identity providers](#other-identity-providers):
 
 ```java
@@ -1599,9 +1600,12 @@ What is and isn't carried on `onError`:
 
 - **Authentication failure**: `401`/`403` HTTP response before the WebSocket
   upgrade completes. Terminal across all endpoints for the first connect of a
-  sender and for a query client: the borrow that triggered the connect
-  rethrows `LineSenderException`. A sender that has connected before keeps
-  retrying instead, as described in
+  sender and for a query client. A synchronous sender connect reports
+  `LineSenderException`. If `db.borrowQuery()` creates a query client and its
+  connection fails, it throws `QueryException` with the connection failure as
+  its cause. A failed reconnect during query execution is reported to the
+  handler's `onError(...)`, and `Completion.await()` throws `QueryException`.
+  A sender that has connected before keeps retrying instead, as described in
   [How the client handles token failures](#how-the-client-handles-token-failures).
   With a [token provider](#how-the-client-handles-token-failures), a `401` can
   trigger a refresh only when the response has no Bearer `error` or has
@@ -1771,8 +1775,10 @@ sections of the connect string reference.
 A sender rides out an outage, such as an unreachable cluster or a token that
 QuestDB rejects, and keeps accepting rows while it retries. To find out that it
 has not reached the server, check its connection health, which requires Java
-client 1.3.10 or later. Reading it never blocks, and never contains a
-credential, so it can back a health endpoint:
+client 1.3.10 or later. Health reads do not perform network I/O or wait for a
+connection attempt. The `db.health()` aggregate acquires pool locks to collect
+each client's snapshot; it is not lock-free. The snapshots contain no
+credential, so they can back a health endpoint:
 
 ```java
 import io.questdb.client.ConnectionHealth;

@@ -589,6 +589,16 @@ the same version as `questdb-client`, 1.3.10 or later:
   </TabItem>
 </Tabs>
 
+`token_provider=azure` requires a TLS-secured `wss::` endpoint. Before running
+this example, configure
+[HTTP server TLS](/docs/security/tls/#enabling-tls-for-http-server-rest-api)
+or a TLS-terminating proxy that supports WebSocket upgrades. Replace
+`questdb.example.com:9000` with the secure host and port reachable from your
+service. For a private CA, configure the
+[Java trust store](/docs/connect/clients/java/#tls-with-custom-trust-store).
+If enabling TLS changes the Web Console URL, update its registered redirect
+URI in Entra ID and `acl.oidc.redirect.uri` to match.
+
 ```java title="Ingest into fx_trades with an app-only token"
 import io.questdb.client.QuestDB;
 import io.questdb.client.Sender;
