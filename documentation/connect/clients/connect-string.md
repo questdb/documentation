@@ -271,9 +271,10 @@ wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<app
 - `azure_client_id`: the client ID of a user-assigned managed identity or of a
   workload identity. Cannot be combined with `azure_credential=environment`.
 
-The keys hold no secret, so a connect string that uses them is safe to log, and
-to keep in `QDB_CLIENT_CONF`. Clients built from equivalent connect strings
-share one provider in a process. See
+The Azure provider keys contain no secret. You can keep the connect string in
+`QDB_CLIENT_CONF`. Redact any other sensitive settings, such as
+`tls_roots_password`, before logging it. Clients built from equivalent connect
+strings share one provider in a process. See
 [Rotating tokens](/docs/connect/clients/java/#rotating-tokens) in the Java
 client reference, and
 [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)

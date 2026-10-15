@@ -635,8 +635,9 @@ public class FxIngest {
   `azure_credential`, the client uses `DefaultAzureCredential`, a discovery
   chain meant for development, which does not ride out an outage of the
   managed identity endpoint at startup.
-- The connect string holds no secret, so it is safe to log, and to keep in the
-  `QDB_CLIENT_CONF` environment variable.
+- The Azure provider keys contain no secret. You can keep the connect string in
+  the `QDB_CLIENT_CONF` environment variable. Redact any other sensitive
+  settings, such as `tls_roots_password`, before logging it.
 - When QuestDB rejects a token with `401`, the client asks Azure Identity for a
   new token, at most once every 30 seconds, and when it gets a different one,
   retries the same server once. Azure Identity can return the token that it

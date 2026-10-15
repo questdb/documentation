@@ -1,12 +1,16 @@
 import type { Plugin } from '@docusaurus/types'
 import nodeFetch from 'node-fetch'
+import {
+  MINIMUM_JAVA_CLIENT_VERSION,
+  resolveJavaClientVersion,
+} from '../../shared/java-client-version'
 
 type Release = {
   name: string
 }
 
 const DEFAULT_RELEASE: Release = {
-  name: '1.0.1',
+  name: MINIMUM_JAVA_CLIENT_VERSION,
 }
 
 async function fetchLatestJavaClientRelease(): Promise<Release> {
@@ -27,8 +31,9 @@ async function fetchLatestJavaClientRelease(): Promise<Release> {
       }
 
       const data = await response.json()
-      const tagName = (data as { tag_name?: string }).tag_name ?? ''
-      return { name: tagName.replace(/^v/, '') || DEFAULT_RELEASE.name }
+      return {
+        name: resolveJavaClientVersion((data as { tag_name?: string }).tag_name),
+      }
     } catch (error) {
       console.error('Failed to fetch latest Java client release:', error)
       return DEFAULT_RELEASE
@@ -47,8 +52,9 @@ async function fetchLatestJavaClientRelease(): Promise<Release> {
     }
 
     const data = await response.json()
-    const tagName = (data as { tag_name?: string }).tag_name ?? ''
-    return { name: tagName.replace(/^v/, '') || DEFAULT_RELEASE.name }
+    return {
+      name: resolveJavaClientVersion((data as { tag_name?: string }).tag_name),
+    }
   } catch (error) {
     console.error('Failed to fetch latest Java client release:', error)
     return DEFAULT_RELEASE

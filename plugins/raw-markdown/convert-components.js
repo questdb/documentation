@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 const clients = require("../../shared/clients.json")
 const ilpClients = require("../../shared/ilp_clients.json")
+const { resolveJavaClientVersion } = require("../../shared/java-client-version")
 
 /**
  * Parses JSX props from a string like: alt="test" height={300} src="..."
@@ -321,7 +322,8 @@ async function fetchReleaseVersion() {
 }
 
 async function fetchJavaClientVersion() {
-  return fetchGitHubRelease("questdb/java-questdb-client", { stripV: true })
+  const tag = await fetchGitHubRelease("questdb/java-questdb-client", { stripV: true })
+  return resolveJavaClientVersion(tag)
 }
 
 function convertInterpolateReleaseData(content, releaseVersion) {

@@ -477,12 +477,15 @@ service principal configured with `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and
 retries an unreachable endpoint, and fails fast when the identity is not
 assigned to the host.
 
-The connect string holds no secret, so it is safe to log, and to keep in
-`QDB_CLIENT_CONF`. Every sender, query client, and pooled connection built from
-equivalent connect strings shares one provider in a process: one thread that
-renews the token, and one request to Entra ID at a time. The provider stays
-open for 60 seconds after the last client that uses it closes, so that a client
-built soon after reuses its token. For the keys, see
+The Azure provider keys contain no secret. You can keep the connect string in
+`QDB_CLIENT_CONF`. Redact any other sensitive settings, such as
+`tls_roots_password`, before logging it.
+
+Every sender, query client, and pooled connection built from equivalent connect
+strings shares one provider in a process: one thread that renews the token,
+and one request to Entra ID at a time. The provider stays open for 60 seconds
+after the last client that uses it closes, so that a client built soon after
+reuses its token. For the keys, see
 [Token providers](/docs/connect/clients/connect-string/#token-providers) in the
 connect string reference. For the Entra ID setup and the QuestDB configuration,
 see
@@ -582,9 +585,13 @@ The provider hands out a token only while more than 60 seconds of its lifetime
 are left. A token that arrives with less counts as a failed request, whose
 error names `handout_floor`. If your identity provider issues tokens that
 short, lower the floor with `handoutFloorMillis(...)` on the builder. A
-connection that needs a token waits up to 30 seconds for one when the provider
-holds none, set with `coldWaitMillis(...)`, and up to 5 seconds for a new
-token after a `401`, set with `forcedWaitMillis(...)`.
+connection that needs a token waits up to 30 seconds when the provider holds no
+usable token, set with `coldWaitMillis(...)`. After a `401`,
+`onTokenRejected()` waits up to 5 seconds for a refresh, set with
+`forcedWaitMillis(...)`. The client then calls `getToken()` again. If the cached
+token became unusable during the forced-refresh wait, this call can add the
+30-second cold wait, for up to 35 seconds of provider waiting with the defaults,
+excluding network time.
 
 #### How the client handles token failures
 

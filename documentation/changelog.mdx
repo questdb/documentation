@@ -46,6 +46,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [Non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Which token each client sends, with client credentials and password grant examples over QWP
 - [Managing authentication](/docs/security/rbac/#managing-authentication) - HTTP sessions of QuestDB Enterprise 4.0.2 end with the credential that opened them
 - [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error policies, and that the `QuestDB` handle accepts an error handler
+- [Java token providers](/docs/connect/clients/java/#rotating-tokens) - Clarified how token-wait budgets combine and which connection-string settings must be redacted before logging
 - [Python](/docs/connect/clients/python/#the-pool), [C/C++](/docs/connect/clients/c-and-cpp/#connecting), and [Rust](/docs/connect/clients/rust/#connecting) clients - Corrected that the pool connects when it is created, unless `lazy_connect=on`
 - [Python client](/docs/connect/clients/python/#flushing-and-acknowledgements) - Corrected that a terminal server rejection raises from `flush(wait=True)`
 - [Client token rotation](/docs/security/oidc/#token-lifetime) - Corrected how the Python, C/C++, .NET, Go, and Rust clients switch to a new token
