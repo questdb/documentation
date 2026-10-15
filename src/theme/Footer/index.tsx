@@ -22,7 +22,7 @@ const Footer = () => {
           <span>{customFields.copyright}</span>
           <div className={styles.rightLinks}>
             <span className={styles.certificationText}>
-              SOC 2 Type 1 Compliant
+              SOC 2 Type 2 Compliant
             </span>
             <a className={styles.link} href="/privacy-notice/">
               Privacy

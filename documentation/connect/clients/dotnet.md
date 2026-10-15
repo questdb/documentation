@@ -1008,6 +1008,7 @@ RAM cap.
 
 Durable acknowledgement requires QuestDB Enterprise with primary replication.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 By default the server confirms a batch once it is committed to the local
@@ -1031,6 +1032,7 @@ Console.WriteLine($"trades durable seqTxn: {sender.GetHighestDurableSeqTxn("trad
 Multi-host failover is most useful with QuestDB Enterprise primary-replica
 replication.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 Supply a comma-separated address list (or repeat `addr=`). The client connects
