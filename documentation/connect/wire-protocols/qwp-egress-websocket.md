@@ -809,6 +809,7 @@ Key behaviors:
 
 Multi-host failover with automatic reconnect requires QuestDB Enterprise.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 ## Flow control
