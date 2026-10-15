@@ -30,14 +30,14 @@ This page tracks significant updates to the QuestDB documentation.
 - [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) and [`acl.oidc.issuer.validation.enabled`](/docs/configuration/oidc/#acloidcissuervalidationenabled) - New settings for the expected issuer of a token
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the name of the property, previously documented as `acl.oidc.pkce.enabled`
 - [`acl.oidc.state.required`](/docs/configuration/oidc/#acloidcstaterequired) and [`acl.oidc.public.keys.expiry`](/docs/configuration/oidc/#acloidcpublickeysexpiry) - Documented both properties
-- [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented what QuestDB caches, and that it also bounds how long an HTTP session reuses a password check
+- [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented what QuestDB caches, distinguished provider checks from JWT revalidation in token mode, and explained how long an HTTP session reuses a password check
 - [`http.session.timeout`](/docs/configuration/http-server/#httpsessiontimeout) - Documented how long an idle HTTP session stays valid
 - [Token providers](/docs/connect/clients/connect-string/#token-providers) - The `token_provider` and `azure_*` keys of the Java client
 
 ### Guides
 
 - [Microsoft Entra ID](/docs/security/oidc/entra-id/) - Moved to its own page, and added app-only tokens for Azure managed identities and service principals
-- [PingFederate](/docs/security/oidc/pingfederate/) - Moved to its own page, added the QuestDB configuration, and corrected the directory that PingFederate reads users from
+- [PingFederate](/docs/security/oidc/pingfederate/) - Moved to its own page, added the QuestDB configuration with ROPC disabled unless explicitly enabled, and corrected the directory that PingFederate reads users from
 
 ### Updated
 

@@ -370,9 +370,13 @@ the password ends the session at once, as described in
 [Managing authentication](/docs/security/rbac/#managing-authentication).
 The session does not reuse the check of any other credential. QuestDB checks a
 REST token on every request that carries it, and an OIDC token or an ROPC login
-through the cache described above, which asks the provider again once this
-time has passed since the provider last checked the credential. See
-[When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
+through the cache described above. Once a cache entry expires, User Info mode
+calls the provider's User Info endpoint again, and ROPC requests a new token
+from the provider in either mode. For bearer tokens in token mode, QuestDB
+instead revalidates the JWT against signing keys and rereads its existing
+claims. It does not ask the provider about the user's current status or group
+memberships; updated group claims require the client to present a new token.
+See [When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
 
 ### acl.oidc.groups.claim
 

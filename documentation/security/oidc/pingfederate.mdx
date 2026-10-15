@@ -373,8 +373,8 @@ acl.oidc.client.id=questdb
 # the claim set up in Add groups to OIDC policy management
 acl.oidc.groups.claim=groups
 
-# optional, required only if ROPC is enabled in PingFederate
-acl.oidc.ropc.flow.enabled=true
+# optional: uncomment only if you enabled ROPC in PingFederate
+# acl.oidc.ropc.flow.enabled=true
 ```
 
 QuestDB reads the groups from the User Info response, so keep the default,
