@@ -152,7 +152,10 @@ ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
 
 The 2-minute reconnect budget covers both the *first* connect and any
 subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
+turns on `initial_connect_retry`. In the C, C++, Python, and Rust clients,
+this applies to a standalone sender only: their pooled facade honours only an
+explicit `initial_connect_retry`, and tolerates a server that is down at
+startup with [`lazy_connect=on`](#pool-keys). See
 [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
@@ -238,7 +241,7 @@ the TLS handshake is server-authenticated only. `tls_roots` /
 
 ### Token providers {#token-providers}
 
-*Applies to: ingress and egress. Java client only.*
+*Applies to: ingress and egress. Java client only, 1.3.10 or later.*
 
 A token provider requests bearer tokens from an identity provider, caches
 them, and renews them in the background before they expire, so every
@@ -684,7 +687,11 @@ architecture is that a producer survives an arbitrarily long outage.
 
 Auth failures during reconnect (authentication rejected, version mismatch,
 durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal — the loop does not retry them.
+terminal: the loop does not retry them. The Java client is the exception for
+authentication, upgrade, and durable-ack rejections: it treats them as terminal
+only for the first connect of a sender and for orphan drainers, and a sender
+that has connected keeps retrying them, as described in
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
 
 ### Egress failover {#egress-failover}
 
@@ -815,7 +822,11 @@ explicit setter always wins over the string.
 - `lazy_connect` — when `on`, the pool defers opening its first connection
   until the first borrow, so construction succeeds against a server that is
   down. This is the supported way to tolerate a server that starts after your
-  application. Default: `off`.
+  application, and in the Java client, an identity provider that is
+  unreachable when a token provider requests its first token. In the Java, C,
+  C++, Python, and Rust clients, it cannot be combined with `query_pool_min`
+  above `0`, or with an `initial_connect_retry` other than `async`: the client
+  rejects the configuration. Default: `off`.
 
 ## Error handling {#error-handling}
 
@@ -918,7 +929,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set, except in the pooled facade of the C, C++, Python, and Rust clients) | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |

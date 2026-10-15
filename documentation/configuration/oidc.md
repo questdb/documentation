@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
-description: "Configure OIDC in QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience and issuer, and principal and groups claims with fallback lists."
+description: "Reference for the acl.oidc.* settings of QuestDB Enterprise: provider endpoints, TLS, PKCE, ROPC, token audience and issuer, and claim lists."
 ---
 
 :::note
@@ -14,7 +14,9 @@ Management. The database can be integrated with any OAuth2/OIDC Identity
 Provider (IdP).
 
 For detailed information about OIDC, see the
-[OpenID Connect (OIDC) integration guide](/docs/security/oidc).
+[OpenID Connect (OIDC) integration guide](/docs/security/oidc). For complete
+provider setups, see the [Microsoft Entra ID](/docs/security/oidc/entra-id/)
+and [PingFederate](/docs/security/oidc/pingfederate/) guides.
 
 ## General
 
@@ -118,7 +120,10 @@ Set it when:
 - The discovery document names another issuer than the tokens, because the
   provider puts the host name of each request into the issuer, such as
   Keycloak without a fixed hostname, and QuestDB reaches the provider through
-  another URL than the clients. Set the issuer that the tokens carry.
+  another URL than the clients. Set the issuer that the tokens carry. The Web
+  Console still sends browsers to the endpoints of that discovery document, so
+  for Web Console logins, give the provider a fixed public hostname instead,
+  as described in [The expected issuer](/docs/security/oidc/#the-expected-issuer).
 
 With issuer validation enabled, QuestDB refuses to start when it has no
 expected issuer:
@@ -180,12 +185,12 @@ scope `openid` is mandatory and must always be included.
 The Web Console requests these scopes when the user logs in. Add
 `offline_access` if the provider issues a refresh token only for that scope,
 such as Microsoft Entra ID. Without a refresh token, the Web Console cannot
-renew its tokens: it logs the user out once QuestDB stops accepting the token
-of the login, for example when the token expires, about an hour after the login
-with Microsoft Entra ID. This can be later than when the user is disabled in
-the provider. See
-[Credentials received](/docs/security/oidc/#6-credentials-received) in the
-OIDC guide.
+renew its tokens, and on QuestDB Enterprise 4.0.2 and later, it logs the user
+out once QuestDB stops accepting the token of the login, about an hour after
+the login with Microsoft Entra ID. Until then, a user who is disabled in the
+provider can keep access. See
+[Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) in
+the OIDC guide.
 
 ## Authentication flows
 
@@ -230,6 +235,11 @@ request of the Authorization Code Flow, and rejects the redirect back from the
 OIDC Provider when it does not carry the same `state`. This ties the redirect
 to a login that the same browser started, which protects against cross-site
 request forgery on the login redirect.
+
+Enable it when your security policy or your provider requires the `state`
+parameter. The PKCE check, which
+[`acl.oidc.pkce.required`](#acloidcpkcerequired) enables by default, already
+ties the authorization code to the browser that started the login.
 
 ## Endpoints
 
@@ -356,10 +366,11 @@ that carries the session cookie and the same password is checked again once
 this time has passed since the session last checked it. Changing or removing
 the password ends the session at once, as described in
 [Managing authentication](/docs/security/rbac/#managing-authentication).
-QuestDB checks OIDC tokens, username and password logins through the ROPC flow,
-and REST tokens on every request, the OIDC ones through the cache described
-above. See
-[Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access).
+The session does not reuse the check of any other credential. QuestDB checks a
+REST token on every request that carries it, and an OIDC token or an ROPC login
+through the cache described above, which asks the provider again once this
+time has passed since the provider last checked the credential. See
+[When QuestDB stops accepting a token](/docs/security/oidc/#when-questdb-stops-accepting-a-token).
 
 ### acl.oidc.groups.claim
 

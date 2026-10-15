@@ -135,7 +135,9 @@ previous client left holding unsent data, and replays them in the background.
 
 With [`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
 `connect()` performs no blocking network I/O, and `query_pool_min` defaults to
-`0`. A borrowed sender then creates its local producer at once and connects its
+`0`. It rejects an explicit `query_pool_min` above `0`, and an
+`initial_connect_retry` other than `async`. A borrowed sender then creates its
+local producer at once and connects its
 delivery runner in the background, so it can queue data while the server is
 unavailable, and reader errors surface from the first borrow. In both modes,
 direct Arrow/Polars transport errors surface from the borrow or during
@@ -156,6 +158,21 @@ let token = QuestDb::connect(
     "wss::addr=db.example.com:9000;token=your_bearer_token;",
 )?;
 ```
+
+A `token` is a static credential: the client sends it on every connection that
+it opens, including reconnects, and never renews it. Acquire it from the
+identity provider of the QuestDB Enterprise
+[OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and for
+Azure services, see
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+Before the token expires, connect a new `QuestDb` with a new token, wait until
+QuestDB has acknowledged what the old senders sent, with
+`wait(AckLevel::Ok, timeout)`, then close the old handle. With `sf_dir`, close
+the old handle first, then connect the new one with the same `sender_id`: two
+handles cannot hold the same store-and-forward slot, and the new handle replays
+what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with
+the User Info endpoint, QuestDB rejects the token on new connections shortly
+after it expires; see [Token lifetime](/docs/security/oidc/#token-lifetime).
 
 With the default crate features, the TLS root set is `webpki_roots`. Other
 choices have feature requirements:
@@ -785,8 +802,10 @@ and is not part of that thread-bound borrow list.
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
 | `lazy_connect` | `off` | `on` makes `connect()` open no connections, so that it tolerates a server that is down at startup. See [Connecting](#connecting). |
 
-Setting an ingress `reconnect_*` key without explicitly setting
-`initial_connect_retry` promotes the initial mode to synchronous retry. See the
+For a standalone `Sender`, setting an ingress `reconnect_*` key without
+explicitly setting `initial_connect_retry` promotes the initial mode to
+synchronous retry. A pool, and so `QuestDb::connect`, honours only an
+explicitly set `initial_connect_retry`. See the
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 

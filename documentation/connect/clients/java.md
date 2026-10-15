@@ -44,6 +44,10 @@ Key capabilities:
   async [`Completion`](#completion) handles, and byte-credit flow control.
 - **Failover**: multi-endpoint connections with automatic reconnect across
   rolling upgrades and primary migrations.
+- **Token renewal**: with a token provider, such as `token_provider=azure` for
+  Microsoft Entra ID managed identities and service principals, the client
+  requests bearer tokens and renews them before they expire. See
+  [Rotating tokens](#rotating-tokens).
 
 :::tip Legacy transports
 
@@ -399,9 +403,11 @@ try (QuestDB db = QuestDB.connect(
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on
 both the ingress and egress WebSocket upgrades. It is mutually exclusive with
 `username`/`password`. The client sends the same token on every connection that
-it opens, so once the token expires, new connections, reconnects, and
-failovers fail. For tokens that expire, use a
-[token provider](#rotating-tokens).
+it opens, so once QuestDB stops accepting the token, new connections,
+reconnects, and failovers fail. QuestDB Enterprise 4.0.2 and later, and the
+User Info endpoint, reject a token shortly after it expires; see
+[Token lifetime](/docs/security/oidc/#token-lifetime). For tokens that expire,
+use a [token provider](#rotating-tokens).
 
 ### Rotating tokens
 
@@ -410,7 +416,7 @@ with Microsoft Entra ID. A **token provider** requests tokens from the identity
 provider instead of a fixed `token`, caches them, and renews them in the
 background at about half of their lifetime, so every connection, reconnect,
 and failover presents a valid token. A connection that is already open is not
-authenticated again.
+authenticated again. Token providers require Java client 1.3.10 or later.
 
 #### Microsoft Entra ID
 
@@ -474,9 +480,33 @@ assigned to the host.
 The connect string holds no secret, so it is safe to log, and to keep in
 `QDB_CLIENT_CONF`. Every sender, query client, and pooled connection built from
 equivalent connect strings shares one provider in a process: one thread that
-renews the token, and one request to Entra ID at a time. For the Entra ID
-setup and the QuestDB configuration, see
+renews the token, and one request to Entra ID at a time. The provider stays
+open for 60 seconds after the last client that uses it closes, so that a client
+built soon after reuses its token. For the keys, see
+[Token providers](/docs/connect/clients/connect-string/#token-providers) in the
+connect string reference. For the Entra ID setup and the QuestDB configuration,
+see
 [Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+
+To use an Azure credential that `azure_credential` cannot select, such as a
+certificate credential, wrap it in an `AzureTokenSource`, and pass it to a
+`RefreshingTokenProvider`, as described in
+[Other identity providers](#other-identity-providers):
+
+```java
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.ClientCertificateCredentialBuilder;
+import io.questdb.client.azure.AzureTokenSource;
+import io.questdb.client.cutlass.auth.RefreshingTokenProvider;
+
+TokenCredential credential = new ClientCertificateCredentialBuilder()
+        .tenantId("<tenant ID>")
+        .clientId("<client ID of the service principal>")
+        .pemCertificate("/etc/fx-ingest/client.pem")
+        .build();
+RefreshingTokenProvider tokens = RefreshingTokenProvider.builder(
+        new AzureTokenSource(credential, "api://<QuestDB application ID>")).build();
+```
 
 #### Other identity providers
 
@@ -489,15 +519,22 @@ provider, in a `RefreshingTokenProvider`, and pass the provider to
 provider: close it after the clients that use it.
 
 ```java
+import java.io.IOException;
+
 import io.questdb.client.QuestDB;
 import io.questdb.client.cutlass.auth.ExpiringToken;
 import io.questdb.client.cutlass.auth.RefreshingTokenProvider;
+import io.questdb.client.cutlass.auth.TokenUnavailableException;
 
 RefreshingTokenProvider tokens = RefreshingTokenProvider.builder(() -> {
     // runs on the provider's own thread: request a token from your
     // identity provider, such as with the client credentials grant
-    MyToken token = requestToken();
-    return new ExpiringToken(token.value(), token.expiresAtEpochMillis());
+    try {
+        MyToken token = requestToken();
+        return new ExpiringToken(token.value(), token.expiresAtEpochMillis());
+    } catch (IOException e) {
+        throw TokenUnavailableException.retryable("token endpoint unreachable");
+    }
 }).build();
 try (QuestDB db = QuestDB.connect("wss::addr=db.example.com:9000;", tokens)) {
     // ...
@@ -508,37 +545,84 @@ try (QuestDB db = QuestDB.connect("wss::addr=db.example.com:9000;", tokens)) {
 
 `requestToken()` and `MyToken` stand for your own code. `ExpiringToken` takes
 the token, without the `Bearer ` prefix, and the time when it expires, in
-milliseconds since the epoch. The provider requests its first token as soon as
-it is built, and `awaitReady(timeoutMillis)` returns `true` once it holds a
-valid one, so an application can wait for it at startup.
+milliseconds since the epoch. The source cannot throw checked exceptions:
+catch them, as the example does with the `IOException` of an HTTP client, and
+throw a `TokenUnavailableException` instead, which is unchecked.
 
 A source reports a failure by throwing `TokenUnavailableException.retryable(...)`
 for network trouble, throttling, or a `5xx` response, or
 `TokenUnavailableException.permanent(...)` for a missing or wrong
-configuration. Any other exception counts as retryable. Don't put a token or a
-raw response body into the message. The provider keeps retrying with backoff,
-and keeps handing out the current token while it is still valid.
+configuration, such as a wrong client secret. Pass the `Retry-After` of a
+throttled response with `retryable(message, retryAfterMillis)`. Any other
+exception counts as retryable. Don't put a token or a raw response body into
+the message. The provider keeps retrying with backoff, whatever the
+classification, and keeps handing out the current token while it is still
+valid.
+
+The provider requests its first token as soon as it is built.
+`awaitReady(timeoutMillis)` returns `true` once it holds a valid one, and
+`false` when the timeout passes, also after a permanent failure. To fail fast
+at startup, for example on a wrong client secret, check `getLastFailure()`:
+
+```java
+if (!tokens.awaitReady(30_000)) {
+    RefreshingTokenProvider.FetchFailure failure = tokens.getLastFailure();
+    if (failure != null && !failure.isRetryable()) {
+        tokens.close();
+        throw new IllegalStateException("cannot get a token: " + failure.getMessage());
+    }
+    // a retryable failure: start anyway, and let the provider keep trying
+}
+```
+
+`getConsecutiveFailures()` and `getTokenExpiresAtEpochMillis()` report the
+state of the provider too, such as for a health check.
 
 The provider hands out a token only while more than 60 seconds of its lifetime
 are left. A token that arrives with less counts as a failed request, whose
 error names `handout_floor`. If your identity provider issues tokens that
-short, lower the floor with `handoutFloorMillis(...)` on the builder.
+short, lower the floor with `handoutFloorMillis(...)` on the builder. A
+connection that needs a token waits up to 30 seconds for one when the provider
+holds none, set with `coldWaitMillis(...)`, and up to 5 seconds for a new
+token after a `401`, set with `forcedWaitMillis(...)`.
 
 #### How the client handles token failures
 
 - When QuestDB rejects a token with `401`, the client asks the provider for a
   new token, and when it gets a different one, retries the same server once,
-  immediately. A `403` does not trigger a retry.
-- At startup, with `initial_connect_retry=off`, the default, the client fails
-  when it cannot get a token. With `on`, it retries a retryable failure of the
-  provider within `reconnect_max_duration_millis`, and fails at once on a
-  permanent one. With `async`, it keeps retrying in the background.
+  immediately. The provider requests a new token for a rejected one at most
+  once every 30 seconds. With `token_provider=azure`, Azure Identity can
+  return the token that it has cached, and then the client does not retry. A
+  `403` does not trigger a retry.
+- At startup, a sender with `initial_connect_retry=off`, the default, fails
+  when it cannot get a token within 30 seconds. With `on`, it retries a
+  retryable failure of the provider within `reconnect_max_duration_millis`,
+  and fails at once on a permanent one. With `async`, it keeps retrying in the
+  background.
+- A `QuestDB` handle also connects `query_pool_min` query clients, one by
+  default, when it starts, and a query client that cannot get a token fails
+  without retrying. `QuestDB.connect()` and `build()` therefore fail while the
+  identity provider is unreachable, whatever `initial_connect_retry` says. To
+  start anyway, set `lazy_connect=true`: senders then connect in the
+  background, as with `initial_connect_retry=async`, and query clients on the
+  first query. `lazy_connect=true` rejects an explicit `query_pool_min` above
+  `0`, and an `initial_connect_retry` other than `async`.
 - Once a sender has connected, it keeps retrying when it cannot get a token or
-  QuestDB rejects one, buffers rows in [store-and-forward](#store-and-forward)
-  meanwhile, and reports each failure to the error handler and in its
-  [connection health](#connection-health). It never fails on its own: an
-  application that prefers a hard failure watches the error handler or the
-  connection health, and closes the sender itself.
+  QuestDB rejects one, with any credential, not only with a token provider. It
+  buffers rows in [store-and-forward](#store-and-forward) meanwhile, and
+  reports each failure in its [connection health](#connection-health) and to
+  the error handler, as a `SECURITY_ERROR` with the `RETRIABLE` policy, whose
+  message starts with `ws-upgrade-failed:` or `credential-unavailable:`. It
+  never fails on its own: an application that prefers a hard failure watches
+  the error handler or the connection health, and closes the sender itself.
+  Without `sf_dir`, closing it discards the rows that QuestDB has not
+  acknowledged.
+- An orphan drainer, enabled with `drain_orphans=on`, gives up instead. When
+  QuestDB keeps rejecting its credential, it sets the slot aside behind a
+  `.failed` file and reports `DATA_LOSS`: at once with a fixed credential, and
+  with a token provider, once the rejections have lasted for
+  `reconnect_max_duration_millis`, at most 5 minutes, and at least six
+  attempts. The rows stay on disk.
 - A query whose client has to connect, and cannot get a token, fails. The next
   query tries again.
 
@@ -1379,16 +1463,15 @@ apply to the query side only and are ignored by the ingest side.
 
 WebSocket ingestion uses an asynchronous error model. Batch rejections are
 delivered via the `SenderErrorHandler` callback, not thrown from `flush()`.
-The `QuestDB` connect-string path does not yet expose this callback — if
-your application needs structured `SenderError` reports, drop down to the
-[low-level `Sender.builder`](#sender-low-level-primitive) directly and
-skip the pool. The structured fields on `SenderError` are the same
-regardless of how the sender was created:
+Register the handler with `QuestDB.builder().errorHandler(...)` for every
+sender of the pool, or with `errorHandler(...)` on the builder of a
+[low-level `Sender`](#sender-low-level-primitive). The structured fields on
+`SenderError` are the same regardless of how the sender was created:
 
 | Field | Accessor | Description |
 |-------|----------|-------------|
-| Category | `getCategory()` | `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`, `SECURITY_ERROR`, `WRITE_ERROR`, `PROTOCOL_VIOLATION`, or `UNKNOWN` |
-| Policy | `getAppliedPolicy()` | `DROP_AND_CONTINUE` (batch dropped, sender continues) or `HALT` (next API call throws `LineSenderServerException`) |
+| Category | `getCategory()` | `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`, `SECURITY_ERROR`, `WRITE_ERROR`, `NOT_WRITABLE`, `DICTIONARY_GAP`, `PROTOCOL_VIOLATION`, `DATA_LOSS`, or `UNKNOWN` |
+| Policy | `getAppliedPolicy()` | `RETRIABLE` (the client reconnects and replays the batch from store-and-forward), `RETRIABLE_OTHER` (the same, on the next endpoint), `TERMINAL` (the next API call throws `LineSenderServerException`, and the rejected rows stay in store-and-forward), or `ABANDONED` (with `DATA_LOSS` only: the rows can never be sent, and stay on disk under `getQuarantinedPath()`) |
 | Server message | `getServerMessage()` | Human-readable error text from the server (may be null) |
 | Table name | `getTableName()` | The rejected table (null for multi-table batches) |
 | FSN range | `getFromFsn()` / `getToFsn()` | Frame sequence number span identifying the rejected batch |
@@ -1398,7 +1481,15 @@ regardless of how the sender was created:
 The error handler runs on a dedicated dispatcher thread, never on the I/O
 or producer thread.
 
-When a sender owned by `QuestDB` enters a terminal `HALT` state, the next
+By default, schema mismatches, parse errors, security errors such as a missing
+grant, and protocol violations are `TERMINAL`. Write errors, internal errors,
+dictionary gaps, and unknown categories are `RETRIABLE`, and a node that cannot
+serve writes is `RETRIABLE_OTHER`. A connected sender also reports each
+reconnect whose credential QuestDB rejects, or for which it cannot get a token,
+as a `RETRIABLE` `SECURITY_ERROR`, as described in
+[How the client handles token failures](#how-the-client-handles-token-failures).
+
+When a sender owned by `QuestDB` enters the `TERMINAL` state, the next
 producer-thread call throws `LineSenderServerException`. The pool detects
 the failure on close/return and replaces the failed sender with a fresh one on
 the next borrow.
@@ -1464,10 +1555,13 @@ What is and isn't carried on `onError`:
 ### Connection-level errors
 
 - **Authentication failure**: `401`/`403` HTTP response before the WebSocket
-  upgrade completes. Terminal across all endpoints. The borrow that
-  triggered the connect rethrows `LineSenderException`. With a
-  [token provider](#rotating-tokens), a `401` first makes the client request
-  a new token and retry the same endpoint once.
+  upgrade completes. Terminal across all endpoints for the first connect of a
+  sender and for a query client: the borrow that triggered the connect
+  rethrows `LineSenderException`. A sender that has connected before keeps
+  retrying instead, as described in
+  [How the client handles token failures](#how-the-client-handles-token-failures).
+  With a [token provider](#rotating-tokens), a `401` first makes the client
+  request a new token and retry the same endpoint once.
 - **Credential unavailable**: the [token provider](#rotating-tokens) cannot
   supply a token, for example because the identity provider is unreachable.
   The client contacts no endpoint, and handles the failure as described in
@@ -1573,10 +1667,11 @@ client and gives you a fresh one on your next query.
 ### Which failures are retried
 
 - **Authentication failures** (a bad token or wrong credentials) stop
-  immediately on every host, because retrying cannot help. With a
-  [token provider](#rotating-tokens), a `401` first makes the client request a
-  new token and retry the same host once. A sender that has already connected
-  keeps retrying instead, as described in
+  immediately on every host for a query and for the first connect of a sender,
+  because retrying cannot help. With a [token provider](#rotating-tokens), a
+  `401` first makes the client request a new token and retry the same host
+  once. A sender that has already connected keeps retrying with any
+  credential, as described in
   [How the client handles token failures](#how-the-client-handles-token-failures).
 - **Network and availability failures** (connection refused, TLS errors, a
   `5xx` from the server, a mid-query drop) are treated as temporary and fed into
@@ -1627,20 +1722,25 @@ sections of the connect string reference.
 
 A sender rides out an outage, such as an unreachable cluster or a token that
 QuestDB rejects, and keeps accepting rows while it retries. To find out that it
-has not reached the server, check its connection health. Reading it never
-blocks, and never contains a credential, so it can back a health endpoint:
+has not reached the server, check its connection health, which requires Java
+client 1.3.10 or later. Reading it never blocks, and never contains a
+credential, so it can back a health endpoint:
 
 ```java
 import io.questdb.client.ConnectionHealth;
 
 // every pooled sender and query client of the handle
 ConnectionHealth.Aggregate health = db.health();
-if (health.count(ConnectionHealth.State.RECONNECTING) > 0) {
-    long since = health.getOldestOutageSinceEpochMillis();
+long since = health.getOldestOutageSinceEpochMillis();
+if (since != ConnectionHealth.NONE) {
+    // a client has not connected yet, is reconnecting, or has failed
     ConnectionHealth.Failure failure = health.getLastFailure();
     System.err.printf("QuestDB unreachable since %d: %s%n", since, failure);
 }
 ```
+
+The aggregate counts query clients too: a query client whose last connect
+failed is in an outage until a later query connects it.
 
 `Sender.health()` and `QwpQueryClient.health()` return the `ConnectionHealth`
 of one client. Only the WebSocket (QWP) sender tracks it; the other transports

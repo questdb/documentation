@@ -81,6 +81,19 @@ occurs. Changing the default value is strongly discouraged.
 Password for HTTP Basic Authentication in QuestDB Open Source. QuestDB
 Enterprise supports more advanced authentication via RBAC.
 
+### http.session.timeout
+
+- **Default**: `30m`
+- **Reloadable**: no
+
+How long an HTTP session stays valid without a request. A client opens a
+session, the `qdb_session` cookie, by sending `session=true`, as the Web
+Console does at login. Every request that QuestDB authorizes with the session
+restarts the timer, so a session in use does not expire. In QuestDB
+Enterprise, a session also ends when the credential that opened it is
+revoked, as described in
+[Managing authentication](/docs/security/rbac/#managing-authentication).
+
 ### http.user
 
 - **Default**: N/A

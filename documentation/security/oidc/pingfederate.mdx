@@ -25,6 +25,12 @@ no LDAP endpoint. An on-premises Active Directory works the same way.
 For how QuestDB uses OIDC in general, such as the login flow and how it maps
 groups to permissions, see [OpenID Connect (OIDC)](/docs/security/oidc/).
 
+This guide covers Web Console logins, and username and password logins through
+the ROPC flow, with QuestDB reading the groups from the User Info endpoint of
+PingFederate. It does not set up tokens that services request for themselves:
+those usually need QuestDB to read the groups from a JWT instead, as described
+in [Non-interactive clients](/docs/security/oidc/#non-interactive-clients).
+
 ## Set up PingFederate client
 
 First thing first, let's pick a name for the client!

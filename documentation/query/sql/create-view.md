@@ -217,6 +217,12 @@ When a user creates a new view, they are automatically assigned all view level
 permissions with the `GRANT` option for that view. This behavior can be
 overridden using `OWNED BY`.
 
+The `OWNED BY` clause cannot be omitted if the view is created by an external
+user, who logs in through OIDC, because permissions cannot be granted to them.
+The owner must then be one of the QuestDB groups that the external user belongs
+to. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
+
 ```questdb-sql
 CREATE GROUP analysts;
 CREATE VIEW trades_summary AS (

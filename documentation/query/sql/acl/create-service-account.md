@@ -50,7 +50,9 @@ clause is present, in which case the permission is granted to the user or
 group specified in the clause.
 
 The `OWNED BY` clause cannot be omitted if the service account is created by
-an external user, because permissions cannot be granted to them.
+an external user, because permissions cannot be granted to them. The owner must
+then be one of the QuestDB groups that the external user belongs to. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
 
 ## Examples
 
