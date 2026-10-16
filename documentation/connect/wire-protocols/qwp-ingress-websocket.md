@@ -1165,10 +1165,17 @@ Key behaviors:
   rejection is terminal before the sender's first successful connection.
   Once a foreground Java sender has connected, it instead keeps buffering
   and retrying rejected credentials with backoff, even with a fixed
-  credential. Orphan drainers have a separate bounded policy. See
-  [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
-  Other clients treat `401`/`403` rejections as terminal, including during
-  reconnect.
+  credential. Rust, C, and C++ builds containing
+  [c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183),
+  and Python builds containing
+  [py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133),
+  also retry server upgrade `401`/`403` indefinitely after the first successful
+  connection, retaining buffered rows. Initial authentication rejection remains
+  terminal after any eligible token retry. Older native releases may still
+  treat reconnect authentication rejection as terminal. Orphan drainers have
+  separate bounded policies, including different Java and native slot-retirement
+  behavior. See
+  [Authentication rejection and credential recovery](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-rejection-and-credential-recovery).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **Transport errors are transient**, including TCP/TLS failures and

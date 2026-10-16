@@ -348,8 +348,8 @@ With `initial_connect_retry=async`:
 
 A sender in async mode does not give up because time passed. Before its first
 successful connection, authentication rejection (after any token-provider retry)
-or a durable-ack capability mismatch is terminal. Established Java senders
-instead retry these rejections; see
+or a durable-ack capability mismatch is terminal. After a sender has connected,
+recovery depends on the rejection and client build; see
 [Authentication rejection and credential recovery](#authentication-rejection-and-credential-recovery).
 The poison-frame detector can still terminate a sender. If the buffer reaches
 `sf_max_total_bytes`, `append()` blocks and then throws after
@@ -392,30 +392,39 @@ and apply back-pressure to the producer rather than dropping data.
 
 ### Authentication rejection and credential recovery
 
-The Java reference client separates a failed endpoint walk from the lifetime of
-the sender or query. A `401`/`403` stops the current walk rather than continuing
-to other hosts with the rejected credential.
+A `401`/`403` ends the current endpoint walk rather than continuing to other
+hosts with the rejected credential. This does not necessarily end the sender's
+lifetime.
 
-With a token provider, a `401` with no Bearer `error` or with
-`error="invalid_token"` can first receive one same-endpoint retry, but only if
-the provider supplies a different token. A `403` or another Bearer error, such
-as `insufficient_scope`, does not trigger this refresh/retry. Any remaining
-rejection follows these Java lifecycle rules:
+Java and native clients with the token-provider changes below can first retry a
+`401` once on the same endpoint when there is no Bearer `error` or when
+`error="invalid_token"`, but only if the provider supplies a different token.
+A `403` or another Bearer error, such as `insufficient_scope`, does not trigger
+this refresh/retry.
 
-| Lifecycle | Authentication rejection behavior |
-| --- | --- |
-| Sender before its first successful connection | Terminal, including with `initial_connect_retry=async`. |
-| Established foreground sender | Retry with backoff indefinitely while retaining buffered rows, even with fixed credentials. Report the outage through connection health and the error handler. |
-| Query initial connect or execution-time reconnect | Terminal for that connection attempt or query; no continuation to later endpoints. |
-| Orphan drainer with fixed credentials | Quarantine the slot immediately behind a `.failed` file. |
-| Orphan drainer with a token provider | Retry under a bounded time/attempt policy, then quarantine if rejections persist. |
+Here, **native clients** means Rust, C, and C++ builds containing
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183), and
+Python builds containing
+[py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133),
+which uses that native core. After any eligible token retry:
 
-Other language clients still treat authentication rejection as terminal even for
-established senders. See [Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys)
-for client differences, and
+| Lifecycle | Java | Native clients |
+| --- | --- | --- |
+| Sender before its first successful connection | Terminal, including with `initial_connect_retry=async`. | Terminal, including with `initial_connect_retry=async`. |
+| Established foreground sender | Retry with backoff indefinitely while retaining buffered rows, even with fixed credentials. Report through connection health and the error handler. | Retry with capped backoff indefinitely while retaining buffered rows, even with fixed credentials. Emit `auth_failed` connection events; an acknowledgement timeout names the rejection. |
+| Query initial connect or execution-time reconnect | Terminal for that connection attempt or query; no continuation to later endpoints. | Terminal for that connection attempt or query; no continuation to later endpoints. |
+| Orphan drainer with fixed credentials | Quarantine the slot immediately behind a `.failed` file. | Retire the slot immediately for the current session and record `.last_error`. |
+| Orphan drainer with a token provider | Retry under a bounded time/attempt policy, then quarantine if rejections persist. | Retry under a bounded time/attempt policy, then retire the slot for the current session and record `.last_error`. No `.failed` sentinel is written; the next session tries the slot again. |
+
+Older native releases may still treat authentication rejection as terminal for
+established senders. See
+[Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys)
+for the native drainer policy, and
 [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
 for Java refresh limits, orphan thresholds, and reporting. The established
-sender's reconnect loop is independent of the one-time token refresh.
+sender's reconnect loop is independent of the one-time token refresh. Retrying
+a server's `401`/`403` does not make a closed or misconfigured native token
+provider recoverable; those provider failures remain terminal.
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
@@ -426,7 +435,7 @@ sender's reconnect loop is independent of the one-time token refresh.
 | TLS session/certificate failure | transport error; try next endpoint |
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
-| `401` / `403` auth failure | End the current walk after any token-provider retry; Java recovery depends on [lifecycle](#authentication-rejection-and-credential-recovery). |
+| `401` / `403` auth failure | End the current walk after any token-provider retry; subsequent recovery depends on [client build and lifecycle](#authentication-rejection-and-credential-recovery). |
 | durable-ack requested but unsupported | Terminal at startup; established Java foreground senders retry, while orphan drainers use a bounded capability-gap budget. |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |

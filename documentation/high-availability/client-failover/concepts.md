@@ -187,7 +187,7 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` during initial connect or query reconnect, after any token-provider retry | The rejected credential stops the endpoint walk. Established Java senders and orphan drainers have [different recovery policies](#authentication-is-cluster-wide). |
+| HTTP `401` / `403` during initial connect or query reconnect, after any token-provider retry | The rejected credential stops the endpoint walk. Established senders and orphan drainers have [client-specific recovery policies](#authentication-is-cluster-wide). |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
 
 ### Topology — handled inside the round
@@ -240,20 +240,35 @@ retries later depends on the client and lifecycle:
 - With a token provider, Java can first retry the same host once when a
   refreshable `401` produces a different token. A `403` or a Bearer error
   other than `invalid_token` does not trigger that refresh/retry.
-- Before a Java sender's first successful connection, or when a query client
+- Before a sender's first successful connection, or when a query client
   connects or reconnects, any remaining authentication rejection is terminal.
 - An established foreground Java sender instead keeps buffering rows and
   retrying with backoff, even with a fixed credential. It reports the outage
-  through connection health and the error handler; applications that need a
-  hard failure must monitor these and close the sender themselves.
+  through connection health and the error handler.
+- Rust, C, and C++ builds containing
+  [c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183),
+  and Python builds containing
+  [py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133),
+  also retry server upgrade `401`/`403` indefinitely on established senders,
+  retaining buffered rows. They emit `auth_failed` connection events, and
+  acknowledgement timeouts identify the rejection. A closed or misconfigured
+  native token provider remains terminal. Older native releases may still
+  treat server authentication rejection as terminal after the first connection.
+- Applications that need a hard failure must monitor the established sender's
+  outage and close it themselves; an acknowledgement timeout does not stop its
+  reconnect loop.
 - A Java orphan drainer fails immediately on a rejected fixed credential.
   With a token provider, it retries under a bounded policy before
   quarantining the slot behind a `.failed` file; the rows stay on disk.
-- Other clients treat authentication rejection as terminal even after the
-  first connection.
+- Native orphan drainers in the builds above also stop immediately on a
+  rejected fixed credential and retry rotating credentials under a bounded
+  policy. They record `.last_error` and retire the slot for the current session
+  without writing a `.failed` sentinel; the next session tries it again.
 
-See [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
-for the refresh rules, drainer thresholds, and reporting.
+See [Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys)
+for native drainer thresholds, and
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+for Java refresh rules, drainer thresholds, and reporting.
 
 Per-host credentials are outside the failover model. Split such workloads
 into one connect string per credential.

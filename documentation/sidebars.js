@@ -740,7 +740,7 @@ module.exports = {
           items: [
             {
               id: "security/oidc/index",
-              type: "doc",
+              type: "ref",
               label: "Overview",
             },
             {

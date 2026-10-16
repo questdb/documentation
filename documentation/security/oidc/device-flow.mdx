@@ -56,7 +56,7 @@ older package that supports only static tokens. In Rust, also enable the
 
 ### Discover the identity provider
 
-The helpers discover the client ID, scope, token endpoint, audience, and
+The helpers discover the client ID, scope, token endpoint, and
 `groups.encoded.in.token` setting from the QuestDB server's public `/settings`
 endpoint. QuestDB advertises the device authorization endpoint when the
 provider's discovery document contains `device_authorization_endpoint`. With
@@ -78,10 +78,23 @@ explicitly. The helper can then discover it from the issuer's
 | C | `questdb_oidc_builder_issuer(builder, issuer, issuer_len, &error)` before building the auth object |
 
 Use an issuer obtained from your administrator, not one inferred from an
-untrusted server. An issuer override pins the endpoints to the issuer's origin;
-settings-sourced endpoints must also satisfy the client's issuer-path checks.
-If the provider intentionally hosts endpoints elsewhere, configure its trusted
-endpoints explicitly instead of weakening TLS verification.
+untrusted server. The issuer override is a trust pin, not a guarantee that all
+credential requests stay on the issuer's origin:
+
+- Endpoints read from QuestDB's `/settings` must be on the issuer's origin and
+  under its path. This prevents a different tenant on the same provider host
+  from receiving credentials.
+- Endpoints obtained from the pinned issuer's own HTTPS discovery document can
+  be outside that origin or path, provided the document's `issuer` matches the
+  requested issuer. The provider's document is authoritative for those endpoints.
+- Python, Rust, C, and C++ also accept a settings-sourced endpoint outside the
+  issuer's origin or path when the issuer's discovery document confirms that
+  endpoint. Java still applies the origin/path checks to settings-sourced
+  endpoints, even if the provider's document would confirm them.
+
+The device authorization and token endpoints must still share an origin. If
+Java rejects a valid settings-sourced endpoint, configure trusted endpoints
+explicitly with `OidcDeviceAuth.builder()` instead of weakening TLS verification.
 
 For Microsoft Entra ID, complete the
 [Web Console and group setup](/docs/security/oidc/entra-id/#web-console-sign-in),
@@ -91,6 +104,27 @@ Use `openid profile offline_access` and token mode so the helpers send the ID
 token, not a Microsoft Graph access token. This is a user login, not the
 app-only role setup for managed identities. See
 [Microsoft's device authorization documentation](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code).
+
+### Configure an audience
+
+QuestDB's `/settings` does not advertise
+[`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). If the provider
+requires an audience request parameter to issue the token QuestDB expects,
+configure it explicitly in the auth helper:
+
+| Client | Audience configuration |
+| --- | --- |
+| Java | `.audience("questdb")` on `OidcDeviceAuth.builder()` |
+| Python | `audience="questdb"` in `OidcDeviceAuth.from_questdb(...)` |
+| Rust | `.audience("questdb")` on the OIDC builder |
+| C++ | `.audience("questdb")` on the OIDC builder |
+| C | `questdb_oidc_builder_audience(builder, audience, audience_len, &error)` before building |
+
+Replace `questdb` with the provider's required audience. Java's discovery factory
+has no audience override. When using its explicit builder, also supply trusted
+`.clientId(...)`, `.deviceAuthorizationEndpoint(...)`, and `.tokenEndpoint(...)`
+values, and set `.scope(...)` and `.groupsInToken(...)` to match the server.
+Configure `.tlsConfig(...)` as needed for private CA trust.
 
 ### Private CA trust
 
@@ -427,12 +461,6 @@ Keep **interactive sign-in** separate from **token retrieval**:
    Handle any separate transport-level failure before resuming ingestion; an
    authentication helper does not undo a sender's terminal state.
 
-Silent refresh performs network I/O and can block token retrieval, a flush,
-or connection setup. The auth helper's HTTP timeout and waits for another
-thread's refresh are separate from the transport's request and reconnect
-budgets. Configure those provider waits for the amount of backpressure the
-application can tolerate; non-interactive does not mean non-blocking.
-
 Do not put `auth.token()` or `auth.signIn()` into a `token=` string and expect
 renewal. That copies one token: future connections keep using it after expiry.
 Use the provider integrations above. Device-flow refresh is demand-driven; it
@@ -448,6 +476,37 @@ reauthenticated on token renewal. The Python helper also provides
 resolves the provider for each new pooled connection, while the latter captures
 the token when connecting. Use certificate and hostname verification as in
 [OIDC for PGWire](/docs/security/oidc/#oidc-for-the-pgwire-endpoint).
+
+### Provider timeouts
+
+Silent refresh performs network I/O and can block token retrieval, a flush,
+or connection setup. The auth helper's HTTP timeout and waits for another
+thread's refresh are separate from the transport's request and reconnect
+budgets. Configure the helper's timeout for the amount of backpressure the
+application can tolerate; non-interactive does not mean non-blocking.
+
+| Client | HTTP timeout configuration | Units | Default |
+| --- | --- | --- | --- |
+| Java | `.httpTimeoutMillis(30000)` on `OidcDeviceAuth.builder()` | Milliseconds | `30000` |
+| Python | `timeout=30` in `OidcDeviceAuth.from_questdb(...)` | Seconds | `30` |
+| Rust | `.timeout(std::time::Duration::from_secs(30))` on the OIDC builder | `Duration` | 30 seconds |
+| C++ | `.timeout_ms(30000)` on the OIDC builder | Milliseconds | `30000` |
+| C | `questdb_oidc_builder_timeout_ms(builder, 30000, &error)` before building | Milliseconds | `30000` |
+
+Timeouts must be positive and no greater than 120 seconds. They bound individual
+HTTP requests or phases, not the entire interactive sign-in, which can last
+until the device code expires. Java's `fromQuestDB(...)` factory uses the
+30-second default and `DiscoveryOptions` has no timeout setter; use an explicit
+builder with the trusted configuration described under
+[Configure an audience](#configure-an-audience) to change it.
+
+Waiting behind another thread's silent refresh on the same auth object can take
+up to **six times the HTTP timeout**, or **180 seconds by default**. This wait
+budget is derived from the timeout; it is not an independent setting. Token-store
+coordination and the caller's own refresh can add further waiting, so this is
+not a total token-acquisition or flush deadline. Transport request and reconnect
+budgets do not cap these provider waits. Size backpressure against the longer
+wait, not just the per-request timeout.
 
 ## Persisting tokens and signing out
 

@@ -700,12 +700,30 @@ architecture is that a producer survives an arbitrarily long outage.
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Authentication rejection, durable-ACK mismatch, and a non-101 upgrade
-response without a role hint are immediately terminal during reconnect in
-clients other than Java: the loop does not retry them. In Java, a sender
-that has connected keeps retrying these rejections. On the first connect,
-these rejections are terminal, after any eligible
-[token-provider refresh and retry](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+Authentication rejection is terminal before a sender's first successful
+connection, after any eligible token-provider refresh and retry. Established
+Java senders instead keep retrying server upgrade `401`/`403` rejections with
+capped backoff while retaining buffered rows, even with fixed credentials.
+Rust, C, and C++ builds containing
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183)
+and Python builds containing
+[py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133)
+share this established-sender policy. Older native releases may still treat
+authentication rejection as terminal after the first connection.
+
+Native clients emit `auth_failed` connection events, and an acknowledgement
+wait that times out identifies the rejection. Applications requiring a hard
+failure must monitor the outage and close the sender themselves. This retry
+policy covers server upgrade rejections, not a closed or misconfigured token
+provider; those native provider failures remain terminal. Query authentication
+rejections remain terminal for the connection attempt or query after any
+eligible token retry, rather than starting an indefinite recovery loop.
+
+A durable-ACK mismatch or non-101 upgrade response without a role hint remains
+terminal during native reconnect. Java senders that have already connected
+retry these rejections; at initial connect they are terminal. See
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+for Java's token-provider refresh and retry rules.
 
 In Java, a protocol-version mismatch is transient, including at startup.
 With `initial_connect_retry=on`, the client retries it within
@@ -724,8 +742,23 @@ Java orphan drainers have a separate policy:
 - Role rejections while all reachable servers are replicas are transient:
   the drainer keeps retrying rather than quarantining the slot.
 
-For the token-rejection thresholds and reporting, see
+For the Java token-rejection thresholds and reporting, see
 [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+
+Native orphan drainers in the builds listed above also distinguish fixed and
+rotating credentials:
+
+- A rejected fixed credential retires the slot immediately for the current
+  session.
+- With a token provider, the drainer retries until at least six rejections have
+  persisted for `min(reconnect_max_duration_millis, 300000)` milliseconds, or
+  until 256 rejections occur without acknowledgement progress. Other failure
+  types reset the persistence timer but not the rejection count; new
+  acknowledgement progress resets both.
+
+Retiring a native slot records `.last_error` and stops draining it for the
+rest of the session, without writing Java's `.failed` sentinel. Unacknowledged
+rows remain on disk, and the next session tries the slot again.
 
 ### Egress failover {#egress-failover}
 
