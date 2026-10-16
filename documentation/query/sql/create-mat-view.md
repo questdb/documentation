@@ -362,7 +362,9 @@ CREATE MATERIALIZED VIEW trades_hourly AS (
 
 :::note
 External users (authenticated via external identity providers) must specify the
-`OWNED BY` clause when creating materialized views.
+`OWNED BY` clause when creating materialized views. The owner must then be one
+of the QuestDB groups that the external user belongs to. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
 :::
 
 ### Permission examples

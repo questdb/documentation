@@ -796,8 +796,13 @@ section of the connect string reference. The shared failover primitives
 
 Key behaviors:
 
-- Authentication errors are terminal at any host; the reconnect loop does not
-  continue past them.
+- Authentication rejections stop the endpoint walk rather than trying other
+  hosts. With a token provider, Java can first retry the same host once if a
+  refreshable `401` produces a different token. A `403` or a Bearer error
+  other than `invalid_token` does not trigger that refresh/retry. If the
+  retry is unavailable or fails, the authentication rejection is terminal
+  for the query. See
+  [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
 - A `CANCEL` acknowledged with `QUERY_ERROR(CANCELLED)` routes through the
   normal error path, not the transport-error path, so it never triggers
   failover.

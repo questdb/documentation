@@ -284,8 +284,9 @@ The [minimal HTTP server](/docs/operations/logging-metrics/#minimal-http-server)
 on port 9003 exposes the same switch to external coordinators. It accepts the
 same credentials as the main HTTP server: HTTP basic authentication, a
 [REST token](/docs/connect/compatibility/rest-api/#authentication-via-token-in-questdb-enterprise)
-as `Authorization: Bearer`, or an OIDC access token. The principal needs the
-`HTTP` endpoint permission and, for the switch, `SWITCH ROLE`. With access
+as `Authorization: Bearer`, or an
+[OIDC token](/docs/security/oidc/#non-interactive-clients). The principal needs
+the `HTTP` endpoint permission and, for the switch, `SWITCH ROLE`. With access
 control disabled no credentials are needed. TLS for this port is configured with
 the `http.min.tls.*` settings on the [TLS](/docs/configuration/tls/) page.
 

@@ -33,7 +33,7 @@ docker-compose up
 
 ## Contributing
 
-You'll need to sign a quick CLA.
+You will need to sign a quick CLA.
 
 Pretty standard, [check it out](https://cla-assistant.io/questdb/documentation).
 

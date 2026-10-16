@@ -730,9 +730,35 @@ module.exports = {
           label: "Role-Based Access Control (RBAC)",
         },
         {
-          id: "security/oidc",
-          type: "doc",
+          type: "category",
           label: "OpenID Connect (OIDC)",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "security/oidc/index",
+          },
+          items: [
+            {
+              id: "security/oidc/index",
+              type: "ref",
+              label: "Overview",
+            },
+            {
+              id: "security/oidc/device-flow",
+              type: "doc",
+              label: "Device flow",
+            },
+            {
+              id: "security/oidc/entra-id",
+              type: "doc",
+              label: "Microsoft Entra ID",
+            },
+            {
+              id: "security/oidc/pingfederate",
+              type: "doc",
+              label: "PingFederate",
+            },
+          ],
         },
         {
           type: "doc",

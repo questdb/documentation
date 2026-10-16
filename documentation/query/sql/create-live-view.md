@@ -400,8 +400,13 @@ owner receives these permissions instead.
 
 ### OWNED BY clause
 
-Assign ownership to a user, group, or service account. The query must be wrapped
-in parentheses:
+Assign ownership to a user, group, or service account. The `OWNED BY` clause
+cannot be omitted if the live view is created by an external user, who logs in
+through OIDC, because permissions cannot be granted to them. The owner must
+then be one of the QuestDB groups that the external user belongs to. See
+[Tables created by external users](/docs/security/oidc/#tables-created-by-external-users).
+
+The query must be wrapped in parentheses:
 
 ```questdb-sql
 CREATE GROUP analysts;

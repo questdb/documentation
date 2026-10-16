@@ -147,13 +147,18 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;query_pool_min=0;initial_connect_retry=on;reconnect_max_duration_millis=120000;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
-[Ingress reconnect](#reconnect-keys).
+The sender retries its first connection synchronously for up to 2 minutes.
+The explicit `initial_connect_retry=on` also enables this in the pooled
+facade of the C, C++, Python, and Rust clients, where `reconnect_*` keys
+alone do not enable initial retries. `query_pool_min=0` prevents the query
+pool's separate, fail-fast startup connection, so this example configures
+ingest startup only. Once connected, the sender retries transport outages
+indefinitely; the 2-minute budget does not limit subsequent reconnects.
+For non-blocking pool startup, use [`lazy_connect=on`](#pool-keys) instead.
+See [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
 
@@ -167,6 +172,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Enable TLS                                        | both      | `addr` with `wss` schema               | `tls_verify`, `tls_roots`, `tls_roots_password`                                             |
 | Basic-auth credentials                            | both      | `username`, `password`                 | `auth_timeout_ms`                                                                           |
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
+| Entra ID tokens that the client renews (Java)     | both      | `token_provider=azure`, `azure_resource` | `azure_credential`, `azure_client_id`                                                     |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
@@ -178,8 +184,9 @@ caveats), follow the section links from the [Key index](#key-index).
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; pooled C/C++/Python/Rust clients need an explicit initial retry mode |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides implicit promotion where supported; see [Ingress reconnect](#reconnect-keys)       |
+| Retry initial ingest connection synchronously     | ingress   | `initial_connect_retry=on`             | `reconnect_max_duration_millis`; use `query_pool_min=0` to skip separate query startup         |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -234,6 +241,55 @@ certificate against a trust store but cannot present a client certificate;
 the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
 `token=<token>` or `username=` / `password=` for client authentication.
+
+For interactive human sign-in, the Java, Python, Rust, C, and C++ clients also
+accept a programmatically supplied
+[OIDC device-flow provider](/docs/security/oidc/device-flow/). Sign in explicitly
+and attach the auth object or callback to the client; do not copy its token
+into a fixed `token=` string. Device flow is not a `token_provider=oidc`
+connect-string option, and must not be combined with static credentials.
+
+### Token providers {#token-providers}
+
+*Applies to: ingress and egress. The connect-string provider keys below are
+Java-only, 1.3.10 or later.*
+
+A token provider requests bearer tokens from an identity provider, caches
+them, and renews them in the background before they expire, so every
+connection, reconnect, and failover presents a valid token. Use it instead of
+a fixed `token` for tokens that expire, such as the tokens of a Microsoft Entra
+ID managed identity or service principal:
+
+```
+wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
+```
+
+- `token_provider`: the provider. `azure` requests tokens from Microsoft Entra
+  ID through the Azure Identity library, and needs the `questdb-client-azure`
+  artifact. Requires the `wss` schema. Cannot be combined with `token`,
+  `username` / `password`, or a token provider that the application passes to
+  the client.
+- `azure_resource`: required with `token_provider=azure`. The Application ID
+  URI, such as `api://<application ID>`, or the application ID of the QuestDB
+  application in Entra ID. The client requests the scope
+  `<azure_resource>/.default`.
+- `azure_credential`: the Azure credential that requests the token. `default`,
+  the default, is `DefaultAzureCredential`, a discovery chain meant for
+  development. `managed_identity`, `workload_identity`, and `environment`, a
+  service principal configured with the `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+  and `AZURE_CLIENT_SECRET` environment variables or a certificate, use that
+  credential alone, which is recommended in production.
+- `azure_client_id`: the client ID of a user-assigned managed identity or of a
+  workload identity. Cannot be combined with `azure_credential=environment`.
+
+The Azure provider keys contain no secret. You can keep the connect string in
+`QDB_CLIENT_CONF`. Redact any other sensitive settings, such as
+`tls_roots_password`, before logging it. Clients built from equivalent connect
+strings share one provider in a process. See
+[Rotating tokens](/docs/connect/clients/java/#rotating-tokens) in the Java
+client reference, and
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)
+for the Entra ID setup.
 
 ## TLS {#tls}
 
@@ -607,16 +663,15 @@ architecture is that a producer survives an arbitrarily long outage.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
-  see below.
+  Default: `100`. See the implicit-promotion rules below for its effect on
+  initial connect.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
-  Default: `5000` (5 s). Setting this enables
-  `initial_connect_retry=on` implicitly; see below.
+  Default: `5000` (5 s). See the implicit-promotion rules below.
 - `reconnect_max_duration_millis` — time budget for the **blocking sync
   initial connect** (`initial_connect_retry=on`): once exceeded, the
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
-  Setting this enables `initial_connect_retry=on` implicitly; see below.
+  See the implicit-promotion rules below.
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -626,13 +681,16 @@ architecture is that a producer survives an arbitrarily long outage.
     the background indefinitely, surfacing only genuine terminal failures
     (auth reject, durable-ack mismatch) via the error inbox.
 
-  **Implicit promotion.** Setting any explicit `reconnect_*` key without
-  also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the budget also covers
-  the *first* connect attempt — without the promotion,
-  `reconnect_max_duration_millis` would be inert. To keep fail-fast
-  behaviour on the first connect while still tuning the backoff, set
-  `initial_connect_retry=off` explicitly; the explicit setting wins.
+  **Implicit promotion.** In Java, .NET, and Go, setting any explicit
+  `reconnect_*` key without also choosing an `initial_connect_retry` mode
+  promotes the initial mode to `on`. In C, C++, Python, and Rust, this
+  promotion applies only to a standalone sender, not to the pooled facade.
+  Set `initial_connect_retry=on` explicitly for blocking initial retries
+  in those pools, or use `lazy_connect=on` for non-blocking startup. Query
+  connections have separate fail-fast startup behavior; set
+  `query_pool_min=0` to skip their prewarm. An explicit
+  `initial_connect_retry=off` always wins over implicit promotion, letting
+  you tune reconnect backoff while retaining fail-fast sender startup.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
@@ -642,9 +700,65 @@ architecture is that a producer survives an arbitrarily long outage.
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Auth failures during reconnect (authentication rejected, version mismatch,
-durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal — the loop does not retry them.
+Authentication rejection is terminal before a sender's first successful
+connection, after any eligible token-provider refresh and retry. Established
+Java senders instead keep retrying server upgrade `401`/`403` rejections with
+capped backoff while retaining buffered rows, even with fixed credentials.
+Rust, C, and C++ builds containing
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183)
+and Python builds containing
+[py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133)
+share this established-sender policy. Older native releases may still treat
+authentication rejection as terminal after the first connection.
+
+Native clients emit `auth_failed` connection events, and an acknowledgement
+wait that times out identifies the rejection. Applications requiring a hard
+failure must monitor the outage and close the sender themselves. This retry
+policy covers server upgrade rejections, not a closed or misconfigured token
+provider; those native provider failures remain terminal. Query authentication
+rejections remain terminal for the connection attempt or query after any
+eligible token retry, rather than starting an indefinite recovery loop.
+
+A durable-ACK mismatch or non-101 upgrade response without a role hint remains
+terminal during native reconnect. Java senders that have already connected
+retry these rejections; at initial connect they are terminal. See
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+for Java's token-provider refresh and retry rules.
+
+In Java, a protocol-version mismatch is transient, including at startup.
+With `initial_connect_retry=on`, the client retries it within
+`reconnect_max_duration_millis`; with `async`, it retries in the background
+indefinitely. A sender that has already connected also retries version
+mismatches indefinitely, allowing a rolling upgrade to settle.
+
+Java orphan drainers have a separate policy:
+
+- Authentication rejection with a fixed credential, and non-retriable upgrade
+  rejection, fail immediately.
+- With a token provider, `401`/`403` rejections receive bounded retries with
+  fresh credentials before the drainer quarantines the slot.
+- A durable-ACK capability mismatch receives bounded retries to allow a
+  rolling upgrade to settle before the drainer quarantines the slot.
+- Role rejections while all reachable servers are replicas are transient:
+  the drainer keeps retrying rather than quarantining the slot.
+
+For the Java token-rejection thresholds and reporting, see
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+
+Native orphan drainers in the builds listed above also distinguish fixed and
+rotating credentials:
+
+- A rejected fixed credential retires the slot immediately for the current
+  session.
+- With a token provider, the drainer retries until at least six rejections have
+  persisted for `min(reconnect_max_duration_millis, 300000)` milliseconds, or
+  until 256 rejections occur without acknowledgement progress. Other failure
+  types reset the persistence timer but not the rejection count; new
+  acknowledgement progress resets both.
+
+Retiring a native slot records `.last_error` and stops draining it for the
+rest of the session, without writing Java's `.failed` sentinel. Unacknowledged
+rows remain on disk, and the next session tries the slot again.
 
 ### Egress failover {#egress-failover}
 
@@ -773,10 +887,21 @@ explicit setter always wins over the string.
   (30 min).
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
-- `lazy_connect` — when `on`, the pool defers opening its first connection
-  until the first borrow, so construction succeeds against a server that is
-  down. This is the supported way to tolerate a server that starts after your
-  application. Default: `off`.
+- `lazy_connect` — when `on`, construction does not wait for a connection,
+  so the application can start while the server is down.
+  - Java can prewarm its configured minimum senders asynchronously before
+    the first borrow. This also lets the application start while the
+    identity provider is unreachable when a token provider requests its
+    first token.
+  - C, C++, Python, and Rust skip sender prewarming: a clean pool creates
+    senders on first borrow, then connects them asynchronously. Recovery
+    of existing disk-backed slots can start before the first borrow.
+  - In these clients, query connections open on first use, and
+    `lazy_connect` cannot be combined with `query_pool_min` above `0`, or
+    with an `initial_connect_retry` other than `async`: the client rejects
+    the configuration.
+
+  Default: `off`.
 
 ## Error handling {#error-handling}
 
@@ -859,6 +984,9 @@ description and behaviour notes.
 | `auto_flush_bytes`                      | size                          | Java `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)                    |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
+| `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
+| `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
 | `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
@@ -876,7 +1004,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set, except in the pooled facade of the C, C++, Python, and Rust clients) | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |
@@ -918,6 +1046,7 @@ description and behaviour notes.
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
+| `token_provider`                        | enum (`azure`)                | unset                         | [Token providers](#token-providers) (Java only)               |
 | `transaction`                           | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `user`                                  | string                        | unset                         | [Authentication](#auth) (alias of `username`)                 |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |

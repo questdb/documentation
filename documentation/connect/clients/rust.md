@@ -125,16 +125,23 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-`QuestDb::connect` parses the connect string and doesn't normally perform any
-blocking network I/O. The exception to that happens when store-and-forward
-durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the dirty slots at construction
-and start replaying them in the background.
+By default, `QuestDb::connect` parses the connect string, then opens the warm
+minimum of connections before it returns: `sender_pool_min` senders and
+`query_pool_min` readers, one of each by default. An unreachable server,
+rejected credentials, or a TLS error therefore fails `connect()` itself.
+Senders honour `initial_connect_retry` while they connect, and readers fail
+fast. With store-and-forward on disk, the pool also reopens the slots that a
+previous client left holding unsent data, and replays them in the background.
 
-The ingestion sender creates its local producer on first borrow and connects its
+With [`lazy_connect=on`](/docs/connect/clients/connect-string/#pool-keys),
+`connect()` performs no blocking network I/O, and `query_pool_min` defaults to
+`0`. It rejects an explicit `query_pool_min` above `0`, and an
+`initial_connect_retry` other than `async`. A borrowed sender then creates its
+local producer at once and connects its
 delivery runner in the background, so it can queue data while the server is
-temporarily unavailable. Reader errors and direct Arrow/Polars transport errors
-surface from the borrow or during operation rather than from `connect()`.
+unavailable, and reader errors surface from the first borrow. In both modes,
+direct Arrow/Polars transport errors surface from the borrow or during
+operation rather than from `connect()`.
 
 ## Authentication and TLS
 
@@ -151,6 +158,69 @@ let token = QuestDb::connect(
     "wss::addr=db.example.com:9000;token=your_bearer_token;",
 )?;
 ```
+
+A `token` is a static credential: the client sends it on every connection that
+it opens, including reconnects, and never renews it. Acquire it from the
+identity provider of the QuestDB Enterprise
+[OpenID Connect flow](/docs/security/oidc/#non-interactive-clients), and for
+Azure services, see
+[Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+Before the token expires, connect a new `QuestDb` with a new token, wait until
+QuestDB has acknowledged what the old senders sent, with
+`wait(AckLevel::Ok, timeout)`, then close the old handle. With `sf_dir`, close
+the old handle first, then connect the new one with the same `sender_id`: two
+handles cannot hold the same store-and-forward slot, and the new handle replays
+what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with
+the User Info endpoint, QuestDB rejects the token on new connections shortly
+after it expires; see [Token lifetime](/docs/security/oidc/#token-lifetime).
+
+### OIDC device flow
+
+With an OIDC-enabled client build and the `oidc` feature, use
+`questdb::oidc::OidcDeviceAuth` for an interactive human login. It displays a
+verification URL and code that the user authorizes on any device. Sign in
+explicitly, then pass a provider closure to
+`QuestDb::connect_with_token_provider` so both ingestion and query connections
+can obtain a current token:
+
+```text title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7", features = ["oidc"] }
+```
+
+```rust
+use std::sync::Arc;
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000").build()?,
+    );
+    auth.sign_in()?;
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    // Borrow senders and readers from db; they share the auth state.
+    drop(db);
+    Ok(())
+}
+```
+
+`token()` can refresh silently but never starts an interactive sign-in.
+Without a usable cached or refreshable credential it returns an OIDC
+`InteractionRequired` error; call `sign_in()` outside transport callbacks.
+The closure's `Arc` keeps the auth object alive for the pool. Do not also set
+static credentials in the configuration string.
+
+See [OIDC device flow](/docs/security/oidc/device-flow/#rust) for client-build
+availability, a complete ingestion example, discovery, persistence, and
+reauthentication. The `oidc` feature is not enabled by default.
+
+### TLS
 
 With the default crate features, the TLS root set is `webpki_roots`. Other
 choices have feature requirements:
@@ -770,17 +840,20 @@ and is not part of that thread-bound borrow list.
 
 | Key | Default | Guidance |
 | --- | --- | --- |
-| `sender_pool_min` | `1` | Warm minimum of ingestion connections retained once they have been opened. Set it near steady concurrent use. |
+| `sender_pool_min` | `1` | Warm minimum of ingestion connections, opened by `connect()` unless `lazy_connect=on`. Set it near steady concurrent use. |
 | `sender_pool_max` | `4` | Ingestion pool growth cap. Set it at or above peak concurrent sender borrows. |
-| `query_pool_min` | `1` | Warm minimum of reader connections retained once they have been opened. |
+| `query_pool_min` | `1`, or `0` with `lazy_connect=on` | Warm minimum of reader connections, opened by `connect()` unless `lazy_connect=on`. |
 | `query_pool_max` | `4` | Reader pool growth cap. Set it at or above peak concurrent reader borrows. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits for a returned connection once its pool is at its cap. `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the warm minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
+| `lazy_connect` | `off` | `on` makes `connect()` open no connections, so that it tolerates a server that is down at startup. See [Connecting](#connecting). |
 
-Setting an ingress `reconnect_*` key without explicitly setting
-`initial_connect_retry` promotes the initial mode to synchronous retry. See the
+For a standalone `Sender`, setting an ingress `reconnect_*` key without
+explicitly setting `initial_connect_retry` promotes the initial mode to
+synchronous retry. A pool, and so `QuestDb::connect`, honours only an
+explicitly set `initial_connect_retry`. See the
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 
@@ -851,9 +924,21 @@ ingestion retry budget uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-Authentication failures, protocol-version failures, and terminal data
-rejections are not retried. A terminal writer is retired when its borrow is
-dropped; there is no pooled `must_close()` or async-error polling API.
+Protocol-version failures and terminal data rejections are not retried. A
+terminal writer is retired when its borrow is dropped; there is no pooled
+`must_close()` or async-error polling API. Authentication rejection is terminal
+before a sender's first successful connection and for query initial connects
+and reconnects, after any eligible token-provider refresh and retry.
+
+In builds containing
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183),
+established senders instead retry server upgrade `401`/`403` rejections
+indefinitely with capped backoff, retaining buffered rows even with fixed
+credentials. They emit `auth_failed` connection events. Applications requiring
+a hard stop must monitor the outage and [close the pool](#closing). Older
+builds may still treat these rejections as terminal. A closed or misconfigured
+token provider remains terminal. See
+[Authentication rejection and credential recovery](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-rejection-and-credential-recovery).
 
 Reader failover has a separate policy:
 

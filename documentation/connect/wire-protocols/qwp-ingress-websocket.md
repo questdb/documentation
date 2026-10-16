@@ -143,7 +143,7 @@ Supported methods:
   [HTTP basic authentication](/docs/connect/compatibility/rest-api/#http-basic-authentication).
 - **Token-based auth** (Enterprise only): see
   [Authentication via token in QuestDB Enterprise](/docs/connect/compatibility/rest-api/#authentication-via-token-in-questdb-enterprise).
-- **OIDC** (Enterprise only): see [OpenID Connect](/docs/security/oidc/).
+- **OIDC** (Enterprise only): see [OpenID Connect](/docs/security/oidc/#non-interactive-clients).
 
 A failed authentication results in a `401` or `403` HTTP response before the
 WebSocket connection is established. No QWP-level auth handshake exists.
@@ -1159,15 +1159,30 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+- **Authentication rejections depend on the client and lifecycle.** In Java,
+  a token provider can retry a refreshable `401` once on the same host with a
+  different token. If that retry is unavailable or fails, authentication
+  rejection is terminal before the sender's first successful connection.
+  Once a foreground Java sender has connected, it instead keeps buffering
+  and retrying rejected credentials with backoff, even with a fixed
+  credential. Rust, C, and C++ builds containing
+  [c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183),
+  and Python builds containing
+  [py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133),
+  also retry server upgrade `401`/`403` indefinitely after the first successful
+  connection, retaining buffered rows. Initial authentication rejection remains
+  terminal after any eligible token retry. Older native releases may still
+  treat reconnect authentication rejection as terminal. Orphan drainers have
+  separate bounded policies, including different Java and native slot-retirement
+  behavior. See
+  [Authentication rejection and credential recovery](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-rejection-and-credential-recovery).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
-- **All other upgrade errors are transient** and feed into the reconnect loop,
-  including `404`, `426`, `503`, generic 4xx/5xx, TCP/TLS failures,
-  mid-stream send/recv errors, and an upgrade response that advertises a QWP
-  version outside the client's supported range (per-endpoint, so a host on a
-  rolling upgrade does not lock the client out of compatible peers).
+- **Transport errors are transient**, including TCP/TLS failures and
+  mid-stream send/recv errors. For other HTTP upgrade rejections, version
+  mismatches, and durable-ACK capability rejections, the client and lifecycle
+  determine whether a failed endpoint round is terminal or retried. See
+  [Ingress reconnect](/docs/connect/clients/connect-string/#reconnect-keys).
 
 :::note Enterprise
 

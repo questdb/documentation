@@ -12,17 +12,56 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [OIDC device flow](/docs/security/oidc/device-flow/) - Human sign-in from Java, Python, Rust, C, and C++, with provider discovery, checked ingestion examples, silent refresh, reauthentication, and optional token persistence
+- [User and group claims](/docs/security/oidc/#user-and-group-claims) - Fallback claim lists of QuestDB Enterprise 4.0.2, how QuestDB picks a claim, and the startup checks
+- [Token validation](/docs/security/oidc/#token-validation) - What QuestDB checks in a token, the expected issuer, and when QuestDB stops accepting an expired token
+- [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, the ID-token requirement in token mode, how transient renewal failures pause queries without logging users out, and which errors end the session
+- [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins) - The log lines of rejected logins and what they mean
+- [Upgrade to 4.0.2](/docs/security/oidc/#upgrade-to-402) - How earlier versions differ, and what to check when you upgrade
+- [Where QuestDB reads the user information](/docs/security/oidc/#where-questdb-reads-the-user-information) - The User Info endpoint compared with reading the claims from the token
+- [Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access) - When a change in the identity provider takes effect, and how to cut off access
+- [Tables created by external users](/docs/security/oidc/#tables-created-by-external-users) - Create tables in advance, or with `OWNED BY` and a QuestDB group of the user
+- [Token lifetime](/docs/security/oidc/#token-lifetime) - Switch a long-running client to a new token without losing rows
+- [Rotating tokens](/docs/connect/clients/java/#rotating-tokens) - The Java client requests and renews bearer tokens with `token_provider=azure` or a `RefreshingTokenProvider`
+- [Connection health](/docs/connect/clients/java/#connection-health) - The Java client reports whether it reaches the server, and its last failure
 - [Databento connector](/docs/integrations/other/databento/) - The Databento page now covers the QuestDB Databento connector, a standalone process that streams Databento Live feeds and runs Historical backfills into QuestDB over QWP, replacing the earlier Python client walkthrough. Covers TOML configuration with multiple datasets per process, the default table and column mapping for each schema, `TIMESTAMP_NS` timestamps and order book arrays, checkpointed at-least-once recovery with a backfill procedure for expired replay, and Prometheus metrics. The page moves to the new Connectors group in the Connect section
 - [ALTER LIVE VIEW RESUME WAL](/docs/query/sql/alter-live-view-resume-wal/) - New reference page for resuming a live view whose own WAL was suspended after an error, and how to find suspended live views through `wal_tables()`
 
 ### Reference
 
+- [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint) - Documented the optional device endpoint, discovery-document behavior, and client discovery through `/settings`
+- [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) and [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) - Documented fallback claim lists and their startup validation
+- [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) and [`acl.oidc.issuer.validation.enabled`](/docs/configuration/oidc/#acloidcissuervalidationenabled) - New settings for the expected issuer of a token
+- [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the name of the property, previously documented as `acl.oidc.pkce.enabled`
+- [`acl.oidc.state.required`](/docs/configuration/oidc/#acloidcstaterequired) and [`acl.oidc.public.keys.expiry`](/docs/configuration/oidc/#acloidcpublickeysexpiry) - Documented both properties, including JWKS refresh timing, outage delays, and retained signing keys
+- [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented what QuestDB caches, distinguished provider checks from JWT revalidation in token mode, and explained how long an HTTP session reuses a password check
+- [`http.session.timeout`](/docs/configuration/http-server/#httpsessiontimeout) - Documented how long an idle HTTP session stays valid
+- [Token providers](/docs/connect/clients/connect-string/#token-providers) - The `token_provider` and `azure_*` keys of the Java client
 - Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views run on their own refresh pool, not the materialized view pool as previously documented
 - Added the `checkpoint_seal_failures` column to [`live_views()`](/docs/query/functions/meta/#live_views) and corrected the `lag_seqtxn`, `last_processed_seqtxn`, `lag_micros`, and `writer_stall_micros` descriptions
 - Corrected the defaults of [`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/#matviewrefreshworkercount) and [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount), and documented that `mat.view.refresh.worker.count=0` disables materialized view refresh
 
+### Guides
+
+- [Microsoft Entra ID](/docs/security/oidc/entra-id/) - Moved to its own page, and added app-only tokens for Azure managed identities and service principals
+- [PingFederate](/docs/security/oidc/pingfederate/) - Moved to its own page, added the QuestDB configuration with ROPC disabled unless explicitly enabled, and corrected the directory that PingFederate reads users from
+
 ### Updated
 
+- [Java](/docs/connect/clients/java/#oidc-device-flow), [Python](/docs/connect/clients/python/#oidc-device-flow), [Rust](/docs/connect/clients/rust/#oidc-device-flow), and [C/C++](/docs/connect/clients/c-and-cpp/#oidc-device-flow) clients - Added device-flow provider integration and distinguished silent renewal from fixed-token replacement
+- [OpenID Connect (OIDC)](/docs/security/oidc/) - Split into an overview and provider guides, with a minimal configuration and an upgrade warning for QuestDB Enterprise 4.0.2
+- [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected that a login without groups is rejected, and added the endpoint permission of each interface
+- [Non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Which token each client sends, with client credentials and password grant examples over QWP
+- [OIDC for PGWire](/docs/security/oidc/#oidc-for-the-pgwire-endpoint) - Require certificate and hostname verification in the bearer-token example, with a trusted CA certificate bundle
+- [Managing authentication](/docs/security/rbac/#managing-authentication) - HTTP sessions of QuestDB Enterprise 4.0.2 end with the credential that opened them
+- [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error policies, and that the `QuestDB` handle accepts an error handler
+- [Java token providers](/docs/connect/clients/java/#rotating-tokens) - Clarified certificate credential configuration, query authentication exceptions, token-wait budgets, which `401` responses trigger refresh, and which connection-string settings must be redacted before logging
+- [Client failover](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) - Distinguished authentication rejection during startup, established Java ingestion, query reconnects, and orphan recovery
+- [Connection strings](/docs/connect/clients/connect-string/#reconnect-keys) - Corrected pooled initial-retry settings and clarified when lazy pools begin connecting in Java, C/C++, Python, and Rust
+- [Python](/docs/connect/clients/python/#the-pool), [C/C++](/docs/connect/clients/c-and-cpp/#connecting), and [Rust](/docs/connect/clients/rust/#connecting) clients - Corrected that the pool connects when it is created, unless `lazy_connect=on`
+- [Python client](/docs/connect/clients/python/#flushing-and-acknowledgements) - Corrected that a terminal server rejection raises from `flush(wait=True)`
+- [Client token rotation](/docs/security/oidc/#token-lifetime) - Corrected how the Python, C/C++, .NET, Go, and Rust clients switch to a new token
+- [`CREATE VIEW`](/docs/query/sql/create-view/#owned-by-enterprise), [`CREATE LIVE VIEW`](/docs/query/sql/create-live-view/#owned-by-clause), and [`CREATE MATERIALIZED VIEW`](/docs/query/sql/create-mat-view/#owned-by-clause) - Documented the owner that an external user must name
 - [Live views](/docs/concepts/live-views/) - Corrected the [supported window functions](/docs/concepts/live-views/#supported-window-functions) to match QuestDB 10.0.1: the statistical functions, EMA, and VWEMA run only in anchored windows, `ksum` does not support `RANGE` frames, `lag` needs a bounded frame or an anchor, and `VARCHAR`, `UUID`, `LONG256`, `DECIMAL`, `BINARY`, and array partition keys are rejected. Added a [rolling standard deviation](/docs/concepts/live-views/#rolling-standard-deviation) recipe for Bollinger bands, rewrote [Freshness](/docs/concepts/live-views/#freshness) to reflect that interval-filtered reads, aggregates, and `ASOF JOIN` see unflushed rows while `LATEST ON` does not, and added the `UPDATE` and `REBASE WAL` invalidation triggers, base WAL retention, and replica freshness. Documented that an out-of-order base row rewrites view rows already emitted, that `view_status` stays `active` while the view's own WAL is suspended, and what to change in `SHOW CREATE LIVE VIEW` output before replaying it
 - [CREATE LIVE VIEW](/docs/query/sql/create-live-view/) - Fixed the `OWNED BY` example, which requires a parenthesized query, documented the designated-timestamp projection requirement and the remaining anchored-window rules, and expanded the error reference with verified messages. Added a grammar for anchored windows and [examples](/docs/query/sql/create-live-view/#examples) of a `RANGE` frame with a `WHERE` filter and an anchored session window
 - [Live view configuration](/docs/configuration/live-views/) - Corrected the descriptions of the in-memory buffer growth budget, partition compaction threshold, flush retry budgets, and refresh memory limit
