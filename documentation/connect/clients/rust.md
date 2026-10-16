@@ -924,9 +924,21 @@ ingestion retry budget uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-Authentication failures, protocol-version failures, and terminal data
-rejections are not retried. A terminal writer is retired when its borrow is
-dropped; there is no pooled `must_close()` or async-error polling API.
+Protocol-version failures and terminal data rejections are not retried. A
+terminal writer is retired when its borrow is dropped; there is no pooled
+`must_close()` or async-error polling API. Authentication rejection is terminal
+before a sender's first successful connection and for query initial connects
+and reconnects, after any eligible token-provider refresh and retry.
+
+In builds containing
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183),
+established senders instead retry server upgrade `401`/`403` rejections
+indefinitely with capped backoff, retaining buffered rows even with fixed
+credentials. They emit `auth_failed` connection events. Applications requiring
+a hard stop must monitor the outage and [close the pool](#closing). Older
+builds may still treat these rejections as terminal. A closed or misconfigured
+token provider remains terminal. See
+[Authentication rejection and credential recovery](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-rejection-and-credential-recovery).
 
 Reader failover has a separate policy:
 

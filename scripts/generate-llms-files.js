@@ -109,7 +109,7 @@ function processForLlmsTxt(items, indent = 0, isTopLevel = false) {
       }
       result += '\n'
 
-    } else if (item.type === 'doc') {
+    } else if (item.type === 'doc' || item.type === 'ref') {
       const docId = item.id
       const docPath = path.join('./documentation', docId + '.md')
       const { title, description } = extractFrontmatter(docPath)
@@ -171,8 +171,12 @@ function generateLlmsFiles() {
   console.log(`   - Size: ${(llmsOutput.length / 1024).toFixed(2)} KB`)
 }
 
-try {
-  generateLlmsFiles()
-} catch (error) {
-  console.error('Error generating llms files:', error)
+if (require.main === module) {
+  try {
+    generateLlmsFiles()
+  } catch (error) {
+    console.error('Error generating llms files:', error)
+  }
 }
+
+module.exports = { processForLlmsTxt }

@@ -791,12 +791,26 @@ uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-Authentication failures, protocol-version failures, and terminal data
-rejections are not retried. When a `flush(wait=True)` or `wait()` makes no
-progress within the budget it raises `QuestDBErrorCode.FailoverRetry`: the
-rows remain queued and background delivery continues, so retry the wait or
-extend the budget — do not rebuild and flush the same rows, which would
-duplicate them once the original frames land.
+Protocol-version failures and terminal data rejections are not retried.
+Authentication rejection is terminal before a sender's first successful
+connection and for query initial connects and reconnects, after any eligible
+token-provider refresh and retry.
+
+In builds containing
+[py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133),
+established senders instead retry server upgrade `401`/`403` rejections
+indefinitely with capped backoff, retaining buffered rows even with fixed
+credentials. They emit `auth_failed` connection events. Applications requiring
+a hard stop must monitor the outage and [close the pool](#closing). Older
+builds may still treat these rejections as terminal. A closed or misconfigured
+token provider remains terminal. See
+[Authentication rejection and credential recovery](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-rejection-and-credential-recovery).
+
+When a `flush(wait=True)` or `wait()` makes no progress within the budget it
+raises `QuestDBErrorCode.FailoverRetry`: the rows remain queued and background
+delivery continues, so retry the wait or extend the budget. Do not rebuild
+and flush the same rows, which would duplicate them once the original frames
+land.
 
 To observe connection state, pass a listener when connecting. It receives
 one `ConnectionEvent` per state transition — `kind`
