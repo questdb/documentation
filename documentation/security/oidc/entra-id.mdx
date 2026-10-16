@@ -271,9 +271,9 @@ acl.oidc.redirect.uri=http://localhost:9000
 # OAuth scopes the user has to consent to
 acl.oidc.scope=openid profile offline_access
 
-# enable ROPC flow
-# optional, required only if ROPC is enabled in Entra ID
-acl.oidc.ropc.flow.enabled=true
+# optional: only for clients sending username/password credentials to QuestDB
+# not required for Web Console sign-in or device flow
+# acl.oidc.ropc.flow.enabled=true
 ```
 
 `preferred_username` shows the user's sign-in name in the Web Console and in
@@ -362,6 +362,27 @@ valid, logging in again usually does not ask for their credentials. See
 [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal).
 
 :::
+
+## Device flow for users
+
+For Java, Python, Rust, C, or C++ applications acting as a human user, use
+[OIDC device flow](/docs/security/oidc/device-flow/) rather than collecting
+the user's password. The client displays a URL and code, and the user signs
+in through Entra ID in a browser on any device. It works from remote notebook
+kernels and applications without a local browser callback.
+
+After the Web Console and group setup above, enable **Allow public client
+flows** in the application's **Authentication** settings, and ensure tenant
+policy permits device code flow. Keep `openid profile offline_access` in
+`acl.oidc.scope` and token mode enabled. The client uses QuestDB's client ID
+and presents the ID token, whose group claims map to the same QuestDB groups
+as the Web Console user's claims. Requesting `offline_access` lets Entra ID
+issue a refresh token, subject to its policies.
+
+This flow needs no client secret, Web Console redirect, or QuestDB ROPC
+setting. A person must authorize the initial login, and sign in again when
+silent refresh is no longer possible. For services that must run without a
+person, use the managed-identity or service-principal flow below instead.
 
 ## Managed identities and service principals
 

@@ -172,16 +172,48 @@ operating-system certificate store. Override it with configuration keys:
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
 
-### Unsupported auth paths
+### OIDC device flow
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
+With an OIDC-enabled client build, `questdb.auth.OidcDeviceAuth` signs a human
+user in from a terminal or notebook, including a remote kernel. The user opens
+a verification URL and enters a code; the application does not collect their
+password. Sign in explicitly, then share the provider with the pool:
 
-| Path | Status | Workaround |
+```python
+import questdb
+from questdb.auth import OidcDeviceAuth
+
+with OidcDeviceAuth.from_questdb("https://questdb.example.com:9000") as auth:
+    auth.sign_in()
+    with questdb.connect(
+        "wss::addr=questdb.example.com:9000;", oidc_auth=auth
+    ) as db:
+        # Senders and queries obtain current tokens from the same auth state.
+        pass
+```
+
+`auth.token()` and transport callbacks never prompt. They return a cached or
+silently refreshed token, or raise `OidcInteractionRequired` when an explicit
+`sign_in()` is needed. For a standalone ILP/HTTP sender, pass `oidc_auth=auth`
+to `Sender.from_conf(...)`. Do not combine it with static credentials or close
+the auth provider while attached transports are still in use.
+
+See [OIDC device flow](/docs/security/oidc/device-flow/#python) for client-build
+availability, provider prerequisites, a complete ingestion example, persistence,
+and reauthentication. Device flow requires a person; for unattended Azure
+services, see
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
+
+### Authentication support {#unsupported-auth-paths}
+
+The client supports HTTP basic auth, static bearer tokens, and device-flow
+authentication through a shared provider:
+
+| Path | Status | Usage |
 | --- | --- | --- |
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. For an example with an Entra ID managed identity, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals). |
+| OIDC device acquisition and refresh | Supported with `OidcDeviceAuth`. | Sign in explicitly and pass `oidc_auth=auth`. Refresh requires a refresh token from the provider. See [Device flow](#oidc-device-flow). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens, including reconnects and failover, and cannot switch to a new token while it runs. | Before the token expires, build a fresh handle with a new token, then close the old one once its senders have flushed with `flush(wait=True)`: closing a handle discards the rows that QuestDB has not acknowledged within `close_flush_timeout_millis`. With `sf_dir`, flush and close the old handle first, then build the new one with the same `sender_id`: two handles cannot hold the same store-and-forward slot, and the new handle replays what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with the User Info endpoint, QuestDB rejects the token on new connections shortly after it expires, so reconnects and failover then fail too; see [Token lifetime](/docs/security/oidc/#token-lifetime). For an example, see [Request a token in the service](/docs/security/oidc/entra-id/#request-a-token-in-the-service). |
+| Changing a fixed `token=` value in place | Not supported; this restriction does not apply to `oidc_auth`. | Before a fixed token expires, build a fresh handle with a new token, then close the old one once its senders have flushed with `flush(wait=True)`. Closing a handle discards rows not acknowledged within `close_flush_timeout_millis`. With `sf_dir`, flush and close the old handle first, then build the new one with the same `sender_id` so it can replay the retained rows. See [Token lifetime](/docs/security/oidc/#token-lifetime). |
 
 ## The pool
 

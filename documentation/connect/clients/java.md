@@ -44,6 +44,9 @@ Key capabilities:
   async [`Completion`](#completion) handles, and byte-credit flow control.
 - **Failover**: multi-endpoint connections with automatic reconnect across
   rolling upgrades and primary migrations.
+- **OIDC device sign-in**: authenticate a human user from a CLI, desktop
+  application, or remote process without collecting a password. See
+  [OIDC device flow](#oidc-device-flow).
 - **Token renewal**: with a token provider, such as `token_provider=azure` for
   Microsoft Entra ID managed identities and service principals, the client
   requests bearer tokens and renews them before they expire. See
@@ -408,6 +411,38 @@ reconnects, and failovers fail. QuestDB Enterprise 4.0.2 and later, and the
 User Info endpoint, reject a token shortly after it expires; see
 [Token lifetime](/docs/security/oidc/#token-lifetime). For tokens that expire,
 use a [token provider](#rotating-tokens).
+
+### OIDC device flow
+
+`OidcDeviceAuth` in the core `questdb-client` artifact signs a user in with the
+OAuth 2.0 Device Authorization Grant. It displays a verification URL and code;
+the user can authorize in a browser on another device. No Azure adapter is
+required. Sign in explicitly, then pass the provider to the handle:
+
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.cutlass.auth.OidcDeviceAuth;
+
+try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+        "https://questdb.example.com:9000")) {
+    auth.signIn();
+    try (QuestDB db = QuestDB.connect(
+            "wss::addr=questdb.example.com:9000;", auth::getToken)) {
+        // Both sender and query connections use the shared provider.
+    }
+}
+```
+
+`getToken()` can refresh silently but never prompts. Request `offline_access`
+if the provider needs that scope to issue a refresh token. Without a usable
+cached or refreshable credential, call `signIn()` again outside transport
+callbacks. Do not copy its result into a fixed `token=` string. Close the
+handle before closing the auth object.
+
+For provider setup, a complete ingestion example, token persistence, and
+reauthentication, see [OIDC device flow](/docs/security/oidc/device-flow/#java).
+For unattended service identities rather than a human login, use the rotating
+token providers below.
 
 ### Rotating tokens
 

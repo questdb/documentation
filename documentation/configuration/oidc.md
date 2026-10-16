@@ -253,6 +253,28 @@ ties the authorization code to the browser that started the login.
 OIDC Authorization Endpoint. The default value should work for the Ping
 Identity Platform.
 
+### acl.oidc.device.authorization.endpoint
+
+- **Default**: none
+- **Reloadable**: no
+
+The provider's device authorization endpoint, used by the
+[Java, Python, Rust, C, and C++ device-flow helpers](/docs/security/oidc/device-flow/).
+With [`acl.oidc.host`](#acloidchost) and manual endpoint configuration, set
+this to the provider's endpoint path. QuestDB combines it with the configured
+host, port, and TLS mode. There is no provider-independent default.
+
+With [`acl.oidc.configuration.url`](#acloidcconfigurationurl), QuestDB reads
+`device_authorization_endpoint` from the provider's discovery document
+instead. A missing, empty, or blank value leaves this endpoint unset and does
+not prevent startup. An invalid nonblank endpoint is rejected like the other
+discovered endpoint URLs.
+
+When present, QuestDB includes the resolved URL in `/settings` so clients can
+discover it. The client, not QuestDB, sends device authorization and token
+requests to the provider. Setting this property does not enable the grant at
+the provider or enable QuestDB's ROPC flow.
+
 ### acl.oidc.public.keys.endpoint
 
 - **Default**: `/pf/JWKS`

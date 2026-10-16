@@ -1,0 +1,522 @@
+---
+title: OIDC device flow for client applications
+sidebar_label: Device flow
+description: "Sign in to QuestDB Enterprise from Java, Python, Rust, C, and C++ with OIDC device flow, then reuse and refresh tokens without storing a password."
+---
+
+The OAuth 2.0 Device Authorization Grant
+([RFC 8628](https://www.rfc-editor.org/rfc/rfc8628)), also called *device flow*,
+lets a user sign in to a QuestDB client without giving the application their
+password. The client shows a verification URL and a short code. The user
+opens the URL in a browser, on the same machine or another device, and completes
+the identity provider's sign-in, including MFA when required. The client polls
+the provider for tokens and uses them to authenticate to QuestDB Enterprise.
+
+Use device flow for a notebook, CLI, or desktop application acting as a human
+user, including a remote kernel or container without a local browser. The
+client only needs outbound connections; it does not run a local callback server
+or receive a browser redirect. Device flow still requires a person to authorize
+access. For unattended services, use
+[managed identities or service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)
+or the [client credentials grant](/docs/security/oidc/#client-credentials-grant)
+instead.
+
+## Prerequisites
+
+- QuestDB Enterprise with [OIDC configured](/docs/security/oidc/#configuration-options),
+  reachable over HTTPS. If necessary, configure
+  [HTTP server TLS](/docs/security/tls/#enabling-tls-for-http-server-rest-api)
+  or a TLS-terminating proxy that supports WebSocket upgrades.
+- An identity provider that supports device authorization. Enable the device
+  grant for the client ID used by QuestDB, and allow public-client
+  authentication without an application secret. Device flow does not use the
+  Web Console's redirect URI and does not require
+  [`acl.oidc.ropc.flow.enabled`](/docs/configuration/oidc/#acloidcropcflowenabled).
+- The `openid` scope so the provider returns an ID token. Request
+  `offline_access` if the provider requires it to issue a refresh token. Set
+  [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope), for example to
+  `openid offline_access`, and keep any additional scopes needed for group
+  claims.
+- A user whose provider groups map to QuestDB groups with the required endpoint
+  and table permissions. A successful device sign-in alone does not grant
+  database access. See [Prepare the database](#prepare-the-database).
+
+:::note Client availability
+
+Use an OIDC-enabled client build. The Java examples use `questdb-client`
+1.3.10 or later; no Azure adapter is required. The Python APIs described here
+are part of [py-questdb-client#133](https://github.com/questdb/py-questdb-client/pull/133).
+The Rust, C, and C++ APIs are part of
+[c-questdb-client#183](https://github.com/questdb/c-questdb-client/pull/183).
+Until those changes are released, use a build containing them rather than an
+older package that supports only static tokens. In Rust, also enable the
+`oidc` crate feature.
+
+:::
+
+### Discover the identity provider
+
+The helpers discover the client ID, scope, token endpoint, audience, and
+`groups.encoded.in.token` setting from the QuestDB server's public `/settings`
+endpoint. QuestDB advertises the device authorization endpoint when the
+provider's discovery document contains `device_authorization_endpoint`. With
+manual endpoint configuration, set
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+A missing device endpoint does not stop QuestDB from serving other OIDC flows,
+but the client cannot start device flow without one.
+
+If the server does not advertise that endpoint, supply the provider's issuer
+explicitly. The helper can then discover it from the issuer's
+`/.well-known/openid-configuration` document:
+
+| Client | Issuer override |
+| --- | --- |
+| Java | `new OidcDeviceAuth.DiscoveryOptions().issuer("https://idp.example.com")`, passed as the second argument to `fromQuestDB(...)` |
+| Python | `OidcDeviceAuth.from_questdb(url, issuer="https://idp.example.com")` |
+| Rust | `OidcDeviceAuth::from_questdb(url).issuer("https://idp.example.com").build()?` |
+| C++ | `questdb::oidc::builder::from_questdb(url).issuer("https://idp.example.com").build()` |
+| C | `questdb_oidc_builder_issuer(builder, issuer, issuer_len, &error)` before building the auth object |
+
+Use an issuer obtained from your administrator, not one inferred from an
+untrusted server. An issuer override pins the endpoints to the issuer's origin;
+settings-sourced endpoints must also satisfy the client's issuer-path checks.
+If the provider intentionally hosts endpoints elsewhere, configure its trusted
+endpoints explicitly instead of weakening TLS verification.
+
+For Microsoft Entra ID, complete the
+[Web Console and group setup](/docs/security/oidc/entra-id/#web-console-sign-in),
+then enable **Allow public client flows** under the application's
+**Authentication** settings. Tenant policy must also permit device code flow.
+Use `openid profile offline_access` and token mode so the helpers send the ID
+token, not a Microsoft Graph access token. This is a user login, not the
+app-only role setup for managed identities. See
+[Microsoft's device authorization documentation](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code).
+
+### Private CA trust
+
+If QuestDB or the provider uses a private certificate authority, configure
+trust for the auth helper as well as for the database transport. The
+connection string's `tls_roots` setting does not configure the helper that
+fetches `/settings` and calls the provider:
+
+| Client | Auth helper configuration |
+| --- | --- |
+| Java | Pass `DiscoveryOptions.tlsConfig(tls)` to `fromQuestDB(...)`, where `tls` is an `io.questdb.client.ClientTlsConfiguration` with your trust store and `TLS_VALIDATION_MODE_FULL` |
+| Python | Pass `ca_bundle="/path/to/ca.pem"` to `from_questdb(...)` |
+| Rust | Add `.ca_bundle("/path/to/ca.pem")` to the builder |
+| C++ | Add `.ca_bundle("/path/to/ca.pem")` to the builder |
+| C | Call `questdb_oidc_builder_ca_bundle(builder, path, path_len, &error)` before building |
+
+Keep certificate and hostname verification enabled. A helper's trust settings
+apply to its QuestDB discovery request and its provider requests, so the trust
+store must cover both. See the client pages for the
+[database transport's TLS settings](/docs/connect/clients/connect-string/#tls).
+
+### Prepare the database
+
+The examples below write the same `fx_trades` schema. As the admin, create it
+before running a client: ingestion cannot create tables or columns for an
+[external user](/docs/security/oidc/#tables-created-by-external-users).
+
+```questdb-sql title="Create the table and grant the user's mapped group access"
+CREATE TABLE fx_trades (
+  timestamp TIMESTAMP_NS,
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+CREATE GROUP fxUsers WITH EXTERNAL ALIAS 'fx-users';
+GRANT HTTP TO fxUsers;
+GRANT INSERT, SELECT ON fx_trades TO fxUsers;
+```
+
+Replace `fx-users` with a group value in the user's token or User Info response.
+For Entra ID security groups, use the group's object ID. A user without a
+populated groups claim is rejected, even if the device authorization succeeded.
+See [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+
+## Sign in and connect
+
+Replace `questdb.example.com:9000` in both the discovery URL and the connection
+string with your secure QuestDB endpoint. Sign in explicitly before opening
+connections. Keep the auth object alive until its connections have closed.
+Do not combine a provider with `token=`, `username`, or `password` in the
+connection string.
+
+The examples use QWP for ingestion; the same shared provider supplies the query
+connections in each pool. The provider returns the access token in User Info
+mode and the ID token in token mode, matching the server's configuration.
+
+### Java
+
+Add the [Java client dependency](/docs/connect/clients/java/#quick-start).
+`OidcDeviceAuth` is in the core `questdb-client` artifact, not
+`questdb-client-azure`:
+
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.Sender;
+import io.questdb.client.cutlass.auth.OidcDeviceAuth;
+
+public class DeviceFlowIngest {
+    public static void main(String[] args) {
+        try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+                "https://questdb.example.com:9000")) {
+            auth.signIn();
+            try (QuestDB db = QuestDB.connect(
+                    "wss::addr=questdb.example.com:9000;", auth::getToken)) {
+                try (Sender sender = db.borrowSender()) {
+                    sender.table("fx_trades")
+                          .symbol("symbol", "EURUSD")
+                          .symbol("side", "buy")
+                          .doubleColumn("price", 1.0842)
+                          .doubleColumn("quantity", 100000.0)
+                          .atNow();
+                    if (!sender.drain(30_000)) {
+                        throw new IllegalStateException("Acknowledgement timed out");
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+`signIn()` may prompt; `getToken()` only returns a cached or silently refreshed
+token. Passing `auth::getToken` lets new connections and reconnects obtain a
+current token without rebuilding the handle. For a standalone ILP/HTTP sender,
+use `httpTokenProvider(auth::getToken)` instead of a fixed `httpToken(...)`.
+
+By default, Java prints the URL and code and attempts to open a browser. On a
+remote or shared host, disable browser launch with
+`-Dquestdb.client.oidc.open.browser=false`, or pass
+`new OidcDeviceAuth.DiscoveryOptions().prompt(DeviceCodePrompt.SYSTEM_OUT)`
+with `io.questdb.client.cutlass.auth.DeviceCodePrompt` imported.
+
+### Python
+
+Install an [OIDC-enabled Python client](#prerequisites). The device-flow helper
+requires no additional OAuth Python dependency:
+
+```python
+import questdb
+from questdb import TimestampNanos
+from questdb.auth import OidcDeviceAuth
+
+with OidcDeviceAuth.from_questdb("https://questdb.example.com:9000") as auth:
+    auth.sign_in()
+    with questdb.connect(
+        "wss::addr=questdb.example.com:9000;", oidc_auth=auth
+    ) as db:
+        with db.sender() as sender:
+            sender.row(
+                "fx_trades",
+                symbols={"symbol": "EURUSD", "side": "buy"},
+                columns={"price": 1.0842, "quantity": 100000.0},
+                at=TimestampNanos.now(),
+            )
+            sender.flush(wait=True)
+```
+
+`sign_in()` presents the prompt in the terminal or notebook.
+`auth.token()` and transport operations never prompt. Use `open_browser=False`
+in `from_questdb(...)` to suppress browser launch; a notebook normally shows
+the challenge in the kernel's output rather than opening a browser on the
+kernel's host. For a standalone ILP/HTTP sender, pass `oidc_auth=auth` to
+`questdb.Sender.from_conf("https::addr=questdb.example.com:9000;", ...)`.
+
+### Rust
+
+Enable OIDC in addition to the default transport and TLS features:
+
+```text title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7", features = ["oidc"] }
+```
+
+```rust
+use std::sync::Arc;
+
+use questdb::{
+    ingress::{AckLevel, TimestampNanos},
+    oidc::OidcDeviceAuth,
+    QuestDb,
+};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000").build()?,
+    );
+    auth.sign_in()?;
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    {
+        let mut sender = db.borrow_sender()?;
+        let mut buffer = sender.new_buffer();
+        buffer
+            .table("fx_trades")?
+            .symbol("symbol", "EURUSD")?
+            .symbol("side", "buy")?
+            .column_f64("price", 1.0842)?
+            .column_f64("quantity", 100000.0)?
+            .at(TimestampNanos::now())?;
+        sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok)?;
+    }
+    Ok(())
+}
+```
+
+The `Arc` keeps one auth state shared by the pool's token-provider closure.
+`sign_in()` is interactive; `token()` is not. For a standalone sender, use
+`SenderBuilder::http_token_provider` for ILP/HTTP or
+`SenderBuilder::qwp_ws_token_provider` for QWP. Set `.open_browser(false)` on
+the OIDC builder when the process should only display the URL and code.
+
+### C++ {#cpp}
+
+Use matching OIDC-enabled headers and the native library from the
+[C/C++ client](/docs/connect/clients/c-and-cpp/#cmake-setup):
+
+```cpp
+#include <questdb/client.hpp>
+#include <questdb/ingress/qwp_sender.hpp>
+#include <questdb/oidc.hpp>
+
+#include <exception>
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        auto auth = questdb::oidc::builder::from_questdb(
+            "https://questdb.example.com:9000").build();
+        auth.sign_in();
+        questdb::pool pool{"wss::addr=questdb.example.com:9000;", auth};
+        {
+            auto sender = pool.borrow_sender();
+            auto buffer = sender.new_buffer();
+            buffer.table("fx_trades"_tn)
+                  .symbol("symbol"_cn, "EURUSD"_utf8)
+                  .symbol("side"_cn, "buy"_utf8)
+                  .column("price"_cn, 1.0842)
+                  .column("quantity"_cn, 100000.0)
+                  .at(questdb::ingress::timestamp_nanos::now());
+            sender.flush_and_wait(buffer);
+        }
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}
+```
+
+The pool retains shared ownership of the auth state. Its connection callbacks
+refresh silently and never run device sign-in. For a standalone sender,
+configure `questdb::ingress::opts::oidc_auth(auth)`. To suppress browser launch,
+set `.open_browser(false)` on the OIDC builder.
+
+### C
+
+Initialize `questdb_db_connect_options` with its initializer before setting
+`oidc_auth`. Check each fallible operation and release the pool and auth handles
+on both success and failure:
+
+```c
+#include <questdb/client.h>
+#include <questdb/ingress/qwp_sender.h>
+#include <questdb/oidc.h>
+
+#include <stdio.h>
+#include <string.h>
+
+int main(void)
+{
+    const char* url = "https://questdb.example.com:9000";
+    const char* conf = "wss::addr=questdb.example.com:9000;";
+    questdb_error* error = NULL;
+    questdb_oidc_builder* builder = NULL;
+    questdb_oidc_auth* auth = NULL;
+    questdb_db* db = NULL;
+    qwp_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+    int result = 1;
+
+    builder = questdb_oidc_builder_from_questdb(url, strlen(url), &error);
+    if (!builder) goto cleanup;
+    auth = questdb_oidc_builder_build(builder, &error);
+    if (!auth) goto cleanup;
+    if (!questdb_oidc_auth_sign_in(auth, &error)) goto cleanup;
+
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.oidc_auth = auth;
+    db = questdb_db_connect_ex(conf, strlen(conf), &options, &error);
+    if (!db) goto cleanup;
+    sender = questdb_db_borrow_sender(db, &error);
+    if (!sender) goto cleanup;
+    buffer = questdb_db_new_buffer(db, &error);
+    if (!buffer) goto cleanup;
+    if (!line_sender_buffer_table(
+            buffer, QDB_TABLE_NAME_LITERAL("fx_trades"), &error)) goto cleanup;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+            QDB_UTF8_LITERAL("EURUSD"), &error)) goto cleanup;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"),
+            QDB_UTF8_LITERAL("buy"), &error)) goto cleanup;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"),
+            1.0842, &error)) goto cleanup;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("quantity"),
+            100000.0, &error)) goto cleanup;
+    if (!line_sender_buffer_at_nanos(
+            buffer, line_sender_now_nanos(), &error)) goto cleanup;
+    if (!qwp_sender_flush_buffer_and_wait(
+            sender, buffer, qwpws_ack_level_ok, &error)) goto cleanup;
+    result = 0;
+
+cleanup:
+    if (error)
+    {
+        size_t length = 0;
+        const char* message = questdb_error_msg(error, &length);
+        fprintf(stderr, "%.*s\n", (int)length, message);
+    }
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_return_sender(db, sender);
+    questdb_db_close(db);
+    questdb_oidc_auth_free(auth);
+    questdb_oidc_builder_free(builder);
+    questdb_error_free(error);
+    return result;
+}
+```
+
+For a standalone sender, attach the auth with
+`line_sender_opts_oidc_auth(options, auth, &error)`. Disable browser launch with
+`questdb_oidc_builder_open_browser(builder, false, &error)` before building the
+auth object. Without a custom event handler, the native client prints the
+verification URL and code to standard error.
+
+## Token renewal and reauthentication
+
+Keep **interactive sign-in** separate from **token retrieval**:
+
+1. Run `signIn()` / `sign_in()` explicitly while a user can respond. It can
+   reuse a cached token or refresh silently; otherwise it starts device flow.
+2. Attach the auth object or a token-provider callback to the transport.
+   Connection and reconnect callbacks can return cached tokens or refresh them,
+   but never start an interactive sign-in.
+3. A refresh requires a refresh token from the provider. Request
+   `offline_access` where required; it does not guarantee one will be issued.
+4. If the token expires without a usable refresh token, or the provider requires
+   user interaction again, token retrieval fails. Python raises
+   `OidcInteractionRequired`; Rust and C/C++ report an OIDC
+   `InteractionRequired` error kind; Java throws `OidcAuthException` with a
+   sign-in instruction. Run explicit sign-in again outside transport callbacks.
+   Handle any separate transport-level failure before resuming ingestion; an
+   authentication helper does not undo a sender's terminal state.
+
+Silent refresh performs network I/O and can block token retrieval, a flush,
+or connection setup. The auth helper's HTTP timeout and waits for another
+thread's refresh are separate from the transport's request and reconnect
+budgets. Configure those provider waits for the amount of backpressure the
+application can tolerate; non-interactive does not mean non-blocking.
+
+Do not put `auth.token()` or `auth.signIn()` into a `token=` string and expect
+renewal. That copies one token: future connections keep using it after expiry.
+Use the provider integrations above. Device-flow refresh is demand-driven; it
+is not the background half-life renewal of Java's
+[`RefreshingTokenProvider`](/docs/connect/clients/java/#rotating-tokens).
+
+For SQL over PGWire, enable
+[`acl.oidc.pg.token.as.password.enabled`](/docs/configuration/oidc/#acloidcpgtokenaspasswordenabled),
+connect as `_sso`, and supply a current token as the password. Pull a fresh token
+when opening **each new connection**. An already-open connection is not
+reauthenticated on token renewal. The Python helper also provides
+`questdb.auth.sqlalchemy_engine` and `questdb.auth.psycopg_connect`; the former
+resolves the provider for each new pooled connection, while the latter captures
+the token when connecting. Use certificate and hostname verification as in
+[OIDC for PGWire](/docs/security/oidc/#oidc-for-the-pgwire-endpoint).
+
+## Persisting tokens and signing out
+
+Tokens stay in memory by default. To resume a login after a process restart,
+opt into a token store:
+
+| Client | Enable the bundled file store |
+| --- | --- |
+| Java | Pass `new OidcDeviceAuth.DiscoveryOptions().tokenStore(FileTokenStore.atDefaultLocation())` to `fromQuestDB(...)`; import `io.questdb.client.cutlass.auth.FileTokenStore` |
+| Python | Pass `token_store=FileTokenStore.at_default_location()` to `from_questdb(...)`; import it from `questdb.auth` |
+| Rust | Add `.token_store(FileTokenStore::at_default_location()?)` to the builder; import it from `questdb::oidc` |
+| C++ | Add `.default_file_token_store()` to the builder |
+| C | Call `questdb_oidc_builder_default_file_token_store(builder, &error)` before building |
+
+The default directory is `~/.questdb/oidc-tokens/`. Python and native clients
+accept an absolute directory override in `QUESTDB_CLIENT_OIDC_TOKEN_STORE_DIR`;
+Java uses the JVM system property `questdb.client.oidc.token.store.dir`.
+A stored refresh token lets a restarted process refresh silently rather than
+prompt again, only while that credential remains valid.
+
+:::warning File persistence stores credentials
+
+The bundled file stores write **unencrypted JSON**, including long-lived refresh
+tokens. Protect the directory and never commit, log, or share its contents.
+On POSIX, directories and files use owner-only permissions. Python and native
+file-store mutations currently require Unix; use in-memory authentication on
+other platforms. Java's file store on Windows relies on the profile directory's
+ACLs rather than enforcing POSIX modes.
+
+A store entry identifies an OIDC configuration, not a separate application
+user. Use separate store directories for different people sharing one OS
+account. File permissions protect against credential theft and substitution;
+the file format is not an encrypted or authenticated vault.
+
+:::
+
+Clear the local cached login with Java `clearCache()`, Python `clear()`, Rust
+`clear()`, C++ `clear()`, or C `questdb_oidc_auth_clear(...)`. These operations
+also remove the configured persisted entry, but **do not revoke tokens at the
+identity provider or terminate existing database connections**. For immediate
+access removal, see
+[Group changes, sessions, and revoking access](/docs/security/oidc/#group-changes-sessions-and-revoking-access).
+Close transports before closing the auth provider. Explicitly closing a Python
+or native auth provider also prevents its attached transports from acquiring
+more tokens; recreate both provider and transports to recover. Closing releases
+resources; it is not an identity-provider logout.
+
+## Security and troubleshooting
+
+- Only discover settings from a QuestDB server you trust, over HTTPS. Those
+  settings designate where the client sends the device code and refresh token.
+  The provider's credential endpoints also require HTTPS outside loopback
+  development environments. Configure private CA trust rather than disabling
+  certificate or hostname verification. The connection string's TLS settings
+  do not automatically configure the auth helper's HTTP client.
+- Treat device codes and verification links as login challenges. Only approve a
+  flow you initiated, verify the provider and account before accepting it, and
+  do not publish the challenge in shared logs. A headless client can display
+  the code without launching a browser.
+- If discovery cannot find the device endpoint, check the provider's discovery
+  document, the server's device-endpoint setting, or configure a trusted issuer
+  explicitly. Enabling QuestDB's ROPC setting does not enable device flow.
+- If token mode reports a missing ID token, include `openid` and ensure the
+  provider issues ID tokens on both device authorization and refresh. Do not
+  substitute an access token issued for a different API.
+- If device authorization succeeds but QuestDB rejects the connection, check
+  audience, issuer, group claims, and mapped endpoint/table grants. See
+  [Troubleshooting OIDC logins](/docs/security/oidc/#troubleshooting-oidc-logins).
+- If the code expires or the user declines authorization, start a new explicit
+  sign-in only when the user is ready. A refresh failure must not cause an
+  automatic loop of interactive prompts. Retain unacknowledged source data;
+  obtaining a token does not confirm ingestion delivery.

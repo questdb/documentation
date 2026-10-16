@@ -333,16 +333,45 @@ a later call on it. A connection that the pool opens later, such as a
 reconnect, can also fail authentication, for example after the token expires
 (see [Which errors mean what](#which-errors-mean-what)).
 
-### Unsupported auth paths
+### OIDC device flow
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
+With matching OIDC-enabled headers and library, the client can acquire and
+refresh tokens for a human user through the OAuth 2.0 Device Authorization
+Grant. The user authorizes a displayed code in a browser on any device; the
+application does not collect their password.
 
-| Path | Status | Workaround |
+- **C++:** include `<questdb/oidc.hpp>`, build an auth object with
+  `questdb::oidc::builder::from_questdb(url).build()`, call `auth.sign_in()`,
+  then construct `questdb::pool{conf, auth}`.
+- **C:** include `<questdb/oidc.h>`, build an auth with
+  `questdb_oidc_builder_from_questdb` and `questdb_oidc_builder_build`, then
+  call `questdb_oidc_auth_sign_in`. Initialize `questdb_db_connect_options`,
+  set its `oidc_auth` field, and pass it to `questdb_db_connect_ex`.
+
+The pool retains shared auth state and resolves a current token on each
+sender/reader connection or reconnect. Provider calls can refresh silently but
+never display a prompt. Sign in before starting the pool, and do not combine
+the provider with `token=`, `username`, or `password`.
+
+For complete checked-error examples, provider setup, client-build availability,
+persistence, and reauthentication, see the
+[C++](/docs/security/oidc/device-flow/#cpp) and
+[C](/docs/security/oidc/device-flow/#c) device-flow examples. For standalone
+senders, use C++ `opts::oidc_auth(auth)` or C
+`line_sender_opts_oidc_auth(options, auth, &error)`.
+
+### Authentication support {#unsupported-auth-paths}
+
+The client supports HTTP basic auth, static bearer tokens, and OIDC device flow:
+
+| Path | Status | Usage |
 |---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/#non-interactive-clients) for which token to send. Acquire the token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. For Azure services, see [Microsoft Entra ID managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals). |
+| OIDC device acquisition and refresh | Supported with a shared device auth object. | Sign in explicitly, then attach the provider to the pool or standalone sender. See [Device flow](#oidc-device-flow). |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
-| Token rotation mid-session | Not supported. The pool sends the credentials in the WebSocket upgrade of every connection that it opens, including reconnects, and cannot switch to a new token while it runs. | Before the token expires, build a new pool with a new token, then close the old one once its senders have waited for their acknowledgements (`qwp_sender_wait`, C++ `wait()`): closing a pool discards the rows that QuestDB has not acknowledged within `close_flush_timeout_millis`. With `sf_dir`, flush and close the old pool first, then build the new one with the same `sender_id`: two pools cannot hold the same store-and-forward slot, and the new pool replays what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with the User Info endpoint, QuestDB rejects the token on new connections shortly after it expires; see [Token lifetime](/docs/security/oidc/#token-lifetime). |
+| Changing a fixed `token=` value in place | Not supported; a device-flow provider can renew tokens without replacing the pool. | With a fixed token, build a new pool before expiry and wait for the old senders' acknowledgements before closing it. With `sf_dir`, flush and close the old pool first, then build the new one with the same `sender_id` so it can replay retained rows. See [Token lifetime](/docs/security/oidc/#token-lifetime). |
+
+Device flow is a human login. For unattended Azure services, see
+[Managed identities and service principals](/docs/security/oidc/entra-id/#managed-identities-and-service-principals).
 
 ## Headers
 

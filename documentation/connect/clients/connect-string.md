@@ -242,9 +242,17 @@ the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
 `token=<token>` or `username=` / `password=` for client authentication.
 
+For interactive human sign-in, the Java, Python, Rust, C, and C++ clients also
+accept a programmatically supplied
+[OIDC device-flow provider](/docs/security/oidc/device-flow/). Sign in explicitly
+and attach the auth object or callback to the client; do not copy its token
+into a fixed `token=` string. Device flow is not a `token_provider=oidc`
+connect-string option, and must not be combined with static credentials.
+
 ### Token providers {#token-providers}
 
-*Applies to: ingress and egress. Java client only, 1.3.10 or later.*
+*Applies to: ingress and egress. The connect-string provider keys below are
+Java-only, 1.3.10 or later.*
 
 A token provider requests bearer tokens from an identity provider, caches
 them, and renews them in the background before they expire, so every

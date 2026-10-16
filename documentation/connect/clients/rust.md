@@ -174,6 +174,54 @@ what the old one left on disk. On QuestDB Enterprise 4.0.2 and later, or with
 the User Info endpoint, QuestDB rejects the token on new connections shortly
 after it expires; see [Token lifetime](/docs/security/oidc/#token-lifetime).
 
+### OIDC device flow
+
+With an OIDC-enabled client build and the `oidc` feature, use
+`questdb::oidc::OidcDeviceAuth` for an interactive human login. It displays a
+verification URL and code that the user authorizes on any device. Sign in
+explicitly, then pass a provider closure to
+`QuestDb::connect_with_token_provider` so both ingestion and query connections
+can obtain a current token:
+
+```text title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7", features = ["oidc"] }
+```
+
+```rust
+use std::sync::Arc;
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000").build()?,
+    );
+    auth.sign_in()?;
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    // Borrow senders and readers from db; they share the auth state.
+    drop(db);
+    Ok(())
+}
+```
+
+`token()` can refresh silently but never starts an interactive sign-in.
+Without a usable cached or refreshable credential it returns an OIDC
+`InteractionRequired` error; call `sign_in()` outside transport callbacks.
+The closure's `Arc` keeps the auth object alive for the pool. Do not also set
+static credentials in the configuration string.
+
+See [OIDC device flow](/docs/security/oidc/device-flow/#rust) for client-build
+availability, a complete ingestion example, discovery, persistence, and
+reauthentication. The `oidc` feature is not enabled by default.
+
+### TLS
+
 With the default crate features, the TLS root set is `webpki_roots`. Other
 choices have feature requirements:
 

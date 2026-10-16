@@ -12,6 +12,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [OIDC device flow](/docs/security/oidc/device-flow/) - Human sign-in from Java, Python, Rust, C, and C++, with provider discovery, checked ingestion examples, silent refresh, reauthentication, and optional token persistence
 - [User and group claims](/docs/security/oidc/#user-and-group-claims) - Fallback claim lists of QuestDB Enterprise 4.0.2, how QuestDB picks a claim, and the startup checks
 - [Token validation](/docs/security/oidc/#token-validation) - What QuestDB checks in a token, the expected issuer, and when QuestDB stops accepting an expired token
 - [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal) - When the Web Console renews its tokens, the ID-token requirement in token mode, how transient renewal failures pause queries without logging users out, and which errors end the session
@@ -28,6 +29,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint) - Documented the optional device endpoint, discovery-document behavior, and client discovery through `/settings`
 - [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) and [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) - Documented fallback claim lists and their startup validation
 - [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) and [`acl.oidc.issuer.validation.enabled`](/docs/configuration/oidc/#acloidcissuervalidationenabled) - New settings for the expected issuer of a token
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the name of the property, previously documented as `acl.oidc.pkce.enabled`
@@ -46,6 +48,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Java](/docs/connect/clients/java/#oidc-device-flow), [Python](/docs/connect/clients/python/#oidc-device-flow), [Rust](/docs/connect/clients/rust/#oidc-device-flow), and [C/C++](/docs/connect/clients/c-and-cpp/#oidc-device-flow) clients - Added device-flow provider integration and distinguished silent renewal from fixed-token replacement
 - [OpenID Connect (OIDC)](/docs/security/oidc/) - Split into an overview and provider guides, with a minimal configuration and an upgrade warning for QuestDB Enterprise 4.0.2
 - [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions) - Corrected that a login without groups is rejected, and added the endpoint permission of each interface
 - [Non-interactive clients](/docs/security/oidc/#non-interactive-clients) - Which token each client sends, with client credentials and password grant examples over QWP

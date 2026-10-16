@@ -29,7 +29,10 @@ and service tokens with one configuration, see
 [Troubleshooting OIDC logins](#troubleshooting-oidc-logins). For step-by-step
 setup, see the guides for [Microsoft Entra ID](/docs/security/oidc/entra-id/),
 which also covers Azure managed identities and service principals, and
-[PingFederate](/docs/security/oidc/pingfederate/).
+[PingFederate](/docs/security/oidc/pingfederate/). To sign a human in from a
+notebook, CLI, or application without a browser callback, see
+[OIDC device flow for clients](/docs/security/oidc/device-flow/), with Java,
+Python, Rust, C, and C++ examples.
 
 :::warning Upgrading to QuestDB Enterprise 4.0.2
 
@@ -69,9 +72,9 @@ acl.oidc.groups.claim=groups
 # instead of calling the User Info endpoint; required for Microsoft Entra ID
 # acl.oidc.groups.encoded.in.token=true
 
-# optional, openid by default: the scopes that the Web Console requests; add
-# offline_access if the provider issues a refresh token only for that scope,
-# such as Microsoft Entra ID, so that the Web Console can renew its tokens
+# optional, openid by default: scopes for the Web Console and device-flow
+# clients that discover their settings from QuestDB; add offline_access if
+# the provider requires it to issue refresh tokens, such as Microsoft Entra ID
 # acl.oidc.scope=openid offline_access
 ```
 
@@ -461,7 +464,28 @@ token can be used for authentication and authorization when communicating with
 QuestDB as explained in the [above 7th step](#7-database-access): the access
 token, or in token mode, the ID token.
 
+### Device flow for client applications
+
+For a notebook, CLI, or application acting as a human user, the
+[Java, Python, Rust, C, and C++ device-flow helpers](/docs/security/oidc/device-flow/)
+run the OAuth 2.0 Device Authorization Grant. The client displays a URL and a
+code, and the user signs in with the identity provider on any device. No
+password or browser redirect passes through the application. Sign in
+explicitly, then attach the shared auth provider so connections can obtain
+cached or silently refreshed tokens without prompting from background threads.
+
+This is not an unattended service flow. Use the
+[client credentials grant](#client-credentials-grant) or an Azure
+[managed identity](/docs/security/oidc/entra-id/#managed-identities-and-service-principals)
+for jobs that must start without a person present.
+
 ### Jupyter notebook
+
+The Python client's [device-flow helper](/docs/security/oidc/device-flow/#python)
+works in local and remote kernels, including notebooks without JupyterHub.
+It supports explicit sign-in and silent refresh without collecting the user's
+SSO password. Prefer it to the legacy ROPC example below when the provider
+supports device flow.
 
 JupyterHub can integrate with OAuth2 providers using OAuthenticator, as
 described in its
@@ -629,11 +653,17 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 ### CLI, standalone applications
 
-When using CLI tools, such as `psql`, or standalone applications like Microsoft
-Access, the best option may be the Resource Owner Password Credentials flow.
+For applications that can integrate a client auth helper, use
+[device flow](/docs/security/oidc/device-flow/) to sign a user in without
+collecting their password. A tool that accepts only PGWire credentials can
+connect as `_sso` with an externally obtained device-flow token as the
+password; see [OIDC for PGWire](#oidc-for-the-pgwire-endpoint).
 
-The user logs in with their SSO credentials, and the server validates the
-details with the OAuth2 provider:
+For tools that cannot integrate token acquisition, such as an unmodified
+`psql` login, the legacy Resource Owner Password Credentials flow is another
+option when explicitly enabled by the administrator and provider. The user
+logs in with their SSO credentials, and the server validates them with the
+OAuth2 provider:
 
 ```shell
 % psql -h localhost -p 8812 -U testuser
@@ -646,6 +676,10 @@ testldap=>
 ```
 
 ## Non-interactive clients
+
+This section covers jobs and services acting as themselves, or integrations
+using the legacy password grant. For a person signing in from a client
+application, see [Device flow](/docs/security/oidc/device-flow/) instead.
 
 Non-interactive clients are usually jobs or standalone applications, such as a
 client for ingesting data. It is practical to manage their credentials via an
@@ -867,9 +901,15 @@ for Microsoft Entra ID, it requests a new token in the background before the
 current one expires, and presents it on every connection that it opens after
 that.
 
-Any other long-running client must switch to a new token before the old one
-expires: request a new token, create a new client with it, wait until the old
-client has delivered what it sent, then close the old client. A QWP client that
+The [device-flow helpers](/docs/security/oidc/device-flow/#token-renewal-and-reauthentication)
+for Java, Python, Rust, C, and C++ can also supply rotating tokens without
+rebuilding the client. They refresh on demand when the provider has issued a
+usable refresh token, and require explicit user sign-in again when it has not.
+
+Without a provider, a long-running client configured with a fixed token must
+switch before that token expires: request a new token, create a new client
+with it, wait until the old client has delivered what it sent, then close the
+old client. A QWP client that
 is closed discards the rows that QuestDB has not acknowledged within
 `close_flush_timeout_millis`, unless it keeps them on disk with `sf_dir`, so
 wait for the acknowledgement first, for example with `flush(wait=True)` in the

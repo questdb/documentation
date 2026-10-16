@@ -744,6 +744,11 @@ module.exports = {
               label: "Overview",
             },
             {
+              id: "security/oidc/device-flow",
+              type: "doc",
+              label: "Device flow",
+            },
+            {
               id: "security/oidc/entra-id",
               type: "doc",
               label: "Microsoft Entra ID",
