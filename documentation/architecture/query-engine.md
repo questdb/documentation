@@ -59,8 +59,13 @@ to process data in table page frames for better CPU use.
   multi-core fashion. Some queries, for example those involving an index, are executed on a single
   thread. Other queries, like those involving `GROUP BY` and `SAMPLE BY`, execute a pipeline with some  single-threaded stages and some multi-threaded stages to avoid slow downs when groups are unbalanced.
 
-- **Worker pools:** QuestDB allows to configure different pools for specialized functions, like
-parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire protocol, or responding to HTTP connections. By default, most tasks are handled by a shared worker pool.
+- **Worker pools:** QuestDB splits work across three thread pools that are sized
+independently: a network pool for HTTP, PostgreSQL and ILP server I/O, a query pool
+for parallel query execution, and a write pool for WAL apply jobs, table writes and
+materialized view refresh. Because query execution has its own pool, a burst of
+ingestion does not starve readers of CPU. Individual subsystems can still be given
+dedicated threads on top of this. See
+[shared workers](/docs/configuration/shared-workers/) for sizing.
 
 - **Query plan caching:**
   The system caches query plans for reuse within the same connection. (Query results are not
