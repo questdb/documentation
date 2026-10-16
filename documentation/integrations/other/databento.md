@@ -367,7 +367,7 @@ with keys that identify an event uniquely. A symbol and timestamp alone do not
 identify every trade or order event.
 
 The optional subscription setting `replay_dedup = true` applies
-[Databento's time-and-count filtering](https://databento.com/docs/api-reference-live#recovering-after-a-disconnection).
+[Databento's time-and-count filtering](https://databento.com/docs/api-reference-live/basics/recovering-after-a-disconnection).
 It assumes that, per instrument, the recovery timestamp (`ts_recv` for BBO and
 CBBO, `ts_event` for other schemas) never decreases, and that records sharing a
 timestamp always arrive in the same order. Enabling it when those assumptions do
@@ -377,7 +377,7 @@ guarantee exactly-once delivery across crashes.
 ### Replay availability
 
 Databento generally provides
-[24 hours of Live replay](https://databento.com/docs/api-reference-live#intraday-replay),
+[24 hours of Live replay](https://databento.com/docs/api-reference-live/basics/intraday-replay),
 with dataset-specific exceptions. If the required history has expired, the task
 fails. To recover:
 
