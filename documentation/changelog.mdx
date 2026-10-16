@@ -8,6 +8,32 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## October 2026
+
+### New
+
+- [Databento connector](/docs/integrations/other/databento/) - The Databento page now covers the QuestDB Databento connector, a standalone process that streams Databento Live feeds and runs Historical backfills into QuestDB over QWP, replacing the earlier Python client walkthrough. Covers TOML configuration with multiple datasets per process, the default table and column mapping for each schema, `TIMESTAMP_NS` timestamps and order book arrays, checkpointed at-least-once recovery with a backfill procedure for expired replay, and Prometheus metrics. The page moves to the new Connectors group in the Connect section
+- [ALTER LIVE VIEW RESUME WAL](/docs/query/sql/alter-live-view-resume-wal/) - New reference page for resuming a live view whose own WAL was suspended after an error, and how to find suspended live views through `wal_tables()`
+
+### Reference
+
+- Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views run on their own refresh pool, not the materialized view pool as previously documented
+- Added the `checkpoint_seal_failures` column to [`live_views()`](/docs/query/functions/meta/#live_views) and corrected the `lag_seqtxn`, `last_processed_seqtxn`, `lag_micros`, and `writer_stall_micros` descriptions
+- Corrected the defaults of [`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/#matviewrefreshworkercount) and [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount), and documented that `mat.view.refresh.worker.count=0` disables materialized view refresh
+
+### Updated
+
+- [Live views](/docs/concepts/live-views/) - Corrected the [supported window functions](/docs/concepts/live-views/#supported-window-functions) to match QuestDB 10.0.1: the statistical functions, EMA, and VWEMA run only in anchored windows, `ksum` does not support `RANGE` frames, `lag` needs a bounded frame or an anchor, and `VARCHAR`, `UUID`, `LONG256`, `DECIMAL`, `BINARY`, and array partition keys are rejected. Added a [rolling standard deviation](/docs/concepts/live-views/#rolling-standard-deviation) recipe for Bollinger bands, rewrote [Freshness](/docs/concepts/live-views/#freshness) to reflect that interval-filtered reads, aggregates, and `ASOF JOIN` see unflushed rows while `LATEST ON` does not, and added the `UPDATE` and `REBASE WAL` invalidation triggers, base WAL retention, and replica freshness. Documented that an out-of-order base row rewrites view rows already emitted, that `view_status` stays `active` while the view's own WAL is suspended, and what to change in `SHOW CREATE LIVE VIEW` output before replaying it
+- [CREATE LIVE VIEW](/docs/query/sql/create-live-view/) - Fixed the `OWNED BY` example, which requires a parenthesized query, documented the designated-timestamp projection requirement and the remaining anchored-window rules, and expanded the error reference with verified messages. Added a grammar for anchored windows and [examples](/docs/query/sql/create-live-view/#examples) of a `RANGE` frame with a `WHERE` filter and an anchored session window
+- [Live view configuration](/docs/configuration/live-views/) - Corrected the descriptions of the in-memory buffer growth budget, partition compaction threshold, flush retry budgets, and refresh memory limit
+- [Shared workers](/docs/configuration/shared-workers/) - The write pool no longer lists WAL apply and materialized view refresh, which run on [dedicated pools](/docs/configuration/shared-workers/#dedicated-pools) together with live view refresh
+- [EMA and VWEMA](/docs/query/functions/window-functions/reference/#avg) - Corrected the frame behavior: both reject a frame clause instead of ignoring it
+- [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/), [Monitoring and alerting](/docs/operations/monitoring-alerting/), and [Write-ahead log](/docs/concepts/write-ahead-log/) - Suspended materialized views and live views now point to their own `RESUME WAL` commands, since `ALTER TABLE` fails on them; [`wal_tables()`](/docs/query/functions/meta/#wal_tables) now lists live views
+- [ALTER MATERIALIZED VIEW RESUME WAL](/docs/query/sql/alter-mat-view-resume-wal/) - Corrected the Enterprise permission to `RESUME WAL`
+- [Kubernetes Operator](/docs/enterprise-kubernetes-operator/releases/) - Updated for Operator 0.3.1, with upgrade notes on the removed convenience ClusterRoles and on applying the new CRDs first when `crd.enable=false`, the synced [API reference](/docs/enterprise-kubernetes-operator/reference/api/), and QuestDB Enterprise 4.0.1 as the tested image
+- [Kubernetes Operator permissions](/docs/enterprise-kubernetes-operator/installation/#operator-permissions) - Documented the cluster-wide RBAC the Operator is granted, which Secrets it reads and creates, why it never deletes a Secret, and that it has no object store or cloud permissions
+- [Kubernetes Operator backups left by departed instances](/docs/enterprise-kubernetes-operator/operations/backup-restore/#backups-left-by-departed-instances) - On Operator-managed clusters, backup prefixes of demoted or scaled-down instances are never pruned automatically. Covers when they are still needed as a seed or restore point, how to identify the safe ones to delete, and why age-based bucket lifecycle rules are risky
+
 ## September 2026
 
 ### QuestDB Enterprise Releases
