@@ -438,8 +438,8 @@ procedure.
 A node that is `NotReady` while its machine keeps running leaves the pod stuck
 until the machine is repaired or replaced. Turn on node auto-repair so this
 happens without a person: AKS repairs unhealthy nodes automatically, and on EKS
-you enable node auto repair on the managed node group. Once the node is gone,
-the operator recreates the pod on a healthy node.
+you enable node auto repair on the managed node group. Once the node is
+repaired or replaced, the pod runs again.
 
 ## Delete a database cluster
 
