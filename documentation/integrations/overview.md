@@ -71,6 +71,8 @@ Improve your interactions with QuestDB using these tools and interfaces:
   analyze monitoring metrics.
 - [SQLAlchemy](/docs/integrations/other/sqlalchemy/): Utilize Python's ORM
   capabilities for database interactions.
+- [Drizzle ORM](/docs/integrations/other/drizzle/): Query QuestDB from
+  TypeScript with a type-safe SQL query builder.
 - [MindsDB](/docs/integrations/other/mindsdb/): Build machine learning models for
   predictive analytics on [time-series data](/blog/what-is-time-series-data/).
 - [Cube](/docs/integrations/other/cube/): Middleware connecting your data sources
