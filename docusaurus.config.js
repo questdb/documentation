@@ -52,6 +52,7 @@ const config = {
       "data-project-name": "QuestDB",
       "data-project-logo": "/docs/images/favicon.webp",
       "data-bot-protection-mechanism": "hcaptcha",
+      "data-user-analytics-cookie-enabled": "false",
       "data-modal-z-index": "9999",
       "data-modal-size": "533px",
 
