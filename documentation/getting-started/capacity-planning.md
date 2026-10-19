@@ -60,13 +60,7 @@ For optimum performance, utilize the maximum settings:
 
 ### Supported filesystems
 
-To enable compression and to match our recommended performance profile, we
-recommend using [ZFS file system](https://en.wikipedia.org/wiki/ZFS).
-
-ZFS is required for system-level compression.
-
-While ZFS is recommended, QuestDB open source supports the following
-filesystems:
+QuestDB supports the following filesystems:
 
 - APFS
 - EXT4
@@ -94,10 +88,18 @@ QuestDB database.
 
 ### Data compression
 
-To enable data compression, filesystem must be ZFS.
+QuestDB compresses data by converting partitions to
+[Parquet](/docs/concepts/parquet/#data-compression), which uses `lz4_raw`
+compression by default and keeps partitions fully queryable. In QuestDB
+Enterprise, a [storage policy](/docs/concepts/storage-policy/) converts
+partitions automatically as they age, and can also tier them to
+[cold storage](/docs/concepts/cold-storage/) in object storage. In QuestDB open
+source, convert partitions manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
 
-For instructions on how to do so, see the
-[ZFS and compression](/docs/deployment/compression-zfs/) guide.
+Compression does not depend on the file system. File-system compression with
+[ZFS](/docs/deployment/compression-zfs/) also works, but Parquet is the
+recommended approach.
 
 ### Write amplification
 
