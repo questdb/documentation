@@ -405,27 +405,27 @@ into a new cluster.
 
 ## Node maintenance and disruption budgets
 
-The default PodDisruptionBudget (PDB) uses `minAvailable: 1` for a singleton and
-`instances-1` for a replicated cluster. A singleton therefore blocks voluntary
-eviction and can make `kubectl drain` wait indefinitely.
+A replicated cluster gets a default PodDisruptionBudget (PDB) with
+`minAvailable: instances-1`, which permits one voluntary disruption at a time.
 
-Before planned maintenance, choose one safe option:
+A singleton gets no PDB by default. `kubectl drain` and managed node upgrades
+evict its only pod, and the operator recreates it on another node in the same
+zone as its volume. The database is down until the new pod is ready. To avoid
+that outage, scale out and wait for a healthy, current replica before planned
+maintenance.
 
-1. scale out and wait for a healthy, current replica;
-2. lower `spec.scheduling.podDisruptionBudget.minAvailable`; or
-3. set `spec.scheduling.podDisruptionBudget.enabled: false` only after accepting
-   database downtime.
+To make a singleton block voluntary eviction instead, enable the PDB. A drain of
+its node then waits until you lower `minAvailable` or disable the PDB again:
 
 ```yaml
 spec:
   scheduling:
     podDisruptionBudget:
       enabled: true
-      minAvailable: 0
 ```
 
-Restore the normal PDB after maintenance and verify the current-generation
-writer contract: `Available=True/PrimaryReady`, `Progressing=False/Settled`, and
+After maintenance, verify the current-generation writer contract:
+`Available=True/PrimaryReady`, `Progressing=False/Settled`, and
 `WriteHealthy=True/Healthy`.
 
 A PDB protects only voluntary disruption. On node loss, the operator reports
@@ -434,6 +434,12 @@ recreating a pod while the old pod may still run on an unreachable node. Restore
 the node/volume or follow the explicit
 [promotion and failover](/docs/enterprise-kubernetes-operator/high-availability/#promotion-and-failover)
 procedure.
+
+A node that is `NotReady` while its machine keeps running leaves the pod stuck
+until the machine is repaired or replaced. Turn on node auto-repair so this
+happens without a person: AKS repairs unhealthy nodes automatically, and on EKS
+you enable node auto repair on the managed node group. Once the node is
+repaired or replaced, the pod runs again.
 
 ## Delete a database cluster
 

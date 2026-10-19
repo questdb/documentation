@@ -227,12 +227,13 @@ worker-node IAM can provide ambient ECR pull access; IRSA cannot.
 
 `spec.scheduling` supports node selectors, affinity, tolerations, topology
 spread, priority class, and an operator-managed PodDisruptionBudget (PDB).
-Without an override, pods get soft hostname anti-affinity, soft zone spread, and
-a PDB with `minAvailable: 1` for one instance or `instances-1` for HA.
+Without an override, pods get soft hostname anti-affinity and soft zone spread.
+A replicated cluster also gets a PDB with `minAvailable: instances-1`.
 
-The single-instance default intentionally blocks voluntary eviction. Before a
-node drain, scale out, lower `spec.scheduling.podDisruptionBudget.minAvailable`,
-or disable the PDB after accepting the availability risk. Follow the
+A one-instance cluster gets no PDB by default, because a budget over a single
+pod would block every node drain. A drain therefore restarts the database. Set
+`spec.scheduling.podDisruptionBudget.enabled: true` to block voluntary eviction
+instead. Follow the
 [node maintenance runbook](/docs/enterprise-kubernetes-operator/operations/database/#node-maintenance-and-disruption-budgets).
 Custom affinity or topology spread replaces the corresponding default rather
 than merging with it.
