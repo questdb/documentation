@@ -238,6 +238,22 @@ instead. Follow the
 Custom affinity or topology spread replaces the corresponding default rather
 than merging with it.
 
+## Pod labels and annotations
+
+`spec.podMetadata` adds labels and annotations to every instance Pod, for
+example so a metrics agent scrapes the `metrics` port (9003):
+
+```yaml
+spec:
+  podMetadata:
+    annotations:
+      k8s.grafana.com/scrape: "true"
+      k8s.grafana.com/metrics.portName: metrics
+```
+
+If you set a key the operator also sets, the operator's value is used. Changing
+`spec.podMetadata` rolls the Pods, including the primary.
+
 ## Wire protocols
 
 `spec.protocols` configures optional wire-protocol behavior. Omit it and HTTP,
@@ -423,7 +439,7 @@ operator-owned QWP keys as `spec.config`: both maps are merged into one
 ## Changes and immutable fields
 
 Changes to the image, image pull Secrets, resources, engine configuration,
-protocol fields, or pod scheduling can roll affected Pods. Ordinary rollouts are
+protocol fields, pod scheduling, or pod metadata can roll affected Pods. Ordinary rollouts are
 serialized: replicas roll in serial order before the primary, and at most one
 ordinary drift delete is attempted per instanceset reconcile. The controller may
 hold a rollout while topology, PVC usability, peer readiness, node health, or
