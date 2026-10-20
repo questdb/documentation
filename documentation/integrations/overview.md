@@ -40,7 +40,7 @@ integrations:
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
 - [Databento](/docs/integrations/other/databento/): Stream Live market data and run
-  Historical backfills with the QuestDB connector.
+  Historical backfills with the QuestDB Enterprise connector.
 
 ## Analytics and Processing
 

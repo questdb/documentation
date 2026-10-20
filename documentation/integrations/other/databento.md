@@ -2,15 +2,14 @@
 title: Ingest market data from Databento
 sidebar_label: Databento
 description:
-  Stream Databento market data into QuestDB. Configure Live feeds and Historical
-  backfills, query trades and order books, and recover after disconnects.
+  Stream Databento market data with the QuestDB Enterprise connector. Configure
+  Live feeds and Historical backfills, query trades and order books, and recover
+  after disconnects.
 ---
 
 ![Databento logo](/images/logos/databento-icon.svg)
 
-The
-[Databento connector](https://github.com/questdb/databento-questdb-connector)
-streams market data into QuestDB using
+The Databento connector is part of QuestDB Enterprise. It streams market data using
 [QWP over WebSocket](/docs/connect/wire-protocols/overview/). It runs as a
 standalone process configured with TOML and handles subscriptions, table
 creation, batching, and recovery.
@@ -31,24 +30,26 @@ may incur charges depending on your plan and dataset. Review
 
 ### Prerequisites
 
-- QuestDB 10.0 or later with QWP over WebSocket, reachable on port 9000 by
-  default. The connector's integration tests use QuestDB 10.0.1.
+- QuestDB Enterprise 10.0 or later with QWP over WebSocket, reachable on port
+  9000 by default.
 - A Databento API key with Live access to `EQUS.MINI` for the example below.
   Historical backfills require Historical access.
-- Rust 1.91.1 to build the connector from source.
 
 ### 1. Install the connector
 
-From a checkout of the
-[connector repository](https://github.com/questdb/databento-questdb-connector),
-run:
+Obtain the connector archive and its SHA-256 checksum through your QuestDB
+Enterprise contact. [Contact us](/enterprise/contact/) if you need access.
+Releases are available for Linux x86-64 and ARM64 (glibc 2.17 or later), macOS
+Apple silicon, and Windows x86-64.
+
+Verify the checksum and extract the archive. It includes the Live configuration
+below as `examples/connector.toml` and the [Historical backfill](#historical-backfills)
+configuration as `examples/backfill.toml`. Add the extracted directory to your
+`PATH`, then check the installation:
 
 ```shell
-cargo install --path . --locked --bin databento-questdb
+databento-questdb --version
 ```
-
-This installs the `databento-questdb` executable into Cargo's binary directory.
-Make sure that directory is on your `PATH`.
 
 ### 2. Configure a Live feed
 
@@ -56,7 +57,7 @@ Set the source API key and QuestDB connection string:
 
 ```shell
 export DATABENTO_API_KEY='<your-api-key>'
-export QDB_CLIENT_CONF='ws::addr=localhost:9000;'
+export QDB_CLIENT_CONF='ws::addr=localhost:9000;username=admin;password=<your-password>;'
 ```
 
 Save the following as `connector.toml`. It collects trades and top-of-book
@@ -122,21 +123,6 @@ LIMIT 10;
 
 For bid and ask queries, see [Order book arrays](#order-book-arrays). Ctrl+C
 requests a normal stop and saves confirmed progress to `state_dir`.
-
-### Docker
-
-The repository includes a Docker image build for Linux AMD64 and ARM64, also
-usable with Docker Desktop on macOS and Windows. Follow the
-[Docker startup instructions](https://github.com/questdb/databento-questdb-connector#docker)
-using the configuration above.
-
-Mount `connector.toml` read-only and keep each task's `state_dir` under the
-persistent volume at `/var/lib/databento-questdb`. Use a QuestDB address
-reachable from the container: a service name on a shared Docker network, or
-`host.docker.internal` on Docker Desktop. Docker gives a container 10 seconds to
-stop by default. Allow at least 60 seconds to drain output and save checkpoints,
-with `docker stop --time 60` or `stop_grace_period: 60s` in Docker Compose, and
-increase it if you raise [`shutdown_timeout_ms`](#batching-and-backpressure).
 
 ## Configuration
 
@@ -321,7 +307,6 @@ pool = "main"
 dataset = "GLBX.MDP3"
 mode = "historical"
 end = "2026-09-15T14:31:00Z"
-state_dir = "./state/cme-backfill"
 
 [[tasks.subscriptions]]
 schema = "trades"
@@ -338,9 +323,10 @@ databento-questdb --config backfill.toml --check-config
 databento-questdb --config backfill.toml
 ```
 
-With `state_dir`, completed subscriptions are skipped on restart. An interrupted
-request restarts from its original `start`, which can repeat rows and incur
-additional Databento charges. Use a new state directory when changing the range.
+Without `state_dir`, each run downloads the full range. Set it to skip completed
+queries on restart; use a new directory when changing the range. Interrupted
+queries always restart from their original `start`, so retries can repeat rows
+and incur additional Databento charges.
 
 Historical and Live tasks can run in the same process. A process containing only
 Historical tasks exits when they finish.
@@ -384,8 +370,8 @@ fails. To recover:
 1. Find each affected subscription's saved recovery boundary using the sources
    below. Keep the original `state_dir` until recovery is complete.
 2. Run a [Historical backfill](#historical-backfills) from that boundary into
-   the same destination tables as the Live task. Give the backfill its own
-   `state_dir`.
+   the same destination tables as the Live task. If you enable checkpoints,
+   use a separate `state_dir`.
 3. Restart Live with a new `state_dir` and an explicit `start` that is still
    within replay coverage. Choose a start before the backfill's `end` to overlap
    the ranges; this overlap can produce duplicates.
@@ -492,20 +478,3 @@ without skipping ahead. If the backlog outlives the replay retention window,
 `ReplayDataAgedOut` fails the task. Follow the
 [backfill procedure](#replay-availability); reconnecting alone cannot restore
 expired data.
-
-## Embedding in Rust
-
-Use the executable for a configured ingestion service. Applications that need to
-manage ingestion themselves can use the `databento_questdb` library: each
-`Connector` accepts source subscriptions, mapping options, a shared
-`Arc<QuestDbPool>`, and a cancellation token. Progress is available through
-`progress_handle()`.
-
-From the connector checkout, build the API reference with:
-
-```shell
-cargo doc --locked --no-deps --lib --open
-```
-
-For a clean shutdown, cancel the token and keep awaiting `run()` until it
-returns. Dropping the run future bypasses draining and final checkpointing.
