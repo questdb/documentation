@@ -39,7 +39,7 @@ integrations:
   platform for simplified data pipelines.
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
-- [Databento](/docs/integrations/other/databento/): Stream Live market data and run
+- [Databento connector](/docs/connect/databento/): Stream Live market data and run
   Historical backfills with the QuestDB Enterprise connector.
 
 ## Analytics and Processing
@@ -79,6 +79,8 @@ Improve your interactions with QuestDB using these tools and interfaces:
   automation, including SCADA and IIoT integrations.
 - [Airbyte](/docs/integrations/other/airbyte/): Sync data from a wide range of
   sources into QuestDB with an open-source ETL platform.
+- [Databento with Python](/docs/integrations/other/databento/): Ingest market data
+  into QuestDB Open Source using the Python clients.
 
 Is there an integration you'd like to see that's not listed? Let us know by
 opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).
