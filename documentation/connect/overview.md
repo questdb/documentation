@@ -29,8 +29,8 @@ Pick the path that matches your environment.
 
 ## Client Libraries
 
-The first-party libraries for **Java, Python, Go, Rust, Node.js, C & C++, and
-.NET** are the recommended way to talk to QuestDB. They speak the
+The first-party libraries for **Java, Python, Go, Rust, Node.js, C & C++,
+.NET, and Ruby** are the recommended way to talk to QuestDB. They speak the
 **QuestDB Wire Protocol (QWP)** and unify ingest and query under one
 configuration and one connection.
 
@@ -48,6 +48,7 @@ and PGWire for queries.
 | Python    | ✓ Stable    |
 | .NET      | Beta        |
 | Go        | Beta        |
+| Ruby      | Beta        |
 | Node.js   | Planned     |
 
 Highlights:
