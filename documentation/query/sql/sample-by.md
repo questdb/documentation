@@ -11,18 +11,21 @@ Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 ## Syntax
 
 ```questdb-sql
-SELECT columns, aggregate_functions
-FROM table
+SELECT column [, column ...], aggregation [, aggregation ...]
+FROM tableName
 [WHERE conditions]
 SAMPLE BY [count]unit
+    [ROLLUP(column [, ...]) | CUBE(column [, ...]) | GROUPING SETS (...)]
     [FROM timestamp TO timestamp]
-    [FILL(fill_option)]
-    [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset] | ALIGN TO FIRST OBSERVATION]
+    [FILL({ NONE | NULL | PREV | PREV(col) | LINEAR | constant } [, ...])]
+    [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset]
+     | ALIGN TO FIRST OBSERVATION]
 ```
 
 ### Key clauses
 
 - **`SAMPLE BY [count]unit`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`). The count is optional and defaults to `1`, so `h` means the same as `1h`
+- **`ROLLUP` / `CUBE` / `GROUPING SETS`**: Multi-level aggregation (see [GROUPING SETS](/docs/query/sql/grouping-sets/), [ROLLUP](/docs/query/sql/rollup/), [CUBE](/docs/query/sql/cube/)). Cannot be combined with `ALIGN TO FIRST OBSERVATION`, `FILL(PREV)`, `FILL(LINEAR)`, or a non-literal `FROM` bound. See [SAMPLE BY integration](/docs/query/sql/grouping-sets/#sample-by-integration)
 - **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
 - **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
 - **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`
@@ -94,6 +97,8 @@ The following restrictions apply:
 - `PREV(col)` references another aggregate column by alias and must match its
   type. It cannot be broadcast across multiple aggregates and is rejected when
   source or target is `SYMBOL`.
+- `PREV` and `LINEAR` strategies are not supported with
+  [GROUPING SETS, ROLLUP, or CUBE](/docs/query/sql/grouping-sets/).
 - The `FILL` keyword must precede alignment described in the
   [sample calculation section](#sample-calculation), i.e.:
 
@@ -620,6 +625,7 @@ SAMPLE BY 1h;
 
 This section includes links to additional information such as tutorials:
 
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute subtotals and grand totals within time buckets
 - [PIVOT](/docs/query/sql/pivot/) - Transform SAMPLE BY results from rows to columns
 - [Materialized Views](/docs/concepts/materialized-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)

@@ -325,6 +325,7 @@ Materialized view queries must:
 
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
+- Not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
