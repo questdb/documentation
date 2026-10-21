@@ -176,7 +176,7 @@ These options are provided as key-value pairs after the `WITH` keyword.
 ### Examples
 
 For more details on parallel import, please also see
-[Importing data in bulk via CSV](/docs/ingestion/import-csv/#import-csv-via-copy-sql).
+[Importing data in bulk via CSV](/docs/connect/compatibility/import-csv/#import-csv-via-copy-sql).
 
 ```questdb-sql title="COPY"
 COPY weather FROM 'weather.csv' WITH HEADER true FORMAT 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ' ON ERROR SKIP_ROW;
@@ -253,6 +253,13 @@ COPY (selectQuery) TO 'destinationPath'
 - Non-blocking exports - writes continue during export
 - Supports partitioned exports matching table partitioning
 - Configurable size limits
+
+An export runs under the query
+[memory limit](/docs/configuration/cairo-engine/#memory-limits); on QuestDB
+Enterprise it uses the issuing principal's
+[per-principal limit](/docs/security/rbac/#memory-limits). A breach fails the
+export with `query memory limit exceeded [workload=QUERY, ...]`, where `queryId`
+is the copy id in decimal. Exports do not appear in `query_activity`.
 
 ### Export root
 

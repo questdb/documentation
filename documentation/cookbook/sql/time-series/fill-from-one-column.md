@@ -17,18 +17,23 @@ WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 SAMPLE BY 100T FILL(PREV, PREV);
 ```
 
-But when there is an interpolation, instead of getting the PREV value for `bid_price` and previous for `ask_price`, you want both prices to show the PREV known value for the `ask_price`. Imagine this SQL was valid:
+But when there is an interpolation, instead of getting the PREV value for `bid_price` and previous for `ask_price`, you want both prices to show the PREV known value for the `ask_price`.
 
-```sql
+## Solution
+
+QuestDB supports referencing another aggregate column by alias inside `PREV()`:
+
+```questdb-sql demo title="Fill bid_price with previous value of ask_price"
 SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
 FROM core_price
 WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 SAMPLE BY 100T FILL(PREV(ask_price), PREV);
 ```
 
-## Solution
-
-The only way to do this is in multiple steps within a single query: first get the sampled data interpolating with null values, then use a window function to get the last non-null value for the reference column, and finally coalesce the missing columns with this filler value.
+The reference must match the target column's type, cannot be broadcast across
+aggregates, and is rejected when either side is a `SYMBOL`. For more flexible
+cases — for example, marking which rows were filled, or chaining custom
+expressions — the equivalent rewrite below uses window functions:
 
 ```questdb-sql demo title="Fill bid and ask prices with value from ask price"
 WITH sampled AS (

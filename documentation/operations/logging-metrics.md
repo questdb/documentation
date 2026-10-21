@@ -214,6 +214,47 @@ for the health check service. To do so, increase `http.min.worker.count` to `1`.
 
 :::
 
+#### Lifecycle endpoint
+
+`GET /lifecycle` on the same port returns the startup and shutdown state of
+every server component as JSON, for probes and coordinators that need more
+than the `200` of the health check:
+
+```shell
+curl http://127.0.0.1:9003/lifecycle
+```
+
+```json
+{
+  "capturedAtMicros": 1756380000123456,
+  "components": [
+    {
+      "name": "engine",
+      "state": "READY",
+      "lastTransitionMicros": 1756379991204000,
+      "latestProgress": null,
+      "hardRequiredDependencies": ["factory-provider"],
+      "softDependencies": []
+    }
+  ]
+}
+```
+
+- `capturedAtMicros` and `lastTransitionMicros` are epoch microseconds.
+- `state` is one of `INIT`, `STARTING`, `DEGRADED`, `READY`, `SWITCHING`,
+  `STOPPING`, `STOPPED`, `FAILED`.
+- `latestProgress` is `null`, or a progress object while a component is
+  restoring data.
+- The dependency lists name the components a component waits for.
+
+The response is chunked and lists every component in registration order. Like
+the health check, the endpoint follows
+[`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired).
+
+In QuestDB Enterprise the response also carries `currentRole`, `switchInFlight`,
+and `ready`, and the port accepts `POST /lifecycle/switch`. See
+[Failover and role switch](/docs/high-availability/failover/#lifecycle-api).
+
 ### Environment variables
 
 Values in the log configuration file can be overridden with environment
@@ -288,6 +329,50 @@ example configuration, enable it in within your `server.conf`:
 
 For an example on how to setup Prometheus, see the
 [QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
+
+### Cold storage read metrics
+
+_Enterprise only._
+
+When [cold storage](/docs/concepts/cold-storage/) is enabled, the endpoint
+exposes fifteen additional metrics under the `questdb_cold_chunk_` prefix,
+covering the chunk cache and the range reads that serve remote partitions:
+
+| Metric | Type | Description |
+| ------ | ---- | ----------- |
+| `questdb_cold_chunk_acquire_full_hit_total` | counter | Reads that found every chunk already resident |
+| `questdb_cold_chunk_acquire_partial_hit_total` | counter | Reads that found some chunks and fetched the rest |
+| `questdb_cold_chunk_acquire_full_miss_total` | counter | Reads where every chunk had to be fetched |
+| `questdb_cold_chunk_acquire_hit_chunks_total` | counter | Chunk lookups served from the cache |
+| `questdb_cold_chunk_acquire_miss_chunks_total` | counter | Chunk lookups that had to be fetched |
+| `questdb_cold_chunk_download_started_total` | counter | Range requests dispatched, one per coalesced group |
+| `questdb_cold_chunk_download_finished_total` | counter | Range requests that returned data |
+| `questdb_cold_chunk_download_failed_total` | counter | Range requests that failed after retries |
+| `questdb_cold_chunk_download_coalesced_total` | counter | Readers that attached to an in-flight download instead of starting a new one |
+| `questdb_cold_chunk_release_evictions_total` | counter | Chunks evicted when their last lease was released |
+| `questdb_cold_chunk_in_flight_downloads` | gauge | Range requests dispatched but not yet complete |
+| `questdb_cold_chunk_pending_batches` | gauge | Batches the read coordinator is tracking |
+| `questdb_cold_chunk_busy_leases` | gauge | Currently allocated leases |
+| `questdb_cold_chunk_ready_chunks` | gauge | Chunks resident in the ready cache |
+| `questdb_cold_chunk_pinned_bytes` | gauge | Compressed bytes resident in the ready cache |
+
+Watch rates and ratios rather than raw totals. Sustained
+`download_failed_total`, `pending_batches` sitting at its configured cap, or
+`pinned_bytes` staying non-zero after query traffic stops are all worth
+investigating. See
+[Operating cold storage](/docs/operations/cold-storage/#cold-read-metrics).
+
+### Replication metrics
+
+_Enterprise only._
+
+Two gauges describe the state of an in-place
+[role switch](/docs/high-availability/failover/):
+
+| Metric | Type | Description |
+| ------ | ---- | ----------- |
+| `questdb_replication_pending_upload_txn` | gauge | Committed transactions not yet uploaded to the object store, summed over the replicated tables. Poll it before demoting a primary: a demote that cannot bring it to zero within its timeout is not completed |
+| `questdb_backup_active_at_last_demote` | gauge | `1` if a backup was still running when the node was last demoted, `0` otherwise. Cleared by the next promotion |
 
 ### Prometheus Alertmanager
 

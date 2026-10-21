@@ -51,6 +51,11 @@
   padding: var(--ifm-pre-padding);
 }
 
+/* Prism's TOML table tokens share a class name with Tailwind's display utility. */
+.codeBlockLines :global(.token.table) {
+  display: inline;
+}
+
 .codeBlockLinesWithNumbering {
   display: table;
   padding: var(--ifm-pre-padding) 0;

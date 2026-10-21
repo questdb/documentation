@@ -1,0 +1,262 @@
+---
+title: Kubernetes Operator releases
+description: Release history for the QuestDB Enterprise Kubernetes Operator.
+---
+
+<!-- Generated from questdb/questdb-enterprise-operator v0.4.0 (ccf29ce8787cc899fb73de99d2bbd9b4b8c1735a).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.4.0 -->
+# Changelog
+
+Notable changes to the QuestDB Enterprise Operator are documented here.
+
+<!-- generated latest operator artifacts: start -->
+## Latest operator artifacts
+
+Latest stable release: **0.4.0**
+
+### Operator images
+
+**AWS ECR**
+
+```text
+695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.4.0
+```
+
+**Non-AWS mirror**
+
+```text
+registry.distribution.questdb.io/questdb-enterprise-operator:0.4.0
+```
+
+Both references require the registry access supplied by QuestDB.
+
+### Helm chart
+
+[View available chart versions on GitHub Packages](https://github.com/orgs/questdb/packages/container/package/charts%2Fquestdb-operator).
+
+```sh
+helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
+  --namespace questdb-operator-system --create-namespace \
+  --version 0.4.0
+```
+
+<!-- generated latest operator artifacts: end -->
+## [0.4.0] - 2026-10-16
+
+### Upgrade notes
+
+- Single-instance clusters no longer get a PodDisruptionBudget by default.
+  After the upgrade, draining the node (or a managed node upgrade on AKS or
+  EKS) restarts the database on another node instead of blocking forever. To
+  keep the old behaviour, set
+  `spec.scheduling.podDisruptionBudget.enabled: true`. Replicated clusters are
+  unchanged.
+- If you manage CRDs yourself (`crd.enable=false`), apply this release's CRDs
+  before upgrading the operator, so `spec.podMetadata` is accepted.
+
+### Added
+
+- `spec.podMetadata` adds your own labels and annotations to every QuestDB
+  Pod, for example metrics-scrape annotations:
+
+  ```yaml
+  podMetadata:
+    annotations:
+      k8s.grafana.com/scrape: "true"
+  ```
+
+  The operator's own labels always win. Changing `podMetadata` restarts the
+  Pods one at a time, like a `scheduling` change.
+
+### Changed
+
+- When a rolling update is waiting, the `Progressing` condition says why and
+  on which instance, for example
+  `waiting: PeerNotReady on instance prod-3`.
+
+### Fixed
+
+- A replica whose PVC was deleted now rebuilds itself. Before, if its Pod came
+  back before the PVC was gone, the PVC stayed `Terminating` and the replica
+  never recovered.
+- The operator is built with Go 1.26.9 and updated dependencies, fixing
+  reported CVEs.
+
+## [0.3.1] - 2026-09-28
+
+### Upgrade notes
+
+- `helm upgrade` removes nine ClusterRoles the chart used to ship for
+  convenience (`questdb-operator-questdb{cluster,objectstore,promotion}-{admin,editor,viewer}-role`).
+  The operator never used them. If you bound users to them, recreate the roles
+  yourself before upgrading.
+- If you manage CRDs yourself (`crd.enable=false`), apply this release's CRDs
+  before upgrading the operator. With the old CRDs in place, changing
+  `spec.coldStorage.manager` makes the operator stop managing that cluster
+  until the CRDs are updated.
+
+### Changed
+
+- A restore from backup now reports its progress and any setup problem on the
+  `Recovered` condition. A failed restore sets the cluster phase to `Degraded`.
+- The `Recovered` condition becomes `True` once the restored primary has stayed
+  Ready for 60 seconds.
+- When the primary is not Ready, the `Available` and `Progressing` conditions
+  say why: a Pending PVC, a waiting container, or a Pod that cannot be
+  scheduled.
+- A `spec.auth.adminSecret` that names a missing Secret or key is reported as
+  `ConfigRejected` instead of failing later.
+- Changing `spec.coldStorage.manager` to move cold-storage duty to another
+  instance no longer raises a Warning or marks the cluster `Degraded` while the
+  move is in progress. A failed move still does, with reason
+  `ManagerSwitchFailed`.
+- The operator's webhook permissions are narrower. Set `webhook.configName` if
+  you need a different name for the webhook configuration.
+- QuestDB Enterprise 4.0.1 is the tested image.
+
+### Fixed
+
+- A spec fix now reaches crash-looping Pods without deleting them by hand,
+  including when several Pods are failing at once.
+- Moving cold-storage duty with `spec.coldStorage.manager` no longer stalls on
+  an idle replica, during a stuck promotion, or on a slow switch. If no
+  instance is doing cold-storage duty, the operator assigns it to the selected
+  instance on its own.
+- Adding `spec.coldStorage` to a cluster that is already running now takes
+  effect. Before, the cluster went `Degraded` and its Pods were never updated.
+- Losing the cold-storage `QuestDBObjectStore` or its Secret no longer stops
+  the rest of the cluster from being managed.
+- Deleting the primary's PVC while a Planned promotion is starting no longer
+  deletes the primary Pod.
+- A brief API error no longer fails a promotion or restarts its drain wait.
+
+## [0.3.0] - 2026-09-14
+
+### Added
+
+- Native cold storage is available through `spec.coldStorage`:
+
+  ```yaml
+  coldStorage:
+    objectStoreRef:
+      name: questdb-cold-store
+      root: cold/questdb/
+    manager: 1
+  ```
+
+  The selected 1-based serial is the independent cold-storage manager and all
+  other instances are refreshers. Recognizable QuestDB Enterprise versions below
+  4.0.0 are rejected; unknown custom tags and digest-only images are allowed.
+  Cold health is reported through the `ColdStorageHealthy` condition and
+  `status.coldStorage` (configured store, current manager, manager term).
+
+### Changed
+
+- Existing raw `spec.config` cold-storage settings remain compatible when
+  `spec.coldStorage` is absent. The operator never manages object-store data or
+  table storage policies, and it never forces a cold-manager handoff.
+- A Planned promotion on a cluster with `spec.coldStorage` requires settled
+  cold-manager ownership on an instance other than the departing primary;
+  otherwise the promotion fails fast with `ColdManagerMoveRequired`. Move
+  `spec.coldStorage.manager` to a ready replica, wait for `ManagerReady`, and
+  create a new promotion request. The default `manager: 1` normally selects the
+  primary, so move it before the first Planned promotion. Emergency promotion
+  never waits on cold ownership.
+- `QuestDBObjectStore` provider and physical coordinates (S3 bucket, region,
+  and endpoint; Azure container, account name, and endpoint; GCS bucket and
+  endpoint) are immutable after creation, for every store use. Credential
+  references, Secret contents, `root`, and non-coordinate transport options
+  remain mutable. OpenDAL coordinate aliases persisted under older CRDs stay
+  accepted while their key and value remain unchanged; new aliases are
+  rejected.
+- The CRDs now use Kubernetes validation ratcheting, which requires Kubernetes
+  1.30 or later — within the supported platform matrix.
+
+### Fixed
+
+- The Emergency-only migration gate no longer fires on Planned promotions, where
+  one transient API read could silently revert a completed drain by re-shaping
+  the departing serial as primary and wedging the promotion in `Promoting`.
+- A Planned promotion no longer fails terminally with `ColdManagerMoveRequired`
+  on a one-pass cold-storage observation transient. A trustworthy misplacement
+  or an in-flight handoff still fails fast; an unsettled observation waits in
+  `Validating`, bounded by `catchUpTimeoutSeconds`.
+- Emergency promotion persists the `Promoting` phase before fencing and waits
+  for the departed primary Pod to be absent from the API server before shaping
+  the target migration; promotion actions are authorized only from the exact
+  controller-owner UID.
+- A completed promotion settles the follower's status against the committed
+  primary in the same pass and emits a `PromotionCompleted` event, instead of
+  leaving a stale `Available=True/Following` status.
+- The undetermined follower replication status message is simplified while
+  retaining `Unknown/StreamNotDetermined` semantics.
+
+## [0.2.1] - 2026-09-02
+
+### Added
+
+- Verified Secret-backed PGWire TLS for new clusters.
+- Manager scheduling, metadata, environment, replica, and PodDisruptionBudget chart values.
+- Chart-managed verified controller metrics TLS.
+- Opt-in per-cluster database ingress policy example.
+
+### Changed
+
+- QuestDB Enterprise 4.0.0 canonical certification.
+- PGWire TLS block presence is creation-time immutable while certificate and verification fields remain mutable.
+- Port 9003 is Pod-only.
+- Strict config-key and source-instance validation.
+
+### Fixed
+
+- Updated the bundled gRPC dependency to 1.83.1 to address CVE-2026-84304.
+- Serialized replica-first rollout/read-route overlap and terminal Pod replacement.
+- Filtered-cache live-object confirmation.
+- Per-table follower progress/quiet evidence and oversized metrics rejection.
+- Backup phase/stall, PITR normalization/fail-closed restore, promotion fencing diagnostics, terminating-cluster behavior, chart typing/webhook/PDB validation.
+
+## [0.2.0] - 2026-08-20
+
+### Fixed
+
+- Planned promotions no longer stall in `Validating` under continuous writes (#205). The
+  catch-up gate now admits a target that is continuously streaming — reachable, no
+  suspended tables, self-consistent, and having applied everything the primary committed
+  a 15-second window ago — in addition to a target at exactly zero lag. The bound is
+  wall-clock, so it is independent of write rate. Frozen or genuinely behind targets still
+  hold; unreachable targets fail closed.
+
+### Added
+
+- `spec.protocols.qwp.udp.enabled` opts a cluster into the QWP UDP receiver.
+  Port 9007/UDP is opened on the Pod and published on the cluster and `-rw`
+  Services only while it is enabled. It is **not** published on `-ro`, since a
+  datagram aimed at a replica is discarded and fire-and-forget means nothing is
+  returned to say so. The headless `<cluster>` Service still resolves to every
+  instance, so per-pod DNS remains a way to address a specific one deliberately
+  — it is not an availability endpoint and should not be used as one.
+
+  The receiver is **unauthenticated**. QWP authenticates on the WebSocket
+  upgrade request and UDP has no upgrade, so anything that can reach the port
+  can write. Restrict it with a NetworkPolicy.
+
+  Requires an engine that ships the QWP UDP receiver; QuestDB Enterprise 3.3.4
+  and later do. Clusters that leave it disabled are unaffected: no `qwp.udp.*`
+  key is written and no pod is rolled on operator upgrade.
+
+### Changed
+
+- `qwp.udp.enabled`, `qwp.udp.bind.to`, `qwp.udp.unicast`, and `qwp.udp.join`
+  are operator-owned and rejected in both `spec.config` and
+  `spec.replication.config` — both maps are merged into one `server.conf`, so a
+  key owned in only one of them is not owned at all. The first two are set through
+  `spec.protocols.qwp.udp`; the multicast pair cannot be fronted by the unicast
+  ClusterIP the operator publishes. The remaining `qwp.udp.*` tuning keys stay
+  settable.
+
+## [0.1.0] - 2026-08-13
+
+Initial release, supporting QuestDB Enterprise clusters on Amazon EKS and Azure
+AKS. See the [installation guide](https://questdb.com/docs/enterprise-kubernetes-operator/installation/)
+and [known limitations](https://questdb.com/docs/enterprise-kubernetes-operator/known-limitations/)
+before deployment.

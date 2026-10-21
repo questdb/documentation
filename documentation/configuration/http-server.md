@@ -89,6 +89,17 @@ Enterprise supports more advanced authentication via RBAC.
 Username for HTTP Basic Authentication in QuestDB Open Source. QuestDB
 Enterprise supports more advanced authentication via RBAC.
 
+:::warning QuestDB Enterprise rejects these settings
+
+Since QuestDB Enterprise 4.0.0, an instance that sets `http.user`,
+`http.password` or `http.password.file`, or the equivalent `QDB_HTTP_USER`,
+`QDB_HTTP_PASSWORD` and `QDB_HTTP_PASSWORD_FILE` environment variables, **fails
+to start**. These are Open Source basic-auth settings that Enterprise has never
+enforced, so carrying them gave the false impression the endpoint was
+protected. Remove them and use [RBAC](/docs/security/rbac/) instead.
+
+:::
+
 ## Connections
 
 ### http.connection.pool.initial.capacity
@@ -254,6 +265,14 @@ optimal value for most workloads.
 - **Default**: `32`
 - **Reloadable**: no
 
+:::caution Not supported since QuestDB 10.0.0
+
+This property is obsolete and no longer has any effect. A configuration that
+still sets it logs an advisory at startup, and fails to start when
+`config.validation.strict` is enabled. Remove it from `server.conf`.
+
+:::
+
 Size of buffer to read from the HTTP connection. If this buffer returns zero
 and the HTTP client is no longer sending data, SQL processing will be
 terminated.
@@ -282,8 +301,9 @@ since the server started.
 Enables termination of SQL processing if the HTTP connection is closed. The
 connection is checked after `circuit.breaker.throttle` iterations. The
 mechanism also reads from the input stream and discards data, since some HTTP
-clients send keep-alive data between requests. `circuit.breaker.buffer.size`
-controls the buffer size for this.
+clients send keep-alive data between requests. The buffer size for this was
+controlled by `circuit.breaker.buffer.size`, which is
+[not supported since QuestDB 10.0.0](#circuitbreakerbuffersize).
 
 ### http.security.max.response.rows
 
@@ -299,6 +319,11 @@ Limit the number of response rows over HTTP.
 
 Forces HTTP read-only mode when `true`, disabling commands which modify data
 or data structure (e.g. INSERT, UPDATE, CREATE TABLE).
+
+Read-only mode is a data boundary, not an administrative lockdown. With access
+control disabled, functions such as `reload_config()` and, in QuestDB
+Enterprise, the [role switch](/docs/high-availability/failover/) statements and
+endpoint stay available on a read-only interface.
 
 ## Query cache
 

@@ -15,7 +15,8 @@ import CodeBlock from "@theme/CodeBlock"
 |-----------|-------------|-------|
 | Instance | `D4s_v5` or `E8s_v5` | 4-8 vCPUs, 16-64 GiB RAM |
 | Storage | Premium SSD v2, 200+ GiB | 16000 IOPS / 1000 MBps |
-| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| File system | `ext4` or `xfs` | Compression is handled by Parquet, not the file system |
+| Compression | Storage policy with `TO PARQUET` | Add `TO REMOTE` to tier history to Blob Storage (Enterprise) |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
 ---
@@ -100,14 +101,32 @@ capacity to get required IOPS.
 
 **File system:**
 
-Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
-compression, `ext4` or `xfs` offer slightly better performance.
+Format the data disk as `ext4` or `xfs`. QuestDB compresses data itself, so the
+file system does not need to.
+
+**Compression and tiering:**
+
+QuestDB compresses data by storing older partitions as
+[Parquet](/docs/concepts/parquet/#data-compression), which uses `lz4_raw`
+compression by default and stays fully queryable. In QuestDB Enterprise, a
+[storage policy](/docs/concepts/storage-policy/) with a `TO PARQUET` stage
+converts partitions automatically as they age. In QuestDB open source, convert
+them manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
+
+For further savings in Enterprise, add a `TO REMOTE` stage so the policy also
+tiers Parquet partitions to Blob Storage
+[cold storage](/docs/concepts/cold-storage/). Blob Storage usually costs less
+than managed disks, the cluster keeps a single copy that every instance reads
+instead of one copy per replica, and history can grow beyond the size of a
+single disk.
 
 **Unsupported storage:**
 
 - **Azure NetApp Files** - Not supported as primary storage (NFS latency too high)
 - **blobfuse2** - Not supported for database workloads
-- **Blob Storage** - Supported for Enterprise replication only, not primary storage
+- **Blob Storage** - Supported for Enterprise replication and cold storage only,
+  not primary storage
 
 ### Networking
 
@@ -262,7 +281,7 @@ pg.password=your_secure_password
 ```
 
 **InfluxDB line protocol** - edit `conf/auth.json`. See
-[ILP authentication](/docs/ingestion/ilp/overview/#authentication).
+[ILP authentication](/docs/connect/compatibility/ilp/overview/#authentication).
 
 Restart after changes:
 
@@ -348,3 +367,27 @@ For EntraID integration, see the
 [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
+
+### Buy through Azure Marketplace
+
+QuestDB Enterprise is listed on
+[Azure Marketplace](https://marketplace.microsoft.com/en-us/product/questdb_com.c5f84985-0214-403e-bdd3-5d436252a35b).
+Buying through the listing puts QuestDB Enterprise on your existing Azure
+invoice and uses your organization's existing Azure procurement process.
+
+The listing is a purchasing route, not a hosted service. QuestDB Enterprise
+still runs in your own Azure subscription, on Virtual Machines, Docker or
+Kubernetes. The infrastructure guidance on this page applies.
+
+**Steps:**
+
+1. Contact [sales@questdb.com](mailto:sales@questdb.com) to agree scope, term
+   and pricing. Subscriptions are priced per deployment.
+2. QuestDB sends a private offer to your Azure account.
+3. Accept the private offer and subscribe through Azure Marketplace.
+4. Once the subscription is active, QuestDB provides access to the Enterprise
+   binaries or container images, along with deployment guidance from QuestDB
+   engineers.
+5. Follow the
+   [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) to
+   install and configure your instance.

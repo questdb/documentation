@@ -30,7 +30,7 @@ Types can be converted from one to another using the `cast()` function.
 
 ## Examples
 
-```questdb-sql title="Queries"
+```questdb-sql demo title="Cast between types"
 SELECT
 cast(3L + 2L AS INT) cast1,
 cast(1578506142000000 AS TIMESTAMP) cast2,
@@ -56,7 +56,7 @@ output data type is smaller than the expression.
 
 ### Precision loss examples
 
-```questdb-sql title="Queries"
+```questdb-sql demo title="Precision loss from casting to smaller types"
 SELECT
 cast(3.5 + 2 AS INT),
 cast(7234623 AS SHORT),
@@ -99,7 +99,7 @@ The below chart illustrates the explicit and implicit cast available in QuestDB:
 ![Table showing the different possibilities the cast function supports, those are defined by an input and output types](/images/docs/castmap.jpg)
 
 
-```questdb-sql title="Queries"
+```questdb-sql demo title="Implicit type widening"
 SELECT
 1234L + 567,
 1234L + 0.567,
@@ -117,7 +117,7 @@ There is a shorthand cast syntax.
 
 Using the above example:
 
-```questdb-sql title="Queries, long form"
+```questdb-sql demo title="Cast, long form"
 SELECT
 cast(3.5 + 2 AS INT),
 cast(7234623 AS SHORT),
@@ -126,7 +126,7 @@ cast(2334444.323 AS SHORT);
 
 We can use the `::` syntax to shorten things up:
 
-```questdb-sql title="Queries, short hand"
+```questdb-sql demo title="Cast, shorthand with ::"
 SELECT
     (3.5 + 2)::INT,
     7234623::SHORT,

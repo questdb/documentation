@@ -1,11 +1,17 @@
 ---
 title: Materialized views
-description: Configuration settings for materialized views in QuestDB.
+description:
+  Materialized view configuration in QuestDB, covering refresh workers, parallel
+  SQL, and the retry limits that govern out-of-memory and busy refresh failures.
 ---
 
 These settings control materialized view SQL support and the background refresh
-job. Materialized views can use dedicated worker threads or share the server's
-common pool.
+job. Materialized views refresh on a dedicated worker pool sized by
+[`mat.view.refresh.worker.count`](#matviewrefreshworkercount); `0` disables
+refresh.
+
+To cap the native memory a single refresh may allocate, see
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
 
 ## cairo.mat.view.enabled
 
@@ -13,6 +19,23 @@ common pool.
 - **Reloadable**: no
 
 Enables or disables SQL support and the refresh job for materialized views.
+
+## cairo.mat.view.max.refresh.retries
+
+- **Default**: `10`
+- **Reloadable**: yes
+
+Maximum number of immediate retries within a single refresh attempt. A retry
+happens when the base table changes structurally during the refresh, when a
+refresh step produces an oversized transaction, or when a step fails with an
+out-of-memory error, including a breach of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits).
+Retries after an oversized transaction or an out-of-memory error shrink the
+refresh interval step; a retry after a structural change recompiles the view
+with the same step, and if it keeps failing the refresh is queued again. Once
+the out-of-memory retries are exhausted or the step cannot shrink further, the
+error propagates and the deferred retries governed by
+`cairo.mat.view.refresh.busy.retry.limit` take over.
 
 ## cairo.mat.view.parallel.sql.enabled
 
@@ -22,20 +45,52 @@ Enables or disables SQL support and the refresh job for materialized views.
 When disabled, SQL executed by the materialized view refresh job always runs
 single-threaded.
 
-## mat.view.refresh.worker.affinity
+## cairo.mat.view.refresh.busy.retry.limit
 
-- **Default**: equal to the CPU core count
+- **Default**: `10`
 - **Reloadable**: no
 
-Comma-separated list of numerical CPU core indexes.
+Maximum number of deferred retries after an incremental or scheduled period
+refresh fails with a transient error. If all retries fail, the view is
+invalidated. A successful refresh resets the counter; `0` disables deferred
+retries.
+
+Transient errors include a busy base table or view and out-of-memory errors,
+including breaches of the
+[refresh memory limit](/docs/configuration/cairo-engine/#memory-limits). Full
+refreshes and user-requested `REFRESH ... RANGE FROM ... TO ...` do not use these
+deferred retries.
+
+## cairo.mat.view.refresh.busy.retry.timeout
+
+- **Default**: `1000`
+- **Reloadable**: no
+
+Delay in milliseconds before a deferred retry for an incremental or scheduled
+period refresh. The retry is timer-driven and does not block a refresh worker.
+The deprecated `cairo.mat.view.refresh.oom.retry.timeout` key is accepted but
+has no effect; deferred out-of-memory retries use this backoff.
+
+## mat.view.refresh.worker.affinity
+
+- **Default**: none
+- **Reloadable**: no
+
+Comma-separated list of numerical CPU core indexes, one per refresh worker.
 
 ## mat.view.refresh.worker.count
 
-- **Default**: `0`
+- **Default**: `2` on hosts with up to 8 CPU cores, `3` on up to 32 cores, `4`
+  on larger hosts. This is the same CPU-based default as
+  [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount);
+  setting that key does not change this one.
 - **Reloadable**: no
 
-Number of dedicated worker threads assigned to refresh materialized views.
-When `0`, uses the shared worker pool.
+Number of dedicated worker threads assigned to refresh materialized views. A
+value of `0` disables materialized view refresh: `CREATE MATERIALIZED VIEW`
+still succeeds, but nothing refreshes the view. Live views use their own pool,
+sized by
+[`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount).
 
 ## mat.view.refresh.worker.haltOnError
 

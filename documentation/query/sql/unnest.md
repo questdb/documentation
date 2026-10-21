@@ -365,6 +365,7 @@ ORDER BY symbol, level;
   increase with care.
 
 :::info Related documentation
+- [`array_agg`](/docs/query/functions/aggregation/#array_agg) - Collect rows into arrays (inverse of Array UNNEST)
 - [Array functions](/docs/query/functions/array/)
 - [JSON functions](/docs/query/functions/json/)
 - [SELECT](/docs/query/sql/select/)

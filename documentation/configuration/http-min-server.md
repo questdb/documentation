@@ -3,10 +3,29 @@ title: Minimal HTTP server
 description: Configuration settings for the minimal HTTP server in QuestDB.
 ---
 
-The minimal HTTP server provides the health check and Prometheus metrics
-endpoints, running on a separate port (default 9003) from the main HTTP server.
-This lightweight server remains responsive even when the main server is under
-heavy load.
+The minimal HTTP server provides the health check, Prometheus metrics, and
+lifecycle endpoints, running on a separate port (default 9003) from the main
+HTTP server. This lightweight server remains responsive even when the main
+server is under heavy load.
+
+It serves `GET /status` (any unbound path answers the same health check),
+`GET /metrics` when metrics are enabled, `GET /lifecycle`, and in QuestDB
+Enterprise `POST /lifecycle/switch`. See the
+[minimal HTTP server](/docs/operations/logging-metrics/#minimal-http-server)
+section for the health check and lifecycle endpoints, and
+[Failover and role switch](/docs/high-availability/failover/#lifecycle-api) for
+the switch endpoint. TLS for this port is configured with the `http.min.tls.*`
+settings on the [TLS](/docs/configuration/tls/) page.
+
+## http.health.check.authentication.required
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Whether `GET /status`, `GET /metrics`, and `GET /lifecycle` require
+authentication when the HTTP server does. Set to `false` to let a load balancer
+or a Kubernetes probe call them without credentials. `POST /lifecycle/switch`
+always requires credentials, regardless of this setting.
 
 ## http.min.bind.to
 

@@ -29,6 +29,41 @@ To work properly, all of the following must be true:
 
 - Columns in each query statement should be in the same order.
 
+## Result column types
+
+A column keeps its type when every branch contributes the same type. When the
+branches differ, the result widens to a type that can hold both.
+
+`SYMBOL` is worth calling out. A column that is `SYMBOL` on **every** branch
+stays `SYMBOL` in the result. It widens to `VARCHAR` only when at least one
+branch contributes a text type:
+
+```questdb-sql title="Symbol columns survive a union" demo
+SELECT * FROM (SELECT symbol FROM trades WHERE symbol = 'BTC-USDT' LIMIT 1)
+UNION ALL
+SELECT * FROM (SELECT symbol FROM trades WHERE symbol = 'ETH-USDT' LIMIT 1);
+```
+
+Both branches contribute `SYMBOL`, so the result column is `SYMBOL`. Replace
+either branch with a `VARCHAR` expression and the result column becomes
+`VARCHAR`.
+
+This affects two things beyond the column type itself:
+
+- `CREATE TABLE AS` over such a union materializes a `SYMBOL` column, not a
+  `STRING` one.
+- The REST API reports `SYMBOL` in the `columns` metadata of its JSON
+  response. PGWire is unaffected, since it exposes both types as the
+  `VARCHAR` OID.
+
+:::note
+
+Before QuestDB 10.0.1, a symbol-only union always widened to a text type. Code
+that inspects REST response metadata, or that depends on the column type
+produced by `CREATE TABLE AS`, may observe the change.
+
+:::
+
 ## Syntax
 
 ```questdb-sql

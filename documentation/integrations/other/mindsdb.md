@@ -104,7 +104,7 @@ ports:
 
 ### Adding data to QuestDB
 
-There are different ways to [insert data to QuestDB](/docs/ingestion/overview/).
+There are different ways to [insert data to QuestDB](/docs/connect/overview/).
 
 #### SQL
 

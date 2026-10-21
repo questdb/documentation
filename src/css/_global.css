@@ -445,8 +445,9 @@ html[data-theme="dark"] .DocSearch {
   display: none;
 }
 
-/* Hide Docusaurus chevron for custom GitHub link */
-.custom-github-link::after {
+/* Hide Docusaurus chevron for the custom GitHub and Enterprise links */
+.custom-github-link::after,
+.navbar__enterprise-link::after {
   display: none !important;
 }
 
@@ -484,4 +485,9 @@ html[data-theme="dark"] .DocSearch {
 .menu {
   font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
   font-size: var(--font-size-small);
+}
+
+/* Make subsample diagram SVGs fill the content width */
+article img[src*="/subsample/"] {
+  width: 100%;
 }

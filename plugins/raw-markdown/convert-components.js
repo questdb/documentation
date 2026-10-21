@@ -77,12 +77,54 @@ function replaceComponent(content, componentName, replacer) {
 }
 
 /**
- * Removes <Screenshot /> components
+ * Public base URL for static assets. Screenshot and LazyVideo resolve their
+ * src through useBaseUrl(), so assets are served under the docs baseUrl
+ * ("/docs/"), not at the site root.
+ */
+const ASSET_BASE_URL = "https://questdb.com/docs"
+
+/**
+ * Converts <Screenshot /> components to a markdown link so the alt text and
+ * image URL survive in the raw markdown output
  */
 function convertScreenshot(content) {
-  return replaceComponent(content, 'Screenshot', (_) => {
-    return ""
+  return replaceComponent(content, 'Screenshot', (match) => {
+    const alt = (match.props.alt || "").trim()
+    const src = (match.props.src || "").trim()
+    if (!src) {
+      return ""
+    }
+    const urlPath = src.startsWith("/") ? src : `/${src}`
+    const label = alt ? `Screenshot: ${alt}` : "Screenshot"
+    return `\n\n[${label}](${ASSET_BASE_URL}${urlPath})\n\n`
   })
+}
+
+/**
+ * Converts native <video /> and <LazyVideo /> embeds to a markdown link.
+ * Without this, the JSX tag and its src leak verbatim into the raw output.
+ */
+function convertVideo(content) {
+  const replacer = (match) => {
+    const src = match.props.src || ""
+    const requireMatch = src.match(/require\(["']([^"']+)["']\)/)
+    let urlPath = (requireMatch ? requireMatch[1] : src).trim()
+    if (!urlPath) {
+      return ""
+    }
+    urlPath = urlPath.replace(/^\/static\//, "/")
+    if (!urlPath.startsWith("/")) {
+      urlPath = `/${urlPath}`
+    }
+    const name = path
+      .basename(urlPath, path.extname(urlPath))
+      .replace(/[-_]+/g, " ")
+    const label = (match.props.label || match.props.title || name).trim()
+    return `\n\n[Video: ${label}](${ASSET_BASE_URL}${urlPath})\n\n`
+  }
+
+  const withNativeVideos = replaceComponent(content, 'video', replacer)
+  return replaceComponent(withNativeVideos, 'LazyVideo', replacer)
 }
 
 function convertImages(content) {
@@ -232,18 +274,21 @@ function convertConfigTable(content, docsPath) {
  * Converts <InterpolateReleaseData /> to actual version number
  * Fetches latest release version once and caches it
  */
-let cachedReleaseVersion = null
+const releaseCache = new Map()
 
-async function fetchReleaseVersion() {
-  if (cachedReleaseVersion) {
-    return cachedReleaseVersion
+async function fetchGitHubRelease(repo, { stripV = false } = {}) {
+  if (releaseCache.has(repo)) {
+    return releaseCache.get(repo)
   }
+
+  const url = `https://api.github.com/repos/${repo}/releases/latest`
+  const fallback = "latest"
 
   try {
     const https = require("https")
 
-    return new Promise((resolve, reject) => {
-      https.get("https://api.github.com/repos/questdb/questdb/releases/latest", {
+    const version = await new Promise((resolve) => {
+      https.get(url, {
         headers: { "User-Agent": "QuestDB-Docs" }
       }, (res) => {
         let data = ""
@@ -252,19 +297,31 @@ async function fetchReleaseVersion() {
         res.on("end", () => {
           try {
             const release = JSON.parse(data)
-            cachedReleaseVersion = release.tag_name || "latest"
-            resolve(cachedReleaseVersion)
+            let tag = release.tag_name || fallback
+            if (stripV) tag = tag.replace(/^v/, '')
+            resolve(tag)
           } catch (e) {
-            resolve("latest")
+            resolve(fallback)
           }
         })
       }).on("error", () => {
-        resolve("latest")
+        resolve(fallback)
       })
     })
+
+    releaseCache.set(repo, version)
+    return version
   } catch (e) {
-    return "latest"
+    return fallback
   }
+}
+
+async function fetchReleaseVersion() {
+  return fetchGitHubRelease("questdb/questdb")
+}
+
+async function fetchJavaClientVersion() {
+  return fetchGitHubRelease("questdb/java-questdb-client", { stripV: true })
 }
 
 function convertInterpolateReleaseData(content, releaseVersion) {
@@ -297,6 +354,30 @@ function convertInterpolateReleaseData(content, releaseVersion) {
 
     // Fallback: just remove the component
     return '\n\n<!-- InterpolateReleaseData component removed -->\n\n'
+  })
+}
+
+function convertInterpolateJavaClientVersion(content, javaClientVersion) {
+  return replaceComponent(content, 'InterpolateJavaClientVersion', (match) => {
+    let renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\(([\s\S]*?)\)\s*\}/);
+
+    if (!renderTextMatch) {
+      renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\{\s*return\s*\(([\s\S]*?)\)\s*\}\s*\}/);
+    }
+
+    if (renderTextMatch) {
+      let extracted = renderTextMatch[1].trim();
+
+      extracted = extracted.replace(/\$?\{release\.name\}/g, javaClientVersion);
+      extracted = extracted.replace(/\$?\{release\.tag_name\}/g, javaClientVersion);
+
+      extracted = extracted.replace(/\{`/g, '');
+      extracted = extracted.replace(/`\}/g, '');
+
+      return `\n\n${extracted}\n\n`;
+    }
+
+    return '\n\n<!-- InterpolateJavaClientVersion component removed -->\n\n'
   })
 }
 
@@ -449,15 +530,18 @@ function convertClients(content) {
 async function convertAllComponents(content, currentFileDir, docsRoot, repoExamples = {}) {
   let processed = content
 
-  // Get release version once
+  // Get release versions once
   const releaseVersion = await fetchReleaseVersion()
+  const javaClientVersion = await fetchJavaClientVersion()
 
   // Convert components in order
   processed = convertInterpolateReleaseData(processed, releaseVersion)
+  processed = convertInterpolateJavaClientVersion(processed, javaClientVersion)
   processed = convertRemoteRepoExample(processed, repoExamples)
   processed = convertILPClientsTable(processed)
   processed = convertClients(processed)
   processed = convertScreenshot(processed)
+  processed = convertVideo(processed)
   processed = convertDocButton(processed)
   processed = convertCodeBlock(processed)
   processed = convertTabs(processed)

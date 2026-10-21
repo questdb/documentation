@@ -10,7 +10,7 @@ async function createTable() {
     const query = "CREATE TABLE IF NOT EXISTS trades (name STRING, value INT)"
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     )
     const json = await response.json()
 
@@ -25,7 +25,7 @@ async function insertData() {
     const query = "INSERT INTO trades VALUES('abc', 123456)"
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     )
     const json = await response.json()
 

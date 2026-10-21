@@ -117,9 +117,22 @@ ALTER TABLE trades ALTER COLUMN client_id CACHE;
 For columns frequently used in `WHERE` clauses, add an index:
 
 ```questdb-sql
+-- Bitmap index (default) — low overhead, good for most cases
 CREATE TABLE trades (
     timestamp TIMESTAMP,
     symbol SYMBOL INDEX,
+    price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+For read-heavy workloads, a [posting index](/docs/concepts/deep-dive/posting-index/)
+offers better compression and supports covering queries:
+
+```questdb-sql
+-- Posting index with covering columns — reads from compact sidecar files
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
     price DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
@@ -128,6 +141,7 @@ Or add an index later:
 
 ```questdb-sql
 ALTER TABLE trades ALTER COLUMN symbol ADD INDEX;
+-- or: ALTER TABLE trades ALTER COLUMN symbol ADD INDEX TYPE POSTING;
 ```
 
 See [Indexes](/docs/concepts/deep-dive/indexes/) for more information.

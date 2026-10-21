@@ -20,7 +20,7 @@ This enables concurrent writes, crash recovery, and replication.
 | **Concurrent writes** | Multiple clients can write simultaneously without blocking |
 | **Crash recovery** | Committed data is never lost — replay from log after restart |
 | **Replication** | WAL enables high availability and disaster recovery |
-| **Out-of-order handling** | Late-arriving data is merged efficiently |
+| **Out-of-order handling** | Late-arriving data is merged efficiently. See [Out-of-order data](/docs/concepts/out-of-order-data/). |
 | **Deduplication** | Enables [DEDUP UPSERT KEYS](/docs/concepts/deduplication/) |
 
 In QuestDB Enterprise, WAL segments are sent to object storage immediately
@@ -88,6 +88,11 @@ If WAL transactions are suspended (rare), resume them:
 ALTER TABLE prices RESUME WAL;
 ```
 
+For a suspended materialized view or live view, use
+[`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/query/sql/alter-mat-view-resume-wal/)
+or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/)
+instead.
+
 ## How WAL works
 
 When data is written to a WAL table:
@@ -122,6 +127,8 @@ WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
 - Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
+- `cairo.wal.apply.memory.limit.bytes` — cap on the native memory a WAL apply
+  batch may allocate; see [memory limits](/docs/configuration/cairo-engine/#memory-limits)
 
 To convert an existing table between WAL and non-WAL:
 

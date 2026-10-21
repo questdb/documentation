@@ -8,7 +8,7 @@ Copy a subset of data from one QuestDB instance to another for testing or develo
 
 ## Problem
 
-You want to copy data between QuestDB instances. This method allows you to copy any arbitrary query result, but if you want a full database copy please check the [backup and restore documentation](/docs/operations/backup/).
+You want to copy data between QuestDB instances. This method allows you to copy any arbitrary query result, but if you want a full database copy please check the [backup and restore documentation](/docs/operations/backup/). To copy only the structure, see [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/).
 
 ## Solution: Table2Ilp utility
 
@@ -30,10 +30,10 @@ This reads from the source instance using PostgreSQL wire protocol and writes to
 
 ## Alternative: Export endpoint
 
-You can also use [the export endpoint](/docs/query/rest-api/#exp---export-data) to export data to CSV or other formats.
+You can also use [the export endpoint](/docs/connect/compatibility/rest-api/#exp---export-data) to export data to CSV or other formats.
 
 :::info Related Documentation
-- [ILP ingestion](/docs/ingestion/overview/)
-- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
-- [REST API export](/docs/query/rest-api/#exp---export-data)
+- [ILP ingestion](/docs/connect/overview/)
+- [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/)
+- [REST API export](/docs/connect/compatibility/rest-api/#exp---export-data)
 :::

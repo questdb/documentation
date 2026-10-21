@@ -1,8 +1,8 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, EMA, VWEMA, and more.
-keywords: [window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, first_value, last_value, min, max, ema, vwema, exponential moving average]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, EMA, VWEMA, the SUBSAMPLE keep-flag functions lttb, m4, minmax, uniform, cadence, sdt, and more.
+keywords: [subsample, lttb, m4, minmax, uniform, cadence, sdt, downsampling, window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
@@ -29,12 +29,12 @@ avg(value, kind, param, volume) OVER (window_definition)
 
 **Arguments:**
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`) to calculate the average of
-- `kind` (EMA/VWEMA): Smoothing mode - `'alpha'`, `'period'`, or a time unit (`'second'`, `'minute'`, `'hour'`, `'day'`, `'week'`)
+- `kind` (EMA/VWEMA): Smoothing mode. One of `'alpha'`, `'period'`, or a time unit (`'second'`, `'minute'`, `'hour'`, `'day'`, `'week'`)
 - `param` (EMA/VWEMA): Parameter for the smoothing mode (see below)
 - `volume` (VWEMA only): Numeric column representing volume weights
 
 **Return value:**
-- `double` - The average of `value` for rows in the window frame
+- `double`. The average of `value` for rows in the window frame
 
 **Description:**
 
@@ -59,7 +59,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS moving_avg
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 #### Exponential Moving Average (EMA)
@@ -88,7 +88,7 @@ SELECT
         ORDER BY timestamp
     ) AS ema_alpha
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="10-period EMA" demo
@@ -101,7 +101,7 @@ SELECT
         ORDER BY timestamp
     ) AS ema_10
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Time-weighted EMA with 5-minute decay" demo
@@ -114,14 +114,14 @@ SELECT
         ORDER BY timestamp
     ) AS ema_5min
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 :::note EMA behavior
 - NULL values are skipped; the previous EMA value is preserved
 - The first non-NULL value initializes the EMA
 - Works with both `TIMESTAMP` and `TIMESTAMP_NS` precision
-- EMA ignores the frame clause and operates cumulatively from the first row
+- EMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 #### Volume-Weighted Exponential Moving Average (VWEMA)
@@ -148,7 +148,7 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_alpha
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="10-period VWEMA" demo
@@ -161,7 +161,7 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_10
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Time-weighted VWEMA with 1-hour decay" demo
@@ -174,13 +174,13 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_1h
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 :::note VWEMA behavior
 - Rows with NULL price, NULL volume, or zero volume are skipped
 - When timestamps are identical (Δt = 0), the row is skipped in time-weighted mode
-- VWEMA ignores the frame clause and operates cumulatively from the first row
+- VWEMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 ---
@@ -195,13 +195,13 @@ corr(y, x) OVER (window_definition)
 ```
 
 **Arguments:**
-- `y`: Numeric column - the dependent variable
-- `x`: Numeric column - the independent variable
+- `y`: Numeric column, the dependent variable
+- `x`: Numeric column, the independent variable
 
 Rows where either `x` or `y` is `NULL` are excluded from the computation.
 
 **Return value:**
-- `double` - The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
+- `double`. The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
 
 **Description:**
 
@@ -254,7 +254,7 @@ count(value) OVER (window_definition)
 - `value`: Counts non-null values only
 
 **Return value:**
-- `long` - Number of rows or non-null values in the window frame
+- `long`. Number of rows or non-null values in the window frame
 
 **Description:**
 
@@ -276,7 +276,7 @@ SELECT
         RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
     ) AS trades_last_second
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -292,13 +292,13 @@ covar_samp(y, x) OVER (window_definition)
 ```
 
 **Arguments:**
-- `y`: Numeric column - the dependent variable
-- `x`: Numeric column - the independent variable
+- `y`: Numeric column, the dependent variable
+- `x`: Numeric column, the independent variable
 
 Rows where either `x` or `y` is `NULL` are excluded from the computation.
 
 **Return value:**
-- `double` - The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
+- `double`. The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
 
 **Description:**
 
@@ -341,7 +341,7 @@ OVER ([PARTITION BY partition_expression]
 - `RESPECT NULLS` (default): Include null values
 
 **Return value:**
-- Same type as input - The first value in the window frame (or first non-null with `IGNORE NULLS`)
+- Same type as input. The first value in the window frame (or first non-null with `IGNORE NULLS`)
 
 **Description:**
 
@@ -367,7 +367,7 @@ SELECT
         ORDER BY timestamp
     ) AS first_non_null_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -385,7 +385,7 @@ ksum(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`) to sum
 
 **Return value:**
-- `double` - The sum of `value` for rows in the window frame with improved precision
+- `double`. The sum of `value` for rows in the window frame with improved precision
 
 **Description:**
 
@@ -410,7 +410,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS cumulative_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Sliding window sum with precision" demo
@@ -423,7 +423,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS rolling_sum
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -446,7 +446,7 @@ OVER ([PARTITION BY partition_expression]
 - `RESPECT NULLS` (default): Include null values
 
 **Return value:**
-- Same type as input - The last value in the window frame (or last non-null with `IGNORE NULLS`)
+- Same type as input. The last value in the window frame (or last non-null with `IGNORE NULLS`)
 
 **Description:**
 
@@ -476,7 +476,7 @@ SELECT
         ORDER BY timestamp
     ) AS last_non_null_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -499,7 +499,7 @@ max(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- Same type as input - The maximum value (excluding null) in the window frame
+- Same type as input. The maximum value (excluding null) in the window frame
 
 **Description:**
 
@@ -522,7 +522,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS highest_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -540,7 +540,7 @@ min(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- Same type as input - The minimum value (excluding null) in the window frame
+- Same type as input. The minimum value (excluding null) in the window frame
 
 **Description:**
 
@@ -563,8 +563,74 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS lowest_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
+
+---
+
+### nth_value() {#nth_value}
+
+Returns the `n`-th value (1-based) within the current window frame.
+
+**Syntax:**
+```questdb-sql
+nth_value(value, n) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Column or expression to retrieve (`double`, `long`, or `timestamp`)
+- `n`: Positive integer constant, the 1-based position within the frame
+
+**Return value:**
+- Same type as input. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
+
+**Description:**
+
+`nth_value()` is similar to `lag()`, but while `lag()` counts the offset relative to the current row, `nth_value()` counts from the start of the frame. For each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
+
+Common use cases include:
+
+- **Reference value within a window**: Compare the current row to a fixed slot in the window (e.g. the third price in the last 10 trades)
+- **Anchor points**: Pick out a specific row from each partition, such as the second observation in a session
+- **Quantile-style spot checks**: Combine with frame clauses to read a specific position in a sliding range
+
+**Behavior:**
+- `n` must be a compile-time constant. A non-constant expression for `n` is rejected at parse time
+- `n = 1` returns the same value as `first_value(value)` for the same frame
+- `IGNORE NULLS` / `RESPECT NULLS` are not supported
+- Supports both `ROWS` and `RANGE` frames, bounded and unbounded
+- For `RANGE` frames, the query must be ordered by the designated timestamp
+
+**Example:**
+```questdb-sql title="3rd most recent price in 5-row window" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    nth_value(price, 3) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS 4 PRECEDING
+    ) AS third_price
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+```questdb-sql title="Compare nth_value with first_value" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_value(price) OVER w AS first_price,
+    nth_value(price, 1) OVER w AS nth_1,
+    nth_value(price, 2) OVER w AS nth_2,
+    nth_value(price, 3) OVER w AS nth_3
+FROM trades
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
+```
+
+With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
 
 ---
 
@@ -583,7 +649,7 @@ stddev(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The standard deviation of `value` for rows in the window frame. Returns `NULL` when there are no values (or no non-null values). `stddev_samp()` and `stddev()` also return `NULL` when there is only one value (since N-1 = 0).
+- `double`. The standard deviation of `value` for rows in the window frame. Returns `NULL` when there are no values (or no non-null values). `stddev_samp()` and `stddev()` also return `NULL` when there is only one value (since N-1 = 0).
 
 **Description:**
 
@@ -612,7 +678,7 @@ SELECT
         ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
     ) AS volatility_20
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Z-score via subquery"
@@ -642,7 +708,7 @@ sum(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The sum of `value` for rows in the window frame
+- `double`. The sum of `value` for rows in the window frame
 
 **Description:**
 
@@ -665,7 +731,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS cumulative_amount
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -685,7 +751,7 @@ variance(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The variance of `value` for rows in the window frame. Returns `NULL` when there are no values. `var_samp()` and `variance()` also return `NULL` for a single value.
+- `double`. The variance of `value` for rows in the window frame. Returns `NULL` when there are no values. `var_samp()` and `variance()` also return `NULL` for a single value.
 
 **Description:**
 
@@ -707,14 +773,79 @@ SELECT
         ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
     ) AS price_variance
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
 
 ## Ranking functions
 
-These functions assign ranks or row numbers. They ignore the frame clause and operate on the entire partition.
+These functions assign ranks, row numbers, or partition-scoped distribution values. They ignore the frame clause and operate on the entire partition.
+
+### cume_dist() {#cume_dist}
+
+Returns the cumulative distribution: the number of rows at or before the current row (including peers) divided by the total number of rows in the partition. The result lies in the range (0, 1].
+
+**Syntax:**
+```questdb-sql
+cume_dist() OVER (window_definition)
+```
+
+**Arguments:**
+- None required
+
+**Return value:**
+- `double`. The cumulative distribution value for the current row's peer group
+
+**Description:**
+
+`cume_dist()` is closely related to `percent_rank()`. Where `percent_rank()` reports relative position using `(rank - 1) / (total_rows - 1)`, `cume_dist()` reports the fraction of rows with `ORDER BY` values *at or before* the current row's value. All peer rows (rows with identical `ORDER BY` values) receive the same `cume_dist`, equal to the position of the last peer divided by total rows.
+
+Use `cume_dist()` to express thresholds in terms of how much of the partition has been seen so far. Common use cases include:
+
+- **Top/bottom percentile filters**: Keep only rows with `cume_dist <= 0.1` to grab the bottom 10% of a distribution
+- **Histogram bucketing**: Group rows by `cume_dist` ranges to build empirical CDFs
+- **Anomaly thresholds**: Flag rows that fall outside the bulk of the partition's distribution
+
+**Behavior:**
+- Without `ORDER BY`, all rows are peers and `cume_dist` is `1.0` for every row
+- The last peer group in a partition always evaluates to `1.0`
+- `ROWS`, `RANGE`, and `EXCLUDE` are rejected. `cume_dist` is always partition-scoped
+
+**Example:**
+```questdb-sql title="Cumulative distribution by price" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    cume_dist() OVER (
+        PARTITION BY symbol
+        ORDER BY price
+    ) AS price_cdf
+FROM trades
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
+ORDER BY price DESC;
+```
+
+The highest prices appear first with `price_cdf = 1.0`, meaning 100% of trades are at or below that price. As you scroll down, the value decreases, showing what fraction of the partition each price level covers.
+
+```questdb-sql title="cume_dist with peer rows"
+SELECT ts, val,
+    cume_dist() OVER (ORDER BY val) AS cd
+FROM tab;
+```
+
+| ts | val | cd |
+|----|-----|-----|
+| 2026-05-08T09:30:00.000000Z | 1 | 0.4 |
+| 2026-05-08T09:30:01.000000Z | 1 | 0.4 |
+| 2026-05-08T09:30:02.000000Z | 2 | 0.8 |
+| 2026-05-08T09:30:03.000000Z | 2 | 0.8 |
+| 2026-05-08T09:30:04.000000Z | 3 | 1.0 |
+
+The two rows with `val = 1` are peers, so they share `cume_dist = 2 / 5 = 0.4`. Likewise the rows with `val = 2` share `cume_dist = 4 / 5 = 0.8`.
+
+---
 
 ### dense_rank()
 
@@ -753,8 +884,72 @@ SELECT
         ORDER BY price DESC
     ) AS price_rank
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
+
+---
+
+### ntile() {#ntile}
+
+Distributes the rows of an ordered partition into `n` approximately equal buckets and returns the 1-based bucket number for each row.
+
+**Syntax:**
+```questdb-sql
+ntile(n) OVER (window_definition)
+```
+
+**Arguments:**
+- `n`: Positive integer constant, the number of buckets
+
+**Return value:**
+- `long`. Bucket number from `1` to `n`
+
+**Description:**
+
+When the partition row count divides evenly by `n`, every bucket has the same size. When it doesn't, the larger buckets come first: with 10 rows and `n = 3`, the buckets contain 4, 3, and 3 rows.
+
+Use `ntile()` to build distribution-based groupings. Common use cases include:
+
+- **Quartiles, deciles, percentiles**: Use `ntile(4)`, `ntile(10)`, or `ntile(100)` to bucket rows by an ordered measure
+- **Even-sized batches**: Split a partition into `n` worker batches without writing manual range logic
+- **Tiered classification**: Assign records to numbered tiers (top tier, middle tier, bottom tier) by some ranked metric
+
+**Behavior:**
+- `n` must be a compile-time constant. A non-constant expression is rejected at parse time
+- `n` must be a positive integer; `0`, negative values, or `NULL` are rejected
+- Without `ORDER BY`, rows are bucketed in table-scan order
+- When `n` exceeds the partition row count, each row gets its own bucket (numbered `1` through row count) and the higher bucket numbers are unused
+- `ROWS`, `RANGE`, and `EXCLUDE` are rejected. `ntile` is always partition-scoped
+
+**Example:**
+```questdb-sql title="Quartiles per symbol" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    ntile(4) OVER (
+        PARTITION BY symbol
+        ORDER BY price
+    ) AS price_quartile
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+```questdb-sql title="ntile with uneven distribution"
+SELECT ts, val,
+    ntile(3) OVER (ORDER BY ts) AS bucket
+FROM tab;
+```
+
+| ts | val | bucket |
+|----|-----|--------|
+| 2026-05-08T09:30:00.000000Z | 10.0 | 1 |
+| 2026-05-08T09:30:01.000000Z | 20.0 | 1 |
+| 2026-05-08T09:30:02.000000Z | 30.0 | 2 |
+| 2026-05-08T09:30:03.000000Z | 40.0 | 2 |
+| 2026-05-08T09:30:04.000000Z | 50.0 | 3 |
+
+With 5 rows and `n = 3`, the leading buckets (1 and 2) get an extra row each.
 
 ---
 
@@ -805,7 +1000,7 @@ SELECT
         ORDER BY price DESC
     ) AS price_percentile
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Compare rank functions" demo
@@ -816,7 +1011,7 @@ SELECT
     rank() OVER (ORDER BY price DESC) AS rank,
     percent_rank() OVER (ORDER BY price DESC) AS percent_rank
 FROM trades
-WHERE timestamp IN '[$today]'
+WHERE timestamp IN '$today'
     AND symbol = 'BTC-USDT';
 ```
 
@@ -869,7 +1064,7 @@ SELECT
         ORDER BY price DESC
     ) AS price_rank
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -911,7 +1106,7 @@ SELECT
         ORDER BY timestamp
     ) AS trade_number
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -958,7 +1153,7 @@ OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
 - `RESPECT NULLS` (default): Include null values in offset counting
 
 **Return value:**
-- Same type as input - Value from the specified previous row
+- Same type as input. Value from the specified previous row
 
 **Description:**
 
@@ -988,7 +1183,7 @@ SELECT
         ORDER BY timestamp
     ) AS price_two_rows_back
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -1016,7 +1211,7 @@ OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
 - `RESPECT NULLS` (default): Include null values in offset counting
 
 **Return value:**
-- Same type as input - Value from the specified following row
+- Same type as input. Value from the specified following row
 
 **Description:**
 
@@ -1046,7 +1241,7 @@ SELECT
         ORDER BY timestamp
     ) AS price_after_next
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -1056,7 +1251,390 @@ This example:
 
 ---
 
-## Examples
+## SUBSAMPLE window functions
+
+These functions expose the [SUBSAMPLE](/docs/query/sql/subsample/)
+downsampling algorithms as window functions. They do not return the reduced
+row set. Each one returns a `boolean` keep flag for every input row: `true`
+means the row is selected, `false` means it is discarded. Filter on the flag
+in an outer query to get the selected rows:
+
+```questdb-sql title="Filter on the keep flag in an outer query" demo
+SELECT *
+FROM (
+    SELECT
+        timestamp,
+        price,
+        lttb(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+When the window uses the same ascending timestamp order as the clause form,
+the rows flagged `true` are the rows the clause form returns. See
+[window-function form](/docs/query/sql/subsample/#window-function-form) on
+the SUBSAMPLE page for when to prefer each interface, and the
+[algorithm sections](/docs/query/sql/subsample/#algorithms) for diagrams and
+method selection.
+
+**Common rules:**
+
+- Window functions are not allowed in a `WHERE` clause at the same query
+  level. Filter on the flag from a subquery or CTE
+- `ORDER BY` is required in the `OVER` clause
+- `m4()`, `minmax()`, `lttb()`, and `sdt()` require an ascending `ORDER BY`.
+  `uniform()` and `cadence()` select by position in whatever window order
+  they are given. Order by the designated timestamp, ascending, to match
+  the clause form
+- Explicit `ROWS` and `RANGE` framing is rejected
+- `PARTITION BY` is supported by `sdt()` only. The other five functions
+  reject it
+- `RESPECT NULLS` and `IGNORE NULLS` are supported by `sdt()` only
+- The value-based functions take the timestamp as an explicit first
+  argument. The value argument can be an expression, such as `price * 2`,
+  which the clause form does not accept
+- Targets, strides, and seeds accept an integer constant, a
+  [DECLARE](/docs/query/sql/declare/) variable, or a bind variable
+- The surrounding query controls the final output order. Add an outer
+  `ORDER BY` when you need a specific order
+- [`cairo.sql.subsample.max.rows`](/docs/configuration/cairo-engine/#cairosqlsubsamplemaxrows)
+  limits the input of every function except `sdt()`
+
+### cadence() {#cadence}
+
+Flags one row out of every `stride` rows, by position in the window order.
+
+**Syntax:**
+```questdb-sql
+cadence(stride [, seed]) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `stride`: Integer constant or bind variable, at least `1`. The step
+  distance between flagged rows, not an output count
+- `seed` (optional): Integer constant, bind variable, or `NULL`. An integer
+  gives a reproducible random starting offset in `[0, stride)`. `NULL` gives
+  a fresh random offset on every run. Without `seed` the offset is `0`
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- The number of flagged rows depends on the input size, approximately
+  `rowCount / stride`
+- When `stride` is greater than `1` and no larger than the input row count,
+  the first and last rows in window order are always flagged
+- `cadence(1)` flags every row
+- When `stride` exceeds the input row count, only the first row is flagged.
+  The last row is not pinned in this case
+- No value column is inspected, so `NULL` and non-finite values in other
+  columns have no effect on the selection
+- `ORDER BY` is required. `PARTITION BY` and `ROWS`/`RANGE` framing are
+  rejected
+
+**Example:**
+```questdb-sql title="Every 1000th trade" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        cadence(1000) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [cadence](/docs/query/sql/subsample/#cadence---every-nth-row) on the
+SUBSAMPLE page for the algorithm, the diagram, and the anti-aliasing use of
+`seed`.
+
+---
+
+### lttb() {#lttb}
+
+Flags the rows chosen by the Largest Triangle Three Buckets algorithm, which
+preserves the visual shape of a line chart.
+
+**Syntax:**
+```questdb-sql
+lttb(ts, value, target [, gapThreshold]) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to measure triangle areas
+- `target`: Integer constant or bind variable, at least `2`. The number of
+  rows to flag
+- `gapThreshold` (optional): String constant such as `'30s'`, `'5m'`, `'1h'`,
+  or `'1d'`, greater than zero. Supported units are `s`, `m`, `h`, and `d`.
+  Enables gap-aware mode
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Without `gapThreshold`, exactly `target` rows are flagged when at least
+  that many eligible rows exist. With fewer eligible rows, all of them are
+  flagged
+- With `gapThreshold`, the input is split wherever consecutive timestamps
+  are further apart than the threshold, and each segment is selected
+  independently. `target` becomes a goal: the number of flagged rows can be
+  below or above it
+- Gap-aware mode adds no `NULL` separator row and no segment identifier.
+  The result is still one flag per input row
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="500 representative points, with gaps over 1 hour kept apart" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        lttb(timestamp, price, 500, '1h')
+            OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [lttb](/docs/query/sql/subsample/#lttb---largest-triangle-three-buckets)
+and [gap-preserving LTTB](/docs/query/sql/subsample/#gap-preserving-lttb) on
+the SUBSAMPLE page for the algorithm, the diagrams, and the client-side
+rendering caveat for gaps.
+
+---
+
+### m4() {#m4}
+
+Flags the first, last, minimum, and maximum rows of each M4 time bucket.
+
+**Syntax:**
+```questdb-sql
+m4(ts, value, target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to find the minimum and
+  maximum rows
+- `target`: Integer constant or bind variable, at least `2`. The row budget:
+  the time range is divided into `target / 4` equal time buckets
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Up to `target` rows are flagged: up to 4 per time bucket
+- When several roles resolve to the same row, that row is flagged once, so
+  a bucket contributes between 1 and 4 rows
+- Empty time buckets contribute no rows
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="First, last, min, and max per time bucket" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        m4(timestamp, price, 1920) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [m4](/docs/query/sql/subsample/#m4---minmaxfirstlast-per-time-interval)
+on the SUBSAMPLE page for the algorithm, the diagram, and how to size
+`target` for a pixel width.
+
+---
+
+### minmax() {#minmax}
+
+Flags the minimum and maximum rows of each non-empty time bucket.
+
+**Syntax:**
+```questdb-sql
+minmax(ts, value, target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to find the minimum and
+  maximum rows
+- `target`: Integer constant or bind variable, at least `2`. The row budget:
+  the time range is divided into `target / 2` equal time buckets
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Up to `target` rows are flagged: up to 2 per time bucket
+- When the minimum and the maximum resolve to the same row, that row is
+  flagged once
+- Empty time buckets contribute no rows
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="Min/max envelope" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        minmax(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [minmax](/docs/query/sql/subsample/#minmax---minmax-per-time-interval)
+on the SUBSAMPLE page for the algorithm and the diagram.
+
+---
+
+### sdt() {#sdt}
+
+Flags the rows retained by Swinging Door Trending, an error-bounded
+compression method. The number of flagged rows is decided by the data, not
+requested.
+
+**Syntax:**
+```questdb-sql
+sdt(ts, value, compdev)
+    [RESPECT NULLS | IGNORE NULLS]
+    OVER ([PARTITION BY columns] ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row, used for the slope calculations
+- `value`: Numeric column or expression, compared as `double`
+- `compdev`: The compression deviation. A constant, finite, non-negative
+  tolerance in the units of `value`. A numeric literal, a constant
+  expression such as `abs(-0.5)`, and a `DECLARE` variable holding a
+  constant are accepted. Bind variables, row-dependent expressions,
+  negative values, `NULL`, `NaN`, and infinity are rejected
+
+**Return value:**
+- `boolean`. `true` for retained rows, `false` for the rest
+
+**Behavior:**
+- Within a run, linear interpolation between consecutive retained rows
+  differs from every original eligible row by no more than `2 * compdev`,
+  not `compdev`
+- With `RESPECT NULLS`, the default, a row with a `NULL` or non-finite
+  `value` is a run boundary. That row is flagged `true`, the last eligible
+  row before it is flagged `true`, and the next eligible row starts a new
+  run
+- With `IGNORE NULLS`, a row with a `NULL` or non-finite `value` is flagged
+  `false` and the current run continues across it
+- A timestamp that does not increase, including an equal timestamp, is also
+  a run boundary
+- A timestamp gap on its own is not a boundary
+- With `PARTITION BY`, every partition keeps its own anchor and corridor
+  state, so each series is compressed independently
+- The `ORDER BY` must be ascending. `ROWS`/`RANGE` framing is rejected
+- `sdt()` is not governed by `cairo.sql.subsample.max.rows`. It remains
+  subject to the query's normal memory limits
+
+**Example:**
+```questdb-sql title="Compress every symbol independently, within 2 pips" demo
+SELECT timestamp, symbol, price
+FROM (
+    SELECT
+        timestamp,
+        symbol,
+        price,
+        sdt(timestamp, price, 0.0001)
+            OVER (PARTITION BY symbol ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [sdt](/docs/query/sql/subsample/#sdt---swinging-door-trending) on the
+SUBSAMPLE page for the swinging-door mechanism, the animation, the
+[error guarantee](/docs/query/sql/subsample/#error-guarantee), and
+[timestamp-gap behavior](/docs/query/sql/subsample/#timestamp-gaps).
+
+---
+
+### uniform() {#uniform}
+
+Flags a target number of evenly spaced rows, by position in the window
+order. It does not inspect a value column.
+
+**Syntax:**
+```questdb-sql
+uniform(target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `target`: Integer constant or bind variable, at least `2`. The number of
+  rows to flag
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- When the input has more rows than `target`, exactly `target` rows are
+  flagged. Otherwise every row is flagged
+- The first and last rows in window order are always flagged. Interior
+  positions round half up, so the selection is deterministic
+- No value column is inspected, so `NULL` and non-finite values in other
+  columns have no effect on the selection
+- `ORDER BY` is required. `PARTITION BY` and `ROWS`/`RANGE` framing are
+  rejected
+
+**Example:**
+```questdb-sql title="500 evenly spaced trades" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        uniform(500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [uniform](/docs/query/sql/subsample/#uniform---evenly-spaced-rows) on
+the SUBSAMPLE page for the algorithm and the diagram.
+
+---
+
+## Window function examples {#examples}
+
+These examples combine the aggregate, ranking, and offset functions from the
+first three categories. Each
+[SUBSAMPLE window function](#subsample-window-functions) has its own example
+in its section.
 
 ### Moving average of best bid price
 
@@ -1072,7 +1650,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS bid_moving_avg
 FROM market_data
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ### Cumulative bid size
@@ -1090,7 +1668,7 @@ SELECT
         ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
     ) AS bid_volume_l1_5rows
 FROM market_data
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ### Time-based rolling sum
@@ -1106,7 +1684,7 @@ SELECT
         RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
     ) AS bid_volume_1min
 FROM market_data
-WHERE timestamp IN '[$today]' AND symbol = 'GBPUSD';
+WHERE timestamp IN '$today' AND symbol = 'GBPUSD';
 ```
 
 ### Trade frequency analysis
@@ -1121,7 +1699,7 @@ SELECT
     COUNT(CASE WHEN side = 'buy' THEN 1 END) OVER w AS buys_per_minute,
     COUNT(CASE WHEN side = 'sell' THEN 1 END) OVER w AS sells_per_minute
 FROM trades
-WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
 WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW);
 ```
 
@@ -1130,7 +1708,7 @@ WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
 ## Notes
 
 - The order of rows in the result set is not guaranteed to be consistent across query executions. Use an `ORDER BY` clause outside the `OVER` clause to ensure consistent ordering.
-- Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`) and offset functions (`lag`, `lead`) ignore frame specifications.
+- Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`) and offset functions (`lag`, `lead`) ignore frame specifications.
+- SUBSAMPLE window functions (`cadence`, `lttb`, `m4`, `minmax`, `sdt`, `uniform`) reject explicit `ROWS` and `RANGE` frame specifications instead of ignoring them.
 - For time-based calculations, consider using `RANGE` frames with timestamp columns.
 - Aggregate window functions (`avg`, `sum`, `ksum`, `count`, `min`, `max`) support numeric types: `short`, `int`, `long`, `float`, `double`. The `decimal` type is not supported.
-- `ntile()` and `cume_dist()` are not currently supported.

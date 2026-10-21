@@ -24,7 +24,7 @@ Two methods for sending ILP data from Ruby:
 
 ## Using the InfluxDB v2 Ruby client
 
-The InfluxDB v2 client provides a convenient Point builder API that works with QuestDB.
+The InfluxDB v2 client provides a convenient `Point` builder API that works with QuestDB.
 
 ### Installation
 
@@ -348,8 +348,8 @@ TCP ILP has no acknowledgments. If the connection drops, data may be lost silent
 :::
 
 :::info Related Documentation
-- [ILP reference](/docs/ingestion/ilp/overview/)
-- [ILP over HTTP](/docs/ingestion/ilp/overview/#transport-selection)
-- [ILP over TCP](/docs/ingestion/ilp/overview/#transport-selection)
+- [ILP reference](/docs/connect/compatibility/ilp/overview/)
+- [ILP over HTTP](/docs/connect/compatibility/ilp/overview/#transport-selection)
+- [ILP over TCP](/docs/connect/compatibility/ilp/overview/#transport-selection)
 - [InfluxDB Ruby client](https://github.com/influxdata/influxdb-client-ruby)
 :::

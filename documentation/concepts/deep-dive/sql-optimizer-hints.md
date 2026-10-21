@@ -75,7 +75,7 @@ width={300}
 ### 2. Distant matching
 
 In this case, the matching row is in the more distant past, earlier than the
-previous left-hand row. The scanning ranges now ovelap, and we end up scanning
+previous left-hand row. The scanning ranges now overlap, and we end up scanning
 almost the entire right-hand dataset. If we do a separate scan for each
 left-hand row, we'll end up going over the same rows many times. In the diagram,
 this shows up as more intensely red regions in the right-hand table.
@@ -157,7 +157,7 @@ This hint enables [Memoized](#memoized-algo), a variant of the
 as in `left ASOF JOIN right ON (symbol)`. It helps when there's a mix of
 localized and distant matches by reusing the results of earlier backward scans.
 
-```questdb-sql title="Appling the query hint for the Memoized algorithm"
+```questdb-sql title="Applying the query hint for the Memoized algorithm"
 SELECT /*+ asof_memoized(orders md) */
     orders.timestamp, orders.symbol, orders.price
 FROM orders
@@ -328,7 +328,7 @@ needed.
 
 As expected for distant matching, the Fast and Memoized algos had to touch the
 most rows. Especially, when matching row 15, Fast algo had to scan backward to
-row 4, and Memoized did only slighly better, scanning until row 6.
+row 4, and Memoized did only slightly better, scanning until row 6.
 
 Light algo had to initially scan all the history (rows 1 to 6), but from then
 on, it only needed to touch the additional rows that came into scope as the LHS
@@ -336,7 +336,7 @@ timestamp was moving on.
 
 Dense algo had the same advantage as Light, but it didn't have to scan all the
 history. It scanned only as far back into history as needed to find the most
-recent occurence of a symbol not yet seen in the forward scan.
+recent occurrence of a symbol not yet seen in the forward scan.
 
 ### RAM considerations
 
@@ -358,3 +358,106 @@ your symbol set is high-cardinality.
   - superseded by `asof_index`
 - `asof_memoized_search`
   - superseded by `asof_memoized`
+
+-----
+
+## Index hints
+
+These hints control whether the query optimizer uses indexes (bitmap or posting)
+for symbol column lookups.
+
+:::note
+
+The async group-by and filter code paths through the covering index are
+currently slower than the regular plan in some workloads. A follow-up
+release will close this gap. In the meantime, if
+[`EXPLAIN`](/docs/query/sql/explain/) shows a query has started picking
+the covering path and you observe a slowdown, apply `no_covering` (or
+`no_index` to disable indexing entirely) on the affected query.
+
+:::
+
+### no_covering
+
+Disables the [covering index](/docs/concepts/deep-dive/posting-index/)
+optimization, forcing the query to read from column files instead of the
+index sidecar. The index is still used for row ID lookup, but column values
+are read from the main column files.
+
+```questdb-sql
+SELECT /*+ no_covering */ price FROM trades WHERE symbol = 'AAPL';
+```
+
+This is useful for benchmarking covering index performance or working around
+a specific issue with the covering path.
+
+### no_index
+
+Completely disables all index usage for the query, including bitmap index,
+posting index, and covering index. The query falls back to a full table scan
+with a filter applied to every row. Also implies `no_covering`.
+
+```questdb-sql
+SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
+```
+
+This is useful for benchmarking index effectiveness or forcing a table scan
+when you know the filter selectivity is low (many rows match).
+
+-----
+
+## Markout horizon hint
+
+### markout_horizon
+
+Speeds up the `CROSS JOIN` that builds the sampling points of a markout curve.
+
+Post-trade analysis evaluates each trade at a series of time offsets, which is
+expressed as a `CROSS JOIN` between the trades and a small table of offsets,
+ordered by the shifted timestamp:
+
+```questdb-sql title="Sampling points across a markout horizon"
+SELECT id, order_ts, sym, price, sec_offs, order_ts + usec_offs AS ts
+FROM orders CROSS JOIN offsets
+ORDER BY order_ts + usec_offs;
+```
+
+By default this materializes the whole join output and then sorts it, which
+scales badly with the number of trades. `markout_horizon` names the two tables
+and lets the optimizer emit the rows already in timestamp order, so only the
+small offsets table is materialized:
+
+```questdb-sql title="Hinting the markout horizon join"
+SELECT /*+ markout_horizon(orders offsets) */ sum(price)
+FROM (SELECT * FROM (
+    SELECT price, ts + usec_offs AS timestamp
+    FROM orders CROSS JOIN offsets
+    ORDER BY ts + usec_offs
+) TIMESTAMP(timestamp));
+```
+
+The first parameter is the table supplying the rows, the second the table
+supplying the offsets. The offsets table must be small, typically generated
+with [`long_sequence()`](/docs/query/functions/row-generator/#long_sequence) or
+[`generate_series()`](/docs/query/functions/row-generator/#generate_series),
+because the optimizer keeps it in memory for random access.
+
+Confirm the hint applied with [`EXPLAIN`](/docs/query/sql/explain/), which
+replaces the join and sort nodes with a single one:
+
+```text
+GroupBy vectorized: false
+  values: [sum(price)]
+    SelectedRecord
+        VirtualRecord
+          functions: [orders.ts+offsets.usec_offs,orders.price]
+            Markout Horizon Join timestampColumn: 0 offsetColumn: 0
+                PageFrame
+                    Row forward scan
+                    Frame forward scan on: orders
+```
+
+For the analysis this supports, see the
+[markout](/docs/cookbook/sql/finance/markout/) recipe and
+[HORIZON JOIN](/docs/query/sql/horizon-join/), which expresses the same shape
+as a dedicated join.

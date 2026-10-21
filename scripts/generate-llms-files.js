@@ -152,6 +152,14 @@ function generateLlmsFiles() {
 
   let llmsOutput = `# QuestDB Documentation
 
+> QuestDB is a high-performance time-series database with SQL. This index links
+> every documentation page as markdown, covering SQL reference and time-series
+> extensions such as SAMPLE BY, ASOF JOIN and LATEST ON, ingestion over the
+> QuestDB Wire Protocol, InfluxDB Line Protocol and PostgreSQL wire protocol,
+> deployment, configuration and operations. Every page is also available as
+> markdown by appending .md to its URL, or by sending an
+> \`Accept: text/markdown\` request header.
+
 ## Getting Started
 
 `

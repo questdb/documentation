@@ -1,0 +1,11 @@
+```text
+Offset  Size  Type    Field           Description
+------  ----  ------  -------------   --------------------------------
+0       4     int32   magic           "QWP1" (0x31505751)
+4       1     uint8   version         Protocol version (0x01)
+5       1     uint8   flags           Encoding flags
+6       2     uint16  table_count     Number of table blocks
+8       4     uint32  payload_length  Payload size in bytes
+```
+
+**Total message size** = 12 + payload_length.

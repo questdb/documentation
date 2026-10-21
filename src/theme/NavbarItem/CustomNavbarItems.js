@@ -23,13 +23,52 @@ export default function CustomNavbarItems() {
 
   return (
     <>
-      <Link
-        className="navbar__item navbar__link navbar__enterprise-link font-semibold font-sans font-normal"
-        href="https://questdb.com/enterprise/"
-        target="_self"
+      <div
+        className="navbar__item dropdown dropdown--hoverable min-w-fit"
+        style={{ paddingLeft: 0, paddingRight: 0 }}
       >
-        ⚡️ QuestDB Enterprise
-      </Link>
+        <Link
+          className="navbar__item navbar__link navbar__enterprise-link font-semibold font-sans font-normal"
+          href="https://questdb.com/enterprise/"
+          target="_self"
+          style={{ display: "flex", alignItems: "center", gap: "6px" }}
+        >
+          ⚡️ QuestDB Enterprise
+          <span style={{ display: "flex", alignItems: "center" }}>
+            <ChevronDownIcon
+              style={{
+                width: "12px",
+                height: "12px",
+                color: "#9ca3af",
+                transition: "color 0.2s ease-in-out",
+              }}
+            />
+          </span>
+        </Link>
+        <ul
+          className="dropdown__menu"
+          style={{ width: "190px", padding: "0.2rem 0.5rem" }}
+        >
+          <li>
+            <Link
+              to="https://questdb.com/enterprise/"
+              target="_self"
+              className="dropdown__link font-semibold"
+            >
+              Enterprise overview
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="https://questdb.com/enterprise/trial/"
+              target="_self"
+              className="dropdown__link font-semibold"
+            >
+              Free 30-day trial
+            </Link>
+          </li>
+        </ul>
+      </div>
       <div
         className="navbar__item dropdown dropdown--hoverable dropdown--left min-w-fit"
         style={{ paddingLeft: 0, paddingRight: 0 }}

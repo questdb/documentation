@@ -152,5 +152,6 @@ Compare VPIN time series across ECNs. An ECN that shows elevated VPIN while othe
 :::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/overview/)
 - [Aggressor volume imbalance recipe](aggressor-volume-imbalance.md)
+- [Order Flow Imbalance (OFI) recipe](order-flow-imbalance.md)
 - [ECN scorecard recipe](ecn-scorecard.md)
 :::

@@ -44,17 +44,11 @@ To illustrate how `LATEST ON` is intended to be used, consider the `trades` tabl
 `symbol` column as `SYMBOL` type which specifies the traded instrument. We can
 find the most recent trade for each symbol with the following query:
 
-```questdb-sql
+```questdb-sql demo title="Latest trade per symbol"
 SELECT symbol, timestamp, price
-FROM trades
+FROM fx_trades
 LATEST ON timestamp PARTITION BY symbol;
 ```
-
-| symbol  | timestamp                   | price   |
-| ------- | --------------------------- | ------- |
-| BTC-USD | 2024-06-30T23:59:56.000000Z | 61432.5 |
-| ETH-USD | 2024-06-30T23:59:54.000000Z | 3421.8  |
-| SOL-USD | 2024-06-30T23:59:42.000000Z | 142.3   |
 
 The above query returns the latest value within each time series stored in the
 table. Those time series are determined based on the values in the column(s)
@@ -242,9 +236,9 @@ It's possible to combine a time-based filter with the balance filter from the
 previous example to query the latest values for the `2020-04-21` date and filter
 out those below 800.
 
-```questdb-sql
-(balances WHERE ts in '2020-04-21' LATEST ON ts PARTITION BY cust_id)
-WHERE balance > 800;
+```questdb-sql demo title="Filter a time slice, then apply LATEST ON"
+(fx_trades WHERE timestamp IN '$today' LATEST ON timestamp PARTITION BY symbol)
+WHERE price > 3;
 ```
 
 Since QuestDB allows you to omit the `SELECT * FROM` part of the query, we

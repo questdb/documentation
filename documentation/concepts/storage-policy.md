@@ -11,21 +11,16 @@ Storage policies are available in **QuestDB Enterprise** only.
 :::
 
 A storage policy automates the lifecycle of table partitions. It defines when
-partitions are converted to Parquet, when native data is removed, and when local
-copies are dropped. This replaces the need for manual partition management or
-external scheduling.
+partitions are converted to Parquet, when they are uploaded to object storage,
+when local copies are dropped, and when the remote copies are finally reclaimed.
+Converting a partition to Parquet removes its native files and serves reads
+directly from the Parquet file. This replaces the need for manual partition
+management or external scheduling.
 
-:::info
-
-Storage policies currently operate **locally only**. Parquet files are not
-automatically uploaded to object storage, and the `DROP REMOTE` clause is
-reserved syntax — it is rejected at SQL parse time with
-`'DROP REMOTE' is not supported yet`. Accordingly, the `drop_remote`
-column in the [`storage_policies`](/docs/query/functions/meta/#storage_policies)
-view is always blank in the current release; it is kept for forward
-compatibility. Object storage integration will be added in a future release.
-
-:::
+The two remote stages, `TO REMOTE` and `DROP REMOTE`, drive
+[cold storage](/docs/concepts/cold-storage/): partitions move to S3, Google
+Cloud Storage, Azure Blob Storage, or a filesystem store and stay queryable with
+normal SQL.
 
 ## Requirements
 
@@ -35,17 +30,30 @@ Storage policies require:
 - [Partitioning](/docs/concepts/partitions/) enabled
 - QuestDB Enterprise
 
+The two remote stages additionally require:
+
+- [Cold storage](/docs/concepts/cold-storage/) enabled and configured on every instance
+- A [WAL-enabled](/docs/concepts/write-ahead-log/) table
+
+Remote stages are rejected on non-WAL tables.
+
+:::note
+
+Storage policies do not apply to materialized views at all, local stages included. `SET STORAGE POLICY` on one is rejected with `storage policy is not supported for materialized views`. Materialized views use [TTL](/docs/query/sql/alter-mat-view-set-ttl/) for retention in Enterprise.
+
+:::
+
 ## How it works
 
 A storage policy consists of up to four TTL settings. Each setting controls a
 stage in the partition lifecycle:
 
-| Setting | Description |
-|---------|-------------|
-| `TO PARQUET` | Convert the partition from native binary format to Parquet |
-| `DROP NATIVE` | Remove native binary files, keeping only the local Parquet copy |
-| `DROP LOCAL` | Remove all local data (both native and Parquet) |
-| `DROP REMOTE` | _Reserved._ Will remove the Parquet file from object storage when remote upload is supported |
+| Setting       | Description                                                                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TO PARQUET`  | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file            |
+| `TO REMOTE`   | Upload a compact Parquet snapshot of the partition to object storage. The local partition remains writable and is still the serving copy       |
+| `DROP LOCAL`  | Seal the partition as read-only and remove its local data. With `TO REMOTE` set, reads switch to the remote copy; without it, the data is gone |
+| `DROP REMOTE` | Remove the partition from the table and reclaim its remote objects after a grace period                                                        |
 
 All settings are optional. Use only the ones relevant to your use case. All TTL
 values must be **positive**; `0` is rejected.
@@ -56,13 +64,29 @@ As time passes, each partition progresses through the stages defined by the
 policy:
 
 ```text
-                  TO PARQUET        DROP NATIVE       DROP LOCAL
-   [Native] ──────────┬──────────────────┬──────────────────┬───────
-                      │                  │                  │
-                      ▼                  ▼                  ▼
-               Native + Parquet    Parquet only       Data removed
-                  (local)            (local)
+             TO PARQUET        TO REMOTE         DROP LOCAL       DROP REMOTE
+   Native ───────┬───────────────────┬───────────────┬─────────────────┬──────
+                 ▼                   ▼               ▼                 ▼
+          Local Parquet      Uploaded, still    Sealed, served    Removed and
+                             served locally     from the store    reclaimed
 ```
+
+`TO PARQUET` and `TO REMOTE` are independent: a partition can be uploaded while
+still being served from native local files, and can be converted locally without
+ever being uploaded.
+
+:::warning
+
+`DROP LOCAL` without `TO REMOTE` is plain local retention: the partition is
+deleted and nothing queryable is left behind. Include `TO REMOTE` whenever the
+partition must stay online after local eviction.
+
+`DROP LOCAL` is also the point at which a partition becomes read-only. Writes
+that arrive for it afterwards are skipped, so set it beyond the longest
+late-arrival, replay, and correction window for the table. See
+[Cold storage](/docs/concepts/cold-storage/#immutability-after-drop-local).
+
+:::
 
 ### TTL evaluation
 
@@ -75,10 +99,10 @@ eligible when: partition_end_time < reference_time - TTL
 ```
 
 **This rule is applied independently for each stage's TTL.** A partition can
-be eligible for `TO PARQUET` long before it is eligible for `DROP NATIVE`,
-`DROP LOCAL`, or (one day) `DROP REMOTE`. Each stage uses its own `TTL` in the
-formula above; the stages share only the reference time and the ordering
-constraint `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`.
+be eligible for `TO PARQUET` long before it is eligible for `TO REMOTE`,
+`DROP LOCAL`, or `DROP REMOTE`. Each stage uses its own `TTL` in the formula
+above; the stages share only the reference time and the
+[ordering constraints](#ordering-constraint).
 
 The reference time is `min(wall_clock_time, latest_timestamp)` by default —
 the same formula used by TTL. The
@@ -88,7 +112,7 @@ the wall-clock cap for both TTL and storage policy evaluation. See
 [TTL § Reference time](/docs/concepts/ttl/#reference-time) for the rationale
 and the data-loss hazard of disabling the cap.
 
-QuestDB checks storage policies periodically (every 15 minutes by default) and
+QuestDB checks storage policies periodically (every 5 minutes by default) and
 processes eligible partitions automatically.
 
 ## Storage policy vs TTL
@@ -96,15 +120,17 @@ processes eligible partitions automatically.
 Storage policies replace [TTL](/docs/concepts/ttl/) in QuestDB Enterprise. If
 you are already familiar with TTL, this comparison is the fastest way in:
 
-| | TTL | Storage Policy |
-|---|-----|----------------|
-| **Availability** | Open source | Enterprise only |
-| **Action** | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
-| **Parquet conversion** | No | Yes (automatic local conversion) |
-| **Granularity** | Single retention window | Up to four independent TTL stages |
+|                        | TTL                       | Storage Policy                           |
+| ---------------------- | ------------------------- | ---------------------------------------- |
+| **Availability**       | Open source               | Enterprise only                          |
+| **Action**             | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
+| **Parquet conversion** | No                        | Yes (automatic local conversion)         |
+| **Granularity**        | Single retention window   | Up to four independent TTL stages        |
 
-In QuestDB Enterprise, `CREATE TABLE ... TTL` and `ALTER TABLE SET TTL` are
-deprecated. Use storage policies instead:
+In QuestDB Enterprise, use storage policies instead of TTL. On a regular table,
+`ALTER TABLE SET TTL` with a non-zero value is rejected, while
+`CREATE TABLE ... TTL` is accepted only for backward compatibility and is
+translated into a `STORAGE POLICY(DROP LOCAL ...)`:
 
 ```questdb-sql
 -- Instead of:
@@ -116,10 +142,12 @@ ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
 
 :::note
 
-If a table already has a TTL set, you must clear it with
-`ALTER TABLE SET TTL 0` before setting a storage policy. `SET TTL 0` is the
-only `SET TTL` value Enterprise accepts; any non-zero value is rejected with
-`TTL settings are deprecated, please, create a storage policy instead`.
+A table can carry a TTL only if it was created in QuestDB Open Source and later
+upgraded to Enterprise. Clear that legacy TTL with `ALTER TABLE SET TTL 0`
+before setting a storage policy; otherwise `SET STORAGE POLICY` is rejected with
+`Cannot set storage policy, please, remove TTL settings`. On Enterprise tables
+`SET TTL 0` is the only accepted `SET TTL` value; any non-zero value is rejected
+with `TTL is not supported on Enterprise tables; use a storage policy instead`.
 
 :::
 
@@ -133,8 +161,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
-    WAL;
+    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 ### On existing tables
@@ -142,27 +169,12 @@ CREATE TABLE trades (
 ```questdb-sql
 ALTER TABLE trades SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
-    DROP NATIVE 10 DAYS,
     DROP LOCAL 1 MONTH
 );
 ```
 
-Only the specified settings are changed. Omitted settings remain unchanged.
-
-### On materialized views
-
-```questdb-sql
-CREATE MATERIALIZED VIEW hourly_trades AS (
-    SELECT ts, symbol, sum(price) total
-    FROM trades
-    SAMPLE BY 1h
-) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 7d, DROP NATIVE 14d);
-```
-
-```questdb-sql
-ALTER MATERIALIZED VIEW hourly_trades SET STORAGE POLICY(TO PARQUET 7d);
-```
+`SET STORAGE POLICY` replaces the policy in full: every stage you omit is
+cleared, not preserved. To keep a stage, restate it in the same statement.
 
 For full syntax details, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
@@ -172,24 +184,29 @@ For full syntax details, see
 Storage policy TTLs accept the same duration formats as
 [TTL](/docs/concepts/ttl/):
 
-| Unit | Long form | Short form |
-|------|-----------|------------|
-| Hours | `1 HOUR` / `2 HOURS` | `1h` |
-| Days | `1 DAY` / `3 DAYS` | `1d` / `3d` |
-| Weeks | `1 WEEK` / `2 WEEKS` | `1W` / `2W` |
+| Unit   | Long form              | Short form  |
+| ------ | ---------------------- | ----------- |
+| Hours  | `1 HOUR` / `2 HOURS`   | `1h`        |
+| Days   | `1 DAY` / `3 DAYS`     | `1d` / `3d` |
+| Weeks  | `1 WEEK` / `2 WEEKS`   | `1W` / `2W` |
 | Months | `1 MONTH` / `6 MONTHS` | `1M` / `6M` |
-| Years | `1 YEAR` / `2 YEARS` | `1Y` / `2Y` |
+| Years  | `1 YEAR` / `2 YEARS`   | `1Y` / `2Y` |
 
 ### Ordering constraint
 
-TTL values must be in ascending order:
+The stages form a partial order, not a single chain. A drop stage may not fire
+before the write stage it depends on:
 
 ```text
-TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE
+TO PARQUET <= DROP LOCAL
+TO REMOTE  <= DROP LOCAL <= DROP REMOTE
 ```
 
-For example, you cannot drop native files before the Parquet conversion
-completes. All TTL values must be positive — `0` is rejected.
+`TO PARQUET` and `TO REMOTE` are **independent**: neither has to precede the
+other. A `TO REMOTE` that runs before `TO PARQUET` uploads a compact Parquet
+snapshot while the local partition stays in native format, with reads served
+locally from native files until `TO PARQUET` converts them. All TTL values must
+be positive; `0` is rejected.
 
 ## Disabling and enabling
 
@@ -218,28 +235,25 @@ ALTER TABLE trades DROP STORAGE POLICY;
 
 ## Checking storage policies
 
-Query the `storage_policies` system view to see all active policies:
+Query the `storage_policies` system view to see all policies and their status:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
 ```
 
-| table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
-|----------------|-----------|-------------|------------|-------------|--------|--------------|
-| trades~12 | 72h | 240h | 1m | | A | 2025-01-15T10:30:00.000000Z |
+| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated                |
+| -------------- | ---------- | --------- | ---------- | ----------- | ------ | --------------------------- |
+| trades~12      | 72h        | 336h      | 1m         | 12m         | A      | 2025-01-15T10:30:00.000000Z |
 
-- TTL values are rendered in just two units: `h` for hours and `m` for
-  **months**. Hour-, day-, and week-based durations are normalized to hours
-  when stored, so a `3 DAYS` TTL appears as `72h` and `1 WEEK` appears as
-  `168h`. Month-based durations keep the lowercase `m` suffix — **`1m` in
-  this view means one month, not one minute**; QuestDB's duration shorthand
-  has no unit for minutes
+- TTL values are rendered in two units: `h` for hours and `m` for **months**.
+  Hour-, day-, and week-based durations are stored as hours, so a `3 DAYS` TTL
+  appears as `72h` and `1 WEEK` as `168h`. Month- and year-based durations are
+  stored as months, so `1 MONTH` appears as `1m` and `1 YEAR` as `12m`. In this
+  view **`m` means months, not minutes**; QuestDB's duration shorthand has no
+  unit for minutes
 - Status `A` means active; `D` means disabled (see
   [Disabling and enabling](#disabling-and-enabling))
-- Unset stages appear blank. `drop_remote` is **always blank in the current
-  release** because `DROP REMOTE` is rejected at SQL parse time with
-  `'DROP REMOTE' is not supported yet`; the column is kept for forward
-  compatibility
+- An unset stage renders as `0h`, not blank
 
 For the full column reference and types, see
 [`storage_policies`](/docs/query/functions/meta/#storage_policies).
@@ -247,42 +261,50 @@ For the full column reference and types, see
 ## Replication
 
 Storage policy definitions are persisted in WAL-backed system tables, so the
-policy itself is replicated to every instance in the cluster. Enforcement runs
-**independently on each instance** — Parquet files are produced locally and
+policy itself is replicated to every instance in the cluster. Local enforcement
+runs **independently on each instance**: Parquet files are produced locally and
 are not replicated.
 
 This means the primary and its replicas can temporarily disagree on which
 partitions have been converted to Parquet or dropped, depending on when each
 node's storage policy [check interval](#configuration) last fired. The state
-converges as each instance processes its own queue. See
+converges as each instance processes its own queue.
+
+The remote stages behave differently: one designated instance does the uploading,
+and partition bytes never travel through the replication stream. See
+[Cold storage roles](/docs/concepts/cold-storage/#roles) for how that is divided,
+and
 [Replication overview](/docs/high-availability/overview/#storage-policies-in-a-replicated-cluster)
-for details.
+for how both kinds of stage behave in a cluster.
 
 ## Configuration
 
 Storage policy behavior can be tuned in `server.conf`. Time-based properties
-accept values with unit suffixes (e.g., `15m`, `30s`, `1h`) or raw microsecond
+accept values with unit suffixes (e.g., `5m`, `1h`, `100ms`) or raw microsecond
 values:
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `storage.policy.check.interval` | `15m` (15 min) | How often QuestDB scans for partitions to process |
-| `storage.policy.retry.interval` | `1m` (1 min) | Retry interval for failed tasks |
-| `storage.policy.max.reschedule.count` | `20` | Maximum retries before abandoning a task |
-| `storage.policy.writer.wait.timeout` | `30s` (30 sec) | Timeout for acquiring the table writer |
-| `storage.policy.worker.count` | `2` | Number of storage policy worker threads (0 disables the feature) |
-| `storage.policy.worker.affinity` | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list) |
-| `storage.policy.worker.sleep.timeout` | `100ms` | Sleep duration when worker has no tasks |
+| Property                              | Default            | Description                                                      |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| `storage.policy.check.interval`       | `5m` (5 min)       | How often QuestDB scans for partitions to process                |
+| `storage.policy.retry.interval`       | `1m` (1 min)       | Retry interval for failed tasks                                  |
+| `storage.policy.max.reschedule.count` | `20`               | Maximum retries before abandoning a task                         |
+| `storage.policy.worker.count`         | `4`                | Number of storage policy worker threads (0 disables the feature) |
+| `storage.policy.worker.affinity`      | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list)       |
+| `storage.policy.worker.sleep.timeout` | `100ms`            | Sleep duration when worker has no tasks                          |
+
+See
+[Storage policy configuration](/docs/configuration/storage-policy/) for the
+complete list, including the remaining worker-pool tuning properties.
 
 ## Permissions
 
 Storage policy operations require specific permissions in QuestDB Enterprise:
 
-| Operation | Required permission |
-|-----------|-------------------|
-| `SET STORAGE POLICY` | `SET STORAGE POLICY` |
-| `DROP STORAGE POLICY` | `REMOVE STORAGE POLICY` |
-| `ENABLE STORAGE POLICY` | `ENABLE STORAGE POLICY` |
+| Operation                | Required permission      |
+| ------------------------ | ------------------------ |
+| `SET STORAGE POLICY`     | `SET STORAGE POLICY`     |
+| `DROP STORAGE POLICY`    | `REMOVE STORAGE POLICY`  |
+| `ENABLE STORAGE POLICY`  | `ENABLE STORAGE POLICY`  |
 | `DISABLE STORAGE POLICY` | `DISABLE STORAGE POLICY` |
 
 Grant permissions using standard RBAC syntax:
@@ -304,21 +326,20 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
-    WAL;
+    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 ```questdb-sql title="2. Verify via the system view"
-SELECT table_dir_name, to_parquet, drop_native, drop_local, status
+SELECT table_dir_name, to_parquet, drop_local, status
 FROM storage_policies
 WHERE table_dir_name LIKE 'trades%';
 ```
 
-| table_dir_name | to_parquet | drop_native | drop_local | status |
-|----------------|------------|-------------|------------|--------|
-| trades~12      | 72h        | 240h        | 1m         | A      |
+| table_dir_name | to_parquet | drop_local | status |
+| -------------- | ---------- | ---------- | ------ |
+| trades~12      | 72h        | 1m         | A      |
 
-```questdb-sql title="3. Modify one stage (others remain unchanged)"
+```questdb-sql title="3. Replace the policy (omitted stages are cleared)"
 ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 1d);
 ```
 
@@ -326,14 +347,18 @@ ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 1d);
 SHOW CREATE TABLE trades;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'trades' (
     ts TIMESTAMP,
     symbol SYMBOL CAPACITY 256 CACHE,
     price DOUBLE
 ) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 1 DAY, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+STORAGE POLICY(TO PARQUET 1 DAY) WAL;
 ```
+
+The `DROP LOCAL 1 MONTH` stage from step 1 is gone: step 3 restated only
+`TO PARQUET`, and `SET STORAGE POLICY` replaces the whole policy rather than
+merging into it.
 
 ```questdb-sql title="5. Temporarily suspend the policy (e.g. during a backfill)"
 ALTER TABLE trades DISABLE STORAGE POLICY;
@@ -348,16 +373,20 @@ ALTER TABLE trades DROP STORAGE POLICY;
 
 ## Guidelines
 
-| Use case | Suggested policy | Rationale |
-|----------|-----------------|-----------|
-| Real-time metrics | `TO PARQUET 1d, DROP NATIVE 7d, DROP LOCAL 30d` | Keep recent data fast, drop old data automatically |
-| Trading data | `TO PARQUET 7d, DROP NATIVE 30d` | Keep Parquet locally for long-term queries |
-| IoT telemetry | `TO PARQUET 1d, DROP NATIVE 3d, DROP LOCAL 90d` | High volume, convert early to save disk; keep a brief native overlap for in-flight queries before dropping the native files |
-| Aggregated views | `TO PARQUET 30d` | Low volume, keep locally in Parquet |
+| Use case           | Suggested policy                               | Rationale                                                        |
+| ------------------ | ---------------------------------------------- | ---------------------------------------------------------------- |
+| Real-time metrics  | `TO PARQUET 1d, DROP LOCAL 30d`                | Keep recent data fast, drop old data automatically               |
+| Trading data       | `TO PARQUET 7d`                                | Keep Parquet locally for long-term queries                       |
+| Regulatory history | `TO PARQUET 7d, TO REMOTE 14d, DROP LOCAL 90d` | Keep years of queryable history without keeping it on local disk |
+| IoT telemetry      | `TO PARQUET 1d, DROP LOCAL 90d`                | High volume, convert early to save disk before dropping the data |
+| Aggregated views   | `TO PARQUET 30d`                               | Low volume, keep locally in Parquet                              |
 
 **Tips:**
 
-- Start with `TO PARQUET` and `DROP NATIVE` to reduce local disk usage while
-  keeping data queryable in Parquet format
-- Use `DROP LOCAL` with care as it permanently removes data from the local disk
+- Start with `TO PARQUET` to reduce local disk usage while keeping data
+  queryable in Parquet format
+- Use `DROP LOCAL` with care. Without `TO REMOTE` it permanently removes the
+  data; with `TO REMOTE` it makes the partition read-only for good
+- Add `DROP REMOTE` only once remote retention is a deliberate decision: it is
+  the only stage that physically deletes data with no local copy left
 - TTL values should be significantly larger than the partition interval

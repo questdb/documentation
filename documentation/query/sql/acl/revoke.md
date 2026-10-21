@@ -28,9 +28,16 @@ REVOKE permission [, permission ...] FROM entityName;
 ```questdb-sql title="Table or column scope"
 REVOKE permission [, permission ...]
     ON { ALL TABLES
-       | tableName [(columnName [, columnName ...])]
-         [, tableName [(columnName [, columnName ...])] ...] }
+       | tableName [(columns)] [, tableName [(columns)] ...] }
     FROM entityName;
+```
+
+Where `columns` is either an explicit list of columns, or `*` for all of the
+table's current columns with an optional `EXCLUDE` list:
+
+```questdb-sql title="Column specification"
+{ columnName [, columnName ...]
+| * [EXCLUDE (columnName [, columnName ...])] }
 ```
 
 ## Description
@@ -43,6 +50,9 @@ REVOKE permission [, permission ...]
   permissions on table level from an entity
 - `REVOKE [permissions] ON [table(columns)] FROM entity` - revoke column level
   permissions on column level from an entity
+- `REVOKE [permissions] ON [table(*)] FROM entity` - revoke column level
+  permissions on all of the table's current columns, with an optional `EXCLUDE`
+  list
 
 ### Revoke database level permissions
 
@@ -79,6 +89,33 @@ REVOKE SELECT ON orders, trades FROM john;
 ```questdb-sql
 REVOKE SELECT ON orders(id, name) FROM john;
 ```
+
+### Revoke from all columns of a table
+
+Use the `*` wildcard to revoke a column level permission from every column the
+table currently has:
+
+```questdb-sql
+REVOKE SELECT ON trades(*) FROM john;
+```
+
+As with [`GRANT`](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table),
+the `*` is expanded to the table's columns at the time the statement runs, and
+the target table must exist.
+
+Add an `EXCLUDE` list to revoke from all columns except the ones you name. For
+example, to take away `SELECT` on every column of `trades` except `symbol` and
+`ts`:
+
+```questdb-sql
+REVOKE SELECT ON trades(* EXCLUDE (symbol, ts)) FROM john;
+```
+
+`EXCLUDE` can only be used together with `*`. Every excluded column must exist,
+and the list can neither be empty nor cover every column of the table. When the
+permission was originally granted at table level, revoking it from a subset of
+columns this way triggers
+[permission level readjustment](#permission-level-readjustment).
 
 ### Implicit permissions
 

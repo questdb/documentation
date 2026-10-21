@@ -29,9 +29,8 @@ inform your own unique choices.
 [5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)\
 [6. Query data, PostgreSQL query](#6-query-data-postgresql-query)\
 [7. Setup replication](#7-setup-replication)\
-[8. Enable compression](#8-enable-compression)\
-[9. Configure a storage policy](#9-configure-a-storage-policy)\
-[10. Double-check kernel limits](#10-double-check-kernel-limits)\
+[8. Compress and tier data with storage policies](#8-compress-and-tier-data-with-storage-policies)\
+[9. Double-check kernel limits](#9-double-check-kernel-limits)\
 [Next steps](#next-steps)\
 [FAQ](#faq)
 
@@ -43,8 +42,9 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
+  - Buying through Azure? QuestDB Enterprise is also available via
+    [Azure Marketplace](/docs/deployment/azure/#buy-through-azure-marketplace).
 - Use of a [supported file system](/docs/getting-started/capacity-planning/#supported-filesystems)
-  - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
 ## Installation guide
 
@@ -234,7 +234,7 @@ ALTER SERVICE ACCOUNT ingest_ilp CREATE TOKEN TYPE REST WITH TTL '3000d' REFRESH
 This command returns a token. **Copy it immediately**, as it's shown only once.
 
 | name       | token                                          | expires_at                  | refresh |
-|------------|------------------------------------------------|-----------------------------|---------|
+| ---------- | ---------------------------------------------- | --------------------------- | ------- |
 | ingest_ilp | qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY | 2033-09-19T15:32:51.628453Z | true    |
 
 ### Step 3: Use the Token in Your Client
@@ -266,18 +266,19 @@ the server's certificate. For local testing with self-signed certificates, you c
 
 Connecting a client to ILP is a common path.
 
-However, you may use something like [Kafka](/docs/ingestion/message-brokers/kafka).
+However, you may use something like [Kafka](/docs/connect/message-brokers/kafka).
 
 For more on ILP ingestion, see:
-- [ILP Overview](/docs/ingestion/ilp/overview/) — Protocol details and configuration
-- [Ingestion Overview](/docs/ingestion/overview/) — Client libraries and ingestion methods
+- [ILP Overview](/docs/connect/compatibility/ilp/overview/) — Protocol details and configuration
+- [Ingestion Overview](/docs/connect/overview/) — Client libraries and ingestion methods
 
 ## 5. Ingest data, Kafka Connect (optional)
 
 _If you're not using Kafka, you can skip to section 6._
 
-The official **QuestDB Kafka Connect sink** forwards messages from Kafka topics directly to your database using ILP protocol.
-The setup process is straightforward:
+Use the **QuestDB Kafka connector** to stream messages from Kafka topics into
+QuestDB. The configuration below requires QuestDB 10.0 or newer and connector
+0.24 or newer.
 
 1. Create a dedicated service account in QuestDB.
 2. Generate an authentication token for the account.
@@ -312,7 +313,7 @@ ALTER SERVICE ACCOUNT kafka CREATE TOKEN TYPE REST WITH TTL '365d';
 The command returns a token. **Copy it immediately**, as it will not be shown again.
 
 | name  | token                                            | expires\_at                   |
-|-------|--------------------------------------------------|-------------------------------|
+| ----- | ------------------------------------------------ | ----------------------------- |
 | kafka | `qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY` | `2026-07-03T18:05:00.000000Z` |
 
 Save the private key in a secure location!
@@ -332,19 +333,19 @@ tasks.max=1
 topics=your_kafka_topic
 
 # --- QuestDB Connection ---
-# Use https:: if your QuestDB server has TLS enabled.
-# Replace the placeholder with the token you generated.
-client.conf.string=https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;
+# Use ws:: if your QuestDB server does not have TLS enabled.
+# Replace YOUR_TOKEN with the token you generated.
+client.conf.string=wss::addr=localhost:9000;token=YOUR_TOKEN;
 
 # --- Optional: Data Mapping ---
 # Use a field from the Kafka message key or value as a QuestDB symbol.
-# symbol.columns=device_id
+# symbols=device_id
 ```
 
 Once you deploy this configuration, the connector will start sending data from your Kafka topic to QuestDB. If you
 encounter any issues, check the logs for both your Kafka Connect worker and your QuestDB server for more details.
 
-See the [QuestDB Kafka Connector documentation](/docs/ingestion/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
+See the [QuestDB Kafka Connector documentation](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
 on the configuration options and how to set up the connector.
 
 ## 6. Query data, PostgreSQL query
@@ -404,7 +405,7 @@ This covers the very basics of user creation and service accounts.
 We have an `ingest` service account and a `dashboard` service account.
 
 For more on querying, see:
-- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) — Connection details and compatibility
+- [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/) — Connection details and compatibility
 - [Query & SQL Overview](/docs/query/overview/) — SQL syntax and functions
 
 > For the full role-based access control docs, including group management, see
@@ -436,94 +437,38 @@ Full instructions can be found within the
    snapshot provides a starting point for the instance, which will soon catch up
    with the primary node.
 
-## 8. Enable compression
+## 8. Compress and tier data with storage policies
 
-Compression requires the
-[Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page).
+[Storage policies](/docs/concepts/storage-policy/) automate what happens to
+partitions as they age. They are not only for moving data to cold storage: the
+`TO PARQUET` stage is also how QuestDB Enterprise compresses data on local
+volumes. It converts partitions to
+[Parquet](/docs/concepts/parquet/#data-compression), compressed with `lz4_raw`
+by default, and removes the native files. Converted partitions stay on local
+disk, remain fully queryable, and still accept late writes.
 
-We'll assume Ubuntu, and demonstrate the basics CLI commands which you'd apply
-in something like an AWS EC2 to enable ZFS:
+A policy has up to four stages, each with its own delay:
 
-```bash title="Ubuntu - Install ZFS"
-sudo apt update
-sudo apt install zfsutils-linux
-```
+- `TO PARQUET` converts the partition to compressed Parquet on local disk.
+- `TO REMOTE` uploads a Parquet copy of the partition to object storage.
+- `DROP LOCAL` removes the local copy. With `TO REMOTE` set, queries switch to
+  the remote copy. Without it, the data is deleted.
+- `DROP REMOTE` deletes the remote copy.
 
-To enable compression, create a ZPool with compression enabled:
+Storage policies replace plain TTL in Enterprise, where `ALTER TABLE SET TTL`
+with a non-zero value is rejected.
 
-```shell title="Ubuntu - Enable compression"
-zpool create -m legacy -o feature@lz4_compress=enabled autoexpand=on -O compression=lz4 -t volume1 questdb-pool sdf
-```
+:::note ZFS compression
+File-system compression with ZFS is no longer the recommended way to compress
+QuestDB data. It works outside the database, while Parquet compression is
+managed by QuestDB per partition. If you already run on ZFS, see
+[ZFS compression](/docs/deployment/compression-zfs/).
+:::
 
-The exact commands depend on which version of ZFS you are running. Use the
-[ZFS docs](https://openzfs.github.io/openzfs-docs/man/master/8/zpool-create.8.html)
-to customize your ZFS to meet your requirements.
+### Compress partitions on local disk
 
-If you are running QuestDB Enterprise in Kubernetes, QuestDB offers a
-[Container Storage Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md)
-(CSI) Driver to create ZFS volumes in your cluster.
-
-Please contact us for more information to see if your version and distribution
-of Kubernetes is supported.
-
-For more on storage and compression, see [Enable compression with ZFS](/docs/deployment/compression-zfs/).
-
-## 9. Configure a storage policy
-
-[Storage policies](/docs/concepts/storage-policy/) are the Enterprise primitive
-for automated partition retention. A policy converts older partitions to
-Parquet, drops the native binary files, and eventually drops the Parquet files
-too — on a schedule you define. This supersedes plain TTL in Enterprise, where
-`ALTER TABLE SET TTL` with a non-zero value is rejected.
-
-### Migrating from TTL when upgrading from OSS
-
-Tables and materialized views that were created in OSS keep their existing
-`TTL` setting after you upgrade to Enterprise — no data is lost at upgrade
-time. However, Enterprise rejects any **new** `TTL` changes (both
-`CREATE ... TTL` and `ALTER ... SET TTL <non-zero>`) with:
-
-```
-TTL settings are deprecated, please, create a storage policy instead
-```
-
-To move a legacy table or materialized view from `TTL` to a storage policy:
-
-1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts, and it is required before a storage policy can be
-   attached:
-
-   ```questdb-sql title="Clear the legacy TTL"
-   ALTER TABLE trades SET TTL 0;
-   -- or, for a materialized view:
-   ALTER MATERIALIZED VIEW trades_hourly SET TTL 0;
-   ```
-
-2. **Attach a storage policy** that reproduces — and ideally extends — the
-   retention the TTL used to provide. A policy lets you keep data in Parquet
-   after you would previously have dropped it, so `DROP LOCAL` (or
-   `DROP NATIVE` if you don't want Parquet at all) is the stage that replaces
-   the old TTL horizon:
-
-   ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
-   ALTER TABLE trades SET STORAGE POLICY(
-       TO PARQUET 3 DAYS,
-       DROP NATIVE 10 DAYS,
-       DROP LOCAL 1 MONTH
-   );
-   ```
-
-   If you want the policy to behave exactly like the old TTL (delete the
-   partition outright after the same interval), use a single-stage policy —
-   for example `STORAGE POLICY(DROP NATIVE 1 MONTH)` to match `TTL 1 MONTH`.
-
-Do this for every table and materialized view you want to keep managed
-automatically. Tables without a storage policy retain their data indefinitely
-once their legacy TTL has been cleared.
-
-### Creating new tables with a storage policy
-
-Attach a policy at table creation:
+A policy with only a `TO PARQUET` stage compresses older partitions and keeps
+all data on local disk. Attach it at table creation:
 
 ```questdb-sql title="Web Console - Create a table with a storage policy"
 CREATE TABLE trades (
@@ -531,32 +476,115 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
-  WAL;
+  STORAGE POLICY(TO PARQUET 3d);
 ```
 
-Or attach a policy to an existing table:
+Or attach it to an existing table:
 
 ```questdb-sql title="Web Console - Set a storage policy on an existing table"
+ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 3 DAYS);
+```
+
+Set the `TO PARQUET` delay beyond the window in which late or out-of-order rows
+usually arrive. Rows that land on a Parquet partition cause QuestDB to rewrite
+it. To trade CPU for a higher compression ratio, change the codec, for example
+to `ZSTD`, as described in
+[Parquet data compression](/docs/concepts/parquet/#data-compression).
+
+To also delete partitions after a retention window, add a `DROP LOCAL` stage,
+for example `STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)`.
+
+Check active policies via the `storage_policies` system view, and track
+conversion with `SHOW PARTITIONS`, where converted partitions have `isParquet`
+set to `true` and report their size in `parquetFileSize`:
+
+```questdb-sql title="Web Console - Check policies and conversion progress"
+SELECT * FROM storage_policies;
+SHOW PARTITIONS FROM trades;
+```
+
+### Tier partitions to object storage
+
+To keep historical partitions queryable without keeping them on local disk, add
+the `TO REMOTE` stage. It uploads a Parquet copy to S3, Google Cloud Storage,
+Azure Blob Storage, or a filesystem store, and `DROP LOCAL` then evicts the
+local copy while queries keep working:
+
+```questdb-sql title="Web Console - Tier partitions to object storage"
 ALTER TABLE trades SET STORAGE POLICY(
-    TO PARQUET 3 DAYS,
-    DROP NATIVE 10 DAYS,
-    DROP LOCAL 1 MONTH
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS
 );
 ```
 
-Check active policies via the `storage_policies` system view:
+Tiering saves more storage on top of Parquet compression:
 
-```questdb-sql
-SELECT * FROM storage_policies;
-```
+- Object storage usually costs less than the block storage behind local
+  volumes.
+- The cluster keeps a single copy of each remote partition. The primary and
+  every replica read the same object instead of each holding its own copy.
+- History is no longer limited by the size of a single volume.
+
+`DROP LOCAL` makes a partition read-only, so set it beyond the longest window
+in which late rows or corrections can arrive. See
+[Immutability after DROP LOCAL](/docs/concepts/cold-storage/#immutability-after-drop-local).
+
+Tiering requires [cold storage](/docs/concepts/cold-storage/) to be enabled and
+an object store prefix to be configured first. See
+[Operating cold storage](/docs/operations/cold-storage/) for the setup
+procedure.
 
 For the full concept, including the stage model, timing, and replication
-behavior, see
-[Storage Policy](/docs/concepts/storage-policy/) and
+behavior, see [Storage Policy](/docs/concepts/storage-policy/) and
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
-## 10. Double-check kernel limits
+### Migrating from TTL when upgrading from OSS
+
+Tables that were created in OSS keep their existing `TTL` setting after you
+upgrade to Enterprise, so no data is lost at upgrade time. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is then rejected with:
+
+```
+TTL is not supported on Enterprise tables; use a storage policy instead
+```
+
+(`CREATE TABLE ... TTL` is still accepted for backward compatibility: Enterprise
+translates it into a `STORAGE POLICY(DROP LOCAL ...)`.) Materialized views are
+not affected: they continue to use `TTL` for retention in Enterprise.
+
+To move a legacy table from `TTL` to a storage policy:
+
+1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
+   value Enterprise accepts on a table, and it is required before a storage
+   policy can be attached:
+
+   ```questdb-sql title="Clear the legacy TTL"
+   ALTER TABLE trades SET TTL 0;
+   ```
+
+2. **Attach a storage policy** that reproduces, and ideally extends, the
+   retention the TTL used to provide. A policy lets you keep data in Parquet
+   after you would previously have dropped it, so `DROP LOCAL` is the stage
+   that replaces the old TTL horizon:
+
+   ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
+   ALTER TABLE trades SET STORAGE POLICY(
+       TO PARQUET 3 DAYS,
+       DROP LOCAL 1 MONTH
+   );
+   ```
+
+   If you want the policy to behave exactly like the old TTL (delete the
+   partition outright after the same interval, with no Parquet conversion),
+   use a single-stage policy, for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
+   to match `TTL 1 MONTH`.
+
+Do this for every table you want to keep managed automatically. Tables without
+a storage policy retain their data indefinitely once their legacy TTL has been
+cleared.
+
+## 9. Double-check kernel limits
 
 QuestDB works together with your server operating system to achieve maximum
 performance. Prior to putting your server under heavy loads, consider checking
@@ -574,7 +602,7 @@ Enterprise.
 
 If you're new to QuestDB, consider checking out:
 
-- [Ingestion overview](/docs/ingestion/overview/): Learn the various ingestion
+- [Ingestion overview](/docs/connect/overview/): Learn the various ingestion
   methods and their benefits and tradeoffs, and pick a language client.
 - [Query & SQL overview](/docs/query/overview/): Learn how to query
   QuestDB.
@@ -645,11 +673,15 @@ correctly configured on both the primary and replica nodes. Check the logs for
 any errors related to replication and ensure there's network connectivity
 between all involved parties.
 
-**Q: Compression is enabled, but I'm not observing reduced storage usage. What
-could be the issue?**
+**Q: I set a storage policy with `TO PARQUET`, but I'm not observing reduced
+storage usage. What could be the issue?**
 
-A: Ensure that the ZFS filesystem is correctly configured with compression
-enabled. Note that the actual compression ratio achieved can vary significantly
-depending on the nature of your data. Some types of data may not compress well.
-Review the ZFS compression statistics to understand the compression level being
-achieved. If it seems out of expected range, please contact us.
+A: A partition converts only once its entire time range is older than the
+`TO PARQUET` delay, and the active partition never converts. Policies are
+checked every 5 minutes by default, so allow time for the first run. Use
+`SHOW PARTITIONS FROM tableName` to confirm which partitions have `isParquet`
+set to `true` and compare `parquetFileSize` with `diskSize`. The compression
+ratio varies with the nature of your data, and some data does not compress
+well. To trade CPU for a higher ratio, switch the codec to `ZSTD`, as described
+in [Parquet data compression](/docs/concepts/parquet/#data-compression). If the
+ratio still seems out of the expected range, please contact us.
