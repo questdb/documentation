@@ -69,11 +69,6 @@ db_client.subscribe(
 )
 ```
 
-Live quotes flow only while the market is open. Outside trading hours the script
-receives no quotes and waits. To test at other times, pass a recent UTC
-timestamp as `start` to `subscribe()` to replay data with Databento's
-[intraday replay](https://databento.com/docs/api-reference-live/basics/intraday-replay).
-
 ### Ingest data into QuestDB
 
 Read the subscription and write quotes through a pooled sender from the
