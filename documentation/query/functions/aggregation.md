@@ -93,6 +93,19 @@ calculations. Functions are organized by category below.
 | [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
 | [weighted_stddev_rel](#weighted_stddev_rel) | Weighted standard deviation (reliability weights) |
 
+### Grouping set functions
+
+`GROUPING()` and `GROUPING_ID()` identify which columns are rolled up in each
+result row, telling a subtotal `NULL` apart from a real `NULL` value. They can
+only be used in queries with `GROUPING SETS`, `ROLLUP`, or `CUBE`. See
+[GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/#grouping-and-grouping_id-functions)
+for full reference.
+
+| Function | Description |
+| :------- | :---------- |
+| [grouping](/docs/query/sql/grouping-sets/#grouping-and-grouping_id-functions) | `1` if the column is rolled up in the row, `0` otherwise |
+| [grouping_id](/docs/query/sql/grouping-sets/#grouping-and-grouping_id-functions) | Bitmask of `grouping()` values for several columns |
+
 ### Array aggregates
 
 Several aggregates on this page ([first](#first), [first_not_null](#first_not_null),

@@ -4,10 +4,10 @@ sidebar_label: GROUPING SETS
 description: GROUPING SETS, ROLLUP, and CUBE SQL keyword reference for computing multiple levels of aggregation in a single query.
 ---
 
-`GROUPING SETS`, `ROLLUP`, and `CUBE` perform aggregation over multiple
-dimensions within a single query. This can be used, for example, to compute
-subtotals and grand totals alongside detail-level results, without multiple
-passes over the data.
+`GROUPING SETS`, `ROLLUP`, and `CUBE` compute several levels of aggregation in
+one query, such as detail rows, subtotals, and a grand total. QuestDB computes
+every level in a single scan of the data, instead of running a separate
+`GROUP BY` per level and combining the results with `UNION ALL`.
 
 ## Syntax
 
@@ -31,7 +31,7 @@ GROUP BY GROUPING SETS ({ (column [, ...]) | () } [, ...])
 SELECT timestamp, [column [, ...],] aggregate(column) [, ...]
 FROM table
 [WHERE condition]
-SAMPLE BY n{units}
+SAMPLE BY [count]unit
     { ROLLUP(column [, ...])
     | CUBE(column [, ...])
     | GROUPING SETS ({ (column [, ...]) | () } [, ...]) }
@@ -40,10 +40,8 @@ SAMPLE BY n{units}
     [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset]]
 ```
 
-A `GROUP BY` clause contains at most one `ROLLUP` or `CUBE`, and it must be the
-last item. Plain columns can only precede `ROLLUP` or `CUBE`, as described in
-[Composite syntax](#composite-syntax). `GROUPING SETS` cannot be combined with
-plain columns.
+With `GROUP BY`, plain columns can precede `ROLLUP` or `CUBE`, as described in
+[Composite syntax](#composite-syntax).
 
 With `SAMPLE BY`, the grouping clause comes directly after the sample interval,
 before `FROM ... TO` and `FILL`. See
@@ -167,7 +165,7 @@ requires raising that property.
 Plain `GROUP BY` columns can be combined with `ROLLUP` or `CUBE`. The plain
 columns are always included in every grouping set.
 
-```questdb-sql title="symbol always grouped, side rolled up" demo
+```questdb-sql title="Symbol always grouped, side rolled up" demo
 SELECT symbol, side, SUM(amount) AS total_amount
 FROM trades
 WHERE timestamp IN '$now-1m..$now'
@@ -283,7 +281,7 @@ non-aggregated column other than the timestamp must appear in the `ROLLUP`,
 [composite syntax](#composite-syntax). To keep a column grouped at every level,
 list it in each set:
 
-```questdb-sql title="symbol in every set, side rolled up" demo
+```questdb-sql title="Symbol in every set, side rolled up" demo
 SELECT timestamp, symbol, side, SUM(amount) AS total_amount
 FROM trades
 WHERE timestamp IN '$now-1d..$now'
@@ -312,13 +310,13 @@ ORDER BY timestamp, symbol;
 
 Supported FILL modes:
 
-| FILL mode    | Supported |
-| ------------ | --------- |
-| `FILL(NONE)` | Yes       |
-| `FILL(NULL)` | Yes       |
-| `FILL(value)` | Yes      |
-| `FILL(PREV)` | No        |
-| `FILL(LINEAR)` | No      |
+| FILL mode      | Supported |
+| -------------- | --------- |
+| `FILL(NONE)`   | Yes       |
+| `FILL(NULL)`   | Yes       |
+| `FILL(value)`  | Yes       |
+| `FILL(PREV)`   | No        |
+| `FILL(LINEAR)` | No        |
 
 `GROUPING()` and `GROUPING_ID()` values are preserved in fill rows. They are not
 replaced by the fill value.
@@ -382,9 +380,6 @@ matters.
   expressions, and bind variables in the `FROM` bound are not supported with
   grouping sets.
 
-- **`CUBE` limited to 15 columns**, and to 12 columns with the default
-  `cairo.sql.max.grouping.sets` value.
-
 - **`GROUPING()` / `GROUPING_ID()` limited to 31 `GROUP BY` key columns**. The
   bitmask is int-based.
 
@@ -392,7 +387,8 @@ matters.
   [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets)
   configuration property (default 4096). `ROLLUP` produces N+1 sets, `CUBE`
   produces 2^N sets, and explicit `GROUPING SETS` produces one set per listed
-  group. Queries exceeding this limit are rejected at parse time.
+  group. Queries exceeding this limit are rejected at parse time. `CUBE` also
+  has a hard limit of 15 columns, so with the default it accepts at most 12.
 
 ## See also
 
