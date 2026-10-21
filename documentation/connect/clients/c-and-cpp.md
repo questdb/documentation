@@ -28,7 +28,7 @@ include(FetchContent)
 FetchContent_Declare(
     c_questdb_client_proj
     GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
-    GIT_TAG        7.0.0)   # or a newer release tag, or a commit SHA
+    GIT_TAG        7.2.0)   # or a newer release tag, or a commit SHA
 FetchContent_MakeAvailable(c_questdb_client_proj)
 
 target_link_libraries(your_target questdb_client)
@@ -465,7 +465,13 @@ your own cadence (row count, byte size via `line_sender_buffer_size`, or a
 timer) and call `flush` yourself. A good starting cadence is about 1,000 rows or
 100 ms, whichever comes first: the auto-flush defaults of the other QWP
 clients. Flushing every row collapses throughput, and a single flush must
-stay under the `sf_max_segment_bytes` payload cap (default 4 MiB). Null columns are
+stay under the frame cap: the smallest of `max_buf_size` (default 100 MiB),
+the batch size the server advertises, and the `sf_max_segment_bytes` segment
+payload capacity (just under 4 MiB by default). `line_sender_buffer_size`
+(C++ `buffer.size()`) is at least the size of the frame a flush encodes, so a
+buffer flushed before its size reaches the cap fits in one frame. A buffer
+over the cap fails with `batch_too_large`, publishes nothing, and keeps its
+rows. Null columns are
 written by **omission**: skip the column for that row. There is no `set_null`
 call.
 
@@ -696,7 +702,8 @@ on_error:;
   the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
   string, binary, or array values — the flush fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code.** Check
-  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). False means the queue
+  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). This describes only the
+  failed operation's input. False means the queue
   never took the frame and the chunk is intact: re-flush it. True means
   delivery is uncertain, so `wait` for what the queue already holds, and resend
   the chunk only where the table's dedup keys make duplicate rows harmless. A
@@ -776,12 +783,17 @@ See `qwp_sender.h` for the exact signatures. Complete list:
 | `column_bool` | LSB-first packed bitmap | `BOOLEAN` |
 | `column_ts` + `qwp_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
 | `column_date` | int64 millis since epoch | `DATE` |
-| `column_uuid` | 16 bytes, canonical RFC-4122 order | `UUID` |
-| `column_long256` | 32 bytes (4 LE limbs) | `LONG256` |
+| `column_uuid` | 16 bytes, canonical RFC 4122 big-endian | `UUID` |
+| `column_long256` | 32 bytes (4 LE limbs, low limb first) | `LONG256` |
 | `column_ipv4` | uint32 | `IPV4` |
 | `column_str` | Arrow Utf8 offsets + bytes | `VARCHAR` |
 | `column_binary` | Arrow Binary offsets + bytes | `BINARY` |
 | `symbol_i8` / `_i16` / `_i32` | dict codes + Utf8 dictionary | `SYMBOL` |
+
+`column_uuid` takes the UUID's canonical RFC 4122 bytes, exactly as they are
+written in the textual form, and byte-swaps them into QWP wire order for you.
+The row-oriented `line_sender_buffer_column_uuid` is the exception: it takes
+the two 64-bit wire halves, `(lo, hi)`.
 
 Designated timestamp (exactly once per chunk, before flush):
 `at_nanos` / `at_micros` / `at_millis` / `at_seconds` (millis and
@@ -873,16 +885,136 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
   caller keeps `schema`. On failure check `array->release != NULL` before
   invoking it.
 - Per-column wire-type hints (`qwp_arrow_override`: force
-  SYMBOL/VARCHAR, IPv4, char, geohash precision) steer encoding without
-  touching the Arrow schema.
+  SYMBOL/VARCHAR, IPv4, char, geohash precision, UUID, LONG256) choose the
+  wire type without touching the Arrow schema. An override wins for its
+  column over any field metadata the schema carries.
 - To append Arrow **columns** into a chunk alongside hand-built ones, use
   `qwp_chunk_append_arrow_column`, or
   `qwp_arrow_import_new` + `..._append_arrow_import` to import once
-  and slice across many chunks.
+  and slice across many chunks. Neither takes an overrides array, so an
+  IPv4, char, geohash, UUID, or LONG256 column has to carry its claim as
+  field metadata instead. The SYMBOL choice is still available on the import
+  path: `qwp_arrow_import_new` takes a `symbol_mode` argument
+  (`qwp_symbol_mode_auto`, `_symbol`, `_not_symbol`).
 - Dictionary-encoded string columns map to `SYMBOL` by default; plain Utf8 to
   `VARCHAR`. `qwp_sender.h` lists every Arrow type the client accepts, and
   the kinds it rejects (`Struct`, `Map`, `Interval`, ...); a rejected type
   fails with `line_sender_error_arrow_unsupported_column_kind`.
+
+### Binary columns: UUID, LONG256, and opaque bytes
+
+Binary Arrow columns land as `BINARY` unless the column *claims* a richer
+type. The width of a column claims nothing on its own: a bare
+`FixedSizeBinary(16)` is opaque bytes, not a UUID. A claim comes from the
+schema or from an override:
+
+| Claim | Lands as |
+| --- | --- |
+| `ARROW:extension:name = arrow.uuid` on `FixedSizeBinary(16)` | `UUID` |
+| `questdb.column_type = uuid` field metadata | `UUID` |
+| `questdb.column_type = long256` field metadata | `LONG256` |
+| `qwp_arrow_override_uuid` / `qwp_arrow_override_long256` | `UUID` / `LONG256` |
+
+UUID bytes are canonical RFC 4122 big-endian and the client byte-swaps them
+into QWP wire order; LONG256 bytes are little-endian limbs, low limb first,
+and go out verbatim. The `questdb.column_type` claims and the two overrides
+also apply to variable-length `Binary` / `LargeBinary` / `BinaryView`
+columns, where every non-null value must then be exactly 16 or 32 bytes. The
+`arrow.uuid` extension is the exception: the Arrow spec fixes its storage to
+`FixedSizeBinary(16)`, so the client rejects the label on any other type. A
+claim whose width doesn't match fails with
+`line_sender_error_arrow_ingest`.
+
+:::caution Behaviour change
+
+Before client 7.1.0 a bare `FixedSizeBinary(16)` or `(32)` column became
+`UUID` or `LONG256` on width alone, with no claim needed. It is now `BINARY`
+unless the column carries one of the claims above, so a batch that used to
+produce a `UUID` column now produces a `BINARY` one and reports no error.
+
+The UUID byte order at the API boundary changed in the same release. Code
+written against an earlier version passed QWP wire-order bytes to
+`qwp_chunk_column_uuid` and `qwp_reader_query_bind_uuid`; those values are
+now stored with their bytes reversed, also with no error.
+
+:::
+
+#### Claiming in the schema
+
+Both metadata claims are attached to the Arrow `Field`, so you make them
+wherever the batch is built. In Arrow C++:
+
+```cpp
+// The standard Arrow extension label. FixedSizeBinary(16) only.
+auto trade_id = arrow::field("trade_id", arrow::fixed_size_binary(16))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"ARROW:extension:name"}, {"arrow.uuid"}));
+
+// The QuestDB claim, also valid on Binary / LargeBinary / BinaryView.
+auto order_hash = arrow::field("order_hash", arrow::fixed_size_binary(32))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"questdb.column_type"}, {"long256"}));
+
+auto batch_schema = arrow::schema({
+    arrow::field("ts", arrow::timestamp(arrow::TimeUnit::NANO)),
+    trade_id,
+    order_hash});
+```
+
+`questdb.column_type = uuid` has the same shape with `uuid` as the value. Use
+it in place of `arrow.uuid` when the bytes sit in a variable-length binary
+column, which the extension label doesn't allow.
+
+Export the batch built against that schema through `arrow::ExportRecordBatch`
+and flush it exactly as above — the claims travel with it, and the flush call
+needs no extra arguments.
+
+#### Claiming at the call site
+
+An override claims the type per flush and leaves the schema alone. Fill in a
+`qwp_arrow_override` per column and pass the array to any
+`flush_arrow_batch*` call, where the example above passes no overrides:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+using namespace questdb::ingress::literals;
+
+const ::qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+sender.flush_arrow_batch_and_wait(
+    "trades"_tn, array, schema, "ts"_cn,
+    overrides, std::size(overrides));
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+const qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+bool ok = qwp_sender_flush_arrow_batch_at_column_and_wait(
+    sender, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
+    QDB_COLUMN_NAME_LITERAL("ts"),
+    overrides, sizeof(overrides) / sizeof(overrides[0]),
+    qwpws_ack_level_ok, &err);
+```
+
+</TabItem>
+</Tabs>
+
+`arg` (the trailing `0`) carries the geohash precision for
+`qwp_arrow_override_geohash` and is unused by every other kind. An override
+that names a column the batch doesn't have, repeats another override's
+column, or carries an unknown kind fails with
+`line_sender_error_invalid_api_call`.
 
 ## Querying data
 
@@ -1084,6 +1216,12 @@ For width-independent access, use `column::visit` and
 mantissa as little-endian two's-complement bytes. Check for null before
 decoding it.
 
+`qwp_reader_column_data_get_bytes` also serves `UUID` and `LONG256`. It hands
+back UUID values as 16 canonical RFC 4122 big-endian bytes — the decoder has
+already reversed them out of wire order, so they match what
+`qwp_chunk_column_uuid` and `bind_uuid` take — and LONG256 values as 32
+little-endian limb bytes, low limb first, verbatim from the wire.
+
 ### Parameterised queries
 
 Prepare then bind: C `qwp_reader_prepare` + `qwp_reader_query_bind_*` +
@@ -1103,8 +1241,8 @@ outlive any cursor it produces. The complete bind surface (C
 | `bind_decimal64` / `bind_decimal128` / `bind_decimal256` | unscaled value + scale | `DECIMAL` |
 | `bind_geohash` | bits + precision | `GEOHASH` |
 | `bind_varchar` | UTF-8 string | `VARCHAR` |
-| `bind_uuid` | 16 bytes | `UUID` |
-| `bind_long256` | 32 bytes | `LONG256` |
+| `bind_uuid` | 16 bytes, canonical RFC 4122 big-endian | `UUID` |
+| `bind_long256` | 32 bytes (4 LE limbs, low limb first) | `LONG256` |
 | `bind_binary` | bytes + length | `BINARY` (not yet accepted server-side) |
 | `bind_ipv4` | uint32, host order | `IPV4` (not yet accepted server-side) |
 
@@ -1244,9 +1382,10 @@ queue and returns before the server acks.
    10 GiB disk mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
-   buffer whose single payload exceeds the frame cap derived from
-   `sf_max_segment_bytes` (default 4 MiB) is rejected immediately instead; an oversize
-   chunk is split across frames rather than rejected.
+   buffer whose single payload exceeds the frame cap (see
+   [Sending data: row buffers](#sending-data-row-major)) is rejected
+   immediately with `batch_too_large` instead; an oversize chunk is split
+   across frames rather than rejected.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
@@ -1436,6 +1575,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
+| `batch_too_large` | A buffer's frame, or a chunk frame that cannot be split further, exceeds the frame cap | Usable | A buffer published nothing and keeps its rows: flush fewer rows at a time, or raise the limit that binds (by default `sf_max_segment_bytes`). A chunk may have queued the frames before the oversized one, so check `in_doubt` before resending it. |
 | `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool
