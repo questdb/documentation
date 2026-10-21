@@ -223,6 +223,7 @@ Materialized views require a `SAMPLE BY` or time-based `GROUP BY` query.
 - `FILL` clause
 - `FROM-TO` clause
 - `ALIGN TO FIRST OBSERVATION`
+- [`GROUPING SETS`, `ROLLUP`, and `CUBE`](/docs/query/sql/grouping-sets/)
 - Non-deterministic functions like `now()` or `rnd_uuid4()`
 
 Keep queries simple. Move complex transformations to queries that run on the

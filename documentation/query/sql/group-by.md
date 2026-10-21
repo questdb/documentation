@@ -12,10 +12,9 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 ```questdb-sql
 SELECT column [, column ...], aggregation [, aggregation ...]
 FROM tableName
-[GROUP BY column [, column ...]
-    | ROLLUP(column [, column ...])
-    | CUBE(column [, column ...])
-    | GROUPING SETS ((column [, column ...]) [, ...])];
+[GROUP BY { column [, column ...]
+          | [column [, ...],] { ROLLUP | CUBE } (column [, ...])
+          | GROUPING SETS ({ (column [, ...]) | () } [, ...]) }];
 ```
 
 :::note

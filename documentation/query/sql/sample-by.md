@@ -14,7 +14,7 @@ Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 SELECT column [, column ...], aggregation [, aggregation ...]
 FROM tableName
 [WHERE conditions]
-SAMPLE BY n { n | U | T | s | m | h | d | M | y }
+SAMPLE BY n { n | U | T | s | m | h | d | w | M | y }
     [ROLLUP(column [, ...]) | CUBE(column [, ...]) | GROUPING SETS (...)]
     [FROM timestamp TO timestamp]
     [FILL({ NONE | NULL | PREV | LINEAR | constant } [, ...])]
@@ -25,7 +25,7 @@ SAMPLE BY n { n | U | T | s | m | h | d | M | y }
 ### Key clauses
 
 - **`SAMPLE BY n{unit}`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`)
-- **`ROLLUP` / `CUBE` / `GROUPING SETS`**: Multi-level aggregation (see [GROUPING SETS](/docs/query/sql/grouping-sets/), [ROLLUP](/docs/query/sql/rollup/), [CUBE](/docs/query/sql/cube/))
+- **`ROLLUP` / `CUBE` / `GROUPING SETS`**: Multi-level aggregation (see [GROUPING SETS](/docs/query/sql/grouping-sets/), [ROLLUP](/docs/query/sql/rollup/), [CUBE](/docs/query/sql/cube/)). Cannot be combined with `ALIGN TO FIRST OBSERVATION`, `FILL(PREV)`, `FILL(LINEAR)`, or a non-literal `FROM` bound. See [SAMPLE BY integration](/docs/query/sql/grouping-sets/#sample-by-integration)
 - **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
 - **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
 - **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`

@@ -13,30 +13,42 @@ passes over the data.
 
 Grouping sets can be used with both `GROUP BY` and `SAMPLE BY`.
 
-With `GROUP BY`:
-
-```questdb-sql
+```questdb-sql title="GROUP BY with ROLLUP or CUBE"
 SELECT column [, ...], aggregate(column) [, ...]
 FROM table
 [WHERE condition]
-GROUP BY
-    column [, ...],
-    ROLLUP(column [, ...])
-    | CUBE(column [, ...])
-    | GROUPING SETS ((column [, ...]) [, ...])
+GROUP BY [column [, ...],] { ROLLUP | CUBE } (column [, ...])
 ```
 
-With `SAMPLE BY`:
+```questdb-sql title="GROUP BY with GROUPING SETS"
+SELECT column [, ...], aggregate(column) [, ...]
+FROM table
+[WHERE condition]
+GROUP BY GROUPING SETS ({ (column [, ...]) | () } [, ...])
+```
 
-```questdb-sql
-SELECT [column [, ...],] aggregate(column) [, ...]
+```questdb-sql title="SAMPLE BY"
+SELECT timestamp, [column [, ...],] aggregate(column) [, ...]
 FROM table
 [WHERE condition]
 SAMPLE BY n{units}
-    [ROLLUP(column [, ...]) | CUBE(column [, ...]) | GROUPING SETS (...)]
+    { ROLLUP(column [, ...])
+    | CUBE(column [, ...])
+    | GROUPING SETS ({ (column [, ...]) | () } [, ...]) }
+    [FROM timestamp TO timestamp]
     [FILL(...)]
-    [ALIGN TO ...]
+    [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset]]
 ```
+
+A `GROUP BY` clause contains at most one `ROLLUP` or `CUBE`, and it must be the
+last item. Plain columns can only precede `ROLLUP` or `CUBE`, as described in
+[Composite syntax](#composite-syntax). `GROUPING SETS` cannot be combined with
+plain columns.
+
+With `SAMPLE BY`, the grouping clause comes directly after the sample interval,
+before `FROM ... TO` and `FILL`. See
+[SAMPLE BY integration](#sample-by-integration) for the rules that differ from
+a regular `SAMPLE BY` query.
 
 ## GROUPING SETS
 
@@ -59,8 +71,14 @@ GROUP BY GROUPING SETS (
 - `(symbol)` groups by symbol only (subtotals per symbol, `side` is `NULL`)
 - `()` is the empty set, producing a single grand total row (both columns `NULL`)
 
+The grand total row is returned even when no rows match the `WHERE` clause. In
+that case `COUNT(*)` returns `0` and `SUM()` returns `NULL`.
+
 You can specify any combination of column subsets. `ROLLUP` and `CUBE` are
 shorthand for common `GROUPING SETS` patterns.
+
+QuestDB does not remove duplicate grouping sets. Listing the same set twice,
+as in `GROUPING SETS ((symbol), (symbol))`, returns its rows twice.
 
 ## ROLLUP
 
@@ -139,7 +157,10 @@ Ordering by `GROUPING_ID` groups the output by aggregation level:
 - `grp=2`: per-side totals (symbol rolled up)
 - `grp=3`: grand total
 
-`CUBE` is limited to 15 columns maximum (2^15 = 32,768 grouping sets).
+`CUBE` accepts at most 15 columns. The number of grouping sets is also capped
+by `cairo.sql.max.grouping.sets`, which defaults to 4096. With the default,
+`CUBE` accepts at most 12 columns (2^12 = 4,096 sets). Using 13 to 15 columns
+requires raising that property.
 
 ## Composite syntax
 
@@ -164,6 +185,17 @@ GROUP BY GROUPING SETS (
 ```
 
 There is no empty set `()` here because `symbol` is always present.
+
+Plain columns must come before `ROLLUP` or `CUBE`. The following forms are
+rejected:
+
+- Columns after the construct: `GROUP BY ROLLUP(side), symbol`
+- More than one construct: `GROUP BY ROLLUP(symbol), CUBE(side)`
+- Plain columns with `GROUPING SETS`: `GROUP BY symbol, GROUPING SETS (...)`
+
+For any of these, write out the sets you need with `GROUPING SETS`. For
+example, `GROUP BY symbol, GROUPING SETS ((side), ())` is written as
+`GROUP BY GROUPING SETS ((symbol, side), (symbol))`.
 
 ## GROUPING() and GROUPING_ID() functions
 
@@ -240,13 +272,34 @@ ORDER BY timestamp, symbol;
 ```
 
 Each time bucket contains one row per symbol plus one grand total row (where
-`symbol` is `NULL`). The timestamp column is never rolled up - it is always
-present as the time bucket key.
+`symbol` is `NULL`). The timestamp column is never rolled up. It is always
+present as the time bucket key. A bucket with no input rows produces no rows,
+including no grand total row, unless `FILL` is used.
+
+In a regular `SAMPLE BY` query, every non-aggregated column in the `SELECT`
+list becomes a key. With grouping sets, this does not happen: every
+non-aggregated column other than the timestamp must appear in the `ROLLUP`,
+`CUBE`, or `GROUPING SETS` clause. `SAMPLE BY` also does not support
+[composite syntax](#composite-syntax). To keep a column grouped at every level,
+list it in each set:
+
+```questdb-sql title="symbol in every set, side rolled up" demo
+SELECT timestamp, symbol, side, SUM(amount) AS total_amount
+FROM trades
+WHERE timestamp IN '$now-1d..$now'
+  AND symbol IN ('BTC-USDT', 'ETH-USDT')
+SAMPLE BY 1h GROUPING SETS ((symbol, side), (symbol))
+ORDER BY timestamp, symbol, side;
+```
+
+`ALIGN TO FIRST OBSERVATION` is not supported with grouping sets. The `FROM`
+bound of `FROM ... TO` must be a timestamp literal; functions, expressions, and
+bind variables are not supported there.
 
 ### FILL support
 
 `FILL` works with grouping sets. Missing time buckets are filled per key
-combination - each distinct (symbol, grouping level) pair gets its own fill row.
+combination: each distinct (symbol, grouping level) pair gets its own fill row.
 
 ```questdb-sql title="SAMPLE BY with FILL and ROLLUP" demo
 SELECT timestamp, symbol, SUM(amount) AS total_amount, AVG(price) AS avg_price
@@ -283,34 +336,63 @@ A fill row for a missing hour shows `gs=0` for detail-level fills and `gs=1` for
 grand-total-level fills, just like real data rows. Only aggregate columns get the
 fill value.
 
+## Execution
+
+QuestDB computes all grouping sets in a single scan of the input. When
+[parallel GROUP BY](/docs/configuration/cairo-engine/#cairosqlparallelgroupbyenabled)
+is enabled, the query runs on multiple worker threads, and `EXPLAIN` shows an
+`Async Group By` node with `groupingSets: true`. Queries with more than 31 key
+columns, or with many grouping sets relative to the number of query workers,
+run on a single thread.
+
+Grouping sets aggregation is never vectorized. When you only need one level of
+aggregation, a plain `GROUP BY` over the same keys can be faster.
+
+Rows are not returned in any guaranteed order. Use `ORDER BY` when order
+matters.
+
 ## Limitations
 
-- **Expressions not allowed** in `ROLLUP`, `CUBE`, or `GROUPING SETS` - only
-  column references are accepted. `ROLLUP(a + b)` is rejected; use a subquery or
-  alias. Plain columns in composite syntax (`GROUP BY expr, ROLLUP(col)`) are not
-  restricted.
+- **Expressions not allowed** in `ROLLUP`, `CUBE`, or `GROUPING SETS`. Only
+  column references are accepted, so `ROLLUP(a + b)` is rejected, and so is a
+  `SELECT` alias of an expression. Compute the expression in a subquery and
+  group by its output column instead. Plain columns in composite syntax
+  (`GROUP BY expr, ROLLUP(col)`) are not restricted.
 
-- **No mixed qualified/unqualified references** to the same column -
+- **No mixed qualified/unqualified references** to the same column.
   `ROLLUP(a, t.a)` is rejected. Use one form consistently.
 
-- **Not supported with `LATEST ON`** - rejected with an error.
+- **One `ROLLUP` or `CUBE` per `GROUP BY`**, placed last.
+  `GROUP BY ROLLUP(a), CUBE(b)` and `GROUP BY ROLLUP(a), b` are rejected, and
+  `GROUPING SETS` cannot be combined with plain columns. See
+  [Composite syntax](#composite-syntax).
+
+- **Not supported with `LATEST ON`**. Rejected with an error.
+
+- **Not supported in materialized views**. A
+  [materialized view](/docs/concepts/materialized-views/) query cannot use
+  `GROUPING SETS`, `ROLLUP`, or `CUBE`.
 
 - **`FILL(PREV)` and `FILL(LINEAR)` not supported** with grouping sets.
 
-- **`CUBE` limited to 15 columns** (2^15 = 32,768 grouping sets).
+- **`ALIGN TO FIRST OBSERVATION` not supported** with grouping sets in
+  `SAMPLE BY`.
 
-- **`GROUPING()` / `GROUPING_ID()` limited to 31 `GROUP BY` key columns** - the
+- **`SAMPLE BY ... FROM` requires a timestamp literal**. Functions,
+  expressions, and bind variables in the `FROM` bound are not supported with
+  grouping sets.
+
+- **`CUBE` limited to 15 columns**, and to 12 columns with the default
+  `cairo.sql.max.grouping.sets` value.
+
+- **`GROUPING()` / `GROUPING_ID()` limited to 31 `GROUP BY` key columns**. The
   bitmask is int-based.
 
-- **No multiple `ROLLUP`/`CUBE` in the same `GROUP BY`** -
-  `GROUP BY ROLLUP(a), CUBE(b)` is not supported.
-
-- **Maximum grouping sets per query** - controlled by the
-  `cairo.sql.max.grouping.sets`
-  [configuration property](/docs/configuration/overview/) (default 4096).
-  `ROLLUP` produces N+1 sets, `CUBE` produces 2^N sets, and explicit
-  `GROUPING SETS` produces one set per listed group. Queries exceeding this limit
-  are rejected at parse time.
+- **Maximum grouping sets per query**, controlled by the
+  [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets)
+  configuration property (default 4096). `ROLLUP` produces N+1 sets, `CUBE`
+  produces 2^N sets, and explicit `GROUPING SETS` produces one set per listed
+  group. Queries exceeding this limit are rejected at parse time.
 
 ## See also
 
