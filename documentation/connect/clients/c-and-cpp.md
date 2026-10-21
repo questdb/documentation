@@ -28,7 +28,7 @@ include(FetchContent)
 FetchContent_Declare(
     c_questdb_client_proj
     GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
-    GIT_TAG        7.1.0)   # or a newer release tag, or a commit SHA
+    GIT_TAG        7.2.0)   # or a newer release tag, or a commit SHA
 FetchContent_MakeAvailable(c_questdb_client_proj)
 
 target_link_libraries(your_target questdb_client)
@@ -465,7 +465,13 @@ your own cadence (row count, byte size via `line_sender_buffer_size`, or a
 timer) and call `flush` yourself. A good starting cadence is about 1,000 rows or
 100 ms, whichever comes first: the auto-flush defaults of the other QWP
 clients. Flushing every row collapses throughput, and a single flush must
-stay under the `sf_max_segment_bytes` payload cap (default 4 MiB). Null columns are
+stay under the frame cap: the smallest of `max_buf_size` (default 100 MiB),
+the batch size the server advertises, and the `sf_max_segment_bytes` segment
+payload capacity (just under 4 MiB by default). `line_sender_buffer_size`
+(C++ `buffer.size()`) is at least the size of the frame a flush encodes, so a
+buffer flushed before its size reaches the cap fits in one frame. A buffer
+over the cap fails with `batch_too_large`, publishes nothing, and keeps its
+rows. Null columns are
 written by **omission**: skip the column for that row. There is no `set_null`
 call.
 
@@ -1377,9 +1383,10 @@ queue and returns before the server acks.
    10 GiB disk mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
-   buffer whose single payload exceeds the frame cap derived from
-   `sf_max_segment_bytes` (default 4 MiB) is rejected immediately instead; an oversize
-   chunk is split across frames rather than rejected.
+   buffer whose single payload exceeds the frame cap (see
+   [Sending data: row buffers](#sending-data-row-major)) is rejected
+   immediately with `batch_too_large` instead; an oversize chunk is split
+   across frames rather than rejected.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
@@ -1569,6 +1576,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
+| `batch_too_large` | A buffer's frame, or a chunk frame that cannot be split further, exceeds the frame cap | Usable | A buffer published nothing and keeps its rows: flush fewer rows at a time, or raise the limit that binds (by default `sf_max_segment_bytes`). A chunk may have queued the frames before the oversized one, so check `in_doubt` before resending it. |
 | `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool

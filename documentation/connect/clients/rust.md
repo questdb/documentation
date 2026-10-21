@@ -227,6 +227,14 @@ successful local publication and retains its allocated capacity. Use
 `flush_buffer_and_keep()` only when you need to retain the rows for another
 destination or operation.
 
+A buffer is published as one frame and is never split, so it must stay under
+the frame cap: the smallest of `max_buf_size` (default 100 MiB), the batch size
+the server advertises, and the `sf_max_segment_bytes` segment payload capacity
+(just under 4 MiB by default). `buffer.len()` is at least the size of the frame
+a flush encodes, so a buffer flushed before its length reaches the cap fits in
+one frame. A buffer over the cap fails with `ErrorCode::BatchTooLarge`,
+publishes nothing, and keeps its rows.
+
 ### Buffer column setters
 
 Every setter returns `Result<&mut Buffer>`, so setters can be chained. The
