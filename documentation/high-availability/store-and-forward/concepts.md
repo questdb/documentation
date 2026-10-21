@@ -84,10 +84,8 @@ Two consequences:
   serialise `wireSeq` — the server assigns it implicitly from receive
   order. Reordering breaks the FSN mapping.
 - After a reconnect, the server sees the **same payloads** at new `wireSeq`
-  values. QWP requests contain neither `wireSeq` nor a persistent message ID,
-  so the protocol does not deduplicate those payloads across connections. If
-  the server committed a frame but its acknowledgement was lost, replay can
-  write the rows again.
+  values. If the server committed a frame but its acknowledgement was lost,
+  replay writes those rows again.
 
 ## Trim: how unacked data is reclaimed
 

@@ -496,8 +496,8 @@ confirmed by an earlier checkpoint, even when a later batch fails validation.
 Internal retries and connection replacements retain this call-level status.
 The flag is conservative: it does not identify a safe row offset for resuming
 the load. A false flag does not make a validation error retryable; correct the
-input first. Low-level Arrow and chunk flushes retain their current-operation
-scope and do not aggregate earlier independent calls.
+input first. For low-level Arrow and chunk flushes, the flag covers only the
+failed call.
 
 ### Binary columns: UUID, LONG256, and opaque bytes
 
@@ -764,10 +764,9 @@ publishes or completes its first frame, so treat `None` from `acked_fsn()` as
 Recovery turns on `err.in_doubt()`, not on `err.code()` and not on whether the
 buffer or chunk still holds rows.
 
-For these low-level APIs, the flag describes the failed operation's input. It
-does not summarize earlier independent flushes or authorize replaying all data
-since an application checkpoint. The DataFrame-level aggregation described
-above applies specifically to `flush_polars_dataframe`.
+For these low-level APIs, the flag describes only the failed operation's
+input. The DataFrame-level aggregation described above applies specifically to
+`flush_polars_dataframe`.
 
 When `in_doubt()` is `false`, the flush failed before the queue took the frame,
 so the rows never entered the send path and your input is intact: re-flush it.
