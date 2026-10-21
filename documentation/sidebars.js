@@ -109,7 +109,7 @@ module.exports = {
             "connect/message-brokers/telegraf",
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
-            "connect/databento",
+            "connect/connectors/databento",
           ],
         },
         {

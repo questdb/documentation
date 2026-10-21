@@ -39,8 +39,9 @@ integrations:
   platform for simplified data pipelines.
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
-- [Databento connector](/docs/connect/databento/): Stream Live market data and run
-  Historical backfills with the QuestDB Enterprise connector.
+- [Databento](/docs/connect/connectors/databento/): Stream Live market data and run
+  Historical backfills with the QuestDB Enterprise connector. On QuestDB Open
+  Source, [ingest with Python](/docs/integrations/other/databento/).
 
 ## Analytics and Processing
 
