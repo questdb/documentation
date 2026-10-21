@@ -321,25 +321,34 @@ as `DOUBLE[]`. MBO is stored as individual order events, not reconstructed book
 arrays. See [Order book analytics](/docs/tutorials/order-book/) for more
 queries.
 
-### Storage policy
+### Cold storage and tiering
 
 Market data tables grow every day. A
-[storage policy](/docs/concepts/storage-policy/) converts older partitions to
-Parquet and moves them to [cold storage](/docs/concepts/cold-storage/) in object
-storage, where they stay queryable. Set it on each destination table after the
+[storage policy](/docs/concepts/storage-policy/) decides where older partitions
+live, and keeps them queryable. Set it on each destination table after the
 connector has created it:
 
 ```questdb-sql title="Tier order book partitions to object storage"
 ALTER TABLE equs_orderbook SET STORAGE POLICY(
     TO PARQUET 7d,
-    TO REMOTE 14d,
+    TO REMOTE 1d,
     DROP LOCAL 30d
+    -- , DROP REMOTE 1Y
 );
 ```
 
-`TO REMOTE` requires cold storage to be configured; without it, `DROP LOCAL`
-deletes the partition. `DROP LOCAL` also seals the partition as read-only, and
-later writes to it are skipped. Keep it beyond the range of any
+- `TO REMOTE` sets when a partition is copied to
+  [cold storage](/docs/concepts/cold-storage/) in object storage. The remote
+  copy is always Parquet, whatever the local format. It requires cold storage
+  to be configured.
+- `TO PARQUET` sets when the local partition is converted to compressed
+  Parquet, to save local disk space.
+- `DROP LOCAL` removes the local copy, after which reads go to the remote copy.
+  Without `TO REMOTE`, it deletes the partition.
+- `DROP REMOTE`, commented out here, deletes the partition from object storage.
+
+`DROP LOCAL` also seals the partition as read-only, and later writes to it are
+skipped. Keep it beyond the range of any
 [Historical backfill](#historical-backfills) into the same table.
 
 ## Materialized views and live views
