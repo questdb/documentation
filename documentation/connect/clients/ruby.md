@@ -229,7 +229,14 @@ end
 timestamp: a `QuestDB::TimestampNanos`, a `QuestDB::TimestampMicros`, a
 `Time`, or `QuestDB::SERVER_TIMESTAMP` to let the server assign arrival time.
 When QWP auto-creates a table, the designated timestamp column is named
-`timestamp`. Column names may be strings or symbols.
+`timestamp`: `TIMESTAMP_NS` for a `TimestampNanos` or a `Time`, and
+`TIMESTAMP` (microseconds) for a `TimestampMicros` or `SERVER_TIMESTAMP`.
+Column names may be strings or symbols.
+
+Keep each timestamp's precision consistent within a batch. Mixing
+`TimestampNanos` and `TimestampMicros` for `at:`, or for the same timestamp
+column, in rows buffered together raises `:invalid_api_call` ("changes type
+within a batched table").
 
 A row append is atomic: if any value fails validation, the whole row is
 discarded and earlier rows stay buffered. `sender.length` reports the number
@@ -245,15 +252,22 @@ The Ruby value type selects the QuestDB column type:
 | `Integer` (signed 64-bit) | `LONG` |
 | `Float` | `DOUBLE` |
 | `String` (UTF-8) | `VARCHAR` |
-| `QuestDB::TimestampMicros`, `QuestDB::TimestampNanos`, `Time` | `TIMESTAMP`, `TIMESTAMP_NS` |
-| `BigDecimal` | `DECIMAL`, QuestDB 9.2.0 or later |
+| `QuestDB::TimestampMicros`, `Time` | `TIMESTAMP` (microseconds) |
+| `QuestDB::TimestampNanos` | `TIMESTAMP_NS` |
+| `BigDecimal` | `DECIMAL`; an auto-created column is `DECIMAL(76, scale)` |
 | `QuestDB::Float64Array` | `DOUBLE[]`, `DOUBLE[][]`, ... matching its shape |
 | `nil` | Column omitted for this row, stored as null |
 
 Strings in `symbols:` become interned `SYMBOL` values; strings in `columns:`
 become `VARCHAR`. Plain Ruby arrays are rejected rather than guessed; wrap
-array values in `QuestDB::Float64Array`. `DECIMAL` columns must be created
-ahead of time with `CREATE TABLE`; the server does not auto-create them.
+array values in `QuestDB::Float64Array`. A `BigDecimal` value auto-creates a
+`DECIMAL(76, scale)` column, using the value's scale. Create the table with
+`CREATE TABLE` first when you want a smaller precision.
+
+A `Time` used as a column value creates a `TIMESTAMP` (microsecond) column,
+even though a `Time` used as `at:` creates a `TIMESTAMP_NS` designated
+timestamp. Use `QuestDB::TimestampNanos.from_time(time)` for a nanosecond
+column.
 
 `UUID`, `IPv4`, `GEOHASH`, `LONG256`, `CHAR`, `DATE`, and `BINARY` have no
 `row` value type. Write them with
@@ -282,10 +296,12 @@ acknowledgement.
 continues in the background. `flush(wait: true)` additionally blocks until
 the server acknowledges everything published on this lease, and
 `wait(timeout_millis:)` is the standalone barrier with an explicit
-no-progress timeout (`0`, the default, means no deadline). Server rejections
-are delivered to the [rejection handler](#server-rejections) rather than
-raised from the wait. Returning the lease (leaving the block) flushes
-remaining rows without waiting.
+no-progress timeout (`0`, the default, means no deadline). When the server
+rejects data published on the lease, the wait raises
+`QuestDB::ServerRejectionError`; see [Server rejections](#server-rejections).
+When the block returns normally, the lease flushes remaining rows without
+waiting. When the block raises, rows not yet flushed are discarded; rows
+already flushed continue to be delivered.
 
 For exact frame tracking, `flush_and_get_fsn` and
 `flush_and_keep_and_get_fsn` return the published frame's sequence number,
@@ -351,6 +367,12 @@ Homogeneous arrays are inferred conservatively: `Integer` becomes `LONG`,
 `char`, `geohash` (with `precision_bits:`), `decimal64` / `decimal128` /
 `decimal256` (with `scale:`), and `double_array` (with `shape:`). For
 example, `QuestDB::ColumnVector.int([1, 2, 3])`.
+
+Geohash values are integers holding the geohash bits, 5 bits per base-32
+character, not strings: `"u33d"` raises `ArgumentError`. The geohash `u33d`
+is `QuestDB::ColumnVector.geohash([0xD0C6C], precision_bits: 20)`. To write
+base-32 geohashes directly, use SQL, for example `INSERT ... VALUES (#u33d,
+...)`.
 
 Nullable kinds keep `nil` as SQL null. `BYTE`, `SHORT`, `BOOLEAN`, and `CHAR`
 cannot store a distinct null, so their vectors reject `nil` instead of
@@ -478,6 +500,12 @@ starting the next one.
 | `BINARY` | Binary (`ASCII-8BIT`) `String` |
 | `DOUBLE[]` | `QuestDB::Float64Array` with the row's shape |
 
+Reading a `DECIMAL` column with a precision of 9 or less fails: current
+servers reject it with `:server_internal_error` ("QWP egress: unsupported
+column type"). Precisions from 10 up to 76 read correctly. Cast a small
+decimal to a wider type in the query when you need to read it, for example
+`SELECT CAST(price AS DECIMAL(18, 2)) FROM ...`.
+
 SQL null always becomes `nil`. `LONG[]` columns cannot be read yet and raise
 an explicit unsupported-column error rather than returning wrong values.
 
@@ -520,7 +548,8 @@ the server has taken responsibility for the data, but it may not be
 queryable yet. On QuestDB Enterprise with replication, `ack: :durable` waits
 until the data has also been uploaded to object storage. It requires
 `request_durable_ack=on` in the configuration string and works on `flush`,
-`wait`, `ingest_columns`, and `ingest_arrow`.
+`wait`, `ingest_columns`, and `ingest_arrow`. Without it, those calls raise
+`:invalid_api_call` before sending anything.
 
 Store-and-forward is bounded. When producers outrun the server, publication
 waits for acknowledgements to free space, then fails with
@@ -620,9 +649,14 @@ client = QuestDB.connect(
 
 Handlers run on dedicated Ruby threads, never on the client's network
 threads, and receive frozen copies (`QuestDB::ConnectionEvent` and
-`QuestDB::SenderError`). Each has a bounded, drop-oldest inbox
-(`connection_event_inbox_capacity` and `error_event_inbox_capacity`, default
-64), so a slow handler cannot stall ingestion. An exception in a handler is
+`QuestDB::SenderError`). Each has a bounded, drop-oldest inbox, so a slow
+handler cannot stall ingestion. Size the inboxes with the
+`connection_event_inbox_capacity:` and `error_event_inbox_capacity:` keyword
+arguments to `QuestDB.connect` (default 64). These are Ruby-only settings: in
+the configuration string they are rejected with "Unknown config key". The
+similarly named `error_inbox_capacity` is a different, native setting that
+does belong in the configuration string; it sizes each connection's own
+diagnostic ring, which `poll_error` on a sender lease reads. An exception in a handler is
 printed with `warn` and dispatch continues. `client.poll_connection_event`
 and `client.poll_error` return the same values without a handler, and
 `connection_events_delivered`, `connection_events_dropped`,
@@ -641,9 +675,33 @@ once `flush` has already returned. Each rejection is sent to the
 rejections for rows whose sender lease was already returned. Without a
 handler, every rejection is logged, so rejections are never silent.
 
-Terminal rejections also latch the connection: the next call on the affected
-sender lease raises `QuestDB::ServerRejectionError`, and the pool retires
-the connection.
+A terminal rejection, such as a schema mismatch, is also raised on the sender
+lease that published the data: `flush(wait: true)` or `wait` raises
+`QuestDB::ServerRejectionError` with code `:server_rejection`, and its
+`sender_error` carries the same diagnostic. Plain `flush` does not wait, so
+it does not raise.
+
+Do not keep using a lease after a terminal rejection. It still remembers the
+rejected row's column types, so the next `row` for that table can fail with
+a misleading `:invalid_api_call` ("column ... changes type within a batched
+table"). Let the lease go (leave the block, or call `close`) and borrow a new
+one:
+
+```ruby
+begin
+  client.sender do |sender|
+    # trades.price is a DOUBLE column, so the server rejects a string
+    sender.row("trades", columns: { price: "not-a-number" }, at: QuestDB::TimestampNanos.now)
+    sender.flush(wait: true)
+  end
+rescue QuestDB::ServerRejectionError => e
+  warn "rejected: #{e.sender_error&.category}: #{e.message}"
+end
+
+client.sender do |sender|
+  # a fresh lease works normally
+end
+```
 
 ### Error taxonomy
 
@@ -671,7 +729,7 @@ Codes you will most often dispatch on:
 | `:invalid_timestamp` | A bad `at:` value. | Pass a timestamp wrapper, a `Time`, or `QuestDB::SERVER_TIMESTAMP`. |
 | `:failover_retry` | `flush(wait: true)` or `wait` made no progress within the budget. | Retry the wait; do not send the rows again. |
 | `:failover_would_duplicate` | Failover during a streaming query. | Discard partial state and rerun the query. |
-| `:server_rejection` | A terminal server rejection latched by the connection. | Inspect `sender_error`; fix the data or the schema. |
+| `:server_rejection` | `flush(wait: true)` or `wait` after the server terminally rejected published data, as `QuestDB::ServerRejectionError`. | Inspect `sender_error`, fix the data or the schema, and continue on a new sender lease. |
 | `:protocol_version_error` | The server lacks a requested capability, such as durable acknowledgements. | Remove the option or upgrade the server. |
 
 Message text is not a stable API: dispatch on `code` and
