@@ -9,6 +9,8 @@ description:
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
+import Screenshot from "@theme/Screenshot"
+
 <EnterpriseNote />
 
 ![Databento logo](/images/logos/databento-icon.svg)
@@ -22,8 +24,8 @@ Each **task** reads one Databento dataset, such as `EQUS.MINI`. Its
 **subscriptions** select schemas and symbols and choose the destination tables.
 Multiple tasks can share a QuestDB connection pool in the same process.
 
-For a Python integration with QuestDB Open Source, see the
-[Databento integration guide](/docs/integrations/other/databento/).
+For QuestDB Open Source, see
+[Databento with Python](/docs/integrations/other/databento/).
 
 ## Quick start
 
@@ -128,7 +130,8 @@ ORDER BY ts_recv DESC
 LIMIT 10;
 ```
 
-For bid and ask queries, see [Order book arrays](#order-book-arrays). Ctrl+C
+For bid and ask queries, see [Order book arrays](#order-book-arrays), and to
+chart them, see [Visualize the data](#visualize-the-data). Ctrl+C
 requests a normal stop and saves confirmed progress to `state_dir`.
 
 ## Configuration
@@ -194,9 +197,30 @@ export QDB_CLIENT_CONF='wss::addr=node-a.example.com:9000,node-b.example.com:900
 
 `wss::` enables TLS, and `target=primary` sends table-creation queries to the
 primary node. `request_durable_ack=on` makes progress wait for durable
-acknowledgements. The account needs write access to the destination tables and
-permission to create any missing tables. Precreate tables if it should not have
-create access.
+acknowledgements.
+
+Authenticate with a
+[service account](/docs/security/rbac/#users-and-service-accounts) token rather
+than a user's credentials. A service account has only the permissions granted to
+it directly, so the connector's access does not change with a person's group
+memberships. [Grant](/docs/query/sql/acl/grant/) it:
+
+- `HTTP`, to connect over QWP.
+- `CREATE TABLE`, to create missing tables. The account
+  [owns](/docs/security/rbac/#owner-grants) the tables it creates, so it can
+  insert into them.
+- `INSERT ON` each destination table, instead of `CREATE TABLE`, if you
+  precreate the tables.
+
+```questdb-sql title="Service account for the connector"
+CREATE SERVICE ACCOUNT databento_connector;
+GRANT HTTP, CREATE TABLE TO databento_connector;
+ALTER SERVICE ACCOUNT databento_connector
+    CREATE TOKEN TYPE REST WITH TTL '365d' REFRESH;
+```
+
+Pass the returned token as `token=` in the connection string. With `REFRESH`,
+each successful connection extends the token's expiry.
 
 ### Source connections
 
@@ -263,9 +287,10 @@ precision as `TIMESTAMP_NS`:
 | `ts_recv`  | Databento capture server's receive time.            | All other schemas.               |
 
 The [designated timestamp](/docs/concepts/designated-timestamp/) controls
-partitioning and time-series operations such as `SAMPLE BY`. On a trades or
-quotes table, these use `ts_recv` by default; `ts_event` remains available for
-event-time analysis.
+partitioning and time-series operations such as `SAMPLE BY`, and the connector
+always uses the column listed above for each schema. On a trades or quotes
+table, `ts_recv` is the designated timestamp; `ts_event` remains available as a
+regular column for event-time analysis.
 
 Empty MBO snapshots are an exception: when the source `ts_recv` is undefined,
 the connector uses `ts_event` for the stored `ts_recv`. This time can precede a
@@ -295,6 +320,87 @@ Where provided by the schema, `bid_ct` and `ask_ct` store per-level order counts
 as `DOUBLE[]`. MBO is stored as individual order events, not reconstructed book
 arrays. See [Order book analytics](/docs/tutorials/order-book/) for more
 queries.
+
+## Visualize the data
+
+### In a Web Console notebook
+
+Chart the quick start's quotes and trades on a
+[live dashboard](/docs/getting-started/web-console/notebooks/live-dashboards/)
+in a Web Console notebook. Notebooks are built into QuestDB and run under the
+same users and permissions as the Web Console, with no extra tool to install.
+
+<Screenshot
+  alt="A Web Console notebook charting 1-minute AAPL bid and ask, and 1-minute candles with volume, for the last hour"
+  title="Quotes and trades from the quick start on a live notebook dashboard."
+  src="images/docs/databento/notebook-dashboard.webp"
+  height={860}
+  width={1116}
+/>
+
+1. Create a notebook and define two
+   [variables](/docs/getting-started/web-console/notebooks/variables/):
+   `@symbol := 'AAPL'` and `@window := '$now - 1h..$now'`.
+2. Add a cell with the following query and press **Draw** to chart bid and ask
+   as lines:
+
+   ```questdb-sql title="1-minute bid and ask for the last hour"
+   SELECT ts_recv, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask
+   FROM equs_orderbook
+   WHERE symbol = @symbol AND ts_recv IN @window
+   SAMPLE BY 1m;
+   ```
+
+3. Add a second cell with these two statements and press **Draw** to chart
+   candles with volume bars behind them. In
+   [Chart settings](/docs/getting-started/web-console/notebooks/charts#chart-settings),
+   assign the volume query to the right axis and cap that axis so the bars stay
+   low:
+
+   ```questdb-sql title="1-minute candles and volume for the last hour"
+   SELECT ts_recv, first(price) AS open, max(price) AS high,
+     min(price) AS low, last(price) AS close
+   FROM equs_trades
+   WHERE symbol = @symbol AND ts_recv IN @window
+   SAMPLE BY 1m;
+
+   SELECT ts_recv, sum(size) AS volume
+   FROM equs_trades
+   WHERE symbol = @symbol AND ts_recv IN @window
+   SAMPLE BY 1m;
+   ```
+
+4. Set the notebook's auto-refresh to **1s** to keep the charts live while the
+   connector runs.
+
+### In Grafana
+
+If you already use Grafana, chart the same data there. The `$__timeFilter` and
+`$__sampleByInterval` macros follow the dashboard's time range.
+
+1. Add the
+   [QuestDB data source](/docs/integrations/visualization/grafana/) to Grafana.
+2. Add a time series panel with the following query to chart bid and ask:
+
+   ```questdb-sql title="Bid and ask for the Grafana time range"
+   SELECT ts_recv, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask
+   FROM equs_orderbook
+   WHERE $__timeFilter(ts_recv) AND symbol = 'AAPL'
+   SAMPLE BY $__sampleByInterval;
+   ```
+
+3. Add a candlestick panel with the following query to chart trades:
+
+   ```questdb-sql title="Candles for the Grafana time range"
+   SELECT ts_recv, first(price) AS open, max(price) AS high,
+     min(price) AS low, last(price) AS close
+   FROM equs_trades
+   WHERE $__timeFilter(ts_recv) AND symbol = 'AAPL'
+   SAMPLE BY $__sampleByInterval;
+   ```
+
+4. Set the dashboard's refresh interval to keep the panels live while the
+   connector runs.
 
 ## Historical backfills
 
@@ -438,6 +544,17 @@ The top-level `on_task_failure` setting controls what happens next:
 A failed task is not restarted in-process. Ctrl+C or SIGTERM requests a normal
 stop: drain pending output, then persist the final checkpoint. The default drain
 timeout is 30 seconds; saving the final checkpoint is not counted against it.
+
+:::tip Stop timeouts under systemd and Kubernetes
+
+Give the service manager more time than
+[`shutdown_timeout_ms`](#batching-and-backpressure) before it kills the process,
+so the final checkpoint is saved. Kubernetes waits 30 seconds by default, which
+is not enough: set `terminationGracePeriodSeconds` to at least `60`. systemd
+waits 90 seconds by default (`TimeoutStopSec`). Raise either value if you
+increase `shutdown_timeout_ms`.
+
+:::
 
 ### Logs and metrics
 
