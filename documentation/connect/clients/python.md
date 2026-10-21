@@ -320,8 +320,10 @@ timeout (`0` means no deadline; `wait()` returns immediately when the lease
 published nothing). The barrier raises only on a terminal connection
 failure: server rejections are pushed to the pool's
 [rejection handler](#server-rejections) — logged by default — rather than
-raised from the wait. Closing the lease (leaving the `with` block) flushes
-remaining rows without waiting.
+raised from the wait. `close()` flushes remaining rows without waiting, and so
+does a `with` block that exits normally. If an exception leaves the `with`
+block, the lease returns to the pool without publishing the rows still
+buffered in it. To keep them, catch the exception inside the block.
 
 The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
 and no manual progress pump; those exist only on the standalone
