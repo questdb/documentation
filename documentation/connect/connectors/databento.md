@@ -321,6 +321,102 @@ as `DOUBLE[]`. MBO is stored as individual order events, not reconstructed book
 arrays. See [Order book analytics](/docs/tutorials/order-book/) for more
 queries.
 
+### Storage policy
+
+Market data tables grow every day. A
+[storage policy](/docs/concepts/storage-policy/) converts older partitions to
+Parquet and moves them to [cold storage](/docs/concepts/cold-storage/) in object
+storage, where they stay queryable. Set it on each destination table after the
+connector has created it:
+
+```questdb-sql title="Tier order book partitions to object storage"
+ALTER TABLE equs_orderbook SET STORAGE POLICY(
+    TO PARQUET 7d,
+    TO REMOTE 14d,
+    DROP LOCAL 30d
+);
+```
+
+`TO REMOTE` requires cold storage to be configured; without it, `DROP LOCAL`
+deletes the partition. `DROP LOCAL` also seals the partition as read-only, and
+later writes to it are skipped. Keep it beyond the range of any
+[Historical backfill](#historical-backfills) into the same table.
+
+## Materialized views and live views
+
+Some Databento schemas are already aggregated by time slice: OHLCV bars at one
+second, minute, hour, and day, and BBO and CBBO snapshots at one second and one
+minute. Subscribe to those directly when they fit. To aggregate the raw
+`trades` or `mbp-1` data in other ways, keep the result in QuestDB:
+
+- A [materialized view](/docs/concepts/materialized-views/) maintains
+  time-bucketed aggregates, such as candles at an interval Databento does not
+  provide.
+- A [live view](/docs/concepts/live-views/) maintains window-function results
+  per row, such as indicators that accumulate through a trading session.
+
+Both refresh as the connector writes, and both are read like regular tables.
+
+### Candles with a materialized view
+
+This view keeps 5-minute candles with volume per symbol:
+
+```questdb-sql title="5-minute OHLCV bars from raw trades"
+CREATE MATERIALIZED VIEW equs_trades_ohlcv_5m AS
+SELECT
+  ts_recv,
+  symbol,
+  first(price) AS open,
+  max(price) AS high,
+  min(price) AS low,
+  last(price) AS close,
+  sum(size) AS volume
+FROM equs_trades
+SAMPLE BY 5m;
+```
+
+The bars are bucketed by `ts_recv`, the designated timestamp, whereas
+Databento's OHLCV schemas use event time, so a trade near a bar boundary can
+fall into a different bar. A view built on an aggregated schema such as
+`ohlcv-1m` does not have this issue, because OHLCV tables use `ts_event` as
+their designated timestamp.
+
+### Session VWAP with a live view
+
+An [anchored window](/docs/concepts/live-views/#anchored-windows) resets a
+live view's calculation at a fixed wall-clock time. This view keeps a session
+VWAP and volume per symbol, resetting at midnight New York time:
+
+```questdb-sql title="Session VWAP per symbol, reset at midnight New York time"
+CREATE LIVE VIEW equs_session_vwap
+FLUSH EVERY 1s
+START FROM BEGINNING
+AS
+SELECT
+  ts_recv,
+  symbol,
+  price,
+  sum(price * size) OVER w / sum(size) OVER w AS session_vwap,
+  sum(size) OVER w AS session_volume
+FROM equs_trades
+WINDOW w AS (
+  PARTITION BY symbol
+  ORDER BY ts_recv
+  ANCHOR DAILY '00:00' 'America/New_York'
+);
+```
+
+`START FROM BEGINNING` seeds the view from the trades already stored, so the
+current session is complete from the first read. On a large table, start from a
+recent timestamp instead, such as `START FROM '2026-10-21T04:00:00Z'`.
+
+```questdb-sql title="Latest session VWAP for AAPL"
+SELECT ts_recv, symbol, price, session_vwap, session_volume
+FROM equs_session_vwap
+WHERE symbol = 'AAPL'
+LIMIT -10;
+```
+
 ## Visualize the data
 
 ### In a Web Console notebook
@@ -331,8 +427,8 @@ in a Web Console notebook. Notebooks are built into QuestDB and run under the
 same users and permissions as the Web Console, with no extra tool to install.
 
 <Screenshot
-  alt="A Web Console notebook charting 1-minute AAPL bid and ask, and 1-minute candles with volume, for the last hour"
-  title="Quotes and trades from the quick start on a live notebook dashboard."
+  alt="A Web Console notebook charting 1-minute AAPL bid and ask, and 1-minute candles with volume and the session VWAP, for the last hour"
+  title="Quotes, trades, and the session VWAP live view on a live notebook dashboard."
   src="images/docs/databento/notebook-dashboard.webp"
   height={860}
   width={1116}
@@ -351,13 +447,15 @@ same users and permissions as the Web Console, with no extra tool to install.
    SAMPLE BY 1m;
    ```
 
-3. Add a second cell with these two statements and press **Draw** to chart
-   candles with volume bars behind them. In
+3. Add a second cell with these statements and press **Draw** to chart candles
+   with volume bars behind them and the session VWAP as a line. In
    [Chart settings](/docs/getting-started/web-console/notebooks/charts#chart-settings),
    assign the volume query to the right axis and cap that axis so the bars stay
-   low:
+   low. The third statement reads the
+   [session VWAP live view](#session-vwap-with-a-live-view); leave it out if you
+   have not created the view:
 
-   ```questdb-sql title="1-minute candles and volume for the last hour"
+   ```questdb-sql title="1-minute candles, volume, and session VWAP for the last hour"
    SELECT ts_recv, first(price) AS open, max(price) AS high,
      min(price) AS low, last(price) AS close
    FROM equs_trades
@@ -366,6 +464,11 @@ same users and permissions as the Web Console, with no extra tool to install.
 
    SELECT ts_recv, sum(size) AS volume
    FROM equs_trades
+   WHERE symbol = @symbol AND ts_recv IN @window
+   SAMPLE BY 1m;
+
+   SELECT ts_recv, last(session_vwap) AS session_vwap
+   FROM equs_session_vwap
    WHERE symbol = @symbol AND ts_recv IN @window
    SAMPLE BY 1m;
    ```

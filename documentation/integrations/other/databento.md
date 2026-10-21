@@ -154,6 +154,30 @@ LIMIT 10;
 
 See the [SQL overview](/docs/query/overview/) for more queries.
 
+## Materialized views and live views
+
+To keep aggregates up to date as the script writes, without recomputing them on
+every query, define them once in QuestDB. A
+[materialized view](/docs/concepts/materialized-views/) maintains time-bucketed
+results, such as 1-minute quotes with their average spread:
+
+```questdb-sql title="1-minute quotes and average spread"
+CREATE MATERIALIZED VIEW top_of_book_1m AS
+SELECT
+  timestamp,
+  symbol,
+  last(bid) AS bid,
+  last(ask) AS ask,
+  avg(ask - bid) AS avg_spread
+FROM top_of_book
+SAMPLE BY 1m;
+```
+
+A [live view](/docs/concepts/live-views/) maintains window-function results per
+row, such as indicators that reset at the start of each trading session. The
+[Databento connector](/docs/connect/connectors/databento/#materialized-views-and-live-views)
+page shows a session VWAP example.
+
 ## Visualize the data
 
 ### In a Web Console notebook
