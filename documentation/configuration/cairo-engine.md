@@ -932,20 +932,19 @@ Queries that don't qualify keep the ordinary plan: a `GroupBy` node over a
 `Hash Right Outer Join [Light]` node. Common reasons a query keeps the
 ordinary plan:
 
-- It uses an aggregate function other than these:
-  - `count()`, `sum()`, `avg()`, `min()` and `max()` over numeric columns
-    other than `BYTE`. `min()` and `max()` also take `CHAR`, `IPv4`, `DATE`
-    and `TIMESTAMP` columns. `count()` also takes `SYMBOL`, `STRING`,
-    `VARCHAR`, `UUID` and `IPv4` columns, but not `DATE` or `TIMESTAMP`
-    columns.
-  - `ksum()`, `nsum()`, `geomean()`, `vwap()`, the standard deviation,
-    variance, skewness, kurtosis, covariance, correlation and linear regression
-    functions, `weighted_avg()`, `weighted_stddev()`,
-    `weighted_stddev_rel()`, `weighted_stddev_freq()`, `bit_and()`,
-    `bit_or()`, `bit_xor()`, `bool_and()` and `bool_or()`.
-
-  Other functions, such as `first()`, `last()`, `count_distinct()` and
+- It uses an aggregate function other than `count()`, `sum()`, `avg()`,
+  `min()`, `max()`, `ksum()`, `nsum()`, `geomean()`, `vwap()`,
+  `weighted_avg()`, `weighted_stddev()`, `weighted_stddev_rel()`,
+  `weighted_stddev_freq()`, `bit_and()`, `bit_or()`, `bit_xor()`,
+  `bool_and()`, `bool_or()`, and the standard deviation, variance, skewness,
+  kurtosis, covariance, correlation and linear regression functions. Other
+  functions, such as `first()`, `last()`, `count_distinct()` and
   `string_agg()`, keep the ordinary plan.
+- An aggregate function takes a column type that doesn't qualify. For
+  example, `ksum()`, `nsum()`, `geomean()` and the standard deviation,
+  variance, skewness and kurtosis functions qualify only over `DOUBLE`
+  columns. Cast other columns, as in `stddev(x::DOUBLE)`, and check the plan
+  with `EXPLAIN`.
 - It outputs, groups by or aggregates a build-side `VARCHAR`, `STRING`,
   `BINARY` or array column. A filter on such a column doesn't disqualify the
   query when it runs on the build table's own scan, such as a `WHERE`

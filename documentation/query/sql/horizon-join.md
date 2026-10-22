@@ -700,10 +700,7 @@ parallel, as an `Async Filter` or `Async JIT Filter` node below it.
 
 QuestDB 10.1.0 changes two HORIZON JOIN behaviors. Both can change the results
 of existing queries and views without an error, and some `ON` predicates that
-were accepted now fail. No materialized view over a HORIZON JOIN could be valid
-before 10.1.0, because the result had no designated timestamp, so there are
-none to migrate. To build one now, see
-[Materialized views](#materialized-views).
+were accepted now fail.
 
 ### Results without aggregate functions
 
