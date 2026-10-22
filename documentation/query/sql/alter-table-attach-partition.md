@@ -72,7 +72,7 @@ following operations:
   does not create a copy `<partition_name>.detached`.
 - [`UPDATE`](/docs/query/sql/update/): Attempts to update the read-only
   partitions result in an error.
-- [`INSERT`](/docs/query/sql/insert/): Attemps to insert data into a
+- [`INSERT`](/docs/query/sql/insert/): Attempts to insert data into a
   read-only partition result in a critical-level log message being logged by the
   server, and the insertion is a no-op. If
   [Prometheus monitoring](/docs/integrations/other/prometheus/) is configured, an
