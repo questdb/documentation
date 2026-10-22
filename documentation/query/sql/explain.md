@@ -59,7 +59,8 @@ The following list contains some plan node types:
   the build side is picked at each execution, a
   `Hash Join Group By Build Choice` node holds both orientations as its
   `Primary` and `Alternate` children. See
-  [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins).
+  [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins)
+  for its settings.
 - `Async Horizon Join`, `Async JIT Horizon Join`, `Async Multi Horizon Join`
   and `Async [JIT] Horizon Join Projection` - a parallelized HORIZON JOIN, with
   or without aggregate functions. The serial plans show `Horizon Join`,

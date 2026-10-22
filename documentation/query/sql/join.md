@@ -131,7 +131,7 @@ column of the build side in the output or in a filter after a `LEFT` join, an
 `ON` condition that compares columns of both tables beyond the join keys, and
 an input that is a subquery with its own `GROUP BY`. See
 [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins)
-for the full rules.
+for its settings.
 
 ## Implicit joins
 

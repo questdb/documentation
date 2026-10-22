@@ -1,8 +1,8 @@
 ---
 title: Cairo engine
 description:
-  Configuration settings for the Cairo SQL engine in QuestDB, including memory
-  limits, parallel GROUP BY over hash joins, and HORIZON JOIN.
+  Configuration settings for the Cairo SQL engine in QuestDB, including the
+  query, materialized view refresh, and WAL apply memory limits.
 ---
 
 The Cairo engine is the core storage and query engine in QuestDB. These settings
@@ -855,189 +855,55 @@ the aggregates.
 
 ## Parallel GROUP BY over hash joins
 
-Since QuestDB 10.1.0, a `GROUP BY`, or an aggregation without grouping keys,
-over a single `INNER`, `LEFT` or `RIGHT` equi-join can run on the
-[query workers](/docs/configuration/shared-workers/#sharedqueryworkercount)
-instead of as a serial join followed by a GROUP BY. QuestDB builds one shared
-hash table from one side of the join, the **build** side. The workers then
-probe it with page frames of the other side, the **probe** side, and aggregate
-the matched rows. A `SAMPLE BY` over such a join qualifies as well, unless it
-uses `ALIGN TO FIRST OBSERVATION` or `FILL` with a value other than `NONE`.
-
-The join type decides which input is the build side:
-
-- **`INNER`**: the input whose table has fewer rows, in whichever order the
-  query names the tables. When either input scans a designated timestamp
-  interval and no join key pairs two `SYMBOL` columns, QuestDB plans both
-  orientations and, at each execution, builds the input whose intervals select
-  fewer rows.
-- **`LEFT`**: the right-hand input.
-- **`RIGHT`**: the left-hand input. A `RIGHT` join qualifies only when the
-  left-hand table has no more rows than the right-hand table, and the
-  right-hand table has no `WHERE` condition, including a designated timestamp
-  interval. So `dim RIGHT JOIN fact` qualifies, and `fact RIGHT JOIN dim`
-  keeps the ordinary plan. With such a condition, write the query as
-  `fact LEFT JOIN dim`, which returns the same rows and qualifies.
-
-[`EXPLAIN`](/docs/query/sql/explain/) shows the plan as
-`Async Hash Join Group By`, or `Async JIT Hash Join Group By` when the
-probe-side filter is JIT-compiled. Its `Probe` and `Build` children show the
-two inputs. For example, with a small `instruments` table that maps each
-symbol to an asset class:
-
-```questdb-sql title="Dimension table"
-CREATE TABLE instruments (symbol SYMBOL, name VARCHAR, asset_class SYMBOL);
-```
-
-```questdb-sql title="Aggregate trades by a dimension table"
-EXPLAIN
-SELECT i.asset_class, sum(t.quantity) AS volume
-FROM instruments AS i
-JOIN fx_trades AS t ON (symbol)
-GROUP BY i.asset_class;
-```
-
-```text title="EXPLAIN output"
-Async Hash Join Group By workers: 4
-  logicalJoinType: inner
-  physicalJoinType: inner
-  inputSwapped: true
-  condition: t.symbol=i.symbol
-  symbolKeyJoin: true
-  buildStrategy: shared
-  buildPayload: copied when the probe is large enough
-  keys: [asset_class]
-  values: [sum(t.quantity)]
-    Probe
-        PageFrame
-            Row forward scan
-            Frame forward scan on: fx_trades
-    Build
-        PageFrame
-            Row forward scan
-            Frame forward scan on: instruments
-```
-
-- `inputSwapped: true` means that the build side is the first table in the
-  query. A qualifying `RIGHT` join shows it with `physicalJoinType: left outer`.
-- `buildPayload` tells whether the build may copy its columns, see
-  [`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize).
-- `buildJitFilter` appears when the build-side filter is JIT-compiled.
-- When QuestDB picks the build side at each execution, a
-  `Hash Join Group By Build Choice` node holds the two orientations as its
-  `Primary` and `Alternate` children.
-
-Queries that don't qualify keep the ordinary plan: a `GroupBy` node over a
-`Hash Join`, `Hash Join Light`, `Hash Left Outer Join [Light]` or
-`Hash Right Outer Join [Light]` node. Common reasons a query keeps the
-ordinary plan:
-
-- It uses an aggregate function other than `count()`, `sum()`, `avg()`,
-  `min()`, `max()`, `ksum()`, `nsum()`, `geomean()`, `vwap()`,
-  `weighted_avg()`, `weighted_stddev()`, `weighted_stddev_rel()`,
-  `weighted_stddev_freq()`, `bit_and()`, `bit_or()`, `bit_xor()`,
-  `bool_and()`, `bool_or()`, and the standard deviation, variance, skewness,
-  kurtosis, covariance, correlation and linear regression functions. Other
-  functions, such as `first()`, `last()`, `count_distinct()` and
-  `string_agg()`, keep the ordinary plan.
-- An aggregate function takes a column type that doesn't qualify. For
-  example, `ksum()`, `nsum()`, `geomean()` and the standard deviation,
-  variance, skewness and kurtosis functions qualify only over `DOUBLE`
-  columns. Cast other columns, as in `stddev(x::DOUBLE)`, and check the plan
-  with `EXPLAIN`.
-- It outputs, groups by or aggregates a build-side `VARCHAR`, `STRING`,
-  `BINARY` or array column. A filter on such a column doesn't disqualify the
-  query when it runs on the build table's own scan, such as a `WHERE`
-  condition on that table in an `INNER` join. It does when it applies after
-  the join, such as a `WHERE` condition on the build table of a `LEFT` join.
-- An `ON` condition compares columns of both tables beyond the join keys, such
-  as `AND t.ecn != i.name`.
-- An input is a subquery with its own `GROUP BY`.
-- Either side uses an index scan, `LATEST ON`, `LIMIT`, `UNION` or `DISTINCT`.
-
-The build's hash table and payload copy count toward the
-[per-query memory limit](#cairoquerymemorylimitbytes).
-
-The defaults suit most workloads. Lower
-[`build.parallel.min.rows`](#cairosqlparallelhashjoingroupbybuildparallelminrows)
-when builds of a few hundred thousand rows are slow on the query's own thread.
-Raise
-[`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize)
-to let larger builds copy their payload, which speeds up probing at the cost of
-more memory per query, or lower it to save memory.
-
 ### cairo.sql.parallel.hash.join.groupby.build.parallel.min.rows
 
 - **Default**: `300000`
 - **Reloadable**: no
 
-Minimum number of build-side rows, counted after the designated timestamp
-interval and before any other filter, for the hash table to be built on the
-query workers. Smaller builds run on the query's own thread. Must be `0` or
-greater.
+Minimum number of build-side rows for the join hash table to be built on the
+query workers. Smaller hash tables are built on the query's own thread.
 
 ### cairo.sql.parallel.hash.join.groupby.build.rows.per.partition
 
 - **Default**: `32768`
 - **Reloadable**: no
 
-Target number of rows per hash partition in a build that runs on the query
-workers. The build splits its rows into partitions of about this size, up to
-256 partitions, and each worker fills one partition at a time. Must be `1` or
-greater.
+Target number of rows per partition of a join hash table built on the query
+workers.
 
 ### cairo.sql.parallel.hash.join.groupby.enabled
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables parallel GROUP BY over hash joins. It takes effect only when
-[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is
-also `true` and the
-[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
-has at least one thread. Set to `false` to run such queries as a serial join
-followed by a GROUP BY.
+Enables parallel GROUP BY over `INNER`, `LEFT` and `RIGHT` hash joins. Takes
+effect only when
+[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is also
+`true`.
 
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.max.size
 
 - **Default**: `128M`
 - **Reloadable**: no
 
-Maximum size of the build's payload copy. By default, the build keeps the row
-ID of each build row, and each match reads the build-side columns at that row.
-When the probe side is large enough relative to the build side, the build
-copies those columns once instead, so that each match reads one compact row.
-The copy happens only when the build's row count times the width of the copied
-columns fits this size. `0` disables the copy. Must be `0` or greater.
+Maximum size of the build-side column copy that speeds up probing of the join
+hash table. `0` disables the copy.
 
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.min.probe.ratio
 
 - **Default**: `0.4`
 - **Reloadable**: no
 
-Minimum ratio of probe-side rows to build-side rows for a build that ran on
-the query's own thread to copy its payload. Probe-side rows are counted after
-the designated timestamp interval and before any other filter. Build-side rows
-are the rows in the hash table, after every build-side filter. Must be a
-non-negative number.
-
-When the build side has rows in
-[Parquet partitions](/docs/concepts/parquet/#in-place-conversion), the ratio
-counts only the build rows in native partitions, as long as the probe side is
-large enough to reach every Parquet row group the copy would decode. A build
-whose rows are all in Parquet partitions then copies whenever the copy fits
-[`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize).
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query's own thread to copy build-side columns.
 
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.parallel.min.probe.ratio
 
 - **Default**: `0.125`
 - **Reloadable**: no
 
-Minimum ratio of probe-side rows to build-side rows for a build that ran on
-the query workers to copy its payload. Rows, including Parquet build rows,
-count as described for
-[`payload.copy.min.probe.ratio`](#cairosqlparallelhashjoingroupbypayloadcopyminproberatio).
-Must be a non-negative number.
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query workers to copy build-side columns.
 
 ## HORIZON JOIN
 
