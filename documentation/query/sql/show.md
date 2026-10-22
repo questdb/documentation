@@ -431,6 +431,8 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 SHOW PARTITIONS FROM my_table;
 ```
 
+Selected columns are shown below; the three new trailing columns are omitted.
+
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
 | 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
@@ -440,13 +442,18 @@ SHOW PARTITIONS FROM my_table;
 
 See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
 full column list, including `hasParquetGenerated`, `isParquet`,
-`parquetFileSize`, `seqTxn`, and `isRemotelyServed`.
+`parquetFileSize`, `seqTxn`, `isRemotelyServed`, `deadRows`,
+`lastWriteTimestamp` and `pieceCount`; see
+[monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)
+for a compact projection of the new columns.
 
 `isRemotelyServed` is `true` when the partition's data lives in object storage and is fetched with range reads. See [cold storage](/docs/concepts/cold-storage/) (Enterprise).
 
 :::note
 
-`seqTxn` and `isRemotelyServed` are appended at the end of the result set. Tools that bind `SHOW PARTITIONS` columns by position rather than by name must account for the two new trailing columns.
+`deadRows`, `lastWriteTimestamp` and `pieceCount` are appended after
+`isRemotelyServed`. Tools that bind `SHOW PARTITIONS` columns by position rather
+than by name must account for the three new trailing columns.
 
 :::
 
