@@ -20,17 +20,17 @@ You want to break down trading costs beyond simple slippage. For each symbol and
 
 ## Solution
 
-Use `HORIZON JOIN` to capture the mid-price at execution time and 30 minutes later, then `PIVOT` to reshape the offsets into columns for the decomposition:
+Use `HORIZON JOIN` to average the mid-price at execution time and 30 minutes later per symbol and side, then `PIVOT` to reshape the offsets into columns for the decomposition:
 
 ```questdb-sql title="Implementation shortfall decomposition by symbol" demo
 WITH markouts AS (
     SELECT
         f.symbol,
-        f.price,
-        f.quantity,
         f.side,
         h.offset,
-        (m.best_bid + m.best_ask) / 2 AS mid
+        avg((m.best_bid + m.best_ask) / 2) AS mid,
+        avg(f.price) AS px,
+        sum(f.quantity) AS vol
     FROM fx_trades f
     HORIZON JOIN market_data m ON (f.symbol = m.symbol)
         LIST (0, 1800s) AS h
@@ -39,11 +39,11 @@ WITH markouts AS (
 pivoted AS (
     SELECT * FROM markouts
     PIVOT (
-        avg(mid) AS mid,
-        avg(price) AS px,
-        sum(quantity) AS vol
+        first(mid) AS mid,
+        first(px) AS px,
+        first(vol) AS vol
         FOR offset IN (
-            0          AS at_fill,
+            0             AS at_fill,
             1800000000000 AS at_30m
         )
         GROUP BY symbol, side
@@ -74,21 +74,25 @@ HORIZON JOIN market_data m ON (f.symbol = m.symbol)
     LIST (0, 1800s) AS h
 ```
 
-For each trade, this produces two rows:
+For each trade, this looks up the mid-price at two offsets:
 - **Offset 0** — the mid-price at the moment of execution (arrival price)
 - **Offset 1800s** — the mid-price 30 minutes later (the "settled" price)
+
+The aggregate functions in the same `SELECT` reduce these matches to one row per symbol, side and offset, with the average mid (`mid`), the average fill price (`px`) and the total quantity (`vol`). The HORIZON JOIN runs them on the query workers in parallel.
 
 ### 2. PIVOT — reshape offsets into columns
 
 ```sql
 PIVOT (
-    avg(mid) AS mid, avg(price) AS px, sum(quantity) AS vol
+    first(mid) AS mid, first(px) AS px, first(vol) AS vol
     FOR offset IN (0 AS at_fill, 1800000000000 AS at_30m)
     GROUP BY symbol, side
 )
 ```
 
-This turns the two offset rows into columns: `at_fill_mid`, `at_fill_px`, `at_fill_vol`, `at_30m_mid`, `at_30m_px`, `at_30m_vol`. The offset values in `FOR ... IN` are in nanoseconds (since `fx_trades` uses `TIMESTAMP_NS`), so 30 minutes = 1,800,000,000,000 ns.
+This turns the two offset rows of each symbol and side into columns: `at_fill_mid`, `at_fill_px`, `at_fill_vol`, `at_30m_mid`, `at_30m_px`, `at_30m_vol`. The offset values in `FOR ... IN` are in nanoseconds (since `fx_trades` uses `TIMESTAMP_NS`), so 30 minutes = 1,800,000,000,000 ns.
+
+Each symbol, side and offset already has a single row, so `first()` only picks its value. Aggregating in the `PIVOT` over a HORIZON JOIN without aggregate functions gives the same numbers, but on a single thread over every trade and offset. See [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions).
 
 ### 3. Decomposition — compute the three components
 
