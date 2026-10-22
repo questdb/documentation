@@ -333,9 +333,8 @@ sender.row(
 )
 ```
 
-Some of these types have one value that QuestDB uses to mean `NULL`. The
-client writes that value if you pass it, so it goes in fine and comes back
-out as `NULL`:
+For these types, QuestDB uses one value to mean `NULL`. If you write that
+value, it reads back as `NULL`:
 
 | Type | Value that reads back as `NULL` |
 | --- | --- |
@@ -344,9 +343,8 @@ out as `NULL`:
 | `UUID` | `80000000-0000-0000-8000-000000000000` |
 | `LONG256` | all four 64-bit limbs set to `0x8000000000000000` |
 
-`CHAR` and `BINARY` have no such value. `Char("\x00")` is stored as code unit
-0, although some SQL functions treat that as absent, and empty `BINARY`
-(`b""`) is a real empty value that is not `NULL`.
+`CHAR` and `BINARY` have no such value: `Char("\x00")` and `b""` are stored
+as themselves, not as `NULL`.
 
 You can also write these types with
 [`dataframe()`](#dataframe-ingestion), or with a SQL `INSERT` through
@@ -462,21 +460,10 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
     db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
 ```
 
-The first successful batch on a fresh direct connection is already a commit
-boundary. Later batches are pipelined until an explicit checkpoint or the final
-commit. If a transient failure occurs before any batch is successfully
-published, the client can replay a materialized source in full. Once any batch
-may have committed, it raises instead of replaying from row zero and reports
-`in_doubt=True` for the whole DataFrame call, even if the final native write
-alone was provably not delivered. This also covers local validation and Arrow
-stream errors after earlier batches were published. Internal checkpoints do
-not reset the call's delivery status. This aggregation is specific to
-`dataframe()`; a sender flush's flag does not summarize earlier independent
-flushes. An application-level retry can then duplicate
-an already committed prefix unless the table uses suitable `DEDUP UPSERT KEYS`.
-A consumed one-shot Arrow stream can also be impossible to replay; when no
-batch could have landed, that separate error has `in_doubt=False` and asks for
-a fresh reader.
+A `dataframe()` call is not atomic: batches commit as the call proceeds, so a
+call that fails partway through can leave its first rows in the table. Such
+an error has `in_doubt=True`, and retrying the whole call duplicates those
+rows unless the table uses [deduplication](/docs/concepts/deduplication/).
 
 `df` accepts pandas `DataFrame`, polars `DataFrame` and `LazyFrame`, pyarrow
 `Table`, `RecordBatch`, and `RecordBatchReader`, and any object exposing the
@@ -514,10 +501,8 @@ negotiated per-batch byte cap regardless of this setting, and a single row
 is never bounded by it. What it does control:
 
 - Peak client memory: each batch is encoded and held as one frame.
-- Checkpoint spacing: sliceable Arrow inputs add a commit checkpoint about
-  every 100 batches. `max_rows_per_batch × 100` approximates the maximum
-  periodic uncommitted tail, not a safe whole-source replay window; the first
-  successful batch on a fresh connection is already a commit boundary.
+- Commit frequency: the client commits about every 100 batches, so roughly
+  `max_rows_per_batch × 100` rows are in flight between commits.
 - Per-batch overhead: very small batches pay framing and server-side
   apply costs per batch.
 
@@ -544,22 +529,19 @@ Binary columns (`pyarrow.binary()`, `pyarrow.large_binary()`, fixed-size
 of a column does not decide its type, so a 16-byte column is treated as
 plain bytes, not as a UUID.
 
-:::caution Upgrading to Python client 5.1.0
+<details>
+<summary>Breaking changes when upgrading from Python client 5.0 or earlier</summary>
 
-Earlier clients inferred UUID or LONG256 from a 16- or 32-byte Arrow
-column's width. In 5.1.0 and later, explicitly identify these columns using
-`schema_overrides`, Arrow field metadata, or the `arrow.uuid` extension
-for UUIDs. Otherwise, the fully Arrow-backed path writes `BINARY`; mixed
-Arrow/NumPy frames reject these unlabelled fixed-size columns.
+- 16- and 32-byte binary columns are no longer inferred as UUID or LONG256.
+  Mark them with `schema_overrides`, or use the `arrow.uuid` extension type
+  for UUIDs, as shown below.
+- UUID bytes are now big-endian, the same as `uuid.UUID.bytes`. Remove any
+  byte-swapping from your ingestion and query code, for example replace
+  `value.int.to_bytes(16, "little")` with `value.bytes`. Otherwise UUIDs are
+  stored reversed. Columns of `uuid.UUID` objects and query binds are
+  unaffected.
 
-UUID raw bytes also changed to canonical RFC 4122 big-endian order. Remove
-any byte-swapping used for the old QWP wire layout on both ingestion and
-query results. For example, replace `value.int.to_bytes(16, "little")`
-with `value.bytes`. Adding a UUID override without fixing the byte order
-silently stores reversed UUIDs. Existing `uuid.UUID` object columns and
-query binds need no byte-order change. The QWP wire format is unchanged.
-
-:::
+</details>
 
 For UUIDs, an object column of `uuid.UUID` values needs no extra
 configuration. The client handles the byte order:
@@ -616,14 +598,12 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
     )
 ```
 
-Every non-null value must then be exactly 16 bytes for `uuid`, or 32 bytes
-for `long256`. UUID bytes are canonical RFC 4122 big-endian — the same bytes
-`uuid.UUID.bytes` gives you, and the same bytes a `UUID` result column reads
-back. LONG256 bytes are little-endian limbs, least significant first, and are
-sent unchanged.
+Each non-null value must be exactly 16 bytes for `uuid` or 32 bytes for
+`long256`. UUID bytes are big-endian, as in `uuid.UUID.bytes`. LONG256 bytes
+are a little-endian 256-bit integer, as in `n.to_bytes(32, "little")`.
 
 The third way is a pyarrow column built with the `arrow.uuid` extension type,
-which carries the claim itself. Using `trade_uuids` from the example above:
+which marks the column as a UUID. Using `trade_uuids` from the example above:
 
 ```python
 import pyarrow as pa
@@ -634,23 +614,16 @@ trade_ids = pa.ExtensionArray.from_storage(
 )
 ```
 
-This one needs pyarrow 18 or later, where `pa.uuid()` was added. Build the
-column from `pa.uuid()` itself — writing `ARROW:extension:name` as field
-metadata is not the same thing, because a pandas column keeps the Arrow type
-but not the field, so the label is lost on the way in.
+This needs pyarrow 18 or later. Setting `ARROW:extension:name` in field
+metadata does not work in a pandas frame, which keeps a column's Arrow type
+but not its field metadata.
 
 :::note
 
-A frame where every column is Arrow-backed takes a different code path from
-one that mixes Arrow and NumPy columns, and the two treat an unlabelled
-16- or 32-byte column differently.
-
-On a fully Arrow-backed frame it is written as `BINARY`, because
-`schema_overrides` is there if you meant something else. If any column is not
-Arrow-backed, `schema_overrides` is unavailable, and rather than guess
-between "plain bytes" and "a UUID whose label was lost", the client refuses
-the column and tells you how to say which you meant. To send those widths as
-plain bytes there, pass them as an object column of `bytes`.
+In a frame that mixes Arrow-backed and NumPy columns, `schema_overrides` is
+unavailable, so the client rejects an unlabelled 16- or 32-byte column rather
+than guess its type. To write it as `BINARY`, pass it as an object column of
+`bytes`.
 
 :::
 
@@ -658,22 +631,16 @@ plain bytes there, pass them as an object column of `bytes`.
 
 `row()` writes a `DATE` with the `DateMillis` wrapper. For `dataframe()`,
 use an Arrow column of `pyarrow.timestamp("ms")`, `pyarrow.date32()`, or
-`pyarrow.date64()`. These types are written as `DATE` in fully Arrow-backed
-frames and frames that mix Arrow and NumPy columns. There is no `date`
-value for `schema_overrides`: the Arrow type identifies the column.
+`pyarrow.date64()`. There is no `date` value for `schema_overrides`.
 
-Without a DATE claim, a NumPy `datetime64[ms]` column widens to a
-microsecond `TIMESTAMP`, and its timezone-aware `datetime64[ms, tz]` form
-is rejected.
+A NumPy `datetime64[ms]` column is written as a microsecond `TIMESTAMP`, and
+its timezone-aware `datetime64[ms, tz]` form is rejected, unless
+`df.attrs["questdb"]` marks the column as `date`.
 
-Query results preserve the type. `to_arrow()` and
-`to_pandas(dtype_backend="pyarrow")` return an Arrow
-`timestamp("ms", "UTC")` column, which can be written straight back as
-`DATE`. Plain `to_pandas()` returns timezone-naive `datetime64[ms]`
-holding UTC instants and records a `{"kind": "date"}` claim in
-`df.attrs["questdb"]`. Python client 5.1.0 and later reads that claim to
-restore the Arrow DATE type before ingestion. Keep the claim when
-[writing a result back](#writing-a-result-back).
+`DATE` query results write back as `DATE`. `to_arrow()` and
+`to_pandas(dtype_backend="pyarrow")` return a `timestamp("ms", "UTC")`
+column, and plain `to_pandas()` marks the column as `date` in
+`df.attrs["questdb"]`. See [Writing a result back](#writing-a-result-back).
 
 Naive timestamps — DataFrame columns and the scalar `at` alike — are
 interpreted as UTC, matching the numpy `datetime64` convention. Prefer
@@ -828,11 +795,8 @@ A pandas dtype does not always identify the QuestDB type. For example,
 `to_pandas()` records the source types in `df.attrs["questdb"]`, and
 `dataframe()` reads that metadata to preserve them.
 
-Plain `to_pandas()` returns `UUID` values as `uuid.UUID` objects and
-`LONG256` values as Python integers. With `dtype_backend="numpy_nullable"`,
-both are object columns of `bytes` instead. The `"pyarrow"` backend keeps
-Arrow-backed columns. All three backends attach the metadata needed to
-preserve the six QuestDB types above.
+This works with every `dtype_backend`. With `"numpy_nullable"`, `UUID` and
+`LONG256` columns hold `bytes` rather than `uuid.UUID` and `int`.
 
 Editing the frame is safe. A column you drop, rename, or convert to another
 type simply loses its record, and the write goes ahead with whatever the
@@ -844,12 +808,9 @@ If a recorded type cannot apply to the column as it now stands — say the
 column is an unsigned integer and the record says `geohash` — the client
 warns and writes the column as its own type implies, rather than failing.
 
-The metadata returned by `to_pandas()` is a read-only dictionary shared
-by copies of the frame. Its nested mappings are also read-only; editing
-any of them in place raises `TypeError`.
-
-To change the metadata, assign a new dictionary to `df.attrs["questdb"]`.
-Unpack the existing `columns` mapping to retain its other entries:
+`df.attrs["questdb"]` is read-only, nested mappings included, and editing it
+in place raises `TypeError`. To change it, assign a new dictionary, unpacking
+the existing `columns` mapping to keep its other entries:
 
 ```python
 df.attrs["questdb"] = {
@@ -863,7 +824,7 @@ df.attrs["questdb"] = {
 }
 ```
 
-For a hand-built frame with no existing claim, omit the unpacking line.
+For a hand-built frame with no existing metadata, omit the unpacking line.
 `version` is required and must be `1`. `kind` is one of `uuid`, `long256`,
 `ipv4`, `char`, `geohash`, or `date`; `precision_bits` goes with `geohash`
 only. Naming a column that is not in the frame does no harm; it is ignored.
