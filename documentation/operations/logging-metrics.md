@@ -378,8 +378,6 @@ Two gauges describe the state of an in-place
 
 ### Persisted metrics
 
-Available from QuestDB 10.0.2.
-
 QuestDB samples its own metrics every second and appends them to the
 `sys.metrics` table, so you can chart metric history with SQL without running
 Prometheus. Persistence is on by default and does not need `metrics.enabled`.
@@ -392,18 +390,11 @@ designated timestamp, and one `LONG` or `DOUBLE` column per metric:
 
 - Column names are usually the Prometheus names without the `questdb_` prefix
   and the `_total` suffix, for example `commits` and `memory_rss`.
-- Labelled metrics get one column per label value, joined with `__`, for
-  example `worker_pool_fiber_live__shared_query`.
+- Labelled metrics get one column per label value, joined with `__`.
 - Counters are cumulative since server start, so compute rates from the
   difference between consecutive rows.
 - Process-level gauges, such as `memory_rss`, are refreshed every 60 seconds
   by default.
-
-```questdb-sql title="Find columns"
-SELECT "column", type
-FROM table_columns('sys.metrics')
-WHERE "column" LIKE 'worker_pool_fiber_live__%';
-```
 
 ```questdb-sql title="Hourly memory and CPU over the last day"
 SELECT
@@ -413,18 +404,6 @@ SELECT
 FROM 'sys.metrics'
 WHERE ts IN '$now-1d..$now'
 SAMPLE BY 1h;
-```
-
-```questdb-sql title="Commits per minute over the last hour"
-WITH deltas AS (
-    SELECT ts, commits - lag(commits) OVER (ORDER BY ts) AS delta
-    FROM 'sys.metrics'
-    WHERE ts IN '$now-1h..$now'
-)
-SELECT ts, sum(delta) AS commits_per_min
-FROM deltas
-WHERE delta >= 0 -- skips the first row and server restarts
-SAMPLE BY 1m;
 ```
 
 Data is kept for one week by default, and completed day partitions are

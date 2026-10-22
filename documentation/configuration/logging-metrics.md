@@ -41,7 +41,7 @@ Enables the Prometheus `/metrics` endpoint on the minimal HTTP server. See the
 
 ## Persisted metrics
 
-Available from QuestDB 10.0.2. These keys control the `sys.metrics` table, see
+These keys control the `sys.metrics` table, see
 [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics).
 
 ### metrics.persist.enabled
