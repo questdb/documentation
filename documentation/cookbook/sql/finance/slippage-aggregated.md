@@ -145,7 +145,7 @@ PIVOT (
 ORDER BY symbol, size_bucket;
 ```
 
-The HORIZON JOIN aggregates on the query workers in parallel and returns one row per symbol, bucket and offset, so `PIVOT` only reshapes it, with `first()` picking the single value for each offset. Aggregating in the `PIVOT` instead would run on one thread over every trade and offset, see [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions). The variations below follow the same pattern.
+The HORIZON JOIN aggregates on the query workers in parallel and returns one row per symbol, bucket and offset, so `PIVOT` only reshapes it, with `first()` picking the single value for each offset. The variations below follow the same pattern.
 
 The result has columns like `at_fill_n`, `at_fill_markout_bps`, `t_5s_markout_bps`, `t_1m_spread_bps`, etc. Compare across size buckets:
 

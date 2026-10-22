@@ -78,7 +78,7 @@ For each trade, this looks up the mid-price at two offsets:
 - **Offset 0** — the mid-price at the moment of execution (arrival price)
 - **Offset 1800s** — the mid-price 30 minutes later (the "settled" price)
 
-The aggregate functions in the same `SELECT` reduce these matches to one row per symbol, side and offset, with the average mid (`mid`), the average fill price (`px`) and the total quantity (`vol`). The HORIZON JOIN runs them on the query workers in parallel. Aggregating in the `PIVOT` instead would run on one thread over every trade and offset, see [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions).
+The aggregate functions in the same `SELECT` reduce these matches to one row per symbol, side and offset, with the average mid (`mid`), the average fill price (`px`) and the total quantity (`vol`). The HORIZON JOIN runs them on the query workers in parallel.
 
 ### 2. PIVOT — reshape offsets into columns
 

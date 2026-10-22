@@ -190,7 +190,7 @@ An ECN with a mildly negative `vw_markout_5s_bps` but 80%+ `adverse_fill_ratio` 
 
 ## Pivoted ECN scorecard
 
-The sections above produce one row per ECN per horizon offset. `PIVOT` reshapes the results into a wide format: one row per symbol-ECN combination, with fill count, average size, volume, and markout at each horizon as separate columns. The HORIZON JOIN computes the metrics per symbol, ECN and offset on the query workers in parallel, and `PIVOT` only moves the offsets into columns, with `first()` picking the single value for each offset. Aggregating in the `PIVOT` instead would run on one thread over every fill and offset, see [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions):
+The sections above produce one row per ECN per horizon offset. `PIVOT` reshapes the results into a wide format: one row per symbol-ECN combination, with fill count, average size, volume, and markout at each horizon as separate columns. The HORIZON JOIN computes the metrics per symbol, ECN and offset on the query workers in parallel, and `PIVOT` only moves the offsets into columns, with `first()` picking the single value for each offset:
 
 ```questdb-sql title="Pivoted ECN scorecard (buy side)" demo
 WITH markouts AS (
