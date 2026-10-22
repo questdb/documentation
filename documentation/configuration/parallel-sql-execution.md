@@ -7,6 +7,10 @@ These settings control the level of parallelism during SQL execution, affecting
 both filter performance and memory usage. JIT compilation of filter expressions
 requires parallel filtering to be enabled.
 
+The settings for parallel GROUP BY, including
+[GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins),
+are in the Cairo engine configuration.
+
 ## cairo.page.frame.column.list.capacity
 
 - **Default**: `16`

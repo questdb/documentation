@@ -852,6 +852,92 @@ merge shard hash tables.
 Row count threshold for parallel GROUP BY to shard the hash table holding
 the aggregates.
 
+## Parallel GROUP BY over hash joins
+
+A `GROUP BY`, or an aggregation without grouping keys, over a single `INNER`,
+`LEFT` or `RIGHT` equi-join can run on the query workers. QuestDB builds one
+shared hash table from one side of the join, the **build** side, then the
+workers probe it with page frames of the other side, the **probe** side, and
+aggregate the matched rows. A `SAMPLE BY` over such a join qualifies as well.
+[`EXPLAIN`](/docs/query/sql/explain/) shows the plan as
+`Async Hash Join Group By`, or `Async JIT Hash Join Group By` when a filter is
+JIT-compiled. Queries that don't qualify keep the ordinary plan, a
+`Hash Join` or `Hash Join Light` node below a `GroupBy` node. Among the queries that don't qualify are those using an
+order-dependent aggregate such as `first()` or `last()`, and those with an
+index scan, `LATEST ON`, `LIMIT`, `UNION` or `DISTINCT` on either side.
+
+The build's hash table and payload copy count toward the
+[per-query memory limit](#cairoquerymemorylimitbytes).
+
+### cairo.sql.parallel.hash.join.groupby.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel GROUP BY over hash joins. It takes effect only when
+[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is
+also `true` and the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread. Set to `false` to run such queries as a serial join
+followed by a GROUP BY.
+
+### cairo.sql.parallel.hash.join.groupby.build.parallel.min.rows
+
+- **Default**: `300000`
+- **Reloadable**: no
+
+Minimum number of build-side rows, counted before any filter, for the hash
+table to be built on the query workers. Smaller builds run on the query's own
+thread. Must be `0` or greater.
+
+### cairo.sql.parallel.hash.join.groupby.build.rows.per.partition
+
+- **Default**: `32768`
+- **Reloadable**: no
+
+Target number of rows per hash partition in a build that runs on the query
+workers. The build splits its rows into partitions of about this size, up to
+256 partitions, and each worker fills one partition at a time. Must be `1` or
+greater.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.max.size
+
+- **Default**: `128M`
+- **Reloadable**: no
+
+Maximum size of the build's payload copy. By default, the build keeps the row ID
+of each build row, and each match reads the build-side columns at that row.
+When the probe side is large enough relative to the build side, the build
+copies those columns once instead, so that each match reads one compact row.
+The copy happens only when the build's row count times the width of the copied
+columns fits this size. `0` disables the copy.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.min.probe.ratio
+
+- **Default**: `0.4`
+- **Reloadable**: no
+
+Minimum ratio of probe-side rows to build-side rows for a build that ran on
+the query's own thread to copy its payload. Must be a non-negative number.
+
+When the build side has rows in
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion), the ratio counts only the
+build rows in native partitions, as long as the probe side is large enough to
+reach every Parquet row group the copy would decode. A build whose rows are all
+in Parquet partitions then copies whenever the copy fits
+[`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize).
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.parallel.min.probe.ratio
+
+- **Default**: `0.125`
+- **Reloadable**: no
+
+Minimum ratio of probe-side rows to build-side rows for a build that ran on
+the query workers to copy its payload. Parquet build rows count as described
+for
+[`payload.copy.min.probe.ratio`](#cairosqlparallelhashjoingroupbypayloadcopyminproberatio).
+Must be a non-negative number.
+
 ## SAMPLE BY
 
 ### cairo.sql.sampleby.default.alignment.calendar
