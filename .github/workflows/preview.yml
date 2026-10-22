@@ -55,9 +55,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Test release metadata fallback
-        run: node --test scripts/test-release-fallback.cjs
-
       - name: Build site
         env:
           CONTEXT: deploy-preview

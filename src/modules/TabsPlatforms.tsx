@@ -52,23 +52,12 @@ export const TabsPlatforms = ({ render, platforms }: Props) => {
     return (
       <p>
         Download binaries from the{" "}
-        <a
-          href={
-            release.html_url ??
-            "https://github.com/questdb/questdb/releases/latest"
-          }
-        >
-          QuestDB release page
-        </a>
-        .
+        <a href={release.html_url}>QuestDB release page</a>.
       </p>
     )
   }
 
-  const os = detectOS()
-  const defaultValue = tabs.some(({ value }) => value === os)
-    ? os
-    : tabs[0].value
+  const defaultValue = detectOS()
 
   return (
     <Tabs defaultValue={defaultValue} values={tabs} groupId="platforms">
