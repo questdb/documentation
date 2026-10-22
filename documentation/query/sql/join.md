@@ -10,8 +10,10 @@ QuestDB supports the type of joins you can frequently find in
 Additionally, it implements joins which are particularly useful for
 time-series analytics: `ASOF`, `LT`, `SPLICE`, `HORIZON`, and `WINDOW`.
 
-All supported join types can be combined in a single SQL statement; QuestDB
-SQL's optimizer determines the best execution order and algorithms.
+Join types can be combined in a single SQL statement, and QuestDB SQL's
+optimizer determines the best execution order and algorithms. The exception is
+HORIZON JOIN, which can't be mixed with other join types at the same level of a
+query.
 
 There are no known limitations on the size of tables or sub-queries used in
 joins and there are no limitations on the number of joins, either.
@@ -110,6 +112,11 @@ As a general rule, whenever you have a table significantly larger than the
 other, try to use the large one first. If you use `EXPLAIN` with the queries
 above, you should see the first version needs to Hash over 1 million rows,
 while the second version needs to Hash only over 1 row.
+
+A `GROUP BY` over an `INNER`, `LEFT` or `RIGHT` equi-join can instead run as a
+parallel aggregation, and for an `INNER` join it hashes the smaller table
+whatever the order in the query. See
+[Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins).
 
 ## Implicit joins
 
@@ -622,9 +629,11 @@ need additional filtering on the two tables, the `ON` clause can also be used.
 
 HORIZON JOIN is a specialized time-series join for markout analysis and event
 impact studies. For each left row, it runs an ASOF JOIN match at a set of time
-offsets in a single pass. Without aggregate functions, it returns one row per
-left row and offset. Combined with aggregate functions, it produces one result
-per offset, such as an average markout curve.
+offsets in a single pass, and each right-hand table can carry a filter that
+applies before the match. Without aggregate functions, it returns one row per
+left row and offset. Combined with aggregate functions, it produces one row per
+combination of the selected non-aggregate columns, typically the offset and
+keys, such as an average markout curve.
 
 It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
 

@@ -1,8 +1,8 @@
 ---
 title: Cairo engine
 description:
-  Configuration settings for the Cairo SQL engine in QuestDB, including the
-  query, materialized view refresh, and WAL apply memory limits.
+  Configuration settings for the Cairo SQL engine in QuestDB, including memory
+  limits, parallel GROUP BY over hash joins, and HORIZON JOIN.
 ---
 
 The Cairo engine is the core storage and query engine in QuestDB. These settings
@@ -833,8 +833,9 @@ Maximum allowed native memory allocation for GROUP BY functions.
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables parallel GROUP BY execution. Requires at least 4 shared worker
-threads.
+Enables parallel GROUP BY execution. Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread.
 
 ### cairo.sql.parallel.groupby.merge.shard.queue.capacity
 
@@ -846,7 +847,7 @@ merge shard hash tables.
 
 ### cairo.sql.parallel.groupby.sharding.threshold
 
-- **Default**: `100000`
+- **Default**: `10000`
 - **Reloadable**: no
 
 Row count threshold for parallel GROUP BY to shard the hash table holding
@@ -855,31 +856,97 @@ the aggregates.
 ## Parallel GROUP BY over hash joins
 
 A `GROUP BY`, or an aggregation without grouping keys, over a single `INNER`,
-`LEFT` or `RIGHT` equi-join can run on the query workers. QuestDB builds one
-shared hash table from one side of the join, the **build** side, then the
-workers probe it with page frames of the other side, the **probe** side, and
-aggregate the matched rows. A `SAMPLE BY` over such a join qualifies as well.
+`LEFT` or `RIGHT` equi-join can run on the
+[query workers](/docs/configuration/shared-workers/#sharedqueryworkercount).
+QuestDB builds one shared hash table from one side of the join, the **build**
+side, then the workers probe it with page frames of the other side, the
+**probe** side, and aggregate the matched rows. A `SAMPLE BY` over such a join
+qualifies as well, unless it uses `FILL` with a value other than `NONE`.
+
+The join type decides which input is the build side:
+
+- **`INNER`**: the input whose table has fewer rows, in whichever order the
+  query names the tables. When either input scans a designated timestamp
+  interval and no join key is a `SYMBOL` column, QuestDB plans both
+  orientations and, at each execution, builds the input whose intervals select
+  fewer rows.
+- **`LEFT`**: the right-hand input.
+- **`RIGHT`**: the left-hand input. A `RIGHT` join qualifies only when the
+  left-hand table has no more rows than the right-hand table, and the
+  right-hand input has no filter of its own. So `dim RIGHT JOIN fact`
+  qualifies, and `fact RIGHT JOIN dim` keeps the ordinary plan.
+
 [`EXPLAIN`](/docs/query/sql/explain/) shows the plan as
-`Async Hash Join Group By`, or `Async JIT Hash Join Group By` when a filter is
-JIT-compiled. Queries that don't qualify keep the ordinary plan, a
-`Hash Join` or `Hash Join Light` node below a `GroupBy` node. Among the queries that don't qualify are those using an
-order-dependent aggregate such as `first()` or `last()`, and those with an
-index scan, `LATEST ON`, `LIMIT`, `UNION` or `DISTINCT` on either side.
+`Async Hash Join Group By`, or `Async JIT Hash Join Group By` when the
+probe-side filter is JIT-compiled. Its `Probe` and `Build` children show the
+two inputs. For example, with a small `instruments` table that maps each
+symbol to an asset class:
+
+```questdb-sql title="Aggregate trades by a dimension table"
+EXPLAIN
+SELECT i.asset_class, sum(t.quantity) AS volume
+FROM instruments AS i
+JOIN fx_trades AS t ON (symbol)
+GROUP BY i.asset_class;
+```
+
+```text
+Async Hash Join Group By workers: 4
+  logicalJoinType: inner
+  physicalJoinType: inner
+  inputSwapped: true
+  condition: t.symbol=i.symbol
+  symbolKeyJoin: true
+  buildStrategy: shared
+  buildPayload: copied when the probe is large enough
+  keys: [asset_class]
+  values: [sum(t.quantity)]
+    Probe
+        PageFrame
+            Row forward scan
+            Frame forward scan on: fx_trades
+    Build
+        PageFrame
+            Row forward scan
+            Frame forward scan on: instruments
+```
+
+- `inputSwapped: true` means that the build side is the first table in the
+  query. A qualifying `RIGHT` join shows it with `physicalJoinType: left outer`.
+- `buildPayload` tells whether the build may copy its columns, see
+  [`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize).
+- `buildJitFilter` appears when the build-side filter is JIT-compiled.
+- When QuestDB picks the build side at each execution, a
+  `Hash Join Group By Build Choice` node holds the two orientations as its
+  `Primary` and `Alternate` children.
+
+Queries that don't qualify keep the ordinary plan: a `GroupBy` node over a
+`Hash Join`, `Hash Join Light`, `Hash Left Outer Join [Light]` or
+`Hash Right Outer Join [Light]` node. A query doesn't qualify when:
+
+- It uses an aggregate function outside a fixed set: `count()`, `sum()`,
+  `avg()`, `min()` and `max()` over numeric and temporal types, `ksum()`,
+  `nsum()`, `geomean()`, the standard deviation, variance, skewness,
+  kurtosis, covariance, correlation and linear regression functions,
+  `weighted_avg()`, `weighted_stddev_rel()`, `weighted_stddev_freq()`,
+  `bit_and()`, `bit_or()`, `bit_xor()`, `bool_and()` and `bool_or()`. Other
+  functions, such as
+  `first()`, `last()`, `count_distinct()` and `string_agg()`, keep the ordinary
+  plan.
+- It outputs or groups by a build-side `VARCHAR`, `STRING`, `BINARY` or array
+  column. A `WHERE` filter on such a column doesn't disqualify the query.
+- Either side uses an index scan, `LATEST ON`, `LIMIT`, `UNION` or `DISTINCT`.
 
 The build's hash table and payload copy count toward the
 [per-query memory limit](#cairoquerymemorylimitbytes).
 
-### cairo.sql.parallel.hash.join.groupby.enabled
-
-- **Default**: `true`
-- **Reloadable**: no
-
-Enables parallel GROUP BY over hash joins. It takes effect only when
-[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is
-also `true` and the
-[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
-has at least one thread. Set to `false` to run such queries as a serial join
-followed by a GROUP BY.
+The defaults suit most workloads. Lower
+[`build.parallel.min.rows`](#cairosqlparallelhashjoingroupbybuildparallelminrows)
+when builds of a few hundred thousand rows are slow on the query's own thread.
+Raise
+[`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize)
+to let larger builds copy their payload, which speeds up probing at the cost of
+more memory per query, or lower it to save memory.
 
 ### cairo.sql.parallel.hash.join.groupby.build.parallel.min.rows
 
@@ -900,17 +967,29 @@ workers. The build splits its rows into partitions of about this size, up to
 256 partitions, and each worker fills one partition at a time. Must be `1` or
 greater.
 
+### cairo.sql.parallel.hash.join.groupby.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel GROUP BY over hash joins. It takes effect only when
+[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is
+also `true` and the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread. Set to `false` to run such queries as a serial join
+followed by a GROUP BY.
+
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.max.size
 
 - **Default**: `128M`
 - **Reloadable**: no
 
-Maximum size of the build's payload copy. By default, the build keeps the row ID
-of each build row, and each match reads the build-side columns at that row.
+Maximum size of the build's payload copy. By default, the build keeps the row
+ID of each build row, and each match reads the build-side columns at that row.
 When the probe side is large enough relative to the build side, the build
 copies those columns once instead, so that each match reads one compact row.
 The copy happens only when the build's row count times the width of the copied
-columns fits this size. `0` disables the copy.
+columns fits this size. `0` disables the copy. Must be `0` or greater.
 
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.min.probe.ratio
 
@@ -921,10 +1000,10 @@ Minimum ratio of probe-side rows to build-side rows for a build that ran on
 the query's own thread to copy its payload. Must be a non-negative number.
 
 When the build side has rows in
-[Parquet partitions](/docs/concepts/parquet/#in-place-conversion), the ratio counts only the
-build rows in native partitions, as long as the probe side is large enough to
-reach every Parquet row group the copy would decode. A build whose rows are all
-in Parquet partitions then copies whenever the copy fits
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion), the ratio
+counts only the build rows in native partitions, as long as the probe side is
+large enough to reach every Parquet row group the copy would decode. A build
+whose rows are all in Parquet partitions then copies whenever the copy fits
 [`payload.copy.max.size`](#cairosqlparallelhashjoingroupbypayloadcopymaxsize).
 
 ### cairo.sql.parallel.hash.join.groupby.payload.copy.parallel.min.probe.ratio
@@ -937,6 +1016,34 @@ the query workers to copy its payload. Parquet build rows count as described
 for
 [`payload.copy.min.probe.ratio`](#cairosqlparallelhashjoingroupbypayloadcopyminproberatio).
 Must be a non-negative number.
+
+## HORIZON JOIN
+
+Settings for [HORIZON JOIN](/docs/query/sql/horizon-join/) queries.
+
+### cairo.sql.horizon.join.max.offsets
+
+- **Default**: `10000`
+- **Reloadable**: no
+
+Maximum number of offsets that the `RANGE` or `LIST` clause of a HORIZON JOIN
+can generate. A query that generates more fails with
+`RANGE generates too many offsets` or `LIST has too many offsets`. Every
+left-hand row is matched once per offset, so the limit stops a `RANGE` with a
+small `STEP` over a long span from multiplying the work and the result size.
+
+### cairo.sql.parallel.horizon.join.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel HORIZON JOIN execution, shown in
+[`EXPLAIN`](/docs/query/sql/explain/) as an `Async ... Horizon Join` node.
+Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread. Set to `false` to run HORIZON JOIN queries on the
+query's own thread. See
+[Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 
 ## SAMPLE BY
 
