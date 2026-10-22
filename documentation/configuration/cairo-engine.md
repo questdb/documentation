@@ -42,9 +42,8 @@ at its default and change the volume mapping instead.
 - **Default**: `sys.`
 - **Reloadable**: no
 
-Prefix for QuestDB internal data storage tables, such as
-[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics). These
-tables are hidden from the web console.
+Prefix for QuestDB internal data storage tables. These tables are hidden from
+the web console.
 
 ### cairo.timestamp.locale
 

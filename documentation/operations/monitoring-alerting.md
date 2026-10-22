@@ -48,26 +48,6 @@ w.alert.level=CRITICAL
 For more details, see the
 [Logging and metrics page](/docs/operations/logging-metrics/#prometheus-alertmanager).
 
-## Query metric history
-
-From QuestDB 10.0.2, each instance keeps a week of its own metrics in the
-`sys.metrics` table. Use it to look back at an incident without a Prometheus
-setup:
-
-```questdb-sql title="Memory and CPU over the last day"
-SELECT
-    ts,
-    max(memory_mem_used) AS native_used,
-    max(memory_rss) AS rss,
-    avg(cpu_questdb_percent) AS cpu_avg
-FROM 'sys.metrics'
-WHERE ts IN '$now-1d..$now'
-SAMPLE BY 15m;
-```
-
-See [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics)
-for details.
-
 ## Detect table health issues
 
 This section covers monitoring and troubleshooting table health issues. For

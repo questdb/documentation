@@ -11,8 +11,7 @@ QuestDB provides real-time metrics, a health check endpoint, and logging to moni
 
 - **Metrics:**
   QuestDB exposes detailed [metrics in Prometheus format](/docs/operations/logging-metrics/#metrics), including query
-  statistics, memory usage, and I/O details. A history of these metrics is
-  kept in the [`sys.metrics` table](/docs/operations/logging-metrics/#persisted-metrics).
+  statistics, memory usage, and I/O details.
 
 - **Health check:**
   A [minimal HTTP server](/docs/operations/logging-metrics/#minimal-http-server) monitors system health.

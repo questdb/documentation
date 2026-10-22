@@ -332,9 +332,6 @@ example configuration, enable it in within your `server.conf`:
 For an example on how to setup Prometheus, see the
 [QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
 
-To keep a metric history without an external scraper, query the
-[`sys.metrics` table](#persisted-metrics) instead.
-
 ### Cold storage read metrics
 
 _Enterprise only._

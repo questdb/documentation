@@ -52,13 +52,19 @@ Available from QuestDB 10.0.2. These keys control the `sys.metrics` table, see
 Samples metrics into `sys.metrics`. When set to `false`, the existing table is
 kept and can be dropped with `DROP TABLE 'sys.metrics'`.
 
+Persistence also counts unhandled errors for
+[`http.pessimistic.health.check.enabled`](/docs/configuration/http-server/#httppessimistichealthcheckenabled),
+even with `metrics.enabled=false`. With both keys set to `false`, the health
+check always returns HTTP 200.
+
 ### metrics.persist.exclude
 
-- **Default**: detailed `worker_pool_fiber_*` scheduler counters
+- **Default**: `worker_pool_fiber_(max_live|mounted|retained|finalizing|outstanding|created|retired|mount|wake|launch|scheduler_publication|scheduler_selection|orphan_recovery|mount_budget_exhaustion)(__.*)?`
 - **Reloadable**: no
 
-Java regular expression matched against column names. Matching metrics are not
-persisted. Set to an empty value to persist every metric.
+Java regular expression that must match the whole column name. Matching
+metrics are not persisted. A custom value replaces the default. Set to an empty
+value to persist every metric.
 
 ### metrics.persist.interval
 
