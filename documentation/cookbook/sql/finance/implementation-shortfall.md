@@ -78,7 +78,7 @@ For each trade, this looks up the mid-price at two offsets:
 - **Offset 0** — the mid-price at the moment of execution (arrival price)
 - **Offset 1800s** — the mid-price 30 minutes later (the "settled" price)
 
-The aggregate functions in the same `SELECT` reduce these matches to one row per symbol, side and offset, with the average mid (`mid`), the average fill price (`px`) and the total quantity (`vol`). The HORIZON JOIN runs them on the query workers in parallel.
+The aggregate functions in the same `SELECT` reduce these matches to one row per symbol, side and offset, with the average mid (`mid`), the average fill price (`px`) and the total quantity (`vol`). The HORIZON JOIN runs them on the query workers in parallel. Aggregating in the `PIVOT` instead would run on one thread over every trade and offset, see [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions).
 
 ### 2. PIVOT — reshape offsets into columns
 
@@ -92,7 +92,7 @@ PIVOT (
 
 This turns the two offset rows of each symbol and side into columns: `at_fill_mid`, `at_fill_px`, `at_fill_vol`, `at_30m_mid`, `at_30m_px`, `at_30m_vol`. The offset values in `FOR ... IN` are in nanoseconds (since `fx_trades` uses `TIMESTAMP_NS`), so 30 minutes = 1,800,000,000,000 ns.
 
-Each symbol, side and offset already has a single row, so `first()` only picks its value. Aggregating in the `PIVOT` over a HORIZON JOIN without aggregate functions gives the same numbers, but on a single thread over every trade and offset. See [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions).
+Each symbol, side and offset already has a single row, so `first()` only picks its value.
 
 ### 3. Decomposition — compute the three components
 

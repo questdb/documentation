@@ -855,14 +855,14 @@ the aggregates.
 
 ## Parallel GROUP BY over hash joins
 
-A `GROUP BY`, or an aggregation without grouping keys, over a single `INNER`,
-`LEFT` or `RIGHT` equi-join can run on the
-[query workers](/docs/configuration/shared-workers/#sharedqueryworkercount).
-Available since QuestDB 10.1.0. QuestDB builds one shared hash table from one
-side of the join, the **build** side, then the workers probe it with page
-frames of the other side, the **probe** side, and aggregate the matched rows. A `SAMPLE BY` over such a join
-qualifies as well, unless it uses `ALIGN TO FIRST OBSERVATION` or `FILL` with a
-value other than `NONE`.
+Since QuestDB 10.1.0, a `GROUP BY`, or an aggregation without grouping keys,
+over a single `INNER`, `LEFT` or `RIGHT` equi-join can run on the
+[query workers](/docs/configuration/shared-workers/#sharedqueryworkercount)
+instead of as a serial join followed by a GROUP BY. QuestDB builds one shared
+hash table from one side of the join, the **build** side. The workers then
+probe it with page frames of the other side, the **probe** side, and aggregate
+the matched rows. A `SAMPLE BY` over such a join qualifies as well, unless it
+uses `ALIGN TO FIRST OBSERVATION` or `FILL` with a value other than `NONE`.
 
 The join type decides which input is the build side:
 
@@ -932,7 +932,7 @@ Queries that don't qualify keep the ordinary plan: a `GroupBy` node over a
 `Hash Right Outer Join [Light]` node. Common reasons a query keeps the
 ordinary plan:
 
-- It uses an aggregate function outside a fixed set:
+- It uses an aggregate function other than these:
   - `count()`, `sum()`, `avg()`, `min()` and `max()` over numeric columns
     other than `BYTE`. `min()` and `max()` also take `CHAR`, `IPv4`, `DATE`
     and `TIMESTAMP` columns. `count()` also takes `SYMBOL`, `STRING`,

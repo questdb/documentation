@@ -190,7 +190,7 @@ An ECN with a mildly negative `vw_markout_5s_bps` but 80%+ `adverse_fill_ratio` 
 
 ## Pivoted ECN scorecard
 
-The sections above produce one row per ECN per horizon offset. Using `PIVOT`, you can reshape the results into a wide format — one row per symbol-ECN combination with fill count, average size, volume, and markout at each horizon as separate columns. The HORIZON JOIN computes the metrics per symbol, ECN and offset, and `PIVOT` only moves the offsets into columns, with `first()` picking the single value for each offset:
+The sections above produce one row per ECN per horizon offset. `PIVOT` reshapes the results into a wide format: one row per symbol-ECN combination, with fill count, average size, volume, and markout at each horizon as separate columns. The HORIZON JOIN computes the metrics per symbol, ECN and offset on the query workers in parallel, and `PIVOT` only moves the offsets into columns, with `first()` picking the single value for each offset. Aggregating in the `PIVOT` instead would run on one thread over every fill and offset, see [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions):
 
 ```questdb-sql title="Pivoted ECN scorecard (buy side)" demo
 WITH markouts AS (
@@ -222,8 +222,6 @@ ORDER BY t_5s_markout_bps;
 ```
 
 The result has columns like `at_fill_fills`, `at_fill_markout_bps`, `t_5s_markout_bps`, `t_1m_markout_bps`, etc. — one set per horizon. This is useful for dashboard views where you want a single wide table rather than long-form output.
-
-The HORIZON JOIN runs its aggregate functions on the query workers in parallel. Aggregating in the `PIVOT` over a HORIZON JOIN without aggregate functions gives the same numbers, but on a single thread over every fill and offset. See [Queries without aggregate functions](/docs/query/sql/horizon-join/#queries-without-aggregate-functions).
 
 Raw markouts can be misleading if an ECN rejects most of your flow and only fills the toxic orders. Compare `at_fill_fills` and `at_fill_avg_size` across ECNs — an ECN that fills fewer, smaller orders but shows clean markouts may simply be rejecting the hard-to-fill flow. A more complete picture requires comparing fill sizes against quoted sizes or incorporating reject rates from an orders table.
 

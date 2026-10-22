@@ -6,10 +6,9 @@ description:
   markout analysis, with right-hand filters and per-row or aggregated results.
 ---
 
-HORIZON JOIN is a specialized time-series join designed for **markout analysis**
-— a common financial analytics pattern where you need to analyze how prices or
-metrics evolve at specific time offsets relative to events (e.g., trades,
-orders).
+HORIZON JOIN is a time-series join for **markout analysis**: measuring how
+prices or other metrics evolve at fixed time offsets from events such as trades
+or orders.
 
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that runs an
 [ASOF JOIN](/docs/query/sql/asof-join/) match at each of a set of forward (or
@@ -102,9 +101,8 @@ shorthand form can't be combined with other predicates.
 
 When using multiple HORIZON JOINs, only the **last** HORIZON JOIN in the chain
 carries the `RANGE`/`LIST` and `AS` clauses. Preceding HORIZON JOINs omit them.
-Each right-hand table can independently use or omit the `ON` clause — you can
-freely mix keyed and non-keyed (timestamp-only ASOF) joins within the same
-query.
+Each right-hand table can use or omit the `ON` clause independently, so one
+query can mix keyed and non-keyed (timestamp-only ASOF) joins.
 
 Table aliases don't need `AS`, but the horizon alias does: `LIST (0) AS h`, not
 `LIST (0) h`.
@@ -148,7 +146,7 @@ the `AS` clause. This pseudo-table exposes two columns:
 ## Interval units
 
 All offset values in `RANGE` (`FROM`, `TO`, `STEP`) and `LIST` **must include a
-unit suffix**. Bare numbers are not valid — write `5s`, not `5` or
+unit suffix**. Bare numbers are not valid: write `5s`, not `5` or
 `5_000_000_000`. The only exception is `0`, which is allowed without a unit as
 shorthand for zero offset.
 
@@ -166,18 +164,17 @@ which fail with `unsupported HORIZON time unit`:
 | `h` | Hours |
 | `d` | Days |
 
-Note that `h.offset` is always returned as a `LONG` in the left-hand table's
-timestamp resolution (e.g., nanoseconds for `TIMESTAMP_NS` tables), regardless
-of the unit used in the `RANGE` or `LIST` definition. When matching offset
-values in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric value
-(e.g., `1_800_000_000_000` for 30 minutes in nanoseconds), not the interval
-literal.
+Whatever unit `RANGE` or `LIST` uses, `h.offset` is a `LONG` in the left-hand
+table's timestamp resolution, such as nanoseconds for `TIMESTAMP_NS` tables. To
+match offsets in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric
+value, such as `1_800_000_000_000` for 30 minutes in nanoseconds, not the
+interval literal.
 
 ## Mixed-precision timestamps
 
 The left-hand and right-hand tables can use different timestamp resolutions
 (e.g., `TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds).
-QuestDB aligns the timestamps internally — no explicit casting is needed.
+QuestDB aligns the timestamps internally, so no explicit casting is needed.
 
 When the tables differ in resolution, `h.offset` uses the resolution of the
 **left-hand table** (the event table).
@@ -199,7 +196,7 @@ When `GROUP BY` is present, it follows stricter rules than regular `GROUP BY`:
 
 For example, if the `SELECT` list contains `h.offset / 1_000_000_000 AS
 horizon_sec`, the `GROUP BY` must use either the alias `horizon_sec` or the full
-expression `h.offset / 1_000_000_000` — using just `h.offset` is not valid
+expression `h.offset / 1_000_000_000`. Using just `h.offset` is not valid,
 because it does not exactly match any non-aggregate `SELECT` expression.
 
 ## Queries without aggregate functions
@@ -227,12 +224,11 @@ WHERE t.timestamp IN '$now-1m..$now';
 
 Each trade in the interval produces four rows, one per offset.
 
-Aggregating these rows in an outer query gives the same result as writing the
-aggregate functions in the HORIZON JOIN itself. When you don't need the
-individual rows, write the aggregate functions in the HORIZON JOIN: there, the
-aggregation runs on the
+When you don't need the individual rows, write the aggregate functions in the
+HORIZON JOIN rather than in an outer query. Both return the same result, but
+the HORIZON JOIN aggregates on the
 [query workers](/docs/configuration/shared-workers/#sharedqueryworkercount),
-while an outer query aggregates on the thread that reads the rows.
+while an outer query aggregates on the single thread that reads the rows.
 
 :::warning Breaking change in QuestDB 10.1.0
 
@@ -246,13 +242,15 @@ no designated timestamp. See
 ### Row order and designated timestamp
 
 Rows are returned in left-hand row order and, within each left-hand row, in
-ascending offset order.
+ascending offset order. They aren't necessarily in `h.timestamp` order. To read
+them by horizon timestamp, add an explicit `ORDER BY`.
 
 When the query selects the left-hand table's designated timestamp, that column
-is the designated timestamp of the result. An `ORDER BY` on it needs no sort,
-and an outer query can use the result as the input of
-[SAMPLE BY](/docs/query/sql/sample-by/) or as the left-hand side of a
-time-series join such as [ASOF JOIN](/docs/query/sql/asof-join/):
+is the designated timestamp of the result. `h.timestamp` never is. An
+`ORDER BY` on the left-hand timestamp needs no sort, and an outer query can use
+the result as the input of [SAMPLE BY](/docs/query/sql/sample-by/) or as the
+left-hand side of a time-series join such as
+[ASOF JOIN](/docs/query/sql/asof-join/):
 
 ```questdb-sql title="30-second markout per symbol in 5-minute buckets" demo
 SELECT timestamp, symbol, avg(mid - price) AS avg_markout
@@ -270,16 +268,10 @@ FROM (
 SAMPLE BY 5m;
 ```
 
-The rows aren't necessarily in `h.timestamp` order, and `h.timestamp` is never
-the designated timestamp of the result. To read the rows by horizon timestamp,
-add an explicit `ORDER BY`. An outer `SAMPLE BY` needs the left-hand timestamp
-in the `SELECT` list of the HORIZON JOIN.
-
-The HORIZON JOIN matches in parallel, but the outer `SAMPLE BY` aggregates on a
-single thread. Use it when you need `FILL`, `ALIGN TO` or a
-[materialized view](#materialized-views). Otherwise, bucket the timestamp in the
-HORIZON JOIN itself, which aggregates on the query workers and returns the same
-values:
+Like any outer aggregation, the `SAMPLE BY` runs on a single thread. Use it
+when you need `FILL`, `ALIGN TO` or a [materialized view](#materialized-views).
+Otherwise, bucket the timestamp with `timestamp_floor()` in the HORIZON JOIN
+itself, which returns the same values and aggregates on the query workers:
 
 ```questdb-sql title="The same markout, aggregated in the HORIZON JOIN" demo
 SELECT
@@ -333,15 +325,15 @@ WHERE t.timestamp IN '$now-1h..$now';
 ### Materialized views
 
 A [materialized view](/docs/concepts/materialized-views/) needs a designated
-timestamp in the result of its query. The result of a HORIZON JOIN with
-aggregate functions, `DISTINCT` or `GROUP BY` has no designated timestamp, so a
-materialized view over it is created, then invalidated on its first refresh
-with
+timestamp in the result of its query, so build it as an outer `SAMPLE BY` over
+a HORIZON JOIN without aggregate functions that selects the left-hand
+designated timestamp. The result of a HORIZON JOIN with aggregate functions,
+`DISTINCT` or `GROUP BY` has no designated timestamp: a materialized view over
+it is created, then invalidated on its first refresh with
 `timestamp type mismatch between materialized view and query`.
 
-Instead, apply `SAMPLE BY` in the view query to a HORIZON JOIN without
-aggregate functions that selects the left-hand designated timestamp. The query
-reads several tables, so `WITH BASE` must name the left-hand table:
+The view query reads several tables, so `WITH BASE` must name the left-hand
+table:
 
 ```questdb-sql title="Hourly 30-second markout per symbol"
 CREATE MATERIALIZED VIEW markout_30s_1h WITH BASE fx_trades AS (
@@ -470,6 +462,21 @@ columns, such as `1 = 0` or a bind variable, applies to the right-hand table of
 that `ON` clause: a true value has no effect, and a false value leaves every
 left-hand row without a match in that table.
 
+The filter runs row by row during the ASOF lookup, without
+[JIT compilation](/docs/concepts/deep-dive/jit-compiler/) or symbol indexes. A
+filter that few rows pass can make each lookup scan far back through the
+right-hand table. In [`EXPLAIN`](/docs/query/sql/explain/) output, the filter
+appears as `slave filter` under the HORIZON JOIN node.
+
+:::warning Breaking change in QuestDB 10.1.0
+
+Before QuestDB 10.1.0, HORIZON JOIN ignored every `ON` predicate other than the
+join keys, so right-hand rows that failed it still matched, and it rejected a
+filter in a right-hand subquery unless the filter was a designated timestamp
+interval. See [Upgrading to QuestDB 10.1.0](#upgrading-to-questdb-1010).
+
+:::
+
 ### Filter restrictions
 
 - Besides the join keys, an `ON` clause can only hold predicates on its own
@@ -495,21 +502,6 @@ left-hand row without a match in that table.
   `right-hand side of HORIZON JOIN can only be a table with an optional filter`
   when the right-hand side is a subquery or a CTE.
 
-The filter runs row by row during the ASOF lookup, without
-[JIT compilation](/docs/concepts/deep-dive/jit-compiler/) or symbol indexes. A
-filter that few rows pass can make each lookup scan far back through the
-right-hand table. In [`EXPLAIN`](/docs/query/sql/explain/) output, the filter
-appears as `slave filter` under the HORIZON JOIN node.
-
-:::warning Breaking change in QuestDB 10.1.0
-
-Before QuestDB 10.1.0, HORIZON JOIN ignored every `ON` predicate other than the
-join keys, so right-hand rows that failed it still matched, and it rejected a
-filter in a right-hand subquery unless the filter was a designated timestamp
-interval. See [Upgrading to QuestDB 10.1.0](#upgrading-to-questdb-1010).
-
-:::
-
 ## Examples
 
 The examples below use the [demo dataset](/docs/cookbook/demo-data-schema/)
@@ -518,8 +510,8 @@ with 2D arrays for bids/asks).
 
 ### Post-trade markout at uniform horizons
 
-Measure the average mid-price at 5-second intervals after each trade — a classic
-way to evaluate execution quality and price impact:
+Measure the average mid-price at 5-second intervals after each trade to
+evaluate execution quality and price impact:
 
 ```questdb-sql title="Post-trade markout curve" demo
 SELECT
@@ -554,8 +546,8 @@ ORDER BY t.symbol, horizon_sec;
 
 ### Pre- and post-trade price movement
 
-Use negative offsets to see price levels before and after trades — useful for
-detecting information leakage or adverse selection:
+Use negative offsets to see price levels before and after trades, which helps
+detect information leakage or adverse selection:
 
 ```questdb-sql title="Price movement around trade events" demo
 SELECT
@@ -588,9 +580,8 @@ ORDER BY horizon_sec;
 
 ### Multi-table: consolidated and ECN-level quotes around trades
 
-Join against two right-hand tables in a single query - `market_data` for
-consolidated book prices and `core_price` for ECN-level quotes - to compare
-how both track around each EURUSD trade:
+Join `market_data` for consolidated book prices and `core_price` for ECN-level
+quotes in a single query to compare how both track around each EURUSD trade:
 
 ```questdb-sql title="Multi-table HORIZON JOIN with demo data" demo
 SELECT
@@ -610,8 +601,7 @@ GROUP BY horizon_ms, t.symbol
 ORDER BY t.symbol, horizon_ms;
 ```
 
-Note that the `LIST` clause appears only on the last HORIZON JOIN. Each
-right-hand table can independently use or omit `ON`.
+The `LIST` clause appears only on the last HORIZON JOIN.
 
 ### Multi-table: bid and ask spread (synthetic example)
 
@@ -636,8 +626,8 @@ ORDER BY t.symbol, horizon_sec;
 ### Multi-table: keyed and non-keyed mix
 
 Combine a keyed join (matching by symbol) with a non-keyed join (timestamp-only
-ASOF) in the same query — useful when one source is symbol-specific and another
-is market-wide:
+ASOF) in the same query when one source is symbol-specific and another is
+market-wide:
 
 ```questdb-sql title="Mixed keyed and non-keyed HORIZON JOIN"
 SELECT
@@ -794,10 +784,9 @@ fail. Before 10.1.0, HORIZON JOIN ignored them. After the upgrade:
   [forms in the grammar](#select-list-right-hand-side-and-on-condition). More
   complex subqueries aren't supported, see
   [Filter restrictions](#filter-restrictions).
-- **Left-hand side queries are restricted as well**. On the left hand side, the
-  query that works best is a table with an optional filter. Some other query
-  types are also supported, but they degrade the query plan to single-threaded
-  processing.
+- **Restricted left-hand side**: A table with an optional filter works best.
+  Some other query types are supported, but they degrade the query plan to
+  single-threaded processing.
 - **RANGE constraints**: `STEP` must be positive; `FROM` must be less than or
   equal to `TO`.
 - **LIST constraints**: Offsets must be interval literals (e.g., `1s`, `-2m`,
