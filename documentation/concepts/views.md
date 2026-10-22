@@ -284,6 +284,10 @@ Views are automatically invalidated when their dependencies change:
 | `RENAME COLUMN` | View becomes invalid if column is referenced |
 | Column type change | View metadata is updated |
 
+Since QuestDB 10.1.0, `CREATE VIEW` and `ALTER VIEW` also record a table named
+by a table-name function in the definition, such as `table_columns('trades')`,
+as a dependency, so dropping that table invalidates the view.
+
 ### Automatic recovery
 
 Views are automatically revalidated when the invalidating condition is reversed:
@@ -376,11 +380,58 @@ GRANT SELECT ON public_summary TO analyst_role;
 
 -- Analysts can query the view without access to sensitive_sales
 SELECT * FROM public_summary;  -- Works!
-SELECT * FROM sensitive_sales; -- Access denied!
+SELECT * FROM sensitive_sales; -- table does not exist
 ```
+
+Holding no permission on `sensitive_sales`, the analysts cannot
+[see it](/docs/security/rbac/#object-visibility) either: it is missing from
+`SHOW TABLES`, and querying it fails with
+`table does not exist [table=sensitive_sales]`. The view's definition, which
+they can read through `views()` and `SHOW CREATE VIEW`, still names the table.
 
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
+
+### Metadata functions in views (Enterprise) {#metadata-functions-in-views}
+
+The table-name functions `table_columns()`, `table_partitions()`,
+`wal_transactions()`, and `table_cold_partitions()`, and the `SHOW COLUMNS`,
+`SHOW PARTITIONS`, and `SHOW CREATE` statements read an object's metadata. In a
+view's definition, they resolve the objects the definition names with the
+view's authority, like the tables the view reads. A view can therefore publish
+the metadata of a table its readers cannot see:
+
+```questdb-sql title="Publish partition statistics, not the table"
+CREATE VIEW risk_limits_partitions AS (
+  SELECT name, numRows, diskSize FROM table_partitions('risk_limits')
+);
+GRANT SELECT ON risk_limits_partitions TO desk_user;
+```
+
+`desk_user` can query `risk_limits_partitions`, while running
+`table_partitions('risk_limits')` directly fails with
+`table does not exist [table=risk_limits]`. A principal that can see the view
+but holds no `SELECT` on it gets `Access denied`.
+
+The view lends its authority only to the objects its definition names. An
+object a reader substitutes through an `OVERRIDABLE` variable resolves with the
+reader's own permissions:
+
+```questdb-sql title="A substituted table resolves as the reader"
+CREATE VIEW columns_of AS (
+  DECLARE OVERRIDABLE @t := 'risk_limits'
+  SELECT "column", type FROM table_columns(@t)
+);
+
+-- As a reader that holds no permission on positions,
+-- fails with: table does not exist [table=positions]
+DECLARE @t := 'positions' SELECT * FROM columns_of;
+```
+
+A view created before QuestDB Enterprise 4.1.0 has no record of the tables its
+table-name functions name, so it resolves them with the reader's own
+permissions until you run [`ALTER VIEW`](/docs/query/sql/alter-view/) or
+`CREATE OR REPLACE VIEW` on it.
 
 ### No column-level permissions on views
 

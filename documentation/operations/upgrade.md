@@ -99,6 +99,35 @@ include it. Accounts that triggered role switches through `SYSTEM ADMIN` on
 3.3.x need an explicit `GRANT SWITCH ROLE`. See
 [Failover operator](/docs/security/rbac/#failover-operator).
 
+### Upgrading to 4.1.0
+
+QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no
+permission on them, see
+[object visibility](/docs/security/rbac/#object-visibility). The behavior
+applies whenever access control is enabled and cannot be turned off. Check the
+following before upgrading:
+
+- Catalogue queries such as `tables()` and `SHOW TABLES` list only the objects
+  a principal holds a permission on. Statements that name any other object fail
+  with the missing-object error, such as `table does not exist [table=trades]`,
+  instead of `Access denied`. Update clients and tests that match the old
+  message.
+- `reader_pool()`, `writer_pool()`, `files()`, and `glob()` with a pattern
+  outside `cairo.sql.copy.root` require `SYSTEM ADMIN`. Monitoring accounts
+  that call them need it, which also makes every unprotected object
+  [visible](/docs/security/rbac/#visibility-rules) to them.
+- Creating a materialized or live view that calls a
+  [catalogue function](/docs/query/sql/create-mat-view/#catalogue-functions),
+  such as `tables()`, requires `SYSTEM ADMIN`. An existing materialized view
+  that reads one through a regular view is invalidated at its first refresh.
+- A view created on an earlier version that calls a table-name function, such
+  as `table_columns('trades')`, lends its readers access to that table's
+  metadata only after `ALTER VIEW` or `CREATE OR REPLACE VIEW` runs on it, see
+  [metadata functions in views](/docs/concepts/views/#metadata-functions-in-views).
+- Compiled statements in the query caches are no longer shared between
+  principals, so cache hit rates can drop when many principals run the same
+  SQL.
+
 ### QuestDB Enterprise BYOC
 
 For QuestDB Enterprise BYOC customers, QuestDB manages the upgrade process. The

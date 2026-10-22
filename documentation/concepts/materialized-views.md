@@ -539,6 +539,10 @@ Materialized view queries:
 - Must use `SAMPLE BY` or `GROUP BY` with a designated timestamp column
 - Must not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Must not use non-deterministic functions (`now()`, `rnd_uuid4()`)
+- Must not read
+  [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions),
+  such as `tables()`, through a regular view. In QuestDB Enterprise, calling
+  them in the view's own query requires `SYSTEM ADMIN`
 - Must use join conditions compatible with incremental refresh
 - When the base table uses [deduplication](/docs/concepts/deduplication/), non-aggregate
   columns must be a subset of the `DEDUP` keys

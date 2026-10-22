@@ -79,7 +79,7 @@ valid again.
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist [view=name]` | View doesn't exist and `IF EXISTS` not specified |
+| `view does not exist [view=name]` | View doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise), and `IF EXISTS` not specified |
 | `Access denied [DROP VIEW on view_name]` | User lacks `DROP VIEW` permission (Enterprise) |
 
 ## Permissions (Enterprise)

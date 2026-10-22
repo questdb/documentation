@@ -16,6 +16,16 @@ learning useful information about your instance, including:
 - Partition storage size on disk
 - Running SQL commands
 
+:::note
+
+In QuestDB Enterprise, the catalogue functions on this page, such as
+`tables()`, `views()`, and `wal_tables()`, list only the objects the caller
+[can see](/docs/security/rbac/#object-visibility). The functions that take a
+table name, such as `table_columns()`, fail with `table does not exist` for a
+table hidden from the caller.
+
+:::
+
 ## build
 
 **Arguments:**
@@ -139,6 +149,8 @@ This function should only be used when directed by QuestDB support. Misuse could
 cause corruption of the metadata cache, requiring the database to be restarted.
 
 :::
+
+In QuestDB Enterprise, the function requires the `SYSTEM ADMIN` permission.
 
 **Arguments:**
 
@@ -466,6 +478,10 @@ table name, the ID of the thread that currently owns the reader, the timestamp
 of the last time the reader was accessed, and the current transaction ID with
 which the reader is associated.
 
+In QuestDB Enterprise, `reader_pool()` requires the `SYSTEM ADMIN` permission,
+because the pool lists tables whether or not the caller
+[can see](/docs/security/rbac/#object-visibility) them.
+
 **Examples:**
 
 ```questdb-sql
@@ -536,13 +552,26 @@ Storage policies — and the `storage_policies` view — are available in
 
 :::
 
-`storage_policies` is a system view that lists every
-[storage policy](/docs/concepts/storage-policy/) currently attached to a table.
-Query it like any other table:
+`storage_policies` is a system view that lists the
+[storage policies](/docs/concepts/storage-policy/) currently attached to
+tables. Every principal can see the view, but it lists only the policies of the
+tables the caller [can see](/docs/security/rbac/#object-visibility), system
+tables included. Query it like any other table:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
 ```
+
+:::note
+
+In QuestDB Enterprise 4.1.0, querying the view also requires `SELECT` on the
+`sys.sp_entries` and `sys.sp_links` system tables, granted directly or through
+`SELECT ON ALL TABLES` or `DATABASE ADMIN`. Without it, the query fails with
+`Access denied for <principal> [SELECT on sys.sp_entries(status)]`. Those
+tables hold the directory name of every table with a policy, so a principal
+that can read them directly can find tables otherwise hidden from it.
+
+:::
 
 **Columns:**
 
@@ -595,6 +624,11 @@ stage set and has been temporarily disabled. Every unset stage renders as `0h`.
 **Arguments:**
 
 - `tableName` (`string`): the name of an existing table.
+
+The caller needs a permission on the table, though not necessarily `SELECT`,
+because the function returns partition metadata rather than data. For a table
+the caller [cannot see](/docs/security/rbac/#object-visibility), it fails with
+`table does not exist [table=tableName]`.
 
 **Columns:**
 
@@ -1283,7 +1317,10 @@ and `errorMessage` of a suspended table.
 
 `wal_tables()` returns the WAL status for all
 [WAL tables](/docs/concepts/write-ahead-log/), materialized views, and live
-views in the database.
+views in the database. In QuestDB Enterprise, it lists the objects the caller
+[can see](/docs/security/rbac/#object-visibility), and also the protected
+access control tables to principals holding `DATABASE ADMIN` or
+`SYSTEM ADMIN`, so that they can recover them.
 
 **Arguments:**
 
@@ -1335,6 +1372,10 @@ writer pool is a cache of table writers that are kept open to speed up
 subsequent writes to the same table. The returned information includes the table
 name, the ID of the thread that currently owns the writer, the timestamp of the
 last time the writer was accessed, and the reason for the ownership.
+
+In QuestDB Enterprise, `writer_pool()` requires the `SYSTEM ADMIN` permission,
+because the pool lists tables whether or not the caller
+[can see](/docs/security/rbac/#object-visibility) them.
 
 **Examples:**
 
