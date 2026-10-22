@@ -908,6 +908,7 @@ module.exports = {
             "integrations/visualization/grafana",
             "integrations/visualization/qstudio",
             "integrations/visualization/superset",
+            "integrations/visualization/visualeaf",
             "integrations/visualization/powerbi",
             "integrations/visualization/embeddable",
           ],
