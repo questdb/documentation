@@ -269,9 +269,9 @@ SAMPLE BY 5m;
 ```
 
 Like any outer aggregation, the `SAMPLE BY` runs on a single thread. Use it
-when you need `FILL`, `ALIGN TO` or a [materialized view](#materialized-views).
-Otherwise, bucket the timestamp with `timestamp_floor()` in the HORIZON JOIN
-itself, which returns the same values and aggregates on the query workers:
+when you need `FILL` or `ALIGN TO`. Otherwise, bucket the timestamp with
+`timestamp_floor()` in the HORIZON JOIN itself, which returns the same values
+and aggregates on the query workers:
 
 ```questdb-sql title="The same markout, aggregated in the HORIZON JOIN" demo
 SELECT
@@ -321,46 +321,6 @@ HORIZON JOIN market_data AS m ON (symbol)
 LIST (0, 5s) AS h
 WHERE t.timestamp IN '$now-1h..$now';
 ```
-
-### Materialized views
-
-A [materialized view](/docs/concepts/materialized-views/) needs a designated
-timestamp in the result of its query, so build it as an outer `SAMPLE BY` over
-a HORIZON JOIN without aggregate functions that selects the left-hand
-designated timestamp. The result of a HORIZON JOIN with aggregate functions,
-`DISTINCT` or `GROUP BY` has no designated timestamp: a materialized view over
-it is created, then invalidated on its first refresh with
-`timestamp type mismatch between materialized view and query`.
-
-The view query reads several tables, so `WITH BASE` must name the left-hand
-table:
-
-```questdb-sql title="Hourly 30-second markout per symbol"
-CREATE MATERIALIZED VIEW markout_30s_1h WITH BASE fx_trades AS (
-    SELECT timestamp, symbol, avg(mid - price) AS avg_markout
-    FROM (
-        SELECT
-            t.timestamp,
-            t.symbol,
-            t.price,
-            (m.best_bid + m.best_ask) / 2 AS mid
-        FROM fx_trades AS t
-        HORIZON JOIN market_data AS m ON (symbol)
-        LIST (30s) AS h
-    )
-    SAMPLE BY 1h
-);
-```
-
-Only inserts into the base table, here `fx_trades`, trigger a refresh. A
-refresh that runs before the quotes at a forward offset arrive matches older
-quotes, and quotes that arrive later don't update the view by themselves. To
-wait for them, create the view with a
-[`PERIOD`](/docs/query/sql/create-mat-view/#period-clause) whose `DELAY` covers
-the largest offset plus the quote delivery delay, such as
-`WITH BASE fx_trades REFRESH PERIOD (LENGTH 1h DELAY 2m)`. To recompute a time
-range after late quotes arrive, run
-[`REFRESH MATERIALIZED VIEW ... RANGE FROM ... TO ...`](/docs/query/sql/refresh-mat-view/#range).
 
 ## Filtering right-hand tables
 
