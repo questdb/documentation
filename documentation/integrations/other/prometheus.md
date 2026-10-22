@@ -51,6 +51,9 @@ configuration:
 metrics.enabled=true
 ```
 
+With or without the endpoint, QuestDB keeps a history of these metrics in the
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics) table.
+
 When running QuestDB via Docker, port `9003` must be exposed and the metrics
 configuration can be enabled via the `QDB_METRICS_ENABLED` environment variable:
 

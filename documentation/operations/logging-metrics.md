@@ -332,6 +332,75 @@ example configuration, enable it in within your `server.conf`:
 For an example on how to setup Prometheus, see the
 [QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
 
+QuestDB also keeps a history of these metrics in the `sys.metrics` table, with
+or without the endpoint. See [Metric history](#persisted-metrics).
+
+### Metric history in `sys.metrics` {#persisted-metrics}
+
+QuestDB samples its own metrics every second and appends them to the
+`sys.metrics` table, so you can chart metric history with SQL without running
+Prometheus. This is on by default and does not need `metrics.enabled`.
+The table holds the metrics of the local node only: it is not replicated, and
+[QuestDB Enterprise backups](/docs/operations/backup/) exclude it.
+
+Like other system tables, `sys.metrics` is hidden from `SHOW TABLES` and the
+Web Console, so query it by name. It has one row per sample, with `ts` as the
+designated timestamp, and one `LONG` or `DOUBLE` column per metric:
+
+- Column names are usually the Prometheus names without the `questdb_` prefix
+  and the `_total` suffix, for example `commits` and `memory_rss`.
+- Labelled metrics get one column per label value, joined with `__`, for
+  example `worker_pool_fiber_live__shared_network`.
+- Counters are cumulative since server start, so a rate is the difference
+  between consecutive rows.
+- The memory gauges `memory_rss`, `memory_mem_used`, `memory_free_count`,
+  `memory_malloc_count`, `memory_realloc_count` and `memory_jvm_*` are
+  refreshed every 60 seconds by default, and rows in between repeat the last
+  value. On QuestDB Enterprise, so are `replication_pending_upload_txn`,
+  `backup_active_at_last_demote` and `tls_cert_ttl_seconds_*`.
+
+```questdb-sql title="List the available metric columns" demo
+SELECT "column", type
+FROM table_columns('sys.metrics')
+ORDER BY "column";
+```
+
+```questdb-sql title="Hourly memory and CPU over the last day" demo
+SELECT
+    ts,
+    max(memory_rss) AS rss_max,
+    avg(cpu_questdb_percent) AS cpu_avg
+FROM 'sys.metrics'
+WHERE ts IN '$now-1d..$now'
+SAMPLE BY 1h;
+```
+
+```questdb-sql title="Commits per second over the last hour" demo
+SELECT ts, commits_per_sec
+FROM (
+    SELECT ts, commits - lag(commits) OVER (ORDER BY ts) AS commits_per_sec
+    FROM 'sys.metrics'
+    WHERE ts IN '$now-1h..$now'
+)
+WHERE commits_per_sec >= 0;
+```
+
+At the default one-second interval, each difference is a per-second rate. The
+`>= 0` filter drops the negative value after a restart, when counters reset.
+
+Data is kept for one week by default, and completed day partitions are
+converted to [Parquet](/docs/concepts/parquet/). To change the interval,
+retention or excluded metrics, or to turn persistence off with
+`metrics.persist.enabled=false`, see the
+[persisted metrics configuration](/docs/configuration/logging-metrics/#persisted-metrics).
+
+:::note
+
+QuestDB owns `sys.metrics`. Don't write to or alter it. If its schema is
+incompatible at startup, QuestDB drops and recreates it, losing its history.
+
+:::
+
 ### Cold storage read metrics
 
 _Enterprise only._
@@ -375,49 +444,6 @@ Two gauges describe the state of an in-place
 | ------ | ---- | ----------- |
 | `questdb_replication_pending_upload_txn` | gauge | Committed transactions not yet uploaded to the object store, summed over the replicated tables. Poll it before demoting a primary: a demote that cannot bring it to zero within its timeout is not completed |
 | `questdb_backup_active_at_last_demote` | gauge | `1` if a backup was still running when the node was last demoted, `0` otherwise. Cleared by the next promotion |
-
-### Persisted metrics
-
-QuestDB samples its own metrics every second and appends them to the
-`sys.metrics` table, so you can chart metric history with SQL without running
-Prometheus. Persistence is on by default and does not need `metrics.enabled`.
-The table holds the metrics of the local node only: it is not replicated, and
-[QuestDB Enterprise backups](/docs/operations/backup/) exclude it.
-
-Like other system tables, `sys.metrics` is hidden from `SHOW TABLES` and the
-Web Console, so query it by name. It has one row per sample, with `ts` as the
-designated timestamp, and one `LONG` or `DOUBLE` column per metric:
-
-- Column names are usually the Prometheus names without the `questdb_` prefix
-  and the `_total` suffix, for example `commits` and `memory_rss`.
-- Labelled metrics get one column per label value, joined with `__`.
-- Counters are cumulative since server start, so compute rates from the
-  difference between consecutive rows.
-- Process-level gauges, such as `memory_rss`, are refreshed every 60 seconds
-  by default.
-
-```questdb-sql title="Hourly memory and CPU over the last day"
-SELECT
-    ts,
-    max(memory_rss) AS rss_max,
-    avg(cpu_questdb_percent) AS cpu_avg
-FROM 'sys.metrics'
-WHERE ts IN '$now-1d..$now'
-SAMPLE BY 1h;
-```
-
-Data is kept for one week by default, and completed day partitions are
-converted to [Parquet](/docs/concepts/parquet/). To change the interval,
-retention or excluded metrics, or to turn persistence off with
-`metrics.persist.enabled=false`, see the
-[persisted metrics configuration](/docs/configuration/logging-metrics/#persisted-metrics).
-
-:::note
-
-QuestDB owns `sys.metrics`. Don't write to or alter it. If its schema is
-incompatible at startup, QuestDB drops and recreates it, losing its history.
-
-:::
 
 ### Prometheus Alertmanager
 

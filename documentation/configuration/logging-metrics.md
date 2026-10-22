@@ -106,4 +106,6 @@ of a storage policy.
 - **Default**: `60s`
 - **Reloadable**: no
 
-How often process-level gauges, such as `memory_rss`, are refreshed.
+How often the memory gauges, such as `memory_rss`, are refreshed. See
+[Metric history in `sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics)
+for the full list.
