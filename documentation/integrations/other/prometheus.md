@@ -24,6 +24,10 @@ instance, and how to enable alerting from QuestDB to Prometheus Alertmanager.
 For guidance on what metrics to monitor and alerting strategies, see
 [Monitoring and alerting](/docs/operations/monitoring-alerting/).
 
+From QuestDB 10.0.2, most of these metrics are also stored in the node-local
+[`sys.metrics` table](/docs/operations/logging-metrics/#persisted-metrics),
+which you can query with SQL without enabling this endpoint.
+
 ## Prerequisites
 
 - **QuestDB** must be running and accessible. Checkout the

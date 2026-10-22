@@ -48,6 +48,27 @@ w.alert.level=CRITICAL
 For more details, see the
 [Logging and metrics page](/docs/operations/logging-metrics/#prometheus-alertmanager).
 
+## Query metric history
+
+From QuestDB 10.0.2, each instance samples its own metrics every second into
+the node-local `sys.metrics` table, kept for one week by default. Use it to
+look back at memory, CPU and error counts around an incident without a
+Prometheus setup:
+
+```questdb-sql title="Native memory, RSS and unhandled errors over the last day"
+SELECT
+    ts,
+    max(memory_mem_used) AS native_used,
+    max(memory_rss) AS rss,
+    max(unhandled_errors) AS unhandled_errors
+FROM 'sys.metrics'
+WHERE ts IN '$now-1d..$now'
+SAMPLE BY 15m;
+```
+
+See [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics)
+for the table layout and configuration.
+
 ## Detect table health issues
 
 This section covers monitoring and troubleshooting table health issues. For
