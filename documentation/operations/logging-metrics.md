@@ -351,8 +351,7 @@ designated timestamp, and one `LONG` or `DOUBLE` column per metric:
   and the `_total` suffix, for example `commits` and `memory_rss`.
 - Labelled metrics get one column per label value, joined with `__`, for
   example `worker_pool_fiber_live__shared_network`.
-- Counters are cumulative since server start, so a rate is the difference
-  between consecutive rows.
+- Counters are cumulative since server start and reset on restart.
 - The memory gauges `memory_rss`, `memory_mem_used`, `memory_free_count`,
   `memory_malloc_count`, `memory_realloc_count` and `memory_jvm_*` are
   refreshed every 60 seconds by default, and rows in between repeat the last
@@ -376,17 +375,21 @@ SAMPLE BY 1h;
 ```
 
 ```questdb-sql title="Commits per second over the last hour" demo
-SELECT ts, commits_per_sec
+SELECT ts, commit_delta / elapsed_seconds AS commits_per_sec
 FROM (
-    SELECT ts, commits - lag(commits) OVER (ORDER BY ts) AS commits_per_sec
+    SELECT
+        ts,
+        commits - lag(commits) OVER (ORDER BY ts) AS commit_delta,
+        (ts - lag(ts) OVER (ORDER BY ts)) / 1000000.0 AS elapsed_seconds
     FROM 'sys.metrics'
     WHERE ts IN '$now-1h..$now'
 )
-WHERE commits_per_sec >= 0;
+WHERE commit_delta >= 0 AND elapsed_seconds > 0;
 ```
 
-At the default one-second interval, each difference is a per-second rate. The
-`>= 0` filter drops the negative value after a restart, when counters reset.
+This uses the time between samples, so it also works with a different sampling
+interval or gaps in the history. Negative changes are omitted; they can occur
+when counters reset after a restart.
 
 Data is kept for one week by default, and completed day partitions are
 converted to [Parquet](/docs/concepts/parquet/). To change the interval,
