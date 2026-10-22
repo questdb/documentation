@@ -14,10 +14,10 @@ orders).
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that runs an
 [ASOF JOIN](/docs/query/sql/asof-join/) match at each of a set of forward (or
 backward) time offsets from every left-hand row, in a single pass. Without
-aggregate functions, the query returns one row per left-hand row and offset.
-Adding aggregate functions collapses those matches into one row per
-combination of the selected non-aggregate columns, typically the offset and
-keys, which is how markout curves are built.
+aggregate functions, `DISTINCT` or `GROUP BY`, the query returns one row per
+left-hand row and offset. Adding aggregate functions collapses those matches
+into one row per combination of the selected non-aggregate columns, typically
+the offset and keys, which is how markout curves are built.
 
 HORIZON JOIN supports joining against **multiple right-hand-side tables** in a
 single query, matching columns from several time-series sources against a
@@ -35,12 +35,11 @@ Generate offsets at regular intervals from `FROM` to `TO` (inclusive) with the
 given `STEP`:
 
 ```questdb-sql title="HORIZON JOIN with RANGE"
+[WITH <cte_name> AS (<query>) [, ...]]
 SELECT [DISTINCT] <select_list>
-FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_side_1> AS <alias_1> [ON (<on_condition_1>)]
-[HORIZON JOIN <right_side_2> AS <alias_2> [ON (<on_condition_2>)]]
-...
-HORIZON JOIN <right_side_N> AS <alias_N> [ON (<on_condition_N>)]
+FROM <left_table> [[AS] <left_alias>]
+HORIZON JOIN <right_side> [[AS] <alias>] [ON <on_condition>]
+[HORIZON JOIN <right_side> [[AS] <alias>] [ON <on_condition>] ...]
 RANGE FROM <from_expr> TO <to_expr> STEP <step_expr> AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -55,12 +54,11 @@ For example, `RANGE FROM -3m TO 3m STEP 1m` generates offsets at -3m, -2m, -1m,
 Specify explicit offsets as interval literals:
 
 ```questdb-sql title="HORIZON JOIN with LIST"
+[WITH <cte_name> AS (<query>) [, ...]]
 SELECT [DISTINCT] <select_list>
-FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_side_1> AS <alias_1> [ON (<on_condition_1>)]
-[HORIZON JOIN <right_side_2> AS <alias_2> [ON (<on_condition_2>)]]
-...
-HORIZON JOIN <right_side_N> AS <alias_N> [ON (<on_condition_N>)]
+FROM <left_table> [[AS] <left_alias>]
+HORIZON JOIN <right_side> [[AS] <alias>] [ON <on_condition>]
+[HORIZON JOIN <right_side> [[AS] <alias>] [ON <on_condition>] ...]
 LIST (<offset_expr>, ...) AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -96,17 +94,20 @@ Each `<right_side>` takes one of these forms:
   aggregation or a join, fails. See
   [Filter restrictions](#filter-restrictions).
 
-`<on_condition>` holds the join keys, such as `symbol` or
-`t.symbol = m.symbol AND t.ecn = m.ecn`. It can also hold predicates on that
-right-hand table alone, joined with `AND`, such as
-`t.symbol = m.symbol AND m.ecn = 'LMAX'`. The shorthand form, `ON (symbol)`,
-can't be combined with other predicates.
+`<on_condition>` holds the join keys, as the shorthand `(symbol)` or as
+equalities such as `t.symbol = c.symbol AND t.ecn = c.ecn`. Parentheses around
+it are optional. It can also hold predicates on that right-hand table alone,
+joined with `AND`, such as `t.symbol = c.symbol AND c.ecn = 'LMAX'`. The
+shorthand form can't be combined with other predicates.
 
 When using multiple HORIZON JOINs, only the **last** HORIZON JOIN in the chain
 carries the `RANGE`/`LIST` and `AS` clauses. Preceding HORIZON JOINs omit them.
 Each right-hand table can independently use or omit the `ON` clause — you can
 freely mix keyed and non-keyed (timestamp-only ASOF) joins within the same
 query.
+
+Table aliases don't need `AS`, but the horizon alias does: `LIST (0) AS h`, not
+`LIST (0) h`.
 
 ## How it works
 
@@ -124,8 +125,9 @@ combination, its columns resolve to `NULL`.
 Aggregate functions are optional, and the shape of the result depends on
 whether the `SELECT` list has them:
 
-- **Without aggregate functions**, the query returns every match: one row per
-  left-hand row and offset. See
+- **Without aggregate functions, `DISTINCT` or `GROUP BY`**, the query returns
+  one row per left-hand row and offset, including those with no match in a
+  right-hand table, which have `NULL` in that table's columns. See
   [Queries without aggregate functions](#queries-without-aggregate-functions).
 - **With aggregate functions**, QuestDB implicitly groups the results by the
   non-aggregate `SELECT` columns (horizon offset, left-hand table keys, etc.),
@@ -150,8 +152,9 @@ unit suffix**. Bare numbers are not valid — write `5s`, not `5` or
 `5_000_000_000`. The only exception is `0`, which is allowed without a unit as
 shorthand for zero offset.
 
-Both `RANGE` and `LIST` use the same interval expression syntax as
-[SAMPLE BY](/docs/query/sql/sample-by/):
+Both `RANGE` and `LIST` accept these units. Unlike
+[SAMPLE BY](/docs/query/sql/sample-by/), they don't accept `w`, `M` or `y`,
+which fail with `unsupported HORIZON time unit`:
 
 | Unit | Meaning |
 |------|---------|
@@ -169,6 +172,35 @@ of the unit used in the `RANGE` or `LIST` definition. When matching offset
 values in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric value
 (e.g., `1_800_000_000_000` for 30 minutes in nanoseconds), not the interval
 literal.
+
+## Mixed-precision timestamps
+
+The left-hand and right-hand tables can use different timestamp resolutions
+(e.g., `TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds).
+QuestDB aligns the timestamps internally — no explicit casting is needed.
+
+When the tables differ in resolution, `h.offset` uses the resolution of the
+**left-hand table** (the event table).
+
+## GROUP BY rules
+
+The `GROUP BY` clause is optional. When it is omitted and the `SELECT` list has
+aggregate functions, results are implicitly grouped by all non-aggregate
+`SELECT` columns. When it is omitted and there are no aggregate functions,
+nothing is grouped: see
+[Queries without aggregate functions](#queries-without-aggregate-functions).
+When `GROUP BY` is present, it follows stricter rules than regular `GROUP BY`:
+
+- Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
+  expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`) or
+  a `SELECT` column alias.
+- Every non-aggregate `SELECT` column must appear in `GROUP BY`.
+- Column index references are supported (e.g., `GROUP BY 1, 2`).
+
+For example, if the `SELECT` list contains `h.offset / 1_000_000_000 AS
+horizon_sec`, the `GROUP BY` must use either the alias `horizon_sec` or the full
+expression `h.offset / 1_000_000_000` — using just `h.offset` is not valid
+because it does not exactly match any non-aggregate `SELECT` expression.
 
 ## Queries without aggregate functions
 
@@ -238,10 +270,28 @@ FROM (
 SAMPLE BY 5m;
 ```
 
-The rows are not in `h.timestamp` order, and `h.timestamp` is never the
-designated timestamp of the result. To read the rows by horizon timestamp, add
-an explicit `ORDER BY`. An outer `SAMPLE BY` needs the left-hand timestamp in
-the `SELECT` list of the HORIZON JOIN.
+The rows aren't necessarily in `h.timestamp` order, and `h.timestamp` is never
+the designated timestamp of the result. To read the rows by horizon timestamp,
+add an explicit `ORDER BY`. An outer `SAMPLE BY` needs the left-hand timestamp
+in the `SELECT` list of the HORIZON JOIN.
+
+The HORIZON JOIN matches in parallel, but the outer `SAMPLE BY` aggregates on a
+single thread. Use it when you need `FILL`, `ALIGN TO` or a
+[materialized view](#materialized-views). Otherwise, bucket the timestamp in the
+HORIZON JOIN itself, which aggregates on the query workers and returns the same
+values:
+
+```questdb-sql title="The same markout, aggregated in the HORIZON JOIN" demo
+SELECT
+    timestamp_floor('5m', t.timestamp) AS ts,
+    t.symbol,
+    avg((m.best_bid + m.best_ask) / 2 - t.price) AS avg_markout
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (30s) AS h
+WHERE t.timestamp IN '$now-1h..$now'
+ORDER BY ts, t.symbol;
+```
 
 With the designated timestamp selected, `INSERT INTO ... SELECT` and
 `CREATE TABLE AS SELECT` carry the rows into a table. When `INSERT` lists the
@@ -312,7 +362,13 @@ CREATE MATERIALIZED VIEW markout_30s_1h WITH BASE fx_trades AS (
 
 Only inserts into the base table, here `fx_trades`, trigger a refresh. A
 refresh that runs before the quotes at a forward offset arrive matches older
-quotes, and quotes that arrive later don't update the view by themselves.
+quotes, and quotes that arrive later don't update the view by themselves. To
+wait for them, create the view with a
+[`PERIOD`](/docs/query/sql/create-mat-view/#period-clause) whose `DELAY` covers
+the largest offset plus the quote delivery delay, such as
+`WITH BASE fx_trades REFRESH PERIOD (LENGTH 1h DELAY 2m)`. To recompute a time
+range after late quotes arrive, run
+[`REFRESH MATERIALIZED VIEW ... RANGE FROM ... TO ...`](/docs/query/sql/refresh-mat-view/#range).
 
 ## Filtering right-hand tables
 
@@ -354,10 +410,10 @@ WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
-The two forms give the same result, and a query can use both. Each right-hand
-table takes its own filter, so the same table can be joined twice with
-different filters. Here, the second side is a `SELECT` of only the columns that
-the query reads:
+The same predicate gives the same result in either form, and a query can use
+both. Each right-hand table takes its own filter, so the same table can be
+joined twice with different filters. Here, the second side is a `SELECT` of
+only the columns that the query reads:
 
 ```questdb-sql title="LMAX and EBS markouts side by side" demo
 SELECT
@@ -377,6 +433,23 @@ WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
+A CTE on the right-hand side works as the same subquery would:
+
+```questdb-sql title="Markout against LMAX quotes, filtered in a CTE" demo
+WITH lmax AS (
+    SELECT * FROM core_price WHERE ecn = 'LMAX'
+)
+SELECT
+    h.offset / 1_000_000_000 AS horizon_sec,
+    t.symbol,
+    avg((c.bid_price + c.ask_price) / 2 - t.price) AS avg_markout
+FROM fx_trades AS t
+HORIZON JOIN lmax AS c ON (symbol)
+LIST (0, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1h..$now'
+ORDER BY t.symbol, horizon_sec;
+```
+
 A filter:
 
 - can use the right-hand table's columns, constants and bind variables, with
@@ -392,10 +465,10 @@ A right-hand filter differs from the `WHERE` clause, which filters the
 left-hand rows and can't reference right-hand columns. To drop output rows
 based on the values that the match returned, filter in an outer query.
 
-An `ON` predicate that references no columns, such as `1 = 0` or a bind
-variable, applies to the right-hand table of that `ON` clause: a true value has
-no effect, and a false value leaves every left-hand row without a match in that
-table.
+When the right-hand side is a table, an `ON` predicate that references no
+columns, such as `1 = 0` or a bind variable, applies to the right-hand table of
+that `ON` clause: a true value has no effect, and a false value leaves every
+left-hand row without a match in that table.
 
 ### Filter restrictions
 
@@ -436,26 +509,6 @@ filter in a right-hand subquery unless the filter was a designated timestamp
 interval. See [Upgrading to QuestDB 10.1.0](#upgrading-to-questdb-1010).
 
 :::
-
-## GROUP BY rules
-
-The `GROUP BY` clause is optional. When it is omitted and the `SELECT` list has
-aggregate functions, results are implicitly grouped by all non-aggregate
-`SELECT` columns. When it is omitted and there are no aggregate functions,
-nothing is grouped: see
-[Queries without aggregate functions](#queries-without-aggregate-functions).
-When `GROUP BY` is present, it follows stricter rules than regular `GROUP BY`:
-
-- Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
-  expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`) or
-  a `SELECT` column alias.
-- Every non-aggregate `SELECT` column must appear in `GROUP BY`.
-- Column index references are supported (e.g., `GROUP BY 1, 2`).
-
-For example, if the `SELECT` list contains `h.offset / 1_000_000_000 AS
-horizon_sec`, the `GROUP BY` must use either the alias `horizon_sec` or the full
-expression `h.offset / 1_000_000_000` — using just `h.offset` is not valid
-because it does not exactly match any non-aggregate `SELECT` expression.
 
 ## Examples
 
@@ -615,15 +668,6 @@ HORIZON JOIN mids AS m ON (t.symbol = m.symbol)
     LIST (0) AS h;
 ```
 
-## Mixed-precision timestamps
-
-The left-hand and right-hand tables can use different timestamp resolutions
-(e.g., `TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds).
-QuestDB aligns the timestamps internally — no explicit casting is needed.
-
-When the tables differ in resolution, `h.offset` uses the resolution of the
-**left-hand table** (the event table).
-
 ## Parallel execution
 
 QuestDB can execute HORIZON JOIN queries in parallel on the
@@ -685,7 +729,8 @@ and the result had no designated timestamp. After the upgrade:
   before 10.1.0, identical rows counted once. The outer aggregation also runs
   on a single thread. To count every row and keep the aggregation parallel,
   write the aggregate functions in the HORIZON JOIN, and use `PIVOT` with
-  `first()` only to reshape the result.
+  `first()` only to reshape the result, as in
+  [Permanent vs temporary impact per order](/docs/cookbook/sql/finance/implementation-shortfall-order/#permanent-vs-temporary-impact-per-order).
 - **[Views](/docs/concepts/views/)** over such queries return the new rows,
   because a view runs its stored SQL.
 - **`INSERT INTO ... SELECT` without a column list** fails when the query
@@ -739,14 +784,16 @@ fail. Before 10.1.0, HORIZON JOIN ignored them. After the upgrade:
   `ORDER BY expressions must appear in select list`. An expression over such a
   column, such as `ORDER BY t.price * 2`, is accepted. Without aggregate
   functions, it only sorts the rows. With aggregate functions, it becomes an
-  extra grouping key, so the query returns one row per distinct value of the
-  expression instead of one per selected key. Order by selected columns or
-  their aliases.
+  extra grouping key, so the query returns one row per combination of the
+  selected keys and the expression's value. Order by selected columns or their
+  aliases.
 - **All tables must have a designated timestamp**: The left-hand and all
   right-hand tables must each have a designated timestamp column.
-- **Right-hand side must be a table**: Each right-hand side of HORIZON JOIN must
-  be a table with an optional filter. More complex subqueries aren't supported,
-  see [Filter restrictions](#filter-restrictions).
+- **Restricted right-hand side**: Each right-hand side of HORIZON JOIN must
+  be a table with an optional filter, in one of the
+  [forms in the grammar](#select-list-right-hand-side-and-on-condition). More
+  complex subqueries aren't supported, see
+  [Filter restrictions](#filter-restrictions).
 - **Left-hand side queries are restricted as well**. On the left hand side, the
   query that works best is a table with an optional filter. Some other query
   types are also supported, but they degrade the query plan to single-threaded

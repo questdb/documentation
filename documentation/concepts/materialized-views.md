@@ -220,6 +220,10 @@ Materialized views require a `SAMPLE BY` or time-based `GROUP BY` query.
 
 - Aggregate functions: `sum`, `avg`, `min`, `max`, `first`, `last`, `count`
 - `JOIN` with other tables (only the base table triggers refresh)
+- `HORIZON JOIN` without aggregate functions in a subquery, aggregated by an
+  outer `SAMPLE BY`. A HORIZON JOIN with aggregate functions invalidates the
+  view, see
+  [HORIZON JOIN materialized views](/docs/query/sql/horizon-join/#materialized-views)
 - `WHERE` clauses
 
 **Not supported:**

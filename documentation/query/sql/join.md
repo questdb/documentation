@@ -11,9 +11,11 @@ Additionally, it implements joins which are particularly useful for
 time-series analytics: `ASOF`, `LT`, `SPLICE`, `HORIZON`, and `WINDOW`.
 
 Join types can be combined in a single SQL statement, and QuestDB SQL's
-optimizer determines the best execution order and algorithms. The exception is
-HORIZON JOIN, which can't be mixed with other join types at the same level of a
-query.
+optimizer determines the best execution order and algorithms. The exceptions
+are [HORIZON JOIN](/docs/query/sql/horizon-join/), which can't be mixed with
+other join types at the same level of a query, and
+[WINDOW JOIN](/docs/query/sql/window-join/), which only another WINDOW JOIN
+can follow.
 
 There are no known limitations on the size of tables or sub-queries used in
 joins and there are no limitations on the number of joins, either.
@@ -113,10 +115,23 @@ other, try to use the large one first. If you use `EXPLAIN` with the queries
 above, you should see the first version needs to Hash over 1 million rows,
 while the second version needs to Hash only over 1 row.
 
-A `GROUP BY` over an `INNER`, `LEFT` or `RIGHT` equi-join can instead run as a
-parallel aggregation, and for an `INNER` join it hashes the smaller table
-whatever the order in the query. See
-[Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins).
+A `GROUP BY` over a single `INNER`, `LEFT` or `RIGHT` equi-join can instead
+run as a parallel aggregation, shown in `EXPLAIN` as `Async Hash Join Group By`.
+It hashes one input, the build side, which depends on the join type:
+
+- `INNER`: the table with fewer rows, whatever the order in the query.
+- `LEFT`: the right-hand input.
+- `RIGHT`: the left-hand input. A `RIGHT` join qualifies only when that table
+  has no more rows than the right-hand table, and the right-hand table has no
+  `WHERE` condition, including a designated timestamp interval.
+
+Common reasons a query keeps the ordinary plan are an aggregate function such
+as `first()`, `last()` or `count_distinct()`, a `VARCHAR`, `STRING` or array
+column of the build side in the output or in a filter after a `LEFT` join, an
+`ON` condition that compares columns of both tables beyond the join keys, and
+an input that is a subquery with its own `GROUP BY`. See
+[Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins)
+for the full rules.
 
 ## Implicit joins
 

@@ -858,29 +858,36 @@ the aggregates.
 A `GROUP BY`, or an aggregation without grouping keys, over a single `INNER`,
 `LEFT` or `RIGHT` equi-join can run on the
 [query workers](/docs/configuration/shared-workers/#sharedqueryworkercount).
-QuestDB builds one shared hash table from one side of the join, the **build**
-side, then the workers probe it with page frames of the other side, the
-**probe** side, and aggregate the matched rows. A `SAMPLE BY` over such a join
-qualifies as well, unless it uses `FILL` with a value other than `NONE`.
+Available since QuestDB 10.1.0. QuestDB builds one shared hash table from one
+side of the join, the **build** side, then the workers probe it with page
+frames of the other side, the **probe** side, and aggregate the matched rows. A `SAMPLE BY` over such a join
+qualifies as well, unless it uses `ALIGN TO FIRST OBSERVATION` or `FILL` with a
+value other than `NONE`.
 
 The join type decides which input is the build side:
 
 - **`INNER`**: the input whose table has fewer rows, in whichever order the
   query names the tables. When either input scans a designated timestamp
-  interval and no join key is a `SYMBOL` column, QuestDB plans both
+  interval and no join key pairs two `SYMBOL` columns, QuestDB plans both
   orientations and, at each execution, builds the input whose intervals select
   fewer rows.
 - **`LEFT`**: the right-hand input.
 - **`RIGHT`**: the left-hand input. A `RIGHT` join qualifies only when the
   left-hand table has no more rows than the right-hand table, and the
-  right-hand input has no filter of its own. So `dim RIGHT JOIN fact`
-  qualifies, and `fact RIGHT JOIN dim` keeps the ordinary plan.
+  right-hand table has no `WHERE` condition, including a designated timestamp
+  interval. So `dim RIGHT JOIN fact` qualifies, and `fact RIGHT JOIN dim`
+  keeps the ordinary plan. With such a condition, write the query as
+  `fact LEFT JOIN dim`, which returns the same rows and qualifies.
 
 [`EXPLAIN`](/docs/query/sql/explain/) shows the plan as
 `Async Hash Join Group By`, or `Async JIT Hash Join Group By` when the
 probe-side filter is JIT-compiled. Its `Probe` and `Build` children show the
 two inputs. For example, with a small `instruments` table that maps each
 symbol to an asset class:
+
+```questdb-sql title="Dimension table"
+CREATE TABLE instruments (symbol SYMBOL, name VARCHAR, asset_class SYMBOL);
+```
 
 ```questdb-sql title="Aggregate trades by a dimension table"
 EXPLAIN
@@ -890,7 +897,7 @@ JOIN fx_trades AS t ON (symbol)
 GROUP BY i.asset_class;
 ```
 
-```text
+```text title="EXPLAIN output"
 Async Hash Join Group By workers: 4
   logicalJoinType: inner
   physicalJoinType: inner
@@ -922,19 +929,31 @@ Async Hash Join Group By workers: 4
 
 Queries that don't qualify keep the ordinary plan: a `GroupBy` node over a
 `Hash Join`, `Hash Join Light`, `Hash Left Outer Join [Light]` or
-`Hash Right Outer Join [Light]` node. A query doesn't qualify when:
+`Hash Right Outer Join [Light]` node. Common reasons a query keeps the
+ordinary plan:
 
-- It uses an aggregate function outside a fixed set: `count()`, `sum()`,
-  `avg()`, `min()` and `max()` over numeric and temporal types, `ksum()`,
-  `nsum()`, `geomean()`, the standard deviation, variance, skewness,
-  kurtosis, covariance, correlation and linear regression functions,
-  `weighted_avg()`, `weighted_stddev_rel()`, `weighted_stddev_freq()`,
-  `bit_and()`, `bit_or()`, `bit_xor()`, `bool_and()` and `bool_or()`. Other
-  functions, such as
-  `first()`, `last()`, `count_distinct()` and `string_agg()`, keep the ordinary
-  plan.
-- It outputs or groups by a build-side `VARCHAR`, `STRING`, `BINARY` or array
-  column. A `WHERE` filter on such a column doesn't disqualify the query.
+- It uses an aggregate function outside a fixed set:
+  - `count()`, `sum()`, `avg()`, `min()` and `max()` over numeric columns
+    other than `BYTE`. `min()` and `max()` also take `CHAR`, `IPv4`, `DATE`
+    and `TIMESTAMP` columns. `count()` also takes `SYMBOL`, `STRING`,
+    `VARCHAR`, `UUID` and `IPv4` columns, but not `DATE` or `TIMESTAMP`
+    columns.
+  - `ksum()`, `nsum()`, `geomean()`, `vwap()`, the standard deviation,
+    variance, skewness, kurtosis, covariance, correlation and linear regression
+    functions, `weighted_avg()`, `weighted_stddev()`,
+    `weighted_stddev_rel()`, `weighted_stddev_freq()`, `bit_and()`,
+    `bit_or()`, `bit_xor()`, `bool_and()` and `bool_or()`.
+
+  Other functions, such as `first()`, `last()`, `count_distinct()` and
+  `string_agg()`, keep the ordinary plan.
+- It outputs, groups by or aggregates a build-side `VARCHAR`, `STRING`,
+  `BINARY` or array column. A filter on such a column doesn't disqualify the
+  query when it runs on the build table's own scan, such as a `WHERE`
+  condition on that table in an `INNER` join. It does when it applies after
+  the join, such as a `WHERE` condition on the build table of a `LEFT` join.
+- An `ON` condition compares columns of both tables beyond the join keys, such
+  as `AND t.ecn != i.name`.
+- An input is a subquery with its own `GROUP BY`.
 - Either side uses an index scan, `LATEST ON`, `LIMIT`, `UNION` or `DISTINCT`.
 
 The build's hash table and payload copy count toward the
@@ -953,9 +972,10 @@ more memory per query, or lower it to save memory.
 - **Default**: `300000`
 - **Reloadable**: no
 
-Minimum number of build-side rows, counted before any filter, for the hash
-table to be built on the query workers. Smaller builds run on the query's own
-thread. Must be `0` or greater.
+Minimum number of build-side rows, counted after the designated timestamp
+interval and before any other filter, for the hash table to be built on the
+query workers. Smaller builds run on the query's own thread. Must be `0` or
+greater.
 
 ### cairo.sql.parallel.hash.join.groupby.build.rows.per.partition
 
@@ -997,7 +1017,10 @@ columns fits this size. `0` disables the copy. Must be `0` or greater.
 - **Reloadable**: no
 
 Minimum ratio of probe-side rows to build-side rows for a build that ran on
-the query's own thread to copy its payload. Must be a non-negative number.
+the query's own thread to copy its payload. Probe-side rows are counted after
+the designated timestamp interval and before any other filter. Build-side rows
+are the rows in the hash table, after every build-side filter. Must be a
+non-negative number.
 
 When the build side has rows in
 [Parquet partitions](/docs/concepts/parquet/#in-place-conversion), the ratio
@@ -1012,14 +1035,16 @@ whose rows are all in Parquet partitions then copies whenever the copy fits
 - **Reloadable**: no
 
 Minimum ratio of probe-side rows to build-side rows for a build that ran on
-the query workers to copy its payload. Parquet build rows count as described
-for
+the query workers to copy its payload. Rows, including Parquet build rows,
+count as described for
 [`payload.copy.min.probe.ratio`](#cairosqlparallelhashjoingroupbypayloadcopyminproberatio).
 Must be a non-negative number.
 
 ## HORIZON JOIN
 
-Settings for [HORIZON JOIN](/docs/query/sql/horizon-join/) queries.
+These settings cap the offsets of a
+[HORIZON JOIN](/docs/query/sql/horizon-join/) and control whether it matches
+rows on the query workers.
 
 ### cairo.sql.horizon.join.max.offsets
 
@@ -1038,11 +1063,14 @@ small `STEP` over a long span from multiplying the work and the result size.
 - **Reloadable**: no
 
 Enables parallel HORIZON JOIN execution, shown in
-[`EXPLAIN`](/docs/query/sql/explain/) as an `Async ... Horizon Join` node.
+[`EXPLAIN`](/docs/query/sql/explain/) as an `Async [JIT] Horizon Join`,
+`Async Multi Horizon Join` or `Async [JIT] Horizon Join Projection` node.
 Takes effect only when the
 [query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
-has at least one thread. Set to `false` to run HORIZON JOIN queries on the
-query's own thread. See
+has at least one thread. Set to `false` to match HORIZON JOIN rows on the
+query's own thread. A `WHERE` filter on the left-hand table can still run on
+the query workers, as an `Async Filter` or `Async JIT Filter` node below the
+HORIZON JOIN. See
 [Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 
 ## SAMPLE BY

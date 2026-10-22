@@ -326,6 +326,9 @@ Materialized view queries must:
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
+- Aggregate a `HORIZON JOIN` with an outer `SAMPLE BY`, not in the HORIZON
+  JOIN itself, see
+  [HORIZON JOIN materialized views](/docs/query/sql/horizon-join/#materialized-views)
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.

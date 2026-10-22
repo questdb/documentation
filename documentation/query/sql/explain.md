@@ -60,6 +60,11 @@ The following list contains some plan node types:
   `Hash Join Group By Build Choice` node holds both orientations as its
   `Primary` and `Alternate` children. See
   [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins).
+- `Async Horizon Join`, `Async JIT Horizon Join`, `Async Multi Horizon Join`
+  and `Async [JIT] Horizon Join Projection` - a parallelized HORIZON JOIN, with
+  or without aggregate functions. The serial plans show `Horizon Join`,
+  `Multi Horizon Join` and `Horizon Join Projection`. See
+  [Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 - `Interval forward` - scans one or more table data ranges based on the
   designated timestamp predicates. Scan endpoints are found via a binary search
   on timestamp column.

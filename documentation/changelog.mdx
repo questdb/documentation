@@ -10,6 +10,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## October 2026
 
+### Releases
+
+- [10.1.0](https://questdb.com/release-notes/) - Released October 22, 2026
+
 ### New
 
 - [Databento connector](/docs/connect/connectors/databento/) - New page for the QuestDB Enterprise Databento connector, which streams Live feeds and runs Historical backfills into QuestDB. Covers installation, TOML configuration, table mappings, storage policies, candles from a materialized view, a session VWAP live view, live dashboards in a Web Console notebook or Grafana, checkpointed recovery, and Prometheus metrics
@@ -26,8 +30,8 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [HORIZON JOIN](/docs/query/sql/horizon-join/#queries-without-aggregate-functions) - Breaking change in QuestDB 10.1.0: a HORIZON JOIN without aggregate functions now returns one row per left-hand row and offset instead of grouping by the selected columns. Documented the row order, the designated timestamp of the result, how `SELECT DISTINCT` or an explicit `GROUP BY` restores the previous result, how to build a [materialized view](/docs/query/sql/horizon-join/#materialized-views) with an outer `SAMPLE BY`, the [upgrade steps](/docs/query/sql/horizon-join/#upgrading-to-questdb-1010) for queries, outer aggregation, views, and `INSERT INTO ... SELECT`, and the new execution plan names
-- [HORIZON JOIN](/docs/query/sql/horizon-join/#filtering-right-hand-tables) - Breaking change in QuestDB 10.1.0: documented right-hand filters, written in the `ON` clause, as a `(table WHERE ...)` subquery, or as a `SELECT` of the table's columns, which apply before the ASOF match. Earlier versions ignored `ON` predicates other than the join keys. Added a grammar for the right-hand side, including CTEs, and corrected the `ORDER BY` limitation
+- [HORIZON JOIN](/docs/query/sql/horizon-join/#queries-without-aggregate-functions) - Breaking change in QuestDB 10.1.0: a HORIZON JOIN without aggregate functions now returns one row per left-hand row and offset instead of grouping by the selected columns. Documented the row order, the designated timestamp of the result, how `SELECT DISTINCT` or an explicit `GROUP BY` restores the previous result, how to build a [materialized view](/docs/query/sql/horizon-join/#materialized-views) with an outer `SAMPLE BY`, the [upgrade steps](/docs/query/sql/horizon-join/#upgrading-to-questdb-1010) for queries, outer aggregation, views, `INSERT INTO ... SELECT`, and `CREATE TABLE AS SELECT`, and the new execution plan names
+- [HORIZON JOIN](/docs/query/sql/horizon-join/#filtering-right-hand-tables) - Breaking change in QuestDB 10.1.0: documented right-hand filters, written in the `ON` clause, as a `(table WHERE ...)` subquery, or as a `SELECT` of the table's columns, which apply before the ASOF match. Earlier versions ignored `ON` predicates other than the join keys. Added a grammar for the right-hand side, including CTEs, and documented the `ORDER BY` limitation
 - [Databento with Python](/docs/integrations/other/databento/) - Updated the QuestDB Open Source guide to ingest an `EQUS.MINI` subscription over QWP with the QuestDB Python client, with `ts_recv` as the designated timestamp as in the connector. Added an example query, a materialized view, and charts on a live Web Console notebook dashboard, with Grafana as an alternative
 - [C and C++](/docs/connect/clients/c-and-cpp/#binary-columns-uuid-long256-and-opaque-bytes) and [Rust](/docs/connect/clients/rust/#binary-columns-uuid-long256-and-opaque-bytes) clients - Documented the 7.1.0 canonical RFC 4122 UUID byte order at the API boundary, UUID and LONG256 claims for binary Arrow columns through field metadata or per-column overrides, and the silent behavior change for code written against 7.0.0.
 - [C and C++](/docs/connect/clients/c-and-cpp/#which-errors-mean-what) and [Rust](/docs/connect/clients/rust/#buffer-ingestion) clients - Documented for 7.2.0 the frame cap a QWP/WebSocket buffer flush must fit, that the buffer size reported by `line_sender_buffer_size` and `Buffer::len()` is at least the encoded frame size, and the `batch_too_large` error an oversized buffer or unsplittable chunk frame returns. The C and C++ FetchContent example now pins the 7.2.0 tag
