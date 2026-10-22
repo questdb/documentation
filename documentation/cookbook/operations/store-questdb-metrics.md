@@ -4,14 +4,14 @@ sidebar_label: Store QuestDB metrics
 description: Scrape QuestDB Prometheus metrics using Telegraf and store them in QuestDB
 ---
 
+Store QuestDB's operational metrics in QuestDB itself by scraping Prometheus metrics using Telegraf.
+
 :::tip
 From QuestDB 10.0.2, every instance stores its own metrics in the
 [`sys.metrics` table](/docs/operations/logging-metrics/#persisted-metrics) by
-default. Use this Telegraf recipe only for a custom pipeline, to collect
-metrics from several instances into one table, or on older versions.
+default. Use this recipe to collect metrics from several instances into one
+table, or on older versions.
 :::
-
-Store QuestDB's operational metrics in QuestDB itself by scraping Prometheus metrics using Telegraf.
 
 ## Solution: Telegraf configuration
 

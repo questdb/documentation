@@ -50,24 +50,23 @@ For more details, see the
 
 ## Query metric history
 
-From QuestDB 10.0.2, each instance samples its own metrics every second into
-the node-local `sys.metrics` table, kept for one week by default. Use it to
-look back at memory, CPU and error counts around an incident without a
-Prometheus setup:
+From QuestDB 10.0.2, each instance keeps a week of its own metrics in the
+`sys.metrics` table. Use it to look back at an incident without a Prometheus
+setup:
 
-```questdb-sql title="Native memory, RSS and unhandled errors over the last day"
+```questdb-sql title="Memory and CPU over the last day"
 SELECT
     ts,
     max(memory_mem_used) AS native_used,
     max(memory_rss) AS rss,
-    max(unhandled_errors) AS unhandled_errors
+    avg(cpu_questdb_percent) AS cpu_avg
 FROM 'sys.metrics'
 WHERE ts IN '$now-1d..$now'
 SAMPLE BY 15m;
 ```
 
 See [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics)
-for the table layout and configuration.
+for details.
 
 ## Detect table health issues
 

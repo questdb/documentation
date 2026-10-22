@@ -1,16 +1,15 @@
 ---
 title: Logging and metrics
-description: Configure and understand QuestDB logging and metrics, including log levels, configuration options, and Prometheus integration.
+description: Configure and understand QuestDB logging and metrics, including log levels, Prometheus integration, and the sys.metrics table of metric history.
 ---
 
 
 This page outlines logging in QuestDB. It covers how to configure logs via
-`log.conf`, expose metrics via Prometheus, and query the metric history that
-QuestDB keeps in its own `sys.metrics` table.
+`log.conf`, expose metrics via Prometheus, and query metric history in the
+`sys.metrics` table.
 
 - [Logging](/docs/operations/logging-metrics/#logging)
 - [Metrics](/docs/operations/logging-metrics/#metrics)
-- [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics)
 
 ## Log location
 
@@ -334,8 +333,7 @@ For an example on how to setup Prometheus, see the
 [QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
 
 To keep a metric history without an external scraper, query the
-[`sys.metrics` table](#persisted-metrics) instead. It is on by default and does
-not need `metrics.enabled`.
+[`sys.metrics` table](#persisted-metrics) instead.
 
 ### Cold storage read metrics
 
@@ -385,103 +383,40 @@ Two gauges describe the state of an in-place
 
 Available from QuestDB 10.0.2.
 
-QuestDB samples its own metrics every second by default and appends them to
-the `sys.metrics` table on the same instance. You can chart memory, CPU, commit and
-query activity over the past days with plain SQL, without running Prometheus or
-any other scraper. Persistence is on by default and works with
-`metrics.enabled=false`. The table holds the metrics of the node that writes
-it. It is not replicated and other instances can't read it.
+QuestDB samples its own metrics every second and appends them to the
+`sys.metrics` table, so you can chart metric history with SQL without running
+Prometheus. Persistence is on by default and does not need `metrics.enabled`.
+The table holds the metrics of the local node only: it is not replicated, and
+[QuestDB Enterprise backups](/docs/operations/backup/) exclude it.
 
-The table is created by a background job a few seconds after startup, so a
-fresh server has no `sys.metrics` until the first sample. Like other system
-tables, it does not appear in `SHOW TABLES`, `tables()` or the web console
-schema browser. Query it by name. The name is
-[`cairo.system.table.prefix`](/docs/configuration/cairo-engine/#cairosystemtableprefix)
-(default `sys.`) followed by `metrics`.
+Like other system tables, `sys.metrics` is hidden from `SHOW TABLES` and the
+Web Console, so query it by name. It has one row per sample, with `ts` as the
+designated timestamp, and one `LONG` or `DOUBLE` column per metric:
 
-#### Table layout
+- Column names are usually the Prometheus names without the `questdb_` prefix
+  and the `_total` suffix, for example `commits` and `memory_rss`.
+- Labelled metrics get one column per label value, joined with `__`, for
+  example `worker_pool_fiber_live__shared_query`.
+- Counters are cumulative since server start, so compute rates from the
+  difference between consecutive rows.
+- Process-level gauges, such as `memory_rss`, are refreshed every 60 seconds
+  by default.
 
-`sys.metrics` has one wide row per sample and one column per metric. This is an
-excerpt of `SHOW CREATE TABLE 'sys.metrics'` on an open source server with
-default settings:
-
-```questdb-sql title="SHOW CREATE TABLE 'sys.metrics' (excerpt)"
-CREATE TABLE 'sys.metrics' (
-    ts TIMESTAMP,
-    json_queries_connections LONG,
-    pg_wire_connections LONG,
-    worker_pool_fiber_live__shared_network LONG,
-    worker_pool_fiber_live__shared_query LONG,
-    unhandled_errors LONG,
-    commits LONG,
-    memory_tag_MMAP_DEFAULT LONG,
-    memory_mem_used LONG,
-    memory_rss LONG,
-    cpu_questdb_percent DOUBLE,
-    jvm_major_gc_count LONG
-    -- ...
-) timestamp(ts) PARTITION BY DAY TTL 1 WEEK BYPASS WAL;
+```questdb-sql title="Find columns"
+SELECT "column", type
+FROM table_columns('sys.metrics')
+WHERE "column" LIKE 'worker_pool_fiber_live__%';
 ```
-
-- `ts` is the sample time and the designated timestamp.
-- Each metric column uses the internal metric name, without the `questdb_`
-  prefix of the Prometheus endpoint. Counters usually drop the Prometheus
-  `_total` suffix as well, so `questdb_commits_total` is stored as `commits`
-  and `questdb_memory_rss` as `memory_rss`. Run
-  `SHOW COLUMNS FROM 'sys.metrics'` to list the columns on your instance.
-- A labelled metric gets one column per label value, joined with a double
-  underscore: `worker_pool_fiber_live__shared_query` is the `live` fiber count
-  of the `shared_query` worker pool.
-- Characters other than `A-Z`, `a-z`, `0-9` and `_` become `_`, and a
-  leading digit becomes `_`.
-- Floating-point gauges, such as `cpu_questdb_percent`, are `DOUBLE`. All other
-  metrics are `LONG`.
-- Counters are cumulative since the server started and restart from `0` after
-  a restart. Compute rates from the difference between consecutive rows.
-- Process-level gauges, such as `memory_rss`, `memory_mem_used`,
-  `memory_jvm_free`, `memory_jvm_total`, `memory_jvm_max`,
-  `memory_malloc_count`, `memory_free_count` and `memory_realloc_count`, are
-  read every
-  [`metrics.persist.virtual.interval`](/docs/configuration/logging-metrics/#metricspersistvirtualinterval)
-  (60 seconds by default). The rows in between repeat the last reading.
-- When a metric first appears at runtime, the job adds a column for it. Older
-  rows hold `NULL` in that column. Columns are never dropped.
-
-_Enterprise only._ The table also stores cold storage metrics, TLS
-certificate expiry, and fleet-wide replication metrics such as
-`replication_up_lag_txn_max`, `replication_up_tables_behind`,
-`replication_up_tables_failing` and `replication_down_stalled_tables`.
-Per-table replication series are not persisted.
-
-#### Example queries
-
-```questdb-sql title="Latest samples"
-SELECT ts, memory_rss, commits, wal_written_rows
-FROM 'sys.metrics'
-LIMIT -3;
-```
-
-| ts                          | memory_rss | commits | wal_written_rows |
-| --------------------------- | ---------- | ------- | ---------------- |
-| 2026-10-22T10:27:14.693474Z | 115687424  | 15      | 1500             |
-| 2026-10-22T10:27:15.694429Z | 115687424  | 17      | 1700             |
-| 2026-10-22T10:27:16.695794Z | 115687424  | 19      | 1900             |
 
 ```questdb-sql title="Hourly memory and CPU over the last day"
 SELECT
     ts,
     max(memory_rss) AS rss_max,
-    max(memory_mem_used) AS native_max,
     avg(cpu_questdb_percent) AS cpu_avg
 FROM 'sys.metrics'
 WHERE ts IN '$now-1d..$now'
 SAMPLE BY 1h;
 ```
-
-Counters only grow, so take the difference between consecutive samples with
-[`lag()`](/docs/query/functions/window-functions/reference/#lag) and add the
-differences up per bucket. The `delta >= 0` filter drops the first row and the
-negative step that follows a restart:
 
 ```questdb-sql title="Commits per minute over the last hour"
 WITH deltas AS (
@@ -489,82 +424,22 @@ WITH deltas AS (
     FROM 'sys.metrics'
     WHERE ts IN '$now-1h..$now'
 )
-SELECT ts, sum(delta) AS commits
+SELECT ts, sum(delta) AS commits_per_min
 FROM deltas
-WHERE delta >= 0
+WHERE delta >= 0 -- skips the first row and server restarts
 SAMPLE BY 1m;
 ```
 
-#### Configuration
+Data is kept for one week by default, and completed day partitions are
+converted to [Parquet](/docs/concepts/parquet/). To change the interval,
+retention or excluded metrics, or to turn persistence off with
+`metrics.persist.enabled=false`, see the
+[persisted metrics configuration](/docs/configuration/logging-metrics/#persisted-metrics).
 
-The `metrics.persist.*` keys in `server.conf` control the sampling interval,
-retention, Parquet conversion, disk sync and excluded metrics. See
-[Persisted metrics configuration](/docs/configuration/logging-metrics/#persisted-metrics).
-None of them are reloadable, so changes need a restart.
+:::note
 
-With the default 1 second interval, the table grows by 86,400 rows per day, and
-each row holds one 8-byte value per metric, about 160 on a default open source
-server. The
-[`metrics.persist.ttl`](/docs/configuration/logging-metrics/#metricspersistttl)
-setting (default `1 WEEK`) bounds the history, and completed day partitions
-are converted to [Parquet](/docs/concepts/parquet/) to compress them. Raise
-[`metrics.persist.interval`](/docs/configuration/logging-metrics/#metricspersistinterval)
-to store fewer rows, or add noisy metrics to
-[`metrics.persist.exclude`](/docs/configuration/logging-metrics/#metricspersistexclude).
-
-To turn persistence off, set:
-
-```ini title="server.conf"
-metrics.persist.enabled=false
-```
-
-or the `QDB_METRICS_PERSIST_ENABLED=false` environment variable, and restart.
-The server then writes no new rows, but the existing table stays in place.
-Drop it once persistence is off:
-
-```questdb-sql
-DROP TABLE 'sys.metrics';
-```
-
-#### Behavior and caveats
-
-- **QuestDB owns the table.** Don't insert into, alter or truncate
-  `sys.metrics`, and don't create your own table with that name. While
-  persistence runs, the job holds the table's writer, so client DDL and writes
-  wait for it and time out. At startup, the job drops and recreates the table,
-  losing its history, if any of these is true:
-  - it is a WAL table;
-  - it is not `PARTITION BY DAY`;
-  - its designated timestamp is not a `TIMESTAMP` column named `ts`;
-  - any other column is not `LONG` or `DOUBLE`;
-  - a known metric's column has the wrong type.
-- **TTL changes apply to the existing table.** At startup, the job applies the
-  current `metrics.persist.ttl` to the table, so shortening it drops older
-  partitions.
-- **Node-local.** The table is `BYPASS WAL` and is not replicated. An instance
-  started with `readonly=true` does not write it. In QuestDB Enterprise, every
-  node, replicas included, writes its own `sys.metrics`.
-  [Backups](/docs/operations/backup/) exclude the table, and a restore keeps
-  the node's local copy.
-- **Durability.** Samples are committed without a disk sync by default. A
-  QuestDB crash keeps them, but an OS crash or power loss can lose recent
-  history. See
-  [`metrics.persist.sync.interval`](/docs/configuration/logging-metrics/#metricspersistsyncinterval).
-- **Clock changes.** If the wall clock moves backwards, the job skips samples
-  until the clock passes the last stored `ts`, so `ts` always increases.
-- **Interaction with `metrics.enabled`.** Persistence turns on internal metric
-  accounting, including the health metrics used by
-  [unhandled error detection](#unhandled-error-detection), even with
-  `metrics.enabled=false`. The Prometheus `/metrics` endpoint still follows
-  `metrics.enabled` only.
-
-:::tip Troubleshooting: the table stops growing
-
-A storage error, such as a full disk, makes the job retry with a back-off that
-starts at 1 second and doubles up to 1 minute. Each failure logs
-`metrics persistence failed, will retry`. Any other error disables persistence
-until the next restart and logs `metrics persistence disabled`. Search the
-server log for these messages, fix the cause and restart.
+QuestDB owns `sys.metrics`. Don't write to or alter it. If its schema is
+incompatible at startup, QuestDB drops and recreates it, losing its history.
 
 :::
 
@@ -659,7 +534,8 @@ timestamp at the time of sending the alert.
 
 ### Unhandled error detection
 
-When the metrics subsystem is enabled, the health endpoint may be configured to
+When metrics or [metrics persistence](#persisted-metrics) are enabled, the
+health endpoint may be configured to
 check the occurrences of any unhandled errors since the database started. For
 any errors detected, it returns the HTTP 500 status code. The check is based on
 the `questdb_unhandled_errors_total` metric.
@@ -667,11 +543,8 @@ the `questdb_unhandled_errors_total` metric.
 To enable this setting, set the following in `server.conf`:
 
 ```ini title="server.conf to enable critical error checks in the health check endpoint"
-metrics.enabled=true
 http.pessimistic.health.check.enabled=true
 ```
 
-Error accounting also runs when [metrics persistence](#persisted-metrics) is
-on, which is the default, so the check works with `metrics.enabled=false`. When
-both `metrics.enabled` and `metrics.persist.enabled` are `false`, the health
-check endpoint always returns the HTTP 200 status code.
+When both `metrics.enabled` and `metrics.persist.enabled` are `false`, the
+health check endpoint always returns the HTTP 200 status code.
