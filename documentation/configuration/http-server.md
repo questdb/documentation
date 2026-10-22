@@ -291,7 +291,10 @@ the HTTP connection is still open.
 - **Reloadable**: no
 
 When enabled, the health check returns HTTP 500 for any unhandled errors
-since the server started.
+since the server started. Requires
+[`metrics.enabled`](/docs/configuration/logging-metrics/#metricsenabled) or
+[`metrics.persist.enabled`](/docs/configuration/logging-metrics/#metricspersistenabled),
+which is on by default.
 
 ### http.security.interrupt.on.closed.connection
 

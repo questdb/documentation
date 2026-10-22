@@ -135,7 +135,7 @@ aspects to observe:
 - Consistency of batch sizes across time periods
 
 :::info
-Metrics View displays key metrics for quick monitoring in the Web Console. For comprehensive metrics and advanced monitoring capabilities, see [Prometheus monitoring and alerting](/docs/integrations/other/prometheus/).
+Metrics View displays key metrics for quick monitoring in the Web Console. For comprehensive metrics and advanced monitoring capabilities, see [Prometheus monitoring and alerting](/docs/integrations/other/prometheus/) or query the server metric history in [`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics).
 :::
 
 ## Best Practices

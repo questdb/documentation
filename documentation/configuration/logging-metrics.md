@@ -20,9 +20,9 @@ For more information, see
 Converts short-hand log level indicators (`E`, `C`, `I`) into long-hand
 (`ERROR`, `CRITICAL`, `INFO`).
 
-### log.timezone
+### log.timestamp.timezone
 
-- **Default**: `UTC`
+- **Default**: `Z` (UTC)
 - **Reloadable**: no
 
 Sets the timezone for log timestamps. Can be a timezone ID such as
@@ -92,6 +92,8 @@ such as `1m` syncs at most that often.
 
 How long `sys.metrics` keeps data, using [TTL](/docs/concepts/ttl/) syntax,
 for example `3 DAYS` or `1 MONTH`. Values in hours must be a multiple of 24.
+This also applies on QuestDB Enterprise, where system tables keep TTL instead
+of a storage policy.
 
 ### metrics.persist.virtual.interval
 

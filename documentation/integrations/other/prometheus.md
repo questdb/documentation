@@ -48,8 +48,8 @@ which you can query with SQL without enabling this endpoint.
 ## Scraping Prometheus metrics from QuestDB
 
 QuestDB has a `/metrics` HTTP endpoint on port `9003` to expose Prometheus
-metrics. Before being able to query metrics, they must be enabled via the
-`metrics.enabled` key in server configuration:
+metrics. The endpoint must be enabled via the `metrics.enabled` key in server
+configuration:
 
 ```ini title="/path/to/server.conf"
 metrics.enabled=true
