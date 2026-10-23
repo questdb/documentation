@@ -50,10 +50,13 @@ rows.
 
 ## How the engine handles it
 
-When out-of-order data arrives, QuestDB does not rewrite the whole partition.
-It splits the partition so that only the affected portion is rewritten, then
-squashes the splits back together in the background once they are no longer
-in the hot write path.
+When out-of-order data arrives, QuestDB can split a partition to rewrite only
+the affected portion, then compact idle splits in the background. With opt-in
+[merge-append partitions](/docs/concepts/merge-append-partitions/), affected
+pieces are appended to the existing column files instead; untouched pieces
+stay in place. Consider this option for repeated late writes into large WAL
+table partitions, balancing lower write amplification against temporary dead
+space and extra query page frames.
 
 For the mechanics, including how splits are named and when squashing runs,
 see
