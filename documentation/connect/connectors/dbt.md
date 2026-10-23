@@ -48,8 +48,12 @@ dbt --version
 ```
 
 The wheel works on Linux, macOS, and Windows. pip installs its dependencies for
-your platform, including dbt Core 1.10.9 or later and the QuestDB Python driver
-6.0.0 or later.
+your platform, including dbt Core 1.x (1.10.9 or later) and the QuestDB Python
+driver 6.0.0 or later. dbt v2 is not supported.
+
+`dbt --version` lists the adapter as
+`questdb: 1.0.0 - Could not determine latest version`. The message is expected:
+the adapter ships in the release archive, not on PyPI.
 
 ### 2. Configure the example
 
@@ -143,15 +147,15 @@ sources:
         identifier: equs_trades
 ```
 
-This model builds candles using the source table's designated timestamp,
-`ts_recv`:
+This model builds candles as a materialized view over the source table's
+designated timestamp, `ts_recv`. QuestDB refreshes the view as the connector
+appends trades, so it stays current between dbt runs:
 
 ```sql title="models/candles_1m.sql"
 {{ config(
-    materialized='table',
-    timestamp='ts_recv',
-    partition_by='DAY',
-    symbols=['symbol']
+    materialized='materialized_view',
+    refresh='immediate',
+    partition_by='DAY'
 ) }}
 
 SELECT
@@ -168,6 +172,29 @@ SAMPLE BY 1m
 
 Run `dbt run --select candles_1m` with your project's profile. The output is
 `candles_1m`; the source remains `equs_trades`.
+
+The Databento connector delivers at least once, so a reconnect can repeat rows.
+For exact aggregates, create the source table with
+[deduplication](/docs/concepts/deduplication/) keys before the connector starts.
+
+### Keep prefix mode
+
+In `prefix` mode, a source renders as `<source schema>__<identifier>`, and the
+source schema defaults to the source name. To keep `prefix` mode, have the
+ingestion job write prefixed table names. For example, set the Databento
+connector's subscription `table = "market__trades"` and declare:
+
+```yaml title="models/sources.yml"
+version: 2
+sources:
+  - name: market
+    tables:
+      - name: trades # reads market__trades
+```
+
+A `prefix` project cannot read an unprefixed table such as `equs_trades`; use
+`flat` mode for that. Choose the table name when you first configure the
+connector: changing an existing task's table name requires a new `state_dir`.
 
 ## Connection settings
 
