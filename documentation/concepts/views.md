@@ -186,6 +186,32 @@ CREATE VIEW mixed_params AS (
 DECLARE @limit := 50 SELECT * FROM mixed_params
 ```
 
+### List parameters
+
+A parameter can hold a list of values for an `IN` filter. Each statement that
+reads the view can override it with a list of any length. In a prepared
+statement, a list of bind variables has the length its text gives it: `($1, $2)`
+always takes two values.
+
+To pass any number of values with one statement, bind one text array instead,
+`DECLARE @symbols := $1`. That works when the view uses the parameter as the
+whole `IN` list, as `symbol IN @symbols` does below. `AUDITED` parameters support
+literal lists and lists of scalar bind variables, such as `($1, $2)`, but cannot
+take the entire list as one text-array bind. See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
+
+```questdb-sql
+CREATE VIEW trades_for AS (
+  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
+)
+
+-- A list of one needs the trailing comma
+DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for
+```
+
+See [value lists](/docs/query/sql/declare/#value-lists) for the rules.
+
 ## View hierarchies
 
 Views can reference other views, tables, and materialized views:
@@ -352,7 +378,8 @@ Use a [live view](/docs/concepts/live-views/) instead when you need to
 incrementally maintain a row-per-input window computation, such as a moving
 average, running total, or ranking.
 
-The output of a live view is one row per base row.
+The output of a live view is one row per base row that passes the view's
+`WHERE` filter and `START FROM` boundary.
 
 ## Security with views
 
@@ -442,6 +469,27 @@ GRANT SELECT ON desk_a_trades TO desk_a_users;
 For more details on permissions, see
 [Role-Based Access Control (RBAC)](/docs/security/rbac/).
 
+### Audited views (Enterprise)
+
+A view created `WITH AUDIT` records each read of it in the `sys.view_audit`
+table: who read it, when, and the values its `AUDITED` parameters resolved to,
+including a caller's overrides and bind variables. Use it to keep a
+best-effort audit trail of access to sensitive data:
+
+```questdb-sql
+CREATE VIEW trades_by_symbol AS (
+  DECLARE
+    OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
+    AUDITED @since := dateadd('h', -1, now())
+  SELECT timestamp, symbol, side, price, amount
+  FROM trades
+  WHERE symbol IN @symbols AND timestamp >= @since
+) WITH AUDIT;
+```
+
+See [Audited views](/docs/security/audited-views/) for what a read records, the
+audit table, permissions, and limitations.
+
 ## Performance considerations
 
 ### Views don't cache results
@@ -496,3 +544,4 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [Materialized Views](/docs/concepts/materialized-views/): Incrementally maintained `SAMPLE BY` aggregates
   - [Live views](/docs/concepts/live-views/): Incrementally maintained row-per-input window-function results
   - [DECLARE](/docs/query/sql/declare/): Parameter declaration for views
+  - [Audited views](/docs/security/audited-views/): Keep an audit trail of reads of a view (Enterprise)

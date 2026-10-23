@@ -838,8 +838,9 @@ Maximum allowed native memory allocation for GROUP BY functions.
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables parallel GROUP BY execution. Requires at least 4 shared worker
-threads.
+Enables parallel GROUP BY execution. Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread.
 
 ### cairo.sql.parallel.groupby.merge.shard.queue.capacity
 
@@ -851,11 +852,96 @@ merge shard hash tables.
 
 ### cairo.sql.parallel.groupby.sharding.threshold
 
-- **Default**: `100000`
+- **Default**: `10000`
 - **Reloadable**: no
 
 Row count threshold for parallel GROUP BY to shard the hash table holding
 the aggregates.
+
+## Parallel GROUP BY over hash joins
+
+### cairo.sql.parallel.hash.join.groupby.build.parallel.min.rows
+
+- **Default**: `300000`
+- **Reloadable**: no
+
+Minimum number of build-side rows for the join hash table to be built on the
+query workers. Smaller hash tables are built on the query's own thread.
+
+### cairo.sql.parallel.hash.join.groupby.build.rows.per.partition
+
+- **Default**: `32768`
+- **Reloadable**: no
+
+Target number of rows per partition of a join hash table built on the query
+workers.
+
+### cairo.sql.parallel.hash.join.groupby.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel GROUP BY over `INNER`, `LEFT` and `RIGHT` hash joins. Takes
+effect only when
+[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is also
+`true`.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.max.size
+
+- **Default**: `128M`
+- **Reloadable**: no
+
+Maximum size of the build-side column copy that speeds up probing of the join
+hash table. `0` disables the copy.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.min.probe.ratio
+
+- **Default**: `0.4`
+- **Reloadable**: no
+
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query's own thread to copy build-side columns.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.parallel.min.probe.ratio
+
+- **Default**: `0.125`
+- **Reloadable**: no
+
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query workers to copy build-side columns.
+
+## HORIZON JOIN
+
+These settings cap the offsets of a
+[HORIZON JOIN](/docs/query/sql/horizon-join/) and control whether it matches
+rows on the query workers.
+
+### cairo.sql.horizon.join.max.offsets
+
+- **Default**: `10000`
+- **Reloadable**: no
+
+Maximum number of offsets that the `RANGE` or `LIST` clause of a HORIZON JOIN
+can generate. A query that generates more fails with
+`RANGE generates too many offsets` or `LIST has too many offsets`. Every
+left-hand row is matched once per offset, so the limit stops a `RANGE` with a
+small `STEP` over a long span from multiplying the work and the result size.
+
+### cairo.sql.parallel.horizon.join.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel HORIZON JOIN execution, shown in
+[`EXPLAIN`](/docs/query/sql/explain/) as an `Async [JIT] Horizon Join`,
+`Async Multi Horizon Join` or `Async [JIT] Horizon Join Projection` node.
+Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread. Set to `false` to match HORIZON JOIN rows on the
+query's own thread. A `WHERE` filter on the left-hand table can still run on
+the query workers, as an `Async Filter` or `Async JIT Filter` node below the
+HORIZON JOIN. See
+[Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 
 ## SAMPLE BY
 
@@ -936,8 +1022,7 @@ edit `server.conf` and call
 materialized view refreshes, and WAL apply batches use the updated limits; work
 already running keeps its original limit. A live view acquires its limit when it
 is first compiled and keeps it across refreshes, so a reloaded value reaches an
-existing view only after a full teardown: invalidation, recreation, or a server
-restart.
+existing view only after the view is recreated or the server restarts.
 
 When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
@@ -1056,7 +1141,9 @@ you can reproduce as a plain query and measure the same way:
   the view retains between refreshes: the `IN MEMORY` tier, whose capacity
   [`live_views()`](/docs/query/functions/meta/#live_views) reports in its
   `in_mem_bytes` column, and the window state. Add these to the transient
-  figure, and keep the limit above the
+  figure. Window state grows with the number of distinct partition keys the
+  view has seen and does not shrink when keys go quiet, so leave headroom for
+  key growth, and keep the limit above the
   [allocation floor](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
   described with the key.
 

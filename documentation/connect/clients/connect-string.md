@@ -391,6 +391,7 @@ sub-section is egress only.*
 Multi-host failover requires QuestDB Enterprise. OSS is single-node — there
 is no secondary server to fail over to.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 The connect string accepts multiple `host:port` pairs in `addr`. The
@@ -671,6 +672,7 @@ Durable ACK requires QuestDB Enterprise. OSS is single-node and does not
 ship WALs off-box, so the server-side durability-acknowledgement signal
 that drives this protocol is enterprise-only.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an

@@ -11,6 +11,8 @@ GitHub.
 
 For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
 see the [Prometheus integration guide](/docs/integrations/other/prometheus/).
+To chart metric history with SQL instead, query the built-in
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics) table.
 
 ## Basic health check
 
@@ -91,8 +93,15 @@ the table.
 **Detection:**
 
 ```questdb-sql
-SELECT table_name FROM tables() WHERE table_suspended;
+SELECT table_name, table_type FROM tables() WHERE table_suspended;
 ```
+
+The result includes suspended materialized views (`table_type = 'M'`) and live
+views (`table_type = 'L'`). Resume those with
+[`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/query/sql/alter-mat-view-resume-wal/)
+or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/);
+`ALTER TABLE ... RESUME WAL` fails on views with `cannot modify materialized view`
+or `cannot modify live view`.
 
 To see why a table was suspended, query `wal_tables()`. Its `errorTag` column
 reads `OUT OF MEMORY` when the cause was a memory limit breach:
@@ -103,7 +112,7 @@ SELECT name, errorTag, errorMessage FROM wal_tables() WHERE suspended;
 
 **Resolution:**
 
-Resume from the failed transaction:
+Resume a suspended table from the failed transaction:
 
 ```questdb-sql
 ALTER TABLE my_table RESUME WAL;

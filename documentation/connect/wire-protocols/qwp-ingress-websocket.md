@@ -420,7 +420,7 @@ columns, which keeps every message self-contained for store-and-forward replay.
 | 9    | `0x09` | SYMBOL          | var     | Dictionary-encoded string          |
 | 10   | `0x0A` | TIMESTAMP       | 8       | Microseconds since Unix epoch      |
 | 11   | `0x0B` | DATE            | 8       | Milliseconds since Unix epoch      |
-| 12   | `0x0C` | UUID            | 16      | RFC 4122 UUID                      |
+| 12   | `0x0C` | UUID            | 16      | UUID, two LE int64 halves, lo first |
 | 13   | `0x0D` | LONG256         | 32      | 256-bit integer                    |
 | 14   | `0x0E` | GEOHASH         | var     | Geospatial hash                    |
 | 15   | `0x0F` | VARCHAR         | var     | Length-prefixed UTF-8              |
@@ -812,7 +812,15 @@ uncompressed mode.
 ### UUID
 
 16 bytes per value: 8 bytes for the low 64 bits, then 8 bytes for the high
-64 bits, both little-endian.
+64 bits, both little-endian. Reverse all 16 bytes and you get the canonical
+RFC 4122 order.
+
+The C, C++, and Rust clients take RFC 4122 bytes in their APIs, so
+they reverse each value on the way to the wire and again on the way back. The
+one exception is the row-buffer call that takes the two 64-bit halves
+directly — `line_sender_buffer_column_uuid(buffer, name, lo, hi, err)` and
+its Rust equivalent — which is already in wire order and is passed through
+unchanged.
 
 ### LONG256
 
@@ -1001,6 +1009,7 @@ Durable acknowledgement (status code 0x02) is available in QuestDB Enterprise
 with primary replication configured. Open source QuestDB returns OK (0x00) or
 error responses only.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 A standard OK confirms the batch was committed to the server's local WAL. To
@@ -1172,6 +1181,7 @@ Key behaviors:
 
 Multi-host failover with automatic reconnect requires QuestDB Enterprise.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 ## Examples
