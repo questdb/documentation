@@ -3,8 +3,8 @@ title: Kubernetes Operator releases
 description: Release history for the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.3.1 (6e6eb55a58d21a5f480eed6a9324b1cd8cdf6580).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.1 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.4.0 (ccf29ce8787cc899fb73de99d2bbd9b4b8c1735a).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.4.0 -->
 # Changelog
 
 Notable changes to the QuestDB Enterprise Operator are documented here.
@@ -12,20 +12,20 @@ Notable changes to the QuestDB Enterprise Operator are documented here.
 <!-- generated latest operator artifacts: start -->
 ## Latest operator artifacts
 
-Latest stable release: **0.3.1**
+Latest stable release: **0.4.0**
 
 ### Operator images
 
 **AWS ECR**
 
 ```text
-695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.3.1
+695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.4.0
 ```
 
 **Non-AWS mirror**
 
 ```text
-registry.distribution.questdb.io/questdb-enterprise-operator:0.3.1
+registry.distribution.questdb.io/questdb-enterprise-operator:0.4.0
 ```
 
 Both references require the registry access supplied by QuestDB.
@@ -37,10 +37,51 @@ Both references require the registry access supplied by QuestDB.
 ```sh
 helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
   --namespace questdb-operator-system --create-namespace \
-  --version 0.3.1
+  --version 0.4.0
 ```
 
 <!-- generated latest operator artifacts: end -->
+## [0.4.0] - 2026-10-16
+
+### Upgrade notes
+
+- Single-instance clusters no longer get a PodDisruptionBudget by default.
+  After the upgrade, draining the node (or a managed node upgrade on AKS or
+  EKS) restarts the database on another node instead of blocking forever. To
+  keep the old behaviour, set
+  `spec.scheduling.podDisruptionBudget.enabled: true`. Replicated clusters are
+  unchanged.
+- If you manage CRDs yourself (`crd.enable=false`), apply this release's CRDs
+  before upgrading the operator, so `spec.podMetadata` is accepted.
+
+### Added
+
+- `spec.podMetadata` adds your own labels and annotations to every QuestDB
+  Pod, for example metrics-scrape annotations:
+
+  ```yaml
+  podMetadata:
+    annotations:
+      k8s.grafana.com/scrape: "true"
+  ```
+
+  The operator's own labels always win. Changing `podMetadata` restarts the
+  Pods one at a time, like a `scheduling` change.
+
+### Changed
+
+- When a rolling update is waiting, the `Progressing` condition says why and
+  on which instance, for example
+  `waiting: PeerNotReady on instance prod-3`.
+
+### Fixed
+
+- A replica whose PVC was deleted now rebuilds itself. Before, if its Pod came
+  back before the PVC was gone, the PVC stayed `Terminating` and the replica
+  never recovered.
+- The operator is built with Go 1.26.9 and updated dependencies, fixing
+  reported CVEs.
+
 ## [0.3.1] - 2026-09-28
 
 ### Upgrade notes

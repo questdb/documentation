@@ -11,6 +11,8 @@ GitHub.
 
 For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
 see the [Prometheus integration guide](/docs/integrations/other/prometheus/).
+To chart metric history with SQL instead, query the built-in
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics) table.
 
 ## Basic health check
 
