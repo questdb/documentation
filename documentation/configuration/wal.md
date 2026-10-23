@@ -22,13 +22,13 @@ transactions.
 When adaptive blocks are disabled, blocks are sized by `cairo.wal.max.lag.size`
 and `cairo.wal.squash.uncommitted.rows.multiplier`.
 
-## cairo.wal.apply.block.max.rows
+## cairo.wal.apply.block.size
 
-- **Default**: `100000000`
+- **Default**: `75M`
 - **Reloadable**: no
 
-Hard row cap for both the starting block size and its growth, from 1 to 2,000,000,000.
-Has no effect when adaptive blocks are disabled.
+Starting data size in bytes for an adaptive WAL apply block.
+Set to `0` to disable adaptive blocks.
 
 ## cairo.wal.apply.block.memory.percent
 
@@ -39,13 +39,13 @@ Percentage of the RSS limit (`ram.usage.limit.bytes` / `ram.usage.limit.percent`
 as the budget for growth beyond the starting block size. With no RSS limit, or with this set to `0`,
 the row limit does not grow.
 
-## cairo.wal.apply.block.size
+## cairo.wal.apply.block.max.rows
 
-- **Default**: `75M`
+- **Default**: `100000000`
 - **Reloadable**: no
 
-Starting data size in bytes for an adaptive WAL apply block.
-Set to `0` to disable adaptive blocks.
+Hard row cap for both the starting block size and its growth, from 1 to 2,000,000,000.
+Has no effect when adaptive blocks are disabled.
 
 ## cairo.wal.apply.parallel.sql.enabled
 
