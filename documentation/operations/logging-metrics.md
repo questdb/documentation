@@ -410,11 +410,11 @@ Console notebook and turn it into a
 with the grid layout and auto-refresh.
 
 <Screenshot
-  alt="A Web Console notebook in grid layout charting ingestion rate, WAL apply lag, CPU and memory from sys.metrics"
+  alt="A Web Console notebook in grid layout charting WAL rows per second, WAL backlog, CPU and open connections by protocol from sys.metrics"
   title="A monitoring dashboard built from sys.metrics, refreshing every 30 seconds."
   src="images/docs/console/sys-metrics-dashboard.webp"
-  height={832}
-  width={990}
+  height={769}
+  width={1568}
 />
 
 ### Cold storage read metrics
