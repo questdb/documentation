@@ -1,10 +1,16 @@
 ---
 title: DECLARE keyword
 sidebar_label: DECLARE
-description: DECLARE SQL keyword reference documentation.
+description:
+  "DECLARE binds @variables in QuestDB SQL: scalar values, value lists for IN
+  filters, bind variables, and OVERRIDABLE and AUDITED view parameters."
 ---
 
 `DECLARE` specifies a series of variable bindings used throughout your query.
+A variable can hold a scalar value, a [value list](#value-lists) for an `IN`
+filter such as `symbol IN @symbols`, or a bind variable. In a view definition,
+a variable can be a parameter that the caller overrides or that an audited view
+records.
 
 This syntax is supported within `SELECT` queries.
 
@@ -16,18 +22,38 @@ DECLARE @variable := expression [, @variable := expression ...]
 SELECT ...
 ```
 
-```questdb-sql title="Inside a view definition (with optional OVERRIDABLE)"
-DECLARE [OVERRIDABLE] @variable := expression
-    [, [OVERRIDABLE] @variable := expression ...]
+```questdb-sql title="Inside a view definition (with optional OVERRIDABLE and AUDITED)"
+DECLARE [OVERRIDABLE] [AUDITED] @variable := expression
+    [, [OVERRIDABLE] [AUDITED] @variable := expression ...]
 [WITH ...]
 SELECT ...
 ```
+
+```questdb-sql title="Value list, for the right-hand side of IN"
+DECLARE @variable := ( expression , [ expression [, expression ...] [,] ] )
+```
+
+```questdb-sql title="Use a value list"
+WHERE expression [ NOT ] IN { @variable | $n | ( item [, item ...] ) }
+```
+
+A [value list](#value-lists) declares the set of values an `IN` filter tests
+against. It has at least one comma. Its members are expressions, including
+bind variables, but not lists or list variables. In `IN`, an `item` is a value
+or a list variable. A `$n` bound to a text array must be the whole list: see
+[Lists of bind variables](#lists-of-bind-variables).
 
 The `OVERRIDABLE` keyword only takes effect inside a
 [view definition](/docs/query/sql/create-view/#declare-with-overridable). It
 marks a variable as a parameter that the caller of the view can override at
 query time. Variables without `OVERRIDABLE` use the value set in the view and
 cannot be changed by the caller.
+
+The `AUDITED` keyword only takes effect inside the definition of an
+[audited view](/docs/security/audited-views/), a QuestDB Enterprise feature. It
+marks a variable whose resolved value each read of the view records in the
+audit trail. It is independent of `OVERRIDABLE`, and the two may appear in
+either order.
 
 ## Mechanics
 
@@ -54,8 +80,9 @@ You should see an error message like this:
 
 The above example declares a single binding, which states that the variable `@x` is replaced with the constant integer `5`.
 
-The variables are resolved at parse-time, meaning that the variable is no longer present
-when the query is compiled.
+The variables are substituted at parse time: each reference is replaced by the
+variable's expression, so the variable is no longer present when the query is
+compiled.
 
 So the above example reduces to this simple query:
 
@@ -196,7 +223,7 @@ FROM second;
 does not perform syntax validation that rejects the `DECLARE` syntax:
 
 ```questdb-sql
-DECLARE @x := ?, @y := ?
+DECLARE @x := $1, @y := $2
 SELECT @x::int + @y::int;
 
 -- Then bind the following values: (1, 2)
@@ -206,7 +233,11 @@ SELECT @x::int + @y::int;
 |--------|
 | 3      |
 
-This can be useful to minimise repeated bind variables.
+Write bind variables as `$1`, `$2`, and so on. JDBC rewrites `?` placeholders
+to that form before it sends the query, but the server does not accept a raw
+`?`.
+
+`DECLARE` can also minimise repeated bind variables.
 
 For example, rather than passing the same value to multiple positional arguments,
 you could instead use a declared variable and send a single bind variable:
@@ -214,22 +245,158 @@ you could instead use a declared variable and send a single bind variable:
 
 ```questdb-sql
 -- instead of this:
-SELECT ? as name, id FROM users WHERE name = ?;
+SELECT $1 as name, id FROM users WHERE name = $2;
 
 -- do this:
-DECLARE @name := ?
+DECLARE @name := $1
 SELECT @name as name, id FROM users WHERE name = @name;
 ```
-Or for repeating columns:
+
+A bind variable carries a value, not a column name. To repeat a column, declare
+the column itself, and bind only the values:
 
 ```questdb-sql
 DECLARE
-    @col = ?,
-    @symbol = ?
+    @col := price,
+    @symbol := $1
 SELECT avg(@col), min(@col), max(@col)
 FROM trades
 WHERE symbol = @symbol;
 ```
+
+## Value lists
+
+A parenthesised, comma-separated list declares the values of an `IN` filter
+once, so that a query or a view can name the set instead of spelling it out:
+
+```questdb-sql title="Declare the values of an IN filter"
+DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE symbol IN @symbols AND timestamp IN '$now-1h..$now';
+```
+
+```questdb-sql title="Exclude the values of a list"
+DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE symbol NOT IN @symbols AND timestamp IN '$now-1h..$now';
+```
+
+The list is expanded into the `IN` when the query is parsed, so the first query
+above is exactly `symbol IN ('BTC-USDT', 'ETH-USDT')`. Each member keeps its
+own type, and every form of `IN` works as it does with a written-out list,
+including `NOT IN` and interval scans on the designated timestamp.
+
+- `IN @symbols` and `IN (@symbols)` are equivalent.
+- A list mixes with literals: `symbol IN ('SOL-USDT', @symbols)`.
+- One list variable can be assigned to another: `@majors := @symbols`.
+- A list of one needs a trailing comma, `('BTC-USDT',)`. Without it,
+  `('BTC-USDT')` is a parenthesised value.
+- A bracketed subquery, `(SELECT ...)` or `(DECLARE ... SELECT ...)`, is a
+  subquery and not a list.
+
+### Lists of timestamps
+
+A list of timestamps follows the rules of a written-out `IN`, which depend on
+the list's length:
+
+- With two or more members, each member is one instant.
+  `('2026-01-05', '2026-01-12')` matches only rows at midnight on those days,
+  not the whole days.
+- A list of one is an interval, like a single string. `('2026-01-05',)`
+  matches the whole day.
+
+So a view parameter that a caller overrides with one date instead of two
+changes from instants to a whole day. To match whole days, declare a
+[TICK](/docs/query/operators/tick/) date list, which is a single string:
+
+```questdb-sql title="Rows on three days"
+DECLARE @days := '[2026-01-05,2026-01-12,2026-01-19]'
+SELECT timestamp, symbol, price, amount
+FROM trades
+WHERE timestamp IN @days;
+```
+
+### Lists of bind variables
+
+To filter a `SYMBOL`, `VARCHAR` or `STRING` value on any number of values with
+one prepared statement, bind one text array over the PostgreSQL wire protocol:
+
+```questdb-sql title="Bind one text array for any number of values"
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN $1;
+-- bind $1 as a text array, such as {BTC-USDT,ETH-USDT,SOL-USDT}
+```
+
+The array can also be bound through a variable:
+
+```questdb-sql title="The same, through a variable"
+DECLARE @symbols := $1
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+```
+
+With JDBC, write `?` in place of `$1`, and bind
+`ps.setArray(1, connection.createArrayOf("varchar", symbols))`. With psql,
+`\bind '{BTC-USDT,ETH-USDT,SOL-USDT}'`.
+
+The array must be the whole `IN` list: `IN $1`, `IN ($1)` or `NOT IN $1`. It
+cannot be mixed with other values, as in `IN ('ETH-USDT', $1)`: put those
+values in the array instead. A typed array bind, as from JDBC, fails there with
+`STRING constant expected`. An untyped one, as from psql `\bind`, is taken as
+one string, such as `'{SOL-USDT,BTC-USDT}'`, so the query silently returns
+wrong results.
+
+A [view parameter](#lists-in-views) can take an array bind too, but only when
+the view's body uses it as the whole list, as `symbol IN @symbols` does.
+Otherwise, bind a list of bind variables, as below.
+
+Members of a list can also be bind variables. An `AUDITED` parameter of an
+[audited view](/docs/security/audited-views/) needs this form, because it
+cannot hold an array:
+
+```questdb-sql title="A list of bind variables"
+DECLARE @symbols := ($1, $2)
+SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols;
+```
+
+The statement text fixes the number of members: `($1, $2)` always takes two
+values, so prepare one statement for each count. A single bind variable needs
+the trailing comma, `($1,)`. With a client that sends parameters untyped, such
+as psql `\bind`, it also needs a cast, `($1::varchar,)`: untyped, `($1,)` is
+taken as one array bind variable for the whole list. An audited view refuses
+both an array and an untyped `($1,)` with
+`audited view parameter has a type that cannot be audited`.
+
+### Lists in views
+
+In a [view](/docs/concepts/views/#parameterized-views), an `OVERRIDABLE` list
+can be overridden with a list of a different length:
+
+```questdb-sql title="A list parameter in a view"
+CREATE VIEW trades_for AS (
+  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
+);
+
+DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for;
+```
+
+### Errors
+
+A list has no value of its own, so it can only be used on the right-hand side
+of `IN`. These fail:
+
+- `SELECT @symbols`, `WHERE symbol = @symbols`, `OVER (PARTITION BY @symbols)`
+  or `@all := (@symbols, 'SOL-USDT')`:<br/>
+  `declared list can only be used on the right-hand side of IN`
+- `@x := ('BTC-USDT', ('ETH-USDT', 'SOL-USDT'))`:<br/>
+  `nested lists are not supported, list members have to be values`
+- `@x := ()`:<br/>
+  `value expected in list`
+
+To combine a list with more values, write both in the `IN`:
+`symbol IN (@symbols, 'SOL-USDT')`.
+
 ## Limitations
 
 Most basic expressions are supported, and we provide examples later in this document.
@@ -240,18 +407,6 @@ how many places you need to update the constant.
 ### Disallowed expressions
 
 However, not all expressions are supported. The following are explicitly disallowed:
-
-#### Bracket lists
-
-```questdb-sql title="bracket lists are not allowed"
-DECLARE
-    @symbols := ('BTC-USDT', 'ETH-USDT')
-SELECT timestamp, price, symbol
-FROM trades
-WHERE symbol IN @symbols;
-
--- error: unexpected bind expression - bracket lists not supported
-```
 
 #### SQL statement fragments
 

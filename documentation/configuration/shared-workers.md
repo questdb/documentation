@@ -8,7 +8,8 @@ be sized independently, letting you balance CPU resources between network I/O,
 query execution, and write operations based on your workload profile.
 
 - **Network pool**: handles HTTP, PostgreSQL, and ILP server I/O
-- **Query pool**: executes parallel query operations (filters, group-by)
+- **Query pool**: executes parallel query operations, such as filters, GROUP BY
+  and SAMPLE BY, GROUP BY over hash joins, HORIZON JOIN and WINDOW JOIN
 - **Write pool**: manages table writes and housekeeping tasks, and WAL apply
   jobs when `wal.apply.worker.count` is `0`
 
@@ -71,7 +72,10 @@ Comma-delimited list of CPU ids, one per thread specified in
 - **Reloadable**: no
 
 Number of worker threads for the query pool, which executes parallel query
-operations such as filters and group-by. Increasing this value raises query
+operations such as filters, GROUP BY and SAMPLE BY,
+[GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins),
+[HORIZON JOIN](/docs/query/sql/horizon-join/#parallel-execution) and
+[WINDOW JOIN](/docs/query/sql/window-join/). Increasing this value raises query
 parallelism at the expense of CPU resources available to network I/O and
 writes.
 

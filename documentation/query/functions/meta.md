@@ -766,6 +766,21 @@ Returns a table with the following columns:
   symbol indexes remain on disk. A remotely served partition is always
   read-only. See [cold storage](/docs/concepts/cold-storage/) (Enterprise)
 
+- `deadRows` - _LONG_, physical rows no longer referenced by live pieces;
+  zero for a standard native partition
+- `lastWriteTimestamp` - _TIMESTAMP_, wall-clock time of the last merge-append
+  layout update, including compaction, in microseconds regardless of the
+  designated timestamp's resolution; null when unavailable
+- `pieceCount` - _INT_, number of pieces sharing the partition's column files;
+  one for a standard native partition
+
+These columns also appear in `SHOW PARTITIONS` and are null when unavailable,
+such as for detached partitions. See
+[monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)
+for an example. Attached Parquet partitions report `deadRows=0`,
+`pieceCount=1` and a null `lastWriteTimestamp`; these columns do not measure
+Parquet dead row-group space.
+
 **Examples:**
 
 ```questdb-sql title="Create table my_table"
@@ -782,6 +797,8 @@ CREATE TABLE my_table AS (
 ```questdb-sql title="Get all partitions from my_table"
 table_partitions('my_table');
 ```
+
+Selected columns are shown below; the three new trailing columns are omitted.
 
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
@@ -801,6 +818,8 @@ SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
 ```questdb-sql title="Get active partition of a table"
 SELECT * FROM table_partitions('my_table') WHERE active = true;
 ```
+
+Selected columns are shown below; the three new trailing columns are omitted.
 
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
@@ -1197,6 +1216,10 @@ Returns a `table` including the following information:
   empty if valid
 - `view_status` - view status: `valid` or `invalid`
 - `view_status_update_time` - timestamp of last status change
+
+`views()` does not report whether a view is
+[audited](/docs/security/audited-views/). Use
+[`SHOW CREATE VIEW`](/docs/query/sql/show/#show-create-view) for that.
 
 **Examples:**
 
