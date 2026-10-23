@@ -1240,6 +1240,10 @@ Returns a `table` including the following information:
 - `view_status` - view status: `valid` or `invalid`
 - `view_status_update_time` - timestamp of last status change
 
+`views()` does not report whether a view is
+[audited](/docs/security/audited-views/). Use
+[`SHOW CREATE VIEW`](/docs/query/sql/show/#show-create-view) for that.
+
 **Examples:**
 
 ```questdb-sql title="List all views"

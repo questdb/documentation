@@ -81,6 +81,7 @@ valid again.
 | ----- | ----- |
 | `view does not exist [view=name]` | View doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise), and `IF EXISTS` not specified |
 | `Access denied [DROP VIEW on view_name]` | User lacks `DROP VIEW` permission (Enterprise) |
+| `Access denied [AUDIT VIEW]` | The view is audited and the user lacks the `AUDIT VIEW` permission (Enterprise) |
 
 ## Permissions (Enterprise)
 
@@ -96,6 +97,10 @@ GRANT DROP VIEW ON view1, view2 TO username;
 
 When a user creates a view, they are automatically granted all permissions
 including `DROP VIEW` on that view.
+
+Dropping an [audited view](/docs/security/audited-views/) also requires the
+database-level `AUDIT VIEW` permission, because dropping is the only way a view
+stops being audited.
 
 ## See also
 

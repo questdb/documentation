@@ -1,5 +1,5 @@
 export type Release = {
-  assets: Array<{
+  assets?: Array<{
     browser_download_url: string
     name: string
     size: number
@@ -17,7 +17,7 @@ export type Asset = {
 const formatSize = (size: number): string => `${(size / 1e6).toPrecision(3)} MB`
 
 export const getAssets = ({
-  assets,
+  assets = [],
 }: Release): { linux: Asset; noJre: Asset; windows: Asset } => {
   const linuxRaw = assets.find(({ name }) => name.includes("linux"))
   const noJreRaw = assets.find(({ name }) => name.includes("no-jre"))

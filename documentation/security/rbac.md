@@ -121,6 +121,9 @@ underlying `trades` table, and since they hold no permission on it, the table is
 [hidden](#object-visibility) from them: it is missing from `SHOW TABLES`, and
 querying it fails with `table does not exist [table=trades]`.
 
+To also record who read the view, and with which parameters, create it as an
+[audited view](/docs/security/audited-views/).
+
 ## Common scenarios
 
 ### Read-only analyst
@@ -132,6 +135,12 @@ CREATE USER analyst WITH PASSWORD 'pwd';
 GRANT HTTP, PGWIRE TO analyst;
 GRANT SELECT ON ALL TABLES TO analyst;
 ```
+
+`SELECT ON ALL TABLES` also covers the tables behind
+[audited views](/docs/security/audited-views/), and their audit trail, so its
+holder reads that data with no audit row. Where audited views guard data, grant
+`SELECT` on those views instead. See
+[Audited views permissions](/docs/security/audited-views/#permissions).
 
 ### Application service account
 
@@ -229,6 +238,14 @@ GRANT DATABASE ADMIN TO dba;
 `DATABASE ADMIN` grants all current and future permissions. Use sparingly.
 
 :::
+
+Since Enterprise 2.3.1, a database-level `GRANT ALL` includes
+`DATABASE ADMIN`, so the warning above applies to it, and it covers permissions
+added in later versions, such as `SWITCH ROLE`, `SET MEMORY LIMIT` and
+`AUDIT VIEW`. A principal granted `ALL` before 2.3.1, or individual permissions
+without `DATABASE ADMIN`, needs each new permission granted explicitly: no
+migration adds them. To check a principal, look for `DATABASE ADMIN` in its
+`SHOW PERMISSIONS` output.
 
 ### Failover operator
 
@@ -860,11 +877,12 @@ non-admin who holds it can raise its own ceiling above
 `cairo.query.memory.limit.bytes`. The built-in admin is exempt only as a
 target: its limit cannot be set at all.
 
-`GRANT ALL` expands to individual permissions at the moment it is granted. A
-principal granted `ALL` before upgrading to a version with this feature does
-not acquire `SET MEMORY LIMIT`; only grants issued after the upgrade include it,
-and no migration backfills it. Grant it explicitly to existing administrators:
-`GRANT SET MEMORY LIMIT TO admins;`.
+A database-level `GRANT ALL` issued on Enterprise 2.3.1 or later includes
+`DATABASE ADMIN`, and so `SET MEMORY LIMIT`. A principal that holds individual
+permissions without `DATABASE ADMIN`, or `ALL` granted before 2.3.1, does not
+acquire it, and no migration backfills it. Grant it explicitly to such
+administrators: `GRANT SET MEMORY LIMIT TO admins;`. See
+[Database administrator](#database-administrator).
 
 :::
 
@@ -1049,6 +1067,7 @@ SELECT * FROM all_permissions();
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
+| AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
 | CREATE TABLE              | Database                            | Create tables                           |
@@ -1115,7 +1134,7 @@ SELECT * FROM all_permissions();
 
 | Permission     | Description                                                           |
 | -------------- | --------------------------------------------------------------------- |
-| ALL            | All permissions at the granted level (database/table/column)          |
+| ALL            | All permissions at the granted level (database/table/column). At database level, includes `DATABASE ADMIN` since Enterprise 2.3.1: see [Database administrator](#database-administrator) |
 | DATABASE ADMIN | All permissions including future ones; can assume any service account |
 
 A few operations have no permission of their own. They require `SYSTEM ADMIN`, which the built-in admin and `DATABASE ADMIN` holders have:

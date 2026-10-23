@@ -383,6 +383,11 @@ Creating and managing materialized views requires specific permissions.
 | `DROP MATERIALIZED VIEW` | Materialized view | Dropping the view |
 | `REFRESH MATERIALIZED VIEW` | Materialized view | Manually refreshing the view |
 
+A materialized view over an [audited view](/docs/security/audited-views/) is
+not audited: its refreshes and its reads record nothing. A principal who can
+read an audited view and create materialized views can copy its data out of the
+audit trail's reach, so grant `CREATE MATERIALIZED VIEW` with that in mind.
+
 ### Owner permissions
 
 When you create a materialized view, you automatically receive all permissions on
