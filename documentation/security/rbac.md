@@ -559,6 +559,66 @@ ALTER USER username DROP TOKEN TYPE REST 'token_value_here';  -- Drop specific t
 Removing all authentication methods (password and tokens) effectively disables
 the user - they can no longer connect to the database.
 
+### HTTP sessions
+
+The Web Console, and any HTTP client that sends `session=true`, opens an HTTP
+session, identified by the `qdb_session` cookie, as described in
+[HTTP sessions](/docs/connect/compatibility/rest-api/#http-sessions) of the
+REST API reference. In QuestDB Enterprise 4.1.0 and later, a session ends with
+the credential that opened it, or that it checked last, even if the client
+sends only the cookie:
+
+- when the password is changed, even to the same value, or removed;
+- when the REST token is dropped or expires;
+- when the user or service account is disabled or dropped;
+- for the built-in admin, when a configuration reload changes the admin
+  credentials.
+
+A request that carries a credential that QuestDB rejects fails with
+`401 Unauthorized`, and ends the session. A session reuses the check of a
+password for [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl),
+30 seconds by default, but checks a REST token on every request, which keeps
+extending a token created with `REFRESH`. Only the requests that QuestDB
+authorizes extend a session. A request refused with `401`, with `429`, or with
+`403` for a disabled user or a user without the `HTTP` permission does not,
+while a query that fails on a missing table permission still does. For OIDC
+tokens, see
+[Sessions and token expiry](/docs/security/oidc/#sessions-and-token-expiry).
+
+When a user logs in to the Web Console with a password, the Web Console
+creates a REST token for the user, valid for one day and extended while in
+use, and sends the token with every later request. A password change
+therefore ends the session that the password opened, but not the Web Console
+access: the next request authenticates with the token, and opens a new
+session. The same holds for the built-in admin. To end the Web Console access
+of a user, drop the REST tokens of the user, which works for the built-in
+admin too, or disable or drop the user:
+
+```questdb-sql title="End the Web Console logins of a user"
+ALTER USER fx_analyst DROP TOKEN TYPE REST;
+```
+
+This also drops the REST tokens that the other clients of the user use.
+
+:::caution Replicated clusters
+
+The node that disables or drops a user ends the sessions of the user at once.
+A replica ends them when they are next used, so a session on a replica that is
+not used while the user is disabled survives if the user is enabled again. The REST token of the Web Console lives in the
+memory of the node that issued it, and is not replicated, so
+`DROP TOKEN TYPE REST` removes it only on the node that runs the statement.
+Run the statement on every node that the user logged in to, the primary first:
+while the user has persistent REST tokens, a replica refuses it until the drop
+on the primary has replicated. For the same reason, `DROP USER` leaves the
+tokens that a replica issued to the user. Such a token authenticates a new
+user that you create with the same name on that replica, and so does a session
+that the replica opened with the token, unless the session was used while the
+user did not exist. After you create a user with the name of a dropped one,
+drop the REST tokens of the user on every replica that the dropped user logged
+in to.
+
+:::
+
 ### Viewing information
 
 ```questdb-sql
