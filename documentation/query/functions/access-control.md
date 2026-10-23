@@ -79,6 +79,14 @@ These apply to both `active_grants()` and `active_permissions()`:
   has a stored access list. An external user gets the permissions of the
   QuestDB groups [mapped](/docs/security/oidc/#mapping-user-permissions) to its
   identity provider groups, so audit the rows of those groups.
+- A row shows a permission, not that the entity can connect. Disabled users
+  and service accounts are listed with their permissions: check the `enabled`
+  column of [`SHOW USERS`](/docs/query/sql/show/#show-users) and
+  [`SHOW SERVICE ACCOUNTS`](/docs/query/sql/show/#show-service-accounts). A
+  user or service account also needs an
+  [endpoint permission](/docs/security/rbac/#endpoint-permissions) such as
+  `HTTP` or `PGWIRE` to connect. Endpoint permissions appear as database-level
+  rows.
 - Group memberships and `ASSUME SERVICE ACCOUNT` grants are not listed, nor
   the permissions a user gains by assuming a service account. Use
   [`SHOW GROUPS userName`](/docs/query/sql/show/#show-groups) and
@@ -148,9 +156,9 @@ ORDER BY entity_name, permission, table_name, column_name;
 | quant        | User            | SELECT       | fx_trades  | symbol      | false        |
 | risk_manager | User            | SELECT       |            |             | true         |
 
-In this example, each `GRANT` produces a row for every permission and every
-table or column it names, and the database-level grants to `analyst` and
-`risk_manager` have no table name.
+The database-level grants to `analyst` and `risk_manager` have no table name,
+`fx_ingest` has a row for `fx_orders` although the table does not exist yet,
+and `quant` has one row per granted column.
 
 ```questdb-sql title="Grants that let the holder pass a permission on"
 SELECT entity_name, permission, table_name, column_name
