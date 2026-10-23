@@ -260,8 +260,8 @@ GRANT UPDATE ON products(id) TO john;
 When granting permissions on the table or column level, sometimes it might seem
 like there is no effect when cross-checking with the `SHOW permissions` command.
 If QuestDB detects that the permission is already granted on a higher level, it
-optimizes and removes any child permissions. Doing so keeps the access list
-model simple and permission checks faster.
+optimizes and removes any child permissions that do not add the grant option.
+Doing so keeps the access list model simple and permission checks faster.
 
 For example, granting the same permission on the database and table level shows
 will show the permission on database level only:

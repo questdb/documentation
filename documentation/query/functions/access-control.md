@@ -54,12 +54,12 @@ groups, use [`active_permissions()`](#active_permissions).
   this scope to others.
 
 Each combination of entity, permission, table, and column appears once, and
-grants on tables or columns that do not exist yet are included. A permission
-appears on two scopes when its grant option is narrower than the permission.
-After `GRANT SELECT ON ALL TABLES TO analyst`, then
-`GRANT SELECT ON fx_trades TO analyst WITH GRANT OPTION`, `analyst` has a
-database-level `SELECT` row with `grant_option` set to `false`, and a `SELECT`
-row on `fx_trades` with `true`.
+grants on tables or columns that do not exist yet are included. One permission
+can still have two rows when its grant option covers less than the permission
+does. In the [examples](#examples), `analyst` holds `SELECT` on all tables and
+the grant option on `fx_trades` only, so it has a database-level `SELECT` row
+with `grant_option` set to `false`, and a `SELECT` row on `fx_trades` with
+`true`.
 
 ### Required permissions
 
@@ -84,6 +84,12 @@ These apply to both `active_grants()` and `active_permissions()`:
   [`SHOW GROUPS userName`](/docs/query/sql/show/#show-groups) and
   [`SHOW SERVICE ACCOUNTS userName`](/docs/query/sql/show/#show-service-accounts)
   to see them.
+- Access through a view is not shown on the tables the view reads. A view
+  reads them with the permissions of its
+  [definer](/docs/concepts/views/#definer-security-model-enterprise), so a user
+  with `SELECT` on a view over `fx_trades` can read `fx_trades` data without any
+  permission on `fx_trades`. To audit who can read a table, also check who holds
+  `SELECT` on the views that read it.
 - When access control is disabled with
   [`acl.enabled=false`](/docs/configuration/iam/#aclenabled), the functions
   return no rows.
@@ -91,8 +97,8 @@ These apply to both `active_grants()` and `active_permissions()`:
   refresh in the background without a session whose permissions could be
   checked. Creating such a view fails with an error such as
   `administrative function cannot be used in materialized view: active_grants`.
-  A regular view can call them, and checks the permissions of the user who
-  queries it.
+  A regular view can call them. Unlike the tables it reads, the functions check
+  the permissions of the user who queries the view, not those of its definer.
 
 ### Examples
 
@@ -113,12 +119,15 @@ CREATE USER fx_trader;
 ADD USER fx_trader TO fx_desk;
 CREATE USER quant;
 CREATE USER risk_manager;
+CREATE USER analyst;
 CREATE SERVICE ACCOUNT fx_ingest;
 
 GRANT SELECT ON fx_trades TO fx_desk;
 GRANT CREATE TABLE TO fx_trader;
 GRANT SELECT ON fx_trades(symbol, price) TO quant;
 GRANT SELECT ON ALL TABLES TO risk_manager WITH GRANT OPTION;
+GRANT SELECT ON ALL TABLES TO analyst;
+GRANT SELECT ON fx_trades TO analyst WITH GRANT OPTION;
 GRANT INSERT ON fx_trades, fx_orders TO fx_ingest;
 ```
 
@@ -129,6 +138,8 @@ ORDER BY entity_name, permission, table_name, column_name;
 
 | entity_name  | entity_type     | permission   | table_name | column_name | grant_option |
 | ------------ | --------------- | ------------ | ---------- | ----------- | ------------ |
+| analyst      | User            | SELECT       |            |             | false        |
+| analyst      | User            | SELECT       | fx_trades  |             | true         |
 | fx_desk      | Group           | SELECT       | fx_trades  |             | false        |
 | fx_ingest    | Service Account | INSERT       | fx_orders  |             | false        |
 | fx_ingest    | Service Account | INSERT       | fx_trades  |             | false        |
@@ -137,17 +148,20 @@ ORDER BY entity_name, permission, table_name, column_name;
 | quant        | User            | SELECT       | fx_trades  | symbol      | false        |
 | risk_manager | User            | SELECT       |            |             | true         |
 
-Each `GRANT` produces a row for every permission and every table or column it
-names, and the database-level grant to `risk_manager` has no table name.
+In this example, each `GRANT` produces a row for every permission and every
+table or column it names, and the database-level grants to `analyst` and
+`risk_manager` have no table name.
 
 ```questdb-sql title="Grants that let the holder pass a permission on"
 SELECT entity_name, permission, table_name, column_name
 FROM active_grants()
-WHERE grant_option;
+WHERE grant_option
+ORDER BY entity_name;
 ```
 
 | entity_name  | permission | table_name | column_name |
 | ------------ | ---------- | ---------- | ----------- |
+| analyst      | SELECT     | fx_trades  |             |
 | risk_manager | SELECT     |            |             |
 
 ## active_permissions
@@ -161,14 +175,20 @@ It takes no arguments and returns the same [columns](#result-columns) as
 `active_grants()`, with the same [required permissions](#required-permissions)
 and [limitations](#limitations). In addition to the direct grants, it reports:
 
-- For each user, the permissions inherited from its groups. These rows repeat
-  the group's rows under the user's name.
+- For each user, the permissions inherited from its groups, merged with the
+  user's own permissions. A broader permission absorbs a narrower one unless
+  the narrower one adds the grant option, and rows on the same scope merge into
+  one row, which has the grant option if any of them has it. So a direct grant
+  can be missing from `active_permissions()` when a group grants more.
 - The [implicit permission](/docs/security/rbac/#implicit-permissions) on the
   designated timestamp. An entity that holds `SELECT` or `UPDATE` on some
   columns of a table holds the same permission on the table's designated
   timestamp column, without the grant option.
-- The permissions that `DATABASE ADMIN` includes: one database-level row per
-  permission, plus a table or column row only where it adds a grant option.
+- The permissions that `DATABASE ADMIN` includes: a database-level row for
+  every permission that [`all_permissions()`](#all_permissions) lists,
+  `DATABASE ADMIN` included, with the grant option of the `DATABASE ADMIN`
+  grant. A table or column grant of the same entity keeps its own row only
+  where it adds the grant option.
 
 ### Examples
 
@@ -181,6 +201,8 @@ ORDER BY entity_name, permission, table_name, column_name;
 
 | entity_name  | entity_type     | permission   | table_name | column_name | grant_option |
 | ------------ | --------------- | ------------ | ---------- | ----------- | ------------ |
+| analyst      | User            | SELECT       |            |             | false        |
+| analyst      | User            | SELECT       | fx_trades  |             | true         |
 | fx_desk      | Group           | SELECT       | fx_trades  |             | false        |
 | fx_ingest    | Service Account | INSERT       | fx_orders  |             | false        |
 | fx_ingest    | Service Account | INSERT       | fx_trades  |             | false        |
@@ -193,7 +215,29 @@ ORDER BY entity_name, permission, table_name, column_name;
 
 Two rows are not direct grants. `fx_trader` inherits `SELECT` on `fx_trades`
 from `fx_desk`, and `quant` holds `SELECT` on the designated timestamp because
-it can read other columns of the table.
+it can read other columns of the table. To list such rows, subtract
+`active_grants()` from `active_permissions()`:
+
+```questdb-sql title="Effective permissions that are not direct grants"
+SELECT entity_name, permission, table_name, column_name, grant_option
+FROM active_permissions()
+EXCEPT
+SELECT entity_name, permission, table_name, column_name, grant_option
+FROM active_grants()
+ORDER BY entity_name;
+```
+
+| entity_name | permission | table_name | column_name | grant_option |
+| ----------- | ---------- | ---------- | ----------- | ------------ |
+| fx_trader   | SELECT     | fx_trades  |             | false        |
+| quant       | SELECT     | fx_trades  | timestamp   | false        |
+
+Each row comes from a group, from the implicit permission on a designated
+timestamp, or from `DATABASE ADMIN`. Comparing `grant_option` as well catches
+a grant option that a user inherits on a scope it also holds directly. To find
+the group a row comes from, list the user's groups with
+[`SHOW GROUPS userName`](/docs/query/sql/show/#show-groups), then look up their
+rows in `active_grants()`.
 
 To find who can read a table, include the database-level rows, where
 `table_name` is `null`:
@@ -203,11 +247,13 @@ SELECT entity_name, table_name, column_name, grant_option
 FROM active_permissions()
 WHERE permission = 'SELECT'
   AND (table_name = 'fx_trades' OR table_name IS NULL)
-ORDER BY entity_name, column_name;
+ORDER BY entity_name, table_name, column_name;
 ```
 
 | entity_name  | table_name | column_name | grant_option |
 | ------------ | ---------- | ----------- | ------------ |
+| analyst      |            |             | false        |
+| analyst      | fx_trades  |             | true         |
 | fx_desk      | fx_trades  |             | false        |
 | fx_trader    | fx_trades  |             | false        |
 | quant        | fx_trades  | price       | false        |
@@ -215,8 +261,11 @@ ORDER BY entity_name, column_name;
 | quant        | fx_trades  | timestamp   | false        |
 | risk_manager |            |             | true         |
 
-`quant` can read three columns of `fx_trades`, and `risk_manager` can read
-every table and grant that access to others.
+`analyst` and `risk_manager` can read every table, and `quant` can read three
+columns of `fx_trades`. `risk_manager` can grant that access to others, and
+`analyst` can grant `SELECT` on `fx_trades` only. The result leaves out access
+that these functions do not show, such as reading `fx_trades` through a view.
+See [limitations](#limitations).
 
 ## all_permissions
 
@@ -267,10 +316,12 @@ It returns these columns:
   designated timestamp column.
 
 Unlike `active_permissions()`, it omits grants on tables or columns that do not
-exist yet. Inspecting an entity other than yourself, one of your groups, or a
-service account you can assume requires `USER DETAILS`. Like
-`active_permissions()`, it cannot be used in a materialized view or a live
-view.
+exist yet, and a table or column row that only adds the grant option to a
+broader permission. To check who can grant a permission, use
+[`active_permissions()`](#active_permissions). Inspecting an entity other than
+yourself, one of your groups, or a service account you can assume requires
+`USER DETAILS`. Like `active_permissions()`, it cannot be used in a
+materialized view or a live view.
 
 ```questdb-sql title="Permissions of quant"
 SELECT * FROM permissions('quant');
@@ -281,3 +332,15 @@ SELECT * FROM permissions('quant');
 | SELECT     | fx_trades  | symbol      | false        | G      |
 | SELECT     | fx_trades  | price       | false        | G      |
 | SELECT     | fx_trades  | timestamp   | false        | I      |
+
+```questdb-sql title="Permissions of analyst"
+SELECT * FROM permissions('analyst');
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     |            |             | false        | G      |
+
+`analyst` can grant `SELECT` on `fx_trades`, but `permissions('analyst')` does
+not show it. `active_permissions()` lists that grant option as a separate row
+on `fx_trades`.
