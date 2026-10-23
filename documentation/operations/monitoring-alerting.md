@@ -56,6 +56,16 @@ function which returns real-time statistics including WAL status, memory pressur
 and performance histograms. The function is lightweight and fully in-memory,
 suitable for frequent polling.
 
+:::note
+
+In QuestDB Enterprise, `tables()` and `wal_tables()` list only the tables the
+querying principal [can see](/docs/security/rbac/#object-visibility), so a
+suspended table hidden from the monitoring account raises no alert. See
+[monitoring account](/docs/security/rbac/#monitoring-account) for the grants
+that let it see every table.
+
+:::
+
 ### Health dashboard query
 
 ```questdb-sql

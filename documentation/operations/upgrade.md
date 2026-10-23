@@ -116,13 +116,29 @@ following before upgrading:
   outside `cairo.sql.copy.root` require `SYSTEM ADMIN`. Monitoring accounts
   that call them need it, which also makes every unprotected object
   [visible](/docs/security/rbac/#visibility-rules) to them.
+- Monitoring accounts that poll `tables()` or `wal_tables()`, for example to
+  [detect suspended tables](/docs/operations/monitoring-alerting/#detect-suspended-tables),
+  see only the tables they hold a permission on, so a suspended table hidden
+  from them raises no alert. Grant such an account `SYSTEM ADMIN`, or a
+  permission on every table it watches, see
+  [monitoring account](/docs/security/rbac/#monitoring-account). Only
+  `SYSTEM ADMIN` and `DATABASE ADMIN` holders also see the protected access
+  control tables in `wal_tables()`.
 - Creating a materialized or live view that calls a
   [catalogue function](/docs/query/sql/create-mat-view/#catalogue-functions),
   such as `tables()`, requires `SYSTEM ADMIN`. An existing materialized view
   that reads one through a regular view is invalidated at its first refresh.
+- Existing materialized and live views that call a catalogue function in their
+  own query keep refreshing, even when their creator does not hold
+  `SYSTEM ADMIN`. Their refresh sees every object, so every principal with
+  `SELECT` on such a view reads what the function lists, including objects
+  hidden from it. Review who can read these views, and drop or rewrite the ones
+  whose readers should not see every object.
 - A view created on an earlier version that calls a table-name function, such
-  as `table_columns('trades')`, lends its readers access to that table's
-  metadata only after `ALTER VIEW` or `CREATE OR REPLACE VIEW` runs on it, see
+  as `table_columns('trades')`, resolves that table with the permissions of
+  each reader. A reader that holds no permission on the table gets
+  `table does not exist` from the view until you redefine the view after the
+  upgrade, see
   [metadata functions in views](/docs/concepts/views/#metadata-functions-in-views).
 - Compiled statements in the query caches are no longer shared between
   principals, so cache hit rates can drop when many principals run the same

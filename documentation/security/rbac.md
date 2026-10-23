@@ -1,8 +1,9 @@
 ---
 title: Role-based Access Control (RBAC)
 description:
-  Users, groups, service accounts, and permissions from database down to column
-  and row level, plus per-principal query memory limits, in QuestDB Enterprise.
+  Users, groups, service accounts, and permissions down to column and row level,
+  which tables each principal can see, and query memory limits in QuestDB
+  Enterprise.
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -244,6 +245,26 @@ GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
 `DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
 `node_role()` and `GET /lifecycle` are open to any authenticated principal. See
 [Failover and role switch](/docs/high-availability/failover/).
+
+### Monitoring account
+
+A service account that watches table health, such as
+[suspended tables](/docs/operations/monitoring-alerting/#detect-suspended-tables),
+without reading table data:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT health_monitor WITH PASSWORD 'pwd';
+GRANT HTTP TO health_monitor;          -- REST API queries
+GRANT SYSTEM ADMIN TO health_monitor;  -- sees every table, reads no rows
+```
+
+With `SYSTEM ADMIN`, the account [sees](#object-visibility) every unprotected
+table in `tables()` and `wal_tables()`, also sees the protected access control
+tables in `wal_tables()`, and can call `reader_pool()` and `writer_pool()`. It
+still cannot read rows: `SELECT * FROM trades` fails with `Access denied`.
+`SYSTEM ADMIN` also authorizes other system functions, such as `reload_tls()`.
+An account granted a permission on specific tables instead sees only those
+tables, so a suspended table hidden from it raises no alert.
 
 ## Core concepts
 
@@ -589,7 +610,9 @@ object exists:
 - Creating an object fails when a hidden object already has its name, whether
   through `CREATE`, `RENAME TABLE ... TO`, `COPY ... FROM`, CSV import, or ILP
   table auto-creation. `CREATE ... IF NOT EXISTS` returns without creating
-  anything.
+  anything when the hidden object is of the same kind. Otherwise it fails with
+  an error that names the hidden object's kind, such as
+  `view or materialized view with the requested name already exists`.
 - An ILP over HTTP write to a hidden table is denied `INSERT` on that table by
   name, and a value of the wrong type fails with a cast error that names the
   column type.
