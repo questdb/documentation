@@ -660,6 +660,7 @@ module.exports = {
             "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
+            "concepts/merge-append-partitions",
             {
               id: "concepts/parquet",
               type: "doc",
