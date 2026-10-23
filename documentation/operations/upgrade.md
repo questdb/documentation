@@ -94,10 +94,12 @@ new metadata the primary produces after its upgrade.
 
 When upgrading to 4.0.0 or later, grant the `SWITCH ROLE` permission only after
 every node runs the new version. The permission is stored in a form older
-versions cannot read, and a `GRANT ALL` issued before the upgrade does not
-include it. Accounts that triggered role switches through `SYSTEM ADMIN` on
-3.3.x need an explicit `GRANT SWITCH ROLE`. See
-[Failover operator](/docs/security/rbac/#failover-operator).
+versions cannot read. A principal that holds `DATABASE ADMIN`, including
+through a database-level `GRANT ALL` issued on 2.3.1 or later, already has it.
+Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
+3.3.x, need an explicit `GRANT SWITCH ROLE`. See
+[Failover operator](/docs/security/rbac/#failover-operator) and
+[Database administrator](/docs/security/rbac/#database-administrator).
 
 ### Authentication changes in 4.1.0
 
