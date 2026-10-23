@@ -564,11 +564,11 @@ not affected: they continue to use `TTL` for retention in Enterprise.
 To move a legacy table from `TTL` to a storage policy:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts on a table, and it is required before a storage
-   policy can be attached:
+   value Enterprise accepts on a user table, and it is required before a
+   storage policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
-   ALTER TABLE trades SET TTL 0;
+   ALTER TABLE trades SET TTL 0 HOURS;
    ```
 
 2. **Attach a storage policy** that reproduces, and ideally extends, the
