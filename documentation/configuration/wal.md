@@ -12,10 +12,10 @@ To cap the native memory a single WAL apply batch may allocate, see
 
 ## Adaptive WAL apply blocks
 
-With adaptive blocks enabled, the row limit starts at
-`cairo.wal.apply.block.size` worth of rows and doubles whenever the row limit
-cuts a block short, while the block fits its memory budget. The grown limit
-resets when the table writer reopens. The look-ahead transaction count starts
+With adaptive blocks enabled, QuestDB derives the initial row limit from the
+byte size configured by `cairo.wal.apply.block.size`. This row limit doubles
+whenever it cuts a block short, while the block fits its memory budget. The
+grown limit resets when the table writer reopens. The look-ahead transaction count starts
 at `cairo.wal.apply.look.ahead.txn.count` and adapts to one block's worth of
 transactions.
 
