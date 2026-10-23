@@ -12,7 +12,7 @@ window - no cron jobs or manual cleanup required.
 
 **QuestDB Enterprise: TTL is superseded by
 [Storage Policy](/docs/concepts/storage-policy/).** Enterprise rejects any
-non-zero `SET TTL` with
+non-zero `SET TTL` on a user table with
 `TTL is not supported on Enterprise tables; use a storage policy instead`.
 Storage policies extend TTL with graduated lifecycle management (convert to
 Parquet, then drop) and are the recommended retention primitive for Enterprise
@@ -20,8 +20,8 @@ users. Materialized views are the exception: they continue to use `TTL` for
 retention on Enterprise (set via
 [`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/)).
 The rest of this page describes TTL behavior on QuestDB Open Source (and the
-`SET TTL 0` case on Enterprise, used to clear an older TTL before attaching a
-storage policy).
+`SET TTL 0 HOURS` case on Enterprise, used to clear an older TTL before
+attaching a storage policy).
 
 :::
 
