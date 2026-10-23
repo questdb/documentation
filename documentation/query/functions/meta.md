@@ -555,8 +555,9 @@ Storage policies — and the `storage_policies` view — are available in
 `storage_policies` is a system view that lists the
 [storage policies](/docs/concepts/storage-policy/) currently attached to
 tables. Every principal can see the view, but it lists only the policies of the
-tables the caller [can see](/docs/security/rbac/#object-visibility), system
-tables included. Query it like any other table:
+tables the caller [can see](/docs/security/rbac/#object-visibility). Unlike
+`tables()`, it also lists the system tables the caller can see, such as
+`sys.view_audit`. Query it like any other table:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
@@ -564,12 +565,19 @@ SELECT * FROM storage_policies;
 
 :::note
 
-In QuestDB Enterprise 4.1.0, querying the view also requires `SELECT` on the
-`sys.sp_entries` and `sys.sp_links` system tables, granted directly or through
-`SELECT ON ALL TABLES` or `DATABASE ADMIN`. Without it, the query fails with
-`Access denied for <principal> [SELECT on sys.sp_entries(status)]`. Those
-tables hold the directory name of every table with a policy, so a principal
-that can read them directly can find tables otherwise hidden from it.
+Querying the view also requires `SELECT` on the `status` column of the
+`sys.sp_entries` system table, which `SELECT ON ALL TABLES` and
+`DATABASE ADMIN` include. Without it, the query fails with
+`Access denied for <principal> [SELECT on sys.sp_entries(status)]`. Grant that
+column alone:
+
+```questdb-sql
+GRANT SELECT ON 'sys.sp_entries'(status) TO analyst;
+```
+
+Do not grant `SELECT` on all of `sys.sp_entries` or `sys.sp_links`. They hold
+the directory name of every table with a policy, so a principal that can read
+them finds tables otherwise hidden from it.
 
 :::
 

@@ -248,23 +248,48 @@ GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
 
 ### Monitoring account
 
-A service account that watches table health, such as
+A service account that watches the health of every table, view, materialized
+view, and live view, such as
 [suspended tables](/docs/operations/monitoring-alerting/#detect-suspended-tables),
 without reading table data:
 
 ```questdb-sql
 CREATE SERVICE ACCOUNT health_monitor WITH PASSWORD 'pwd';
 GRANT HTTP TO health_monitor;          -- REST API queries
-GRANT SYSTEM ADMIN TO health_monitor;  -- sees every table, reads no rows
+GRANT SYSTEM ADMIN TO health_monitor;  -- sees every object, reads no rows
+```
+
+The account polls the WAL status of every object:
+
+```questdb-sql
+SELECT name, errorTag, errorMessage FROM wal_tables() WHERE suspended;
 ```
 
 With `SYSTEM ADMIN`, the account [sees](#object-visibility) every unprotected
-table in `tables()` and `wal_tables()`, also sees the protected access control
+object in `tables()` and `wal_tables()`, also sees the protected access control
 tables in `wal_tables()`, and can call `reader_pool()` and `writer_pool()`. It
 still cannot read rows: `SELECT * FROM trades` fails with `Access denied`.
-`SYSTEM ADMIN` also authorizes other system functions, such as `reload_tls()`.
-An account granted a permission on specific tables instead sees only those
-tables, so a suspended table hidden from it raises no alert.
+
+`SYSTEM ADMIN` is an administrative permission, so protect the account's
+credentials like an administrator's. Besides visibility, it authorizes:
+
+- [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/), which
+  discards a table's pending WAL, and
+  [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/)
+- System functions, such as `hydrate_table_metadata()` and `reload_tls()`
+- `files()` and `glob()` on any directory of the server
+
+An account that does not need `reader_pool()`, `writer_pool()`, or the protected
+tables can hold a single table-level permission granted `ON ALL TABLES` instead.
+It makes every unprotected object visible, including objects created later,
+without `SYSTEM ADMIN`:
+
+```questdb-sql
+GRANT RESUME WAL ON ALL TABLES TO health_monitor;  -- can also resume WAL
+```
+
+An account granted a permission on specific tables only sees those tables, so
+a suspended table hidden from it raises no alert.
 
 ## Core concepts
 
@@ -474,12 +499,30 @@ get it back without someone re-granting it.
 
 QuestDB Enterprise hides tables, views, materialized views, and live views from
 principals that hold no permission on them, so that users and applications
-cannot list, or read the schema of, data they have no access to. To such a
-principal, a hidden object is indistinguishable from a missing one: catalogue
+cannot list the objects they have no access to, or read their schema through
+SQL. To such a principal, a hidden object looks like a missing one: catalogue
 queries such as `tables()`, `SHOW TABLES`, `information_schema`, and
 `pg_catalog` leave it out, and statements that name it fail with the error a
-missing object returns. Object visibility is available since QuestDB Enterprise
-4.1.0 and applies whenever access control is enabled.
+missing object returns. A few paths still reveal a hidden object, see
+[Limitations](#limitations). Object visibility is available since QuestDB
+Enterprise 4.1.0 and applies whenever access control is enabled.
+
+:::warning Breaking change
+
+Before QuestDB Enterprise 4.1.0, every principal could list every object and
+read its schema through catalogue queries, `SHOW` statements, and functions
+such as `table_columns()`, and statements that read or changed an object it
+held no permission on failed with `Access denied` or `Grant denied`. Both now
+behave as for a missing object: catalogue queries leave the object out,
+statements fail with the [errors for hidden objects](#errors-for-hidden-objects),
+and the `IF EXISTS` forms do nothing. Over the REST API, a `does not exist`
+error returns HTTP status 400, where `Access denied` returned 403. Clients and
+tests that read the schema of such objects, or match the old messages, must
+expect the missing-object behavior instead, or the principal needs a permission
+on the object. See the
+[4.1.0 upgrade checklist](/docs/operations/upgrade/#upgrading-to-410).
+
+:::
 
 ### Visibility rules
 
@@ -568,34 +611,27 @@ The `IF EXISTS` forms, such as `DROP TABLE IF EXISTS`, do nothing for a hidden
 object, and [`DROP ALL TABLES`](/docs/query/sql/drop/) leaves hidden objects in
 place without naming them in its error report.
 
-:::warning Breaking change
-
-Before QuestDB Enterprise 4.1.0, these statements failed with an authorization
-error, such as `Access denied` or `Grant denied`, for an object the principal
-held no permission on. Clients and tests that match those messages for such
-objects must expect the missing-object error instead, or the principal needs a
-permission on the object.
-
-:::
-
 ### Views
 
 A principal with `SELECT` on a [view](/docs/concepts/views/) reads its rows
 while the objects the view reads stay hidden, as in the
 [row-level access](#row-level-access-with-views) example. The view's
 definition, visible through `views()`, `SHOW CREATE VIEW`, and `EXPLAIN`, still
-names those objects. Table-name functions such as `table_columns()` and `SHOW`
-statements in a view's definition can also publish the metadata of a table
-hidden from the view's readers, as described in
+names those objects. In a view's definition, table-name functions such as
+`table_columns()` and `SHOW` statements that name an object, such as
+`SHOW COLUMNS`, can also publish the metadata of a table hidden from the view's
+readers, as described in
 [metadata functions in views](/docs/concepts/views/#metadata-functions-in-views).
+Functions and statements that list objects, such as `tables()` and
+`SHOW TABLES`, list only what the reader can see, also inside a view.
 
 ### Administrative and catalogue functions
 
-`reader_pool()`, `writer_pool()`, `files()`, and `glob()` with a pattern
-outside [`cairo.sql.copy.root`](/docs/configuration/copy-settings/#cairosqlcopyroot)
-list objects whether or not the caller can see them. They require
-`SYSTEM ADMIN` and otherwise fail with
-`Access denied for <principal> [SYSTEM ADMIN]`.
+`reader_pool()`, `writer_pool()`, `files()`, and `glob()` list objects whether
+or not the caller can see them. They require `SYSTEM ADMIN`, `glob()` only with
+an absolute pattern outside
+[`cairo.sql.copy.root`](/docs/configuration/copy-settings/#cairosqlcopyroot),
+and otherwise fail with `Access denied for <principal> [SYSTEM ADMIN]`.
 
 Materialized and live views refresh under a context that sees every object, so
 they accept catalogue functions and `SHOW` statements only in their own query,
@@ -604,25 +640,34 @@ and only from a principal with `SYSTEM ADMIN`. See
 
 ### Limitations
 
-Visibility hides an object's schema, but some paths still reveal that the
-object exists:
+Visibility keeps hidden objects out of catalogue queries and SQL statements,
+but some paths still reveal that an object exists, and ILP writes reveal the
+columns of a hidden table:
 
-- Creating an object fails when a hidden object already has its name, whether
-  through `CREATE`, `RENAME TABLE ... TO`, `COPY ... FROM`, CSV import, or ILP
-  table auto-creation. `CREATE ... IF NOT EXISTS` returns without creating
-  anything when the hidden object is of the same kind. Otherwise it fails with
-  an error that names the hidden object's kind, such as
-  `view or materialized view with the requested name already exists`.
-- An ILP over HTTP write to a hidden table is denied `INSERT` on that table by
-  name, and a value of the wrong type fails with a cast error that names the
-  column type.
-- `LIST USERS` and `USER DETAILS` holders see the object names in other
-  principals' grants, and `SQL ENGINE ADMIN` holders see the text of every
-  running query in
+- Any principal can test whether a name is taken, because the name is checked
+  before the permission to create. Creating an object fails when a hidden
+  object already has its name, whether through `CREATE` or
+  `RENAME TABLE ... TO`: `CREATE TABLE` fails with `table already exists`,
+  where a free name fails with `Access denied` for a principal without
+  `CREATE TABLE`. `CREATE ... IF NOT EXISTS` returns without creating anything
+  when the hidden object is of the same kind. Otherwise it fails with an error
+  such as `view or materialized view with the requested name already exists`.
+  `COPY ... FROM` and CSV import into a hidden table fail with
+  `Access denied for <principal> [INSERT on <table>]`.
+- An ILP over HTTP write to a hidden table fails with
+  `Access denied for <principal> [INSERT on <table>]` when the table has every
+  column the line writes, and with `[ADD COLUMN on <table>]` when it lacks one.
+  A value of the wrong type fails with a cast error that names the column and
+  its type. A principal that knows a hidden table's name can therefore probe
+  its column names and types.
+- `USER DETAILS` holders see the object names in other principals' grants,
+  through `SHOW PERMISSIONS`, and `SQL ENGINE ADMIN` holders see the text of
+  every running query in
   [`query_activity()`](/docs/query/functions/meta/#query_activity).
-- Table ids are allocated database-wide, so gaps between visible ids, and the
-  per-table WAL activity in the public `sys.telemetry_wal` table, reveal that
-  other tables exist.
+- Table ids are allocated database-wide, so gaps between visible ids reveal
+  that other tables exist. The public `sys.telemetry_wal` table records every
+  WAL write by table id, with its row count and timestamp range, so it also
+  shows how much data each hidden table receives.
 
 ## Advanced topics
 
@@ -1073,7 +1118,7 @@ SELECT * FROM all_permissions();
 | ALL            | All permissions at the granted level (database/table/column)          |
 | DATABASE ADMIN | All permissions including future ones; can assume any service account |
 
-A few operations are reserved for database administrators and are not grantable as permissions at all:
+A few operations have no permission of their own. They require `SYSTEM ADMIN`, which the built-in admin and `DATABASE ADMIN` holders have:
 
 | Operation                                                               | Notes                                                                                       |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
