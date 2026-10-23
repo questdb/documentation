@@ -41,6 +41,8 @@ calculations. Functions are organized by category below.
 | [kurtosis / kurtosis_samp](#kurtosis--kurtosis_samp) | Sample excess kurtosis |
 | [kurtosis_pop](#kurtosis_pop) | Population excess kurtosis |
 | [mode](#mode) | Most frequent value |
+| [percentile_cont / quantile_cont](#percentile_cont--quantile_cont) | Exact percentile, interpolated between values |
+| [percentile_disc / quantile_disc](#percentile_disc--quantile_disc) | Exact percentile, returns an input value |
 | [skewness / skewness_samp](#skewness--skewness_samp) | Sample skewness |
 | [skewness_pop](#skewness_pop) | Population skewness |
 | [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
@@ -264,12 +266,25 @@ GROUP BY symbol;
 
 `approx_percentile(value, percentile, precision)` calculates the approximate
 value for the given non-negative column and percentile using the
-[HdrHistogram](http://hdrhistogram.org/) algorithm.
+[HdrHistogram](http://hdrhistogram.org/) algorithm. Pass an array of
+percentiles to read several of them from the same histogram.
+
+```questdb-sql
+approx_percentile(value, percentile [, precision])
+approx_percentile(value, ARRAY[percentile1, percentile2, ...] [, precision])
+```
+
+The histogram uses a bounded amount of memory per group regardless of how many
+rows the group holds. When you need exact results, or the input contains
+negative values, use [percentile_cont](#percentile_cont--quantile_cont) or
+[percentile_disc](#percentile_disc--quantile_disc) instead.
 
 #### Parameters
 
 - `value` is any numeric non-negative value.
-- `percentile` is a `double` value between 0.0 and 1.0, inclusive.
+- `percentile` is a `double` value between 0.0 and 1.0, inclusive, or a
+  one-dimensional `double[]` of such values. It must be a constant or a bind
+  variable.
 - `precision` is an optional `int` value between 0 and 5, inclusive. This is the
   number of significant decimal digits to which the histogram will maintain
   value resolution and separation. For example, when the input column contains
@@ -284,7 +299,8 @@ value for the given non-negative column and percentile using the
 
 #### Return value
 
-Return value type is `double`.
+Return value type is `double`, or `double[]` when `percentile` is an array. The
+array holds the results in the same order as the requested percentiles.
 
 #### Examples
 
@@ -297,9 +313,21 @@ WHERE timestamp IN '$today';
 | :---------------- |
 | 211.24            |
 
+```questdb-sql demo title="Several approximate quantity percentiles per FX pair"
+SELECT
+    symbol,
+    approx_percentile(quantity, ARRAY[0.5, 0.9, 0.99], 3) AS qty_pcts
+FROM fx_trades
+WHERE timestamp IN '$today'
+ORDER BY symbol;
+```
+
 #### See also
 
 - [approx_median](#approx_median) - Shorthand for 50th percentile
+- [percentile_cont](#percentile_cont--quantile_cont) and
+  [percentile_disc](#percentile_disc--quantile_disc) calculate exact
+  percentiles
 
 ## arg_max
 
@@ -1642,6 +1670,199 @@ Return value type is `double`.
 SELECT nsum(a)
 FROM (SELECT rnd_double() a FROM long_sequence(100));
 ```
+
+## percentile_cont / quantile_cont
+
+`percentile_cont(value, percentile)` calculates the exact continuous percentile
+of a group, interpolating linearly between the two input values closest to the
+requested position. Use it for latency SLOs, fill-size distributions, or price
+bands where an interpolated value is acceptable and an exact answer is needed.
+Pass an array of percentiles to compute several of them over the same values in
+one pass. `quantile_cont` is an alias.
+
+The function follows the SQL standard and PostgreSQL definition. For `n`
+non-NULL values sorted in ascending order, the result sits at the 0-based
+position `percentile * (n - 1)`. When that position falls between two values,
+the result is interpolated between them.
+
+```questdb-sql
+percentile_cont(value, percentile)
+percentile_cont(value, ARRAY[percentile1, percentile2, ...])
+```
+
+Unlike [approx_percentile](#approx_percentile), `percentile_cont` keeps every
+non-NULL value of a group in memory, so its memory use grows with the size of
+the group. It accepts negative values and supports parallel execution.
+
+#### Parameters
+
+- `value` (numeric): the values to calculate the percentile of. NULL values are
+  ignored.
+- `percentile` (`double` or `double[]`): a constant or bind variable between
+  0.0 and 1.0, inclusive. A `double[]` must be one-dimensional and returns one
+  result per element. A value that varies per row is rejected.
+
+#### Return value
+
+Return value type is `double`, or `double[]` when `percentile` is an array. The
+array holds the results in the same order as the requested percentiles.
+
+Returns `NULL` when the group has no non-NULL values.
+
+#### Examples
+
+Given a `fills` table with execution latency per trading desk:
+
+| ts                          | desk | latency_us |
+| :-------------------------- | :--- | :--------- |
+| 2026-10-01T09:00:00.000000Z | eq   | 120        |
+| 2026-10-01T09:00:01.000000Z | eq   | 150        |
+| 2026-10-01T09:00:02.000000Z | eq   | 180        |
+| 2026-10-01T09:00:03.000000Z | eq   | 240        |
+| 2026-10-01T09:00:04.000000Z | eq   | 900        |
+| 2026-10-01T09:00:05.000000Z | fi   | 300        |
+| 2026-10-01T09:00:06.000000Z | fi   | 310        |
+| 2026-10-01T09:00:07.000000Z | fi   | 2500       |
+| 2026-10-01T09:00:08.000000Z | fi   | NULL       |
+
+```questdb-sql title="Latency percentiles per desk"
+SELECT
+    desk,
+    percentile_cont(latency_us, 0.5) AS p50,
+    percentile_cont(latency_us, ARRAY[0.5, 0.9, 0.99]) AS pcts
+FROM fills
+ORDER BY desk;
+```
+
+| desk | p50   | pcts                   |
+| :--- | :---- | :--------------------- |
+| eq   | 180.0 | [180.0,636.0,873.6]    |
+| fi   | 310.0 | [310.0,2062.0,2456.2]  |
+
+For the `eq` desk, the 90th percentile sits at position `0.9 * 4 = 3.6`, so the
+result is 60% of the way from 240 to 900, which is 636. The NULL latency on the
+`fi` desk is ignored.
+
+```questdb-sql demo title="Quantity percentiles per FX pair in 15-minute buckets"
+SELECT
+    timestamp,
+    symbol,
+    percentile_cont(quantity, ARRAY[0.5, 0.9, 0.99]) AS qty_pcts
+FROM fx_trades
+WHERE timestamp IN '$now-1h..$now'
+SAMPLE BY 15m;
+```
+
+Access individual elements of the result with array indexing, which is 1-based:
+
+```questdb-sql demo title="Read individual percentiles from the array"
+SELECT symbol, pcts[1] AS p50, pcts[3] AS p99
+FROM (
+    SELECT symbol, percentile_cont(quantity, ARRAY[0.5, 0.9, 0.99]) AS pcts
+    FROM fx_trades
+    WHERE timestamp IN '$today'
+);
+```
+
+:::note
+
+- `SAMPLE BY` with `FILL(LINEAR)` is not supported. The array form also rejects
+  a constant fill value such as `FILL(0)`. `FILL(NULL)` and `FILL(PREV)` work
+  with both forms.
+- A long-running sort or selection on a very large group does not stop
+  immediately on a query timeout or cancellation. It finishes the current
+  group first.
+
+:::
+
+#### See also
+
+- [percentile_disc](#percentile_disc--quantile_disc) returns an actual value
+  from the input instead of an interpolated one
+- [approx_percentile](#approx_percentile) uses a fixed amount of memory per
+  group, at the cost of precision
+- [percentile_cont window function](/docs/query/functions/window-functions/reference/#percentile)
+  attaches the percentile of a partition to every row
+
+## percentile_disc / quantile_disc
+
+`percentile_disc(value, percentile)` calculates the exact discrete percentile
+of a group. The result is always one of the input values, which makes it the
+right choice when an interpolated value would be meaningless, such as a price
+on a tick grid, an integer count, or a value that must exist in the data.
+`quantile_disc` is an alias.
+
+The function follows the SQL standard and PostgreSQL definition: it returns the
+first value, in ascending order, whose cumulative distribution reaches the
+percentile. For `n` non-NULL values, that is the `ceil(percentile * n)`-th
+smallest value, or the smallest value when `percentile` is 0.
+
+```questdb-sql
+percentile_disc(value, percentile)
+percentile_disc(value, ARRAY[percentile1, percentile2, ...])
+```
+
+`percentile_disc` shares the parameter rules, memory use, and limitations of
+[percentile_cont](#percentile_cont--quantile_cont).
+
+#### Parameters
+
+- `value` (numeric): the values to calculate the percentile of. NULL values are
+  ignored.
+- `percentile` (`double` or `double[]`): a constant or bind variable between
+  0.0 and 1.0, inclusive. A `double[]` must be one-dimensional and returns one
+  result per element.
+
+#### Return value
+
+- `long` for integer input (`byte`, `short`, `int`, `long`), so the result
+  keeps the exact input value
+- `double` for floating-point input
+- `double[]` when `percentile` is an array, for any input type
+
+Returns `NULL` when the group has no non-NULL values.
+
+#### Examples
+
+Using the `fills` table from the [percentile_cont](#percentile_cont--quantile_cont)
+examples:
+
+```questdb-sql title="Discrete latency percentiles per desk"
+SELECT
+    desk,
+    percentile_disc(latency_us, 0.5) AS p50,
+    percentile_disc(latency_us, ARRAY[0.5, 0.9, 0.99]) AS pcts
+FROM fills
+ORDER BY desk;
+```
+
+| desk | p50 | pcts                  |
+| :--- | :-- | :-------------------- |
+| eq   | 180 | [180.0,900.0,900.0]   |
+| fi   | 310 | [310.0,2500.0,2500.0] |
+
+`p50` is a `long` because `latency_us` is a `long` column. The `eq` desk has
+five values, so the 90th percentile is the `ceil(0.9 * 5) = 5`th smallest value,
+900.
+
+```questdb-sql demo title="Median trade price per FX pair, discrete and interpolated"
+SELECT
+    symbol,
+    percentile_disc(price, 0.5) AS median_traded,
+    percentile_cont(price, 0.5) AS median_interpolated
+FROM fx_trades
+WHERE timestamp IN '$today'
+ORDER BY symbol;
+```
+
+#### See also
+
+- [percentile_cont](#percentile_cont--quantile_cont) interpolates between
+  input values
+- [approx_percentile](#approx_percentile) uses a fixed amount of memory per
+  group, at the cost of precision
+- [percentile_disc window function](/docs/query/functions/window-functions/reference/#percentile)
+  attaches the percentile of a partition to every row
 
 ## skewness / skewness_samp
 
