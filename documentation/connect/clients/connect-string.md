@@ -478,6 +478,17 @@ replays whatever is still on disk.
 To enable SF mode, set `sf_dir`. Without it, the client runs a memory-only
 equivalent — same architecture, no durability across restarts.
 
+:::note Go client
+
+The Go client accepts `sf_max_segment_bytes`, `sf_max_total_bytes`,
+`sf_durability`, and `sf_append_deadline_millis` only when `sf_dir` is set.
+Without `sf_dir`, its buffer is fixed at 128 MiB and its append deadline at 30
+seconds. With `sf_dir`, an OS crash or power loss costs at most rows from the
+end of the segment being written, with weaker guarantees on macOS and Windows.
+See [What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
+
+:::
+
 ### Storage
 
 - `sf_dir` — parent directory under which the slot lives. The slot path is
@@ -729,6 +740,15 @@ egress side; the Sender silently accepts even a value the
   cursor mid-result-set, breaking out of iteration) before the client
   declares the connection desynced and discards it. Positive integer
   milliseconds; default `5000` (5 s).
+- `server_info_timeout_ms` — **Go client only; other clients reject it,** so
+  leave it out of a connect string shared with them. How long the client waits
+  for the server's `SERVER_INFO` message after the WebSocket upgrade. Positive
+  integer milliseconds; default `5000` (5 s).
+- `replay_exec` — **Go client only; other clients reject it,** so leave it out
+  of a connect string shared with them. Whether `Exec` runs a statement again
+  after the connection fails mid-statement. `off` (default) returns the error
+  instead, because the server may already have applied the statement. Set it
+  to `on` only if your statements are safe to run twice.
 - `buffer_pool_size` — number of decoded result-batch buffers the I/O
   thread keeps in rotation. Sets the in-flight window between the
   receive/decode loop and the user's `onBatch` callback: the I/O thread
@@ -903,10 +923,12 @@ description and behaviour notes.
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
+| `replay_exec`                           | enum (`on` / `off`)           | `off` (Go only)               | [Query client keys](#egress-keys)                             |
 | `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
+| `server_info_timeout_ms`                | int (ms)                      | `5000` (Go only)              | [Query client keys](#egress-keys)                             |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only) | [Store-and-forward](#sf-keys)                                |
