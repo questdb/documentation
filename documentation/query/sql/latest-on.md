@@ -24,8 +24,6 @@ where:
   table directly, it must be the table's
   [designated timestamp](/docs/concepts/designated-timestamp/).
 - `partitionColumn` is one or more columns that identify each time series.
-- `SELECT * FROM` can be omitted, for example
-  `trades LATEST ON timestamp PARTITION BY symbol;`.
 
 ### Supported PARTITION BY column types
 
