@@ -12,11 +12,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics) - New section on the `sys.metrics` table, where QuestDB keeps a history of its own metrics, with example queries
 - [Databento connector](/docs/connect/connectors/databento/) - New page for the QuestDB Enterprise Databento connector, which streams Live feeds and runs Historical backfills into QuestDB. Covers installation, TOML configuration, table mappings, storage policies, candles from a materialized view, a session VWAP live view, live dashboards in a Web Console notebook or Grafana, checkpointed recovery, and Prometheus metrics
 - [ALTER LIVE VIEW RESUME WAL](/docs/query/sql/alter-live-view-resume-wal/) - New reference page for resuming a live view whose own WAL was suspended after an error, and how to find suspended live views through `wal_tables()`
 
 ### Reference
 
+- Added [`metrics.enabled`](/docs/configuration/logging-metrics/#metricsenabled) and the [`metrics.persist.*`](/docs/configuration/logging-metrics/#persisted-metrics) settings for `sys.metrics`
 - Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views run on their own refresh pool, not the materialized view pool as previously documented
 - Added the `checkpoint_seal_failures` column to [`live_views()`](/docs/query/functions/meta/#live_views) and corrected the `lag_seqtxn`, `last_processed_seqtxn`, `lag_micros`, and `writer_stall_micros` descriptions
 - Corrected the defaults of [`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/#matviewrefreshworkercount) and [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount), and documented that `mat.view.refresh.worker.count=0` disables materialized view refresh
