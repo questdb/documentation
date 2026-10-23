@@ -111,6 +111,18 @@ check how these changes affect your users and clients:
   dropped or expires, or its user is disabled or dropped. This applies to
   passwords and REST tokens, not only to OIDC. See
   [HTTP sessions](/docs/security/rbac/#http-sessions).
+- **Expired OIDC tokens are rejected.** With
+  `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token that has no
+  `exp` claim, or whose `exp` has passed, with 60 seconds of allowed clock
+  skew. Earlier versions never checked the expiry, so a token kept working
+  after it expired. A client that sends a fixed token, such as
+  `token=<ID token>` in a connect string, stops working once that token
+  expires, and an orphan drainer that presents an expired token sets its
+  store-and-forward slot aside, and reports data loss, instead of draining
+  it. Such a client must switch to a new token before the old one expires,
+  or use a
+  [token provider](/docs/connect/clients/java/#token-providers) in the Java
+  client. See [Token validation](/docs/security/oidc/#token-validation).
 - **OIDC tokens must come from the expected issuer.** With
   `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token whose `iss`
   claim is missing or is not the expected issuer, and refuses to start without

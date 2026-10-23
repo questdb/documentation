@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC) Integration
-description: Configure OpenID Connect (OIDC) integration with external Identity Providers for SSO authentication in QuestDB Enterprise Web Console.
+description: Set up OpenID Connect (OIDC) in QuestDB Enterprise for Web Console SSO, service authentication with Entra ID managed identities, token validation, and troubleshooting.
 ---
 
 import Screenshot from "@theme/Screenshot";
@@ -24,10 +24,11 @@ Specific installation steps depend on the type of the provider.
 :::warning QuestDB Enterprise 4.1.0
 
 QuestDB Enterprise 4.1.0 checks tokens and HTTP sessions more strictly. With
-`acl.oidc.groups.encoded.in.token=true`, it rejects a token whose issuer is not
-the expected one, and refuses to start with `acl.oidc.host` unless
-`acl.oidc.issuer` is set. A request whose token QuestDB rejects fails with
-`401 Unauthorized`, even with a valid session cookie. See
+`acl.oidc.groups.encoded.in.token=true`, it rejects a token that has expired
+or whose issuer is not the expected one, and refuses to start with
+`acl.oidc.host` unless `acl.oidc.issuer` is set. A request whose token
+QuestDB rejects fails with `401 Unauthorized`, even with a valid session
+cookie. See
 [Authentication changes in 4.1.0](/docs/operations/upgrade/#authentication-changes-in-410)
 before you upgrade.
 
@@ -982,6 +983,7 @@ Request failed [errorMsg=Failed to decode JWT token Error(InvalidIssuer)]
 Request failed [errorMsg=Failed to decode JWT token Error(MissingRequiredClaim("iss"))]
 Request failed [errorMsg=Failed to decode JWT token Error(InvalidAudience)]
 Request failed [errorMsg=Failed to decode JWT token Error(ExpiredSignature)]
+Request failed [errorMsg=Failed to decode JWT token Error(MissingRequiredClaim("exp"))]
 ```
 
 - `InvalidIssuer`: the `iss` claim is not the expected issuer. Compare the
@@ -1015,7 +1017,7 @@ code at the token endpoint of the provider directly:
   such as the error page of a proxy.
 - **Missing ID token**: with `acl.oidc.groups.encoded.in.token=true`, the
   provider returned no ID token. Include `openid` in `acl.oidc.scope`.
-- Any other message is the error that the provider returned, such as for a
+- Other messages usually come from the provider, such as the error for a
   redirect URI that the provider does not accept.
 
 The network tab of the developer tools of the browser shows the request to
@@ -1030,7 +1032,9 @@ For all OIDC-related configuration options of QuestDB, see
 
 ## Active Directory
 
-The following sections are guides for setting up single sign-on (SSO) with various OAuth2 providers.
+The following sections are guides for setting up single sign-on (SSO) with
+various OAuth2 providers, and for authenticating Azure services with
+Microsoft Entra ID.
 
 ### PingFederate
 
@@ -1383,6 +1387,10 @@ If all has been wired up well, then login will succeed.
 This document sets up SSO authentication for the [QuestDB Web Console](/docs/getting-started/web-console/overview/) in
 [Microsoft EntraID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id), formerly known as Azure AD.
 
+Azure services that authenticate without a user, as a managed identity or a
+service principal, build on this setup, as described in
+[Microsoft Entra ID managed identities and service principals](#managed-identities-and-service-principals).
+
 
 :::tip
 
@@ -1647,7 +1655,7 @@ will have the access granted to them. If the login fails, the login page or
 the server log gives the reason, as described in
 [Troubleshooting](#troubleshooting).
 
-#### Managed identities and service principals
+### Microsoft Entra ID managed identities and service principals {#managed-identities-and-service-principals}
 
 Azure services, such as an ingestion job on a virtual machine or in Azure
 Kubernetes Service, can authenticate to QuestDB without a user. They request
@@ -1657,6 +1665,14 @@ claim: it carries the object ID of the service in `oid`, and the app roles
 assigned to the service in `roles`. QuestDB Enterprise 4.1.0 and later accept
 these tokens next to the ID tokens of users, with
 [fallback claim lists](#fallback-claim-lists).
+
+This setup builds on the QuestDB application and the
+[QuestDB configuration](#questdb-configuration) of the
+[Microsoft Entra ID guide](#microsoft-entraid) above. QuestDB reads the
+principal and the roles of a service from its token, and validates the token
+itself, so OIDC must run in token mode, with
+`acl.oidc.groups.encoded.in.token=true`, as described in
+[Token validation](#token-validation).
 
 First, configure the QuestDB application in Entra ID:
 
@@ -1689,15 +1705,26 @@ az rest --method POST \
   --body "{\"principalId\": \"$MI\", \"resourceId\": \"$APP\", \"appRoleId\": \"$ROLE\"}"
 ```
 
-In `server.conf`, keep the configuration above, but replace the two claim
-settings with fallback lists:
+In `server.conf`, keep the [QuestDB configuration](#questdb-configuration)
+of the Entra ID guide, and replace its two claim settings with fallback
+lists. These are the settings that the tokens of services depend on:
 
 ```ini title="server.conf"
+acl.oidc.enabled=true
+# QuestDB validates the tokens itself, and reads the claims from them
+acl.oidc.groups.encoded.in.token=true
+# the v2.0 discovery document of the tenant names the expected issuer
+acl.oidc.configuration.url=https://login.microsoftonline.com/12345678-1234-1234-1234-123456789abc/v2.0/.well-known/openid-configuration
+# the application ID, also the expected audience of the tokens
+acl.oidc.client.id=8de84b90-1ea5-4e41-9e84-dba860aa01a6
 # users have preferred_username, services only oid
 acl.oidc.sub.claim=preferred_username,oid
 # services have roles, users have groups
 acl.oidc.groups.claim=roles,groups
 ```
+
+Keep the settings that only the Web Console uses, such as
+`acl.oidc.redirect.uri` and `acl.oidc.scope`, as they are.
 
 The principal of a service is then its object ID, which `current_user()`
 returns. Map each app role to a QuestDB group, and grant the group the
@@ -1726,7 +1753,9 @@ CREATE TABLE fx_trades (
 
 The [Java client](/docs/connect/clients/java/#microsoft-entra-id) requests the
 token of the service and renews it by itself, with `token_provider=azure` and
-the `questdb-client-azure` artifact:
+the `questdb-client-azure` artifact. The token provider requires the `wss`
+schema, so QuestDB must serve HTTP over
+[TLS](/docs/security/tls/#enabling-tls-for-http-server-rest-api):
 
 ```java title="Ingest into fx_trades as the managed identity of the host"
 import java.time.Instant;

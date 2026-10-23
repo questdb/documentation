@@ -348,9 +348,11 @@ With `initial_connect_retry=async`:
 
 A sender in async mode does not give up because time passed. It ends only on
 a **terminal** condition: an authentication rejection or a durable-ack
-capability mismatch before its first successful connect, the poison-frame
-detector, or the producer hitting `sf_max_total_bytes` and exhausting
-`sf_append_deadline_millis` on `append()`.
+capability mismatch, the poison-frame detector, or the producer hitting
+`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
+`append()`. ⚠ The Java client treats an authentication rejection or a
+durable-ack capability mismatch as terminal only before the sender first
+connects, and retries them afterwards.
 
 ### Reconnect and outage handling
 
@@ -383,7 +385,8 @@ and apply back-pressure to the producer rather than dropping data.
 
 :::
 
-A running sender also retries authentication failures. See
+⚠ In the Java client, a running sender also retries authentication failures.
+Other clients treat them as terminal. See
 [Authentication failures and token providers](#authentication-failures-and-token-providers).
 
 ### Authentication failures and token providers
@@ -607,7 +610,14 @@ source states the contract directly:
 > converts it into the durable-ack capability-gap budget. Neither bounds this
 > loop's steady-state reconnect.
 
-`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
-end the endpoint walk. They are terminal for an orphan drainer, and for a
-sender that has not connected yet. A sender that has connected retries them,
-like everything else, and reports each one to its error handler.
+Each connect attempt walks the endpoints in `addr`. A `QwpAuthFailedException`
+ends the walk at once, because every endpoint would reject the same
+credential. A `WebSocketUpgradeException`, a non-101 upgrade response without
+a role hint, does not: the walk tries the remaining endpoints, and raises it
+only when none of them accepts the connection. When another endpoint
+role-rejected the upgrade in the same walk, the walk raises a role mismatch
+instead, which the loop retries. Raised inside the loop, both exceptions are
+terminal for a sender that has not connected yet, and for an orphan drainer,
+which first rides out repeated `401` or `403` responses when its credential
+comes from a token provider. A sender that has connected retries them, like
+everything else, and reports each one to its error handler.

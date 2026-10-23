@@ -681,11 +681,15 @@ architecture is that a producer survives an arbitrarily long outage.
 In most clients, rejections of the upgrade request during reconnect
 (authentication rejected, version mismatch, durable-ack mismatch, non-101
 upgrade without a role hint) are immediately terminal: the loop does not
-retry them. The Java client treats an authentication rejection as terminal
+retry them. The Java client treats a version mismatch like a transport
+failure, to ride out a rolling upgrade, and the other rejections as terminal
 only before the sender first connects. A Java sender that has connected keeps
-retrying it, and reports each failed attempt to its error handler and in its
-connection health. See
-[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
+retrying all of them, and reports each failed attempt in its connection
+health. It also reports the rejections other than a version mismatch to its
+error handler. See
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+and, for orphan drainers,
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 ### Egress failover {#egress-failover}
 
