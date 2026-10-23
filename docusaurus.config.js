@@ -194,6 +194,12 @@ const config = {
           className: "mobile-only",
         },
         {
+          to: "https://questdb.com/enterprise/trial/",
+          label: "Free Enterprise trial",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
           to: "https://slack.questdb.com/",
           label: "Public Slack",
           position: "left",

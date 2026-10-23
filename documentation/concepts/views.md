@@ -378,7 +378,8 @@ Use a [live view](/docs/concepts/live-views/) instead when you need to
 incrementally maintain a row-per-input window computation, such as a moving
 average, running total, or ranking.
 
-The output of a live view is one row per base row.
+The output of a live view is one row per base row that passes the view's
+`WHERE` filter and `START FROM` boundary.
 
 ## Security with views
 

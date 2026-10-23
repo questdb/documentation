@@ -5,6 +5,22 @@ description:
   How to install ZFS and enable system-level compression for QuestDB.
 ---
 
+:::warning Use Parquet for compression
+
+The preferred way to compress QuestDB data is to convert partitions to
+[Parquet](/docs/concepts/parquet/#data-compression). QuestDB compresses Parquet
+partitions natively and keeps them fully queryable, with no file system
+requirements. In QuestDB Enterprise, a
+[storage policy](/docs/concepts/storage-policy/) converts partitions
+automatically as they age, and can also tier them to object storage. In QuestDB
+open source, convert partitions manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
+
+ZFS compression works at the file system level, outside the database. This page
+remains for existing deployments that already run on ZFS.
+
+:::
+
 QuestDB can use [ZFS](https://openzfs.org/wiki/Main_Page) for system-level
 compression, reducing disk usage without application changes.
 

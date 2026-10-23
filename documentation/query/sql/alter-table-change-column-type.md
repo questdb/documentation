@@ -119,7 +119,7 @@ data types.
 | varchar      | X      | X      |         |
 
 However conversion from `SYMBOL`, `STRING` and `VARCHAR` to other types can
-result in `NULL` values for inconvertable string values.
+result in `NULL` values for inconvertible string values.
 
 | From \ To | boolean | byte | short | char | int | float | long | date | timestamp | timestamp_ns | double | uuid | decimal |
 | --------- | ------- | ---- | ----- | ---- | --- | ----- | ---- | ---- | --------- | ------------ | ------ | ---- | ------- |

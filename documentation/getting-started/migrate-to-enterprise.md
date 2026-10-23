@@ -35,6 +35,9 @@ a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
 You should have received an email with download credentials for the Enterprise
 binaries. Download the version matching your operating system and architecture.
 
+No credentials yet? [Start a free 30-day trial](https://questdb.com/enterprise/trial/)
+and we'll email you a download link within one business day.
+
 :::tip
 Check the [release notes](https://questdb.com/release-notes/?ref=docs&type=enterprise)
 for the latest features and improvements.
