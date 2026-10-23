@@ -5,8 +5,9 @@ description: Reduce out-of-order write amplification with merge-append partition
 ---
 
 Merge-append partitions reduce the data copied by backdated writes into large
-native partitions. Available since QuestDB 10.0.2, this opt-in layout lets a
-partition hold several pieces over one set of column files: a commit appends
+native partitions. Available since QuestDB 10.1.0 and QuestDB Enterprise 4.1.0,
+this opt-in layout lets a partition hold several pieces over one set of column
+files: a commit appends
 the affected pieces at the tail and leaves untouched pieces in place.
 
 ## When to use it
@@ -18,8 +19,7 @@ nothing for purely in-order ingestion.
 
 The trade-offs are extra disk space until compaction reclaims superseded rows,
 and additional page-frame boundaries at piece boundaries, which can increase
-query overhead. Merge-append tables do not use WAL lag or the in-order
-fast-append path.
+query overhead.
 
 ## Enable or disable
 
@@ -95,13 +95,43 @@ Log messages use the name "composite partition" for a merge-append partition.
 ## Downgrade safely
 
 :::warning
-Versions before 10.0.2 refuse tables that still contain merge-append partitions.
+QuestDB versions before 10.1.0 and QuestDB Enterprise versions before 4.1.0
+refuse tables that still contain merge-append partitions.
 Before downgrading, stop ingestion, disable the flag and restart on the current
 version. Run `ALTER TABLE trades SQUASH PARTITIONS` for every affected table to
 open its writer and convert all its partitions, and wait for these operations
 to complete before stopping the server and installing the older binary.
 Do not rely on disabling the flag alone: an unopened table can retain the layout.
 :::
+
+Materialized and live views cannot use `ALTER TABLE ... SQUASH PARTITIONS`.
+For their backing partitions, use background compaction instead:
+
+1. Stop ingestion and let pending WAL apply and view refresh finish. Temporarily
+   set the following in `server.conf` (the live-view setting is only needed for
+   live views):
+
+   ```ini
+   cairo.o3.partition.merge.append.enabled=false
+   mat.view.refresh.worker.count=0
+   live.view.refresh.worker.count=0
+   cairo.partition.compaction.check.interval=0
+   cairo.partition.compaction.idle.timeout=0
+   cairo.partition.compaction.squash.idle.timeout=0
+   ```
+
+   The worker counts disable view refresh. Zero is the minimum enabled sweep
+   interval; zero idle timeouts remove the normal waiting periods.
+2. Restart on the current version and wait for background compaction to finish.
+   Keep WAL apply enabled so pending work and compaction commands can complete.
+3. Inspect each affected view with `table_partitions('trades_1m')`, replacing
+   `trades_1m` with its name. Before downgrading, every native partition must
+   report `pieceCount=1`, `deadRows=0` and a null `lastWriteTimestamp`.
+   The [sweep's eligibility restrictions](#compaction) still apply; do not
+   downgrade while any merge-append partitions remain.
+4. Restore the previous refresh-worker and compaction settings and restart
+   before resuming normal operation; keep merge-append disabled when using an
+   older binary.
 
 ## QuestDB Enterprise
 

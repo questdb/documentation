@@ -316,13 +316,13 @@ Partitions whose merge-append column files stay open between commits; lower this
 
 **Default**: `10000`; **Reloadable**: no
 
-Maximum cuts per partition per commit, clamped to at least 1 to bound the number of pieces created.
+Maximum cuts per partition per commit in the row-based pre-split pass, excluding clustering and replace-range boundary cuts; clamped to at least 1.
 
 ### cairo.o3.partition.presplit.min.piece.multiple
 
 **Default**: `2`; **Reloadable**: no
 
-Minimum new piece size as a multiple of `cairo.partition.compaction.avg.rows.piece.lim`, clamped to at least 1; raise it for fewer, larger pieces.
+Minimum existing rows an optional pre-split cut must spare, as a multiple of `cairo.partition.compaction.avg.rows.piece.lim`, clamped to at least 1; raise it to make fewer cuts.
 
 ### cairo.o3.partition.purge.list.initial.capacity
 
