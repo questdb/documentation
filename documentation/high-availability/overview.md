@@ -101,6 +101,11 @@ cases.
 Tables without timestamps (typically used for reference/lookup data) are not
 replicated automatically and should be populated separately on each instance.
 
+The audit trail of [audited views](/docs/security/audited-views/),
+`sys.view_audit`, is a WAL table whose definition and storage policy replicate,
+but whose rows do not: each node records the reads it serves. See
+[Replication, backups, and read-only instances](/docs/security/audited-views/#replication-backups-and-read-only-instances).
+
 ## Storage policies in a replicated cluster
 
 [Storage policy](/docs/concepts/storage-policy/) definitions are stored in
