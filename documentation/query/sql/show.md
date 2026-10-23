@@ -452,7 +452,12 @@ full column list, including `hasParquetGenerated`, `isParquet`,
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 
-_Enterprise only._
+_Enterprise only._ `SHOW PERMISSIONS` lists the effective permissions of one
+user, group, or service account. The
+[`permissions()`](/docs/query/functions/access-control/#permissions) table
+function returns the same rows, and
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
+lists the permissions of every entity at once.
 
 ```questdb-sql
 SHOW PERMISSIONS;

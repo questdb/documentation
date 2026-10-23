@@ -186,7 +186,15 @@ GRANT ALL ON table2 TO user2 WITH GRANT OPTION;
 
 Permission grants can be specific and fine-tuned.
 
-List the full list of applied permissions with `all_permissions()`.
+To check the grants, query
+[`active_grants()`](/docs/query/functions/access-control/#active_grants),
+which lists the direct grants of every user, group, and service account. It is
+available since QuestDB Enterprise 4.1.0:
+
+```questdb-sql
+SELECT * FROM active_grants()
+WHERE entity_name IN ('readonly', 'user1', 'user2');
+```
 
 - For the full role-based access control docs, including group management, see
   the [RBAC operations guide](/docs/security/rbac/).

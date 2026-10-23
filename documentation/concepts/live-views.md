@@ -529,6 +529,11 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **Deterministic queries only.** Non-deterministic functions such as `now()`,
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.
+- **No administrative functions.** Enterprise functions that check the
+  caller's permissions, such as `permissions()` and `backup_instance_name()`,
+  are rejected, since a live view refreshes in the background. See
+  [query constraints](/docs/query/sql/create-live-view/#query-constraints) for
+  the full list.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Base-table retention does not shrink the view, because `DROP PARTITION`,
   `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.

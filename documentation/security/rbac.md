@@ -511,6 +511,24 @@ ASSUME SERVICE ACCOUNT ingest_app;
 EXIT SERVICE ACCOUNT;
 ```
 
+### Access control on replicas {#replicas}
+
+Users, groups, service accounts, and their permissions are managed on the
+primary. A read-only [replica](/docs/high-availability/overview/) rejects
+statements such as `CREATE USER` and `GRANT`, and receives the changes through
+replication instead. Before it authorizes a statement, the replica reloads its
+access lists if new changes have arrived.
+
+A statement that finds another session already reloading waits for that reload
+for up to 30 seconds. If the access lists are still out of date after that, the
+statement fails instead of being authorized against outdated permissions:
+
+```text
+timed out waiting for the access lists to refresh [timeout=30000ms]
+```
+
+Retry the statement.
+
 ## User management reference {#user-management}
 
 ### Creating and removing principals
@@ -583,11 +601,22 @@ JWK Token    false
 REST Token   true
 ```
 
+To audit permissions across all users, groups, and service accounts in one
+query, use the
+[access control functions](/docs/query/functions/access-control/):
+
+```questdb-sql
+SELECT * FROM active_permissions();  -- Effective, including group permissions
+SELECT * FROM active_grants();       -- Direct grants only
+```
+
 :::note
 
 Viewing other users' information requires `LIST USERS` (to list all) or
 `USER DETAILS` (to see details) permissions. Users can always view their own
-information without these permissions.
+information without these permissions. `active_permissions()` and
+`active_grants()` list the permissions of every entity, so they require both,
+even to read your own rows.
 
 :::
 
@@ -798,7 +827,8 @@ again at startup.
 
 ## Permissions reference {#permissions}
 
-Use `all_permissions()` to see all available permissions:
+Use [`all_permissions()`](/docs/query/functions/access-control/#all_permissions)
+to list all available permissions and the levels they can be granted at:
 
 ```questdb-sql
 SELECT * FROM all_permissions();

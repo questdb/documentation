@@ -302,6 +302,9 @@ Such permissions do not show on `SHOW PERMISSIONS` output.
 | permission | table_name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 
+To see them before the table or column exists, query
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
+
 However, when the table is created, then the applicable permissions appear:
 
 ```questdb-sql

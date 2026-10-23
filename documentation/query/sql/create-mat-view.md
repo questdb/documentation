@@ -326,6 +326,8 @@ Materialized view queries must:
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
+- Not use Enterprise administrative functions, such as `permissions()` or
+  `backups()`
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.
@@ -390,6 +392,7 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `materialized view already exists` | View exists and `IF NOT EXISTS` not specified |
 | `base table does not exist` | Referenced table doesn't exist |
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
+| `administrative function cannot be used in materialized view: <function>` | The query calls an Enterprise administrative function, such as `active_permissions()` or `backups()` |
 | `permission denied` | Missing required permission (Enterprise) |
 
 ## See also
