@@ -404,6 +404,19 @@ incompatible at startup, QuestDB drops and recreates it, losing its history.
 
 :::
 
+To monitor QuestDB without an external tool, put queries like these in a Web
+Console notebook and turn it into a
+[live dashboard](/docs/getting-started/web-console/notebooks/live-dashboards/)
+with the grid layout and auto-refresh.
+
+<Screenshot
+  alt="A Web Console notebook in grid layout charting ingestion rate, WAL apply lag, CPU and memory from sys.metrics"
+  title="A monitoring dashboard built from sys.metrics, refreshing every 30 seconds."
+  src="images/docs/console/sys-metrics-dashboard.webp"
+  height={832}
+  width={990}
+/>
+
 ### Cold storage read metrics
 
 _Enterprise only._
