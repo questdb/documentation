@@ -1,10 +1,12 @@
 ---
 title: Logging and metrics
-description: Configure and understand QuestDB logging and metrics, including log levels, configuration options, and Prometheus integration.
+description: Configure and understand QuestDB logging and metrics, including log levels, Prometheus integration, and the sys.metrics table of metric history.
 ---
 
 
-This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus.
+This page outlines logging in QuestDB. It covers how to configure logs via
+`log.conf`, expose metrics via Prometheus, and query metric history in the
+`sys.metrics` table.
 
 - [Logging](/docs/operations/logging-metrics/#logging)
 - [Metrics](/docs/operations/logging-metrics/#metrics)
@@ -330,6 +332,91 @@ example configuration, enable it in within your `server.conf`:
 For an example on how to setup Prometheus, see the
 [QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
 
+QuestDB also keeps a history of these metrics in the `sys.metrics` table, with
+or without the endpoint. See [Metric history](#persisted-metrics).
+
+### Metric history in `sys.metrics` {#persisted-metrics}
+
+QuestDB samples its own metrics every second and appends them to the
+`sys.metrics` table, so you can chart metric history with SQL without running
+Prometheus. This is on by default and does not need `metrics.enabled`.
+The table holds the metrics of the local node only: it is not replicated, and
+[QuestDB Enterprise backups](/docs/operations/backup/) exclude it.
+
+Like other system tables, `sys.metrics` is hidden from `SHOW TABLES` and the
+Web Console, so query it by name. It has one row per sample, with `ts` as the
+designated timestamp, and one `LONG` or `DOUBLE` column per metric:
+
+- Column names are usually the Prometheus names without the `questdb_` prefix
+  and the `_total` suffix, for example `commits` and `memory_rss`.
+- Labelled metrics get one column per label value, joined with `__`, for
+  example `worker_pool_fiber_live__shared_network`.
+- Counters are cumulative since server start and reset on restart.
+- The memory gauges `memory_rss`, `memory_mem_used`, `memory_free_count`,
+  `memory_malloc_count`, `memory_realloc_count` and `memory_jvm_*` are
+  refreshed every 60 seconds by default, and rows in between repeat the last
+  value. On QuestDB Enterprise, so are `replication_pending_upload_txn`,
+  `backup_active_at_last_demote` and `tls_cert_ttl_seconds_*`.
+
+```questdb-sql title="List the available metric columns" demo
+SELECT "column", type
+FROM table_columns('sys.metrics')
+ORDER BY "column";
+```
+
+```questdb-sql title="Hourly memory and CPU over the last day" demo
+SELECT
+    ts,
+    max(memory_rss) AS rss_max,
+    avg(cpu_questdb_percent) AS cpu_avg
+FROM 'sys.metrics'
+WHERE ts IN '$now-1d..$now'
+SAMPLE BY 1h;
+```
+
+```questdb-sql title="Commits per second over the last hour" demo
+SELECT ts, commit_delta / elapsed_seconds AS commits_per_sec
+FROM (
+    SELECT
+        ts,
+        commits - lag(commits) OVER (ORDER BY ts) AS commit_delta,
+        (ts - lag(ts) OVER (ORDER BY ts)) / 1000000.0 AS elapsed_seconds
+    FROM 'sys.metrics'
+    WHERE ts IN '$now-1h..$now'
+)
+WHERE commit_delta >= 0 AND elapsed_seconds > 0;
+```
+
+This uses the time between samples, so it also works with a different sampling
+interval or gaps in the history. Negative changes are omitted; they can occur
+when counters reset after a restart.
+
+Data is kept for one week by default, and completed day partitions are
+converted to [Parquet](/docs/concepts/parquet/). To change the interval,
+retention or excluded metrics, or to turn persistence off with
+`metrics.persist.enabled=false`, see the
+[persisted metrics configuration](/docs/configuration/logging-metrics/#persisted-metrics).
+
+:::note
+
+QuestDB owns `sys.metrics`. Don't write to or alter it. If its schema is
+incompatible at startup, QuestDB drops and recreates it, losing its history.
+
+:::
+
+To monitor QuestDB without an external tool, put queries like these in a Web
+Console notebook and turn it into a
+[live dashboard](/docs/getting-started/web-console/notebooks/live-dashboards/)
+with the grid layout and auto-refresh.
+
+<Screenshot
+  alt="A Web Console notebook in grid layout charting ingestion rate, WAL apply lag, CPU and memory from sys.metrics"
+  title="A monitoring dashboard built from sys.metrics, refreshing every 30 seconds."
+  src="images/docs/console/sys-metrics-dashboard.webp"
+  height={832}
+  width={990}
+/>
+
 ### Cold storage read metrics
 
 _Enterprise only._
@@ -465,7 +552,8 @@ timestamp at the time of sending the alert.
 
 ### Unhandled error detection
 
-When the metrics subsystem is enabled, the health endpoint may be configured to
+When metrics or [metrics persistence](#persisted-metrics) are enabled, the
+health endpoint may be configured to
 check the occurrences of any unhandled errors since the database started. For
 any errors detected, it returns the HTTP 500 status code. The check is based on
 the `questdb_unhandled_errors_total` metric.
@@ -473,9 +561,8 @@ the `questdb_unhandled_errors_total` metric.
 To enable this setting, set the following in `server.conf`:
 
 ```ini title="server.conf to enable critical error checks in the health check endpoint"
-metrics.enabled=true
 http.pessimistic.health.check.enabled=true
 ```
 
-When the metrics subsystem is disabled, the health check endpoint always returns
-the HTTP 200 status code.
+When both `metrics.enabled` and `metrics.persist.enabled` are `false`, the
+health check endpoint always returns the HTTP 200 status code.

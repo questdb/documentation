@@ -52,6 +52,20 @@ The following list contains some plan node types:
 - `Async JIT Filter` - a parallelized filter that evaluates expressions with
   Just-In-Time-compiled filter. In certain scenarios, it also implements the
   `LIMIT` keyword.
+- `Async Hash Join Group By` / `Async JIT Hash Join Group By` - a parallelized
+  `GROUP BY` over an `INNER`, `LEFT` or `RIGHT` hash join, the JIT variant
+  when the probe-side filter is JIT-compiled. Its `Build` child feeds the
+  shared hash table, and its `Probe` child is scanned by the workers. When
+  the build side is picked at each execution, a
+  `Hash Join Group By Build Choice` node holds both orientations as its
+  `Primary` and `Alternate` children. See
+  [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins)
+  for its settings.
+- `Async Horizon Join`, `Async JIT Horizon Join`, `Async Multi Horizon Join`
+  and `Async [JIT] Horizon Join Projection` - a parallelized HORIZON JOIN, with
+  or without aggregate functions. The serial plans show `Horizon Join`,
+  `Multi Horizon Join` and `Horizon Join Projection`. See
+  [Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 - `Interval forward` - scans one or more table data ranges based on the
   designated timestamp predicates. Scan endpoints are found via a binary search
   on timestamp column.
