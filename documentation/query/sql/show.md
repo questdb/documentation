@@ -352,7 +352,9 @@ SHOW CREATE VIEW my_view;
 | CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades); |
 
 This returns the `CREATE VIEW` statement that would recreate the view,
-including any `DECLARE` parameters if the view is parameterized.
+including any `DECLARE` parameters if the view is parameterized. For an
+[audited view](/docs/security/audited-views/) (Enterprise), the statement has
+`WITH AUDIT` after the body. It is the way to check whether a view is audited.
 
 ### SHOW GROUPS
 

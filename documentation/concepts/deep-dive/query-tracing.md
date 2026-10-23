@@ -51,3 +51,7 @@ ORDER BY execution_micros DESC;
 
 The `_query_trace` table will drop data older than 24 hours in order to limit
 how much storage query tracing uses.
+
+To keep a longer-lived record of who read sensitive data, and with which
+parameter values, use [audited views](/docs/security/audited-views/) in QuestDB
+Enterprise.

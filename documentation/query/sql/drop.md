@@ -6,6 +6,10 @@ description: DROP TABLE SQL keyword reference documentation.
 
 `DROP TABLE` permanently deletes a table and its contents. `DROP ALL TABLES`
 permanently deletes all tables, all materialized views, and their contents on disk.
+It also drops views, and skips system tables. In QuestDB Enterprise, dropping an
+[audited view](/docs/security/audited-views/#permissions) this way also needs
+the `AUDIT VIEW` permission. Anything it cannot drop is listed in the error,
+and the rest is still dropped.
 
 :::note
 
