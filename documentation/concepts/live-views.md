@@ -529,6 +529,10 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **Deterministic queries only.** Non-deterministic functions such as `now()`,
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.
+- **Restricted catalogue functions.** Functions and `SHOW` statements that list
+  objects, such as `tables()`, follow the
+  [materialized view rules](/docs/query/sql/create-mat-view/#catalogue-functions):
+  in QuestDB Enterprise, only a creator with `SYSTEM ADMIN` can use them.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Base-table retention does not shrink the view, because `DROP PARTITION`,
   `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.

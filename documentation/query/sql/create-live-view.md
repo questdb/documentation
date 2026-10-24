@@ -265,6 +265,11 @@ The view query is validated at creation time and must:
   `WHERE` predicates are supported.
 - Not use non-deterministic functions such as `now()`, `sysdate()`,
   `systimestamp()`, or `rnd_*()`.
+- Not use
+  [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions)
+  or `SHOW` statements, such as `tables()` in a `WHERE` sub-query, unless the
+  creator holds `SYSTEM ADMIN` (Enterprise). The same rules as for materialized
+  views apply.
 - Not read another live view.
 
 ## Examples
@@ -445,6 +450,7 @@ the query.
 | `live view requires a START FROM clause` | `START FROM` is missing |
 | `Access denied for <user> [CREATE LIVE VIEW]` | Missing `CREATE LIVE VIEW` permission (Enterprise) |
 | `Access denied for <user> [SELECT on <table>(<column>)]` | Missing `SELECT` on a base-table column the view reads (Enterprise) |
+| `catalogue function cannot be used in live view without SYSTEM ADMIN: <function>` | The query calls a [catalogue function](/docs/query/sql/create-mat-view/#catalogue-functions) and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
 | `OWNED BY clause is required for external users` | An external user created a view without `OWNED BY` (Enterprise) |
 
 ### Query shape errors

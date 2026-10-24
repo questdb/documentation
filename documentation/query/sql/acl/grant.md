@@ -181,8 +181,9 @@ GRANT SELECT ON trades(* EXCLUDE (counterparty)) TO john;
 - Every excluded column must exist, otherwise the statement fails. This catches
   typos that would otherwise silently grant a column you meant to keep private.
 - The `EXCLUDE` list cannot be empty and cannot cover every column of the table.
-- The target table must exist. Unlike other grants, a wildcard grant cannot be
-  issued ahead of table creation.
+- The target table must exist and be
+  [visible](/docs/security/rbac/#object-visibility) to the granter. Unlike
+  other grants, a wildcard grant cannot be issued ahead of table creation.
 
 :::note
 
@@ -214,6 +215,15 @@ GRANT SELECT ON ALL TABLES TO john;
 | permission | table_name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 | SELECT     |            |             | f            | G      |
+
+### Grant on a table the granter cannot see
+
+A granter that holds no permission on a table cannot
+[see it](/docs/security/rbac/#object-visibility), so granting on that table
+fails exactly as it does on a missing table: with `Invalid table name`, or with
+`table does not exist [table=tableName]` for a `*` column list. A granter that
+can see the table but lacks the grant option fails with
+`Grant denied for <granter> [<permission> on <table>]` instead.
 
 ### Verification
 
@@ -289,7 +299,9 @@ GRANT SELECT ON products(id) TO john;
 
 ### Grant ahead of table or column creation
 
-Grant permissions ahead of table or column creation:
+Grant permissions ahead of table or column creation. Only the built-in admin can
+grant on a table that does not exist yet: any other granter, including one
+holding `DATABASE ADMIN`, gets `Invalid table name`.
 
 ```questdb-sql
 GRANT SELECT ON countries TO john;

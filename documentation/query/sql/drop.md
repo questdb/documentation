@@ -33,6 +33,11 @@ An optional `IF EXISTS` clause may be added directly after the `DROP TABLE`
 keywords to indicate that the selected table should be dropped only if it exists.
 Without `IF EXISTS`, QuestDB will throw an error if the table does not exist.
 
+In QuestDB Enterprise, a table
+[hidden](/docs/security/rbac/#object-visibility) from the user counts as
+missing: `DROP TABLE IF EXISTS` does nothing, and `DROP ALL TABLES` leaves
+hidden tables and views in place.
+
 ## Description
 
 This command irremediably deletes the data in the target table. Unless the table

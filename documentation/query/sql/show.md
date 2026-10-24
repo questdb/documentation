@@ -65,6 +65,12 @@ SHOW { COLUMNS FROM tableName
 - `SHOW USERS` lists all users with their enabled flag, memory limit and
   resource group (enterprise-only)
 
+In QuestDB Enterprise, `SHOW TABLES` and `SHOW CREATE DATABASE` cover only the
+objects you [can see](/docs/security/rbac/#object-visibility). The statements
+that name an object, such as `SHOW COLUMNS` or `SHOW CREATE TABLE`, fail with
+the missing-object error, for example `table does not exist [table=trades]`,
+for an object hidden from you.
+
 ## Examples
 
 ### SHOW COLUMNS
@@ -205,8 +211,11 @@ statements carry no password or token, so set these after replaying the dump.
 The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
 `PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
 or `USER DETAILS` permission, while the schema categories need no access control
-permission, so a user with only `SELECT` can still dump the structure. When
-access control is disabled the command degrades to a schema-only dump.
+permission, so a user with only `SELECT` can still dump the structure of the
+objects it can see. To dump the whole schema, run the statement as a principal
+that sees every object, such as the built-in admin or a user holding
+`DATABASE ADMIN`. When access control is disabled the command degrades to a
+schema-only dump.
 
 ### SHOW CREATE LIVE VIEW
 
