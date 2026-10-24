@@ -785,10 +785,11 @@ QuestDB picks the claims as follows:
 - **Groups are not combined.** QuestDB takes every group from one claim. With
   `roles,groups`, a user whose token carries a `roles` claim gets only the
   QuestDB groups that the roles map to.
-- **Listed claims must have the expected shape.** A principal claim holds a
-  string, and a groups claim an array of strings or a single string. A listed
-  claim of another shape, such as an array in a principal claim, fails the
-  login, even when a claim earlier on the list carries a value.
+- **Claim shapes.** Use a string for the principal, and an array of strings
+  or a single string for the groups. QuestDB also accepts numbers and
+  booleans as their text values. Unsupported containers, such as an array in
+  a principal claim or an object in a listed claim, fail the login even when
+  a claim earlier on the list carries a value.
 - **Only top-level claims count.** QuestDB ignores nested claims, and the
   claims that the lists do not name, whatever their shape.
 
