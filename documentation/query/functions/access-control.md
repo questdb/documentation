@@ -194,9 +194,11 @@ and [limitations](#limitations). In addition to the direct grants, it reports:
   timestamp column, without the grant option.
 - The permissions that `DATABASE ADMIN` includes: a database-level row for
   every permission that [`all_permissions()`](#all_permissions) lists,
-  `DATABASE ADMIN` included, with the grant option of the `DATABASE ADMIN`
-  grant. A table or column grant of the same entity keeps its own row only
-  where it adds the grant option.
+  `DATABASE ADMIN` included. If `DATABASE ADMIN` was granted with
+  `WITH GRANT OPTION`, every expanded row has the grant option. Otherwise,
+  separately granted database-level grant options are preserved. A table or
+  column grant of the same entity keeps its own row only where it adds the
+  grant option.
 
 ### Examples
 
