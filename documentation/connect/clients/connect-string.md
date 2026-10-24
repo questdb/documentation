@@ -167,6 +167,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Enable TLS                                        | both      | `addr` with `wss` schema               | `tls_verify`, `tls_roots`, `tls_roots_password`                                             |
 | Basic-auth credentials                            | both      | `username`, `password`                 | `auth_timeout_ms`                                                                           |
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
+| Entra ID tokens that the client renews (Java)     | both      | `token_provider=azure`, `azure_resource` | `azure_credential`, `azure_client_id`                                                     |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
@@ -234,6 +235,41 @@ certificate against a trust store but cannot present a client certificate;
 the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
 `token=<token>` or `username=` / `password=` for client authentication.
+
+### Token providers {#token-providers}
+
+*Applies to: ingress and egress. Java client 1.3.11 or later only.*
+
+A fixed `token` stops working when it expires. A token provider requests
+bearer tokens from an identity provider instead, and renews them in the
+background before they expire, so every connection, reconnect, and failover
+presents a valid token:
+
+```
+wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
+```
+
+- `token_provider` selects the provider. `azure` requests Microsoft Entra ID
+  tokens through the Azure Identity library, and needs the
+  `questdb-client-azure` artifact. Requires the `wss` schema. Cannot be
+  combined with `token`, `username` / `password`, or a token provider that
+  the application passes in code.
+- `azure_resource` is required with `token_provider=azure`. It is the
+  Application ID URI of the QuestDB application in Entra ID, such as
+  `api://<application ID>`, or its application ID. The client requests tokens
+  for the scope `<azure_resource>/.default`.
+- `azure_credential` selects the Azure credential that requests the tokens:
+  `default`, `managed_identity`, `workload_identity`, or `environment`, a
+  service principal configured in environment variables. `default`, the
+  default, is `DefaultAzureCredential`, a discovery chain meant for
+  development. Name the credential in production.
+- `azure_client_id` is the client ID of a user-assigned managed identity or of
+  a workload identity. Cannot be combined with `azure_credential=environment`.
+
+These keys contain no secret, so they are safe to log. Clients built from
+equivalent connect strings share one provider in a process. See
+[Token providers](/docs/connect/clients/java/#token-providers) in the Java
+client reference.
 
 ## TLS {#tls}
 
@@ -642,9 +678,18 @@ architecture is that a producer survives an arbitrarily long outage.
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Auth failures during reconnect (authentication rejected, version mismatch,
-durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal — the loop does not retry them.
+In most clients, rejections of the upgrade request during reconnect
+(authentication rejected, version mismatch, durable-ack mismatch, non-101
+upgrade without a role hint) are immediately terminal: the loop does not
+retry them. The Java client treats a version mismatch like a transport
+failure, to ride out a rolling upgrade, and the other rejections as terminal
+only before the sender first connects. A Java sender that has connected keeps
+retrying all of them, and reports each failed attempt in its connection
+health. It also reports the rejections other than a version mismatch to its
+error handler. See
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+and, for orphan drainers,
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 ### Egress failover {#egress-failover}
 
@@ -859,6 +904,9 @@ description and behaviour notes.
 | `auto_flush_bytes`                      | size                          | Java `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)                    |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
+| `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
+| `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
 | `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
@@ -918,6 +966,7 @@ description and behaviour notes.
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
+| `token_provider`                        | enum (`azure`)                | unset                         | [Token providers](#token-providers) (Java only)               |
 | `transaction`                           | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `user`                                  | string                        | unset                         | [Authentication](#auth) (alias of `username`)                 |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |

@@ -16,6 +16,15 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Token providers](/docs/connect/clients/java/#token-providers) - The Java client 1.3.11 requests and renews bearer tokens itself, with `token_provider=azure` for Microsoft Entra ID or a `RefreshingTokenProvider` for other identity providers. Covers the `questdb-client-azure` artifact, credential selection, failure classification, and how senders, queries, and orphan drainers handle token failures
+- [Connection health](/docs/connect/clients/java/#connection-health) - The Java client reports whether each sender and query client reaches the server, since when it has not, and its last failure
+- [Managed identities and service principals](/docs/security/oidc/#managed-identities-and-service-principals) - Authenticate Azure services to QuestDB Enterprise with Entra ID app-only tokens: app roles, v2.0 tokens, claim lists, group mappings, and the Java client
+- [User and group claims](/docs/security/oidc/#user-and-group-claims) - Fallback claim lists for `acl.oidc.sub.claim` and `acl.oidc.groups.claim` in QuestDB Enterprise 4.1.0, how QuestDB picks a claim, and the startup checks
+- [Token validation](/docs/security/oidc/#token-validation) - What QuestDB checks in a token, and how it finds the expected issuer
+- [Sessions and token expiry](/docs/security/oidc/#sessions-and-token-expiry) - HTTP sessions end when QuestDB rejects their token, and how the Web Console renews its tokens and handles failed renewals
+- [Troubleshooting OIDC](/docs/security/oidc/#troubleshooting) - Log lines of rejected logins and tokens, and the errors of the Web Console login page
+- [HTTP sessions in the REST API](/docs/connect/compatibility/rest-api/#http-sessions) - Open and close a session with the `qdb_session` cookie, and how QuestDB 10.1.0 and QuestDB Enterprise 4.1.0 end a session whose credential they reject
+- [HTTP sessions in RBAC](/docs/security/rbac/#http-sessions) - Sessions of QuestDB Enterprise 4.1.0 end with their credential, how to end the Web Console logins of a user, and what replicas keep
 - [Merge-append partitions](/docs/concepts/merge-append-partitions/) - Reduce copying for backdated ingestion, monitor partition pieces and dead rows, and safely disable the layout before downgrading or converting to non-WAL
 - [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics) - New section on the `sys.metrics` table, where QuestDB keeps a history of its own metrics, with example queries
 - [Databento connector](/docs/connect/connectors/databento/) - New page for the QuestDB Enterprise Databento connector, which streams Live feeds and runs Historical backfills into QuestDB. Covers installation, TOML configuration, table mappings, storage policies, candles from a materialized view, a session VWAP live view, live dashboards in a Web Console notebook or Grafana, checkpointed recovery, and Prometheus metrics
@@ -25,6 +34,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) and [`acl.oidc.issuer.validation.enabled`](/docs/configuration/oidc/#acloidcissuervalidationenabled) - New settings for the expected issuer of a token
+- [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) and [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) - Documented claim lists and their startup validation, and corrected that `acl.oidc.groups.claim` has no default and is required
+- [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented that `0` disables the cache, and how long an HTTP session reuses a password check
+- [`http.session.timeout`](/docs/configuration/http-server/#httpsessiontimeout) - Documented how long an idle HTTP session stays valid, and that a value without a unit suffix is read as microseconds
+- [Token providers](/docs/connect/clients/connect-string/#token-providers) - The `token_provider` and `azure_*` connect-string keys of the Java client
 - Added [merge-append and partition compaction settings](/docs/configuration/cairo-engine/#partition-compaction) and the `deadRows`, `lastWriteTimestamp` and `pieceCount` columns in [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) and [`table_partitions()`](/docs/query/functions/meta/#table_partitions)
 - Added [`metrics.enabled`](/docs/configuration/logging-metrics/#metricsenabled) and the [`metrics.persist.*`](/docs/configuration/logging-metrics/#persisted-metrics) settings for `sys.metrics`
 - Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views run on their own refresh pool, not the materialized view pool as previously documented
@@ -37,6 +51,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Upgrade QuestDB](/docs/operations/upgrade/#authentication-changes-in-410) - Authentication changes to check before upgrading to QuestDB Enterprise 4.1.0
+- [QWP client behaviour](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers) - Authentication failures by phase, and the retry with a new token after a `401`. The QWP ingress and egress, client failover, and connect string pages now describe how the Java client retries authentication failures
+- [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error categories and policies, that the `QuestDB` builder accepts an error handler, and the `AUTH_FAILED` connection event
+- [Microsoft Entra ID](/docs/security/oidc/#microsoft-entraid) - The configuration takes the principal from `preferred_username` instead of the display name
 - [Partition splitting](/docs/concepts/partitions/#partition-splitting-and-squashing) - Documented WAL split retention and background merging of idle splits and reclamation of Parquet dead space, including when merge-append is disabled
 - [HORIZON JOIN](/docs/query/sql/horizon-join/#queries-without-aggregate-functions) - Breaking change in QuestDB 10.1.0: a HORIZON JOIN without aggregate functions now returns one row per left-hand row and offset instead of grouping by the selected columns. Documented the row order, the designated timestamp of the result, how `SELECT DISTINCT` or an explicit `GROUP BY` restores the previous result, the [upgrade steps](/docs/query/sql/horizon-join/#upgrading-to-questdb-1010) for queries, outer aggregation, views, `INSERT INTO ... SELECT`, and `CREATE TABLE AS SELECT`, and the new execution plan names
 - [HORIZON JOIN](/docs/query/sql/horizon-join/#filtering-right-hand-tables) - Breaking change in QuestDB 10.1.0: documented right-hand filters, written in the `ON` clause, as a `(table WHERE ...)` subquery, or as a `SELECT` of the table's columns, which apply before the ASOF match. Earlier versions ignored `ON` predicates other than the join keys. Added a grammar for the right-hand side, including CTEs, and documented the `ORDER BY` limitation
