@@ -326,11 +326,51 @@ Materialized view queries must:
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
+- Not read [catalogue functions](#catalogue-functions) through a regular view,
+  and in QuestDB Enterprise call them only with `SYSTEM ADMIN`
 - Not use Enterprise administrative functions, such as `permissions()` or
   `backups()`
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.
+
+### Catalogue functions
+
+Catalogue functions and statements list database objects or read their
+metadata:
+
+- `tables()`, `all_tables()`, `views()`, `materialized_views()`,
+  `live_views()`, `wal_tables()`, and `table_storage()`
+- `table_columns()`, `table_partitions()`, `wal_transactions()`, and, in
+  QuestDB Enterprise, `table_cold_partitions()`
+- `information_schema.tables()`, `information_schema.columns()`,
+  `information_schema.questdb_columns()`, `pg_class()`, `pg_attribute()`, and
+  `pg_attrdef()`
+- `reader_pool()`, `writer_pool()`, `query_activity()`, `export_activity()`,
+  `files()`, and `glob()`
+- `SHOW TABLES`, `SHOW COLUMNS`, `SHOW PARTITIONS`, `SHOW CREATE TABLE`,
+  `SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, `SHOW CREATE LIVE VIEW`,
+  and `SHOW CREATE DATABASE`
+
+A materialized view refreshes under a context that sees every object, and every
+reader of the view reads what the refresh stored. To keep a view from
+publishing objects its readers cannot
+[see](/docs/security/rbac/#object-visibility), these functions and statements
+are restricted:
+
+- In the view's own query, `CREATE MATERIALIZED VIEW` accepts them only from
+  the built-in admin, unless it has assumed a service account, or from a
+  principal holding `SYSTEM ADMIN`, which `DATABASE ADMIN` includes. This check
+  applies to QuestDB Enterprise only.
+- Reached through a regular view that the query reads, they are rejected at
+  `CREATE` and at every refresh, for every principal, because anyone who can
+  alter that view could change what the refresh stores. A system view, such as
+  [`storage_policies`](/docs/query/functions/meta/#storage_policies), counts as
+  part of the view's own query.
+
+After an upgrade to QuestDB 10.1.0 or QuestDB Enterprise 4.1.0, a materialized
+view that reads such a function through a regular view is invalidated at its
+first refresh. One that calls it in its own query keeps refreshing.
 
 ## Permissions (Enterprise)
 
@@ -397,6 +437,8 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `materialized view already exists` | View exists and `IF NOT EXISTS` not specified |
 | `base table does not exist` | Referenced table doesn't exist |
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
+| `catalogue function from view <view> cannot be used in materialized view: <function>` | A regular view the query reads calls a [catalogue function](#catalogue-functions). A `SHOW` statement reports `catalogue statement from view` |
+| `catalogue function cannot be used in materialized view without SYSTEM ADMIN: <function>` | The query calls a catalogue function and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
 | `administrative function cannot be used in materialized view: <function>` | The query calls an Enterprise administrative function, such as `active_permissions()` or `backups()` |
 | `permission denied` | Missing required permission (Enterprise) |
 

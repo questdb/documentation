@@ -34,6 +34,20 @@ perform a synthetic write and does not guarantee free disk capacity, so retain
 application write probes and storage monitoring where those guarantees are
 required.
 
+:::warning QuestDB Enterprise 4.1.0
+
+The operator observes `wal_tables()` as its `questdb_operator` service account,
+which holds only `PGWIRE` and `BACKUP DATABASE`. From QuestDB Enterprise 4.1.0,
+`wal_tables()` lists only the tables a principal
+[can see](/docs/security/rbac/#object-visibility), so the account sees none of
+your tables. `WriteHealthy`, the replica lag, and the `caughtUpNow` check before
+a cutover do not cover them, and the operator reverts any database-level grant
+added to the account. Watch suspended tables with a separate
+[monitoring account](/docs/security/rbac/#monitoring-account) until an operator
+release covers 4.1.0.
+
+:::
+
 An intentional replica-only follower is the exception: no primary is correct, so
 `WriteHealthy` is omitted rather than reported healthy. Require current
 generation, `phase=Following`, `status.replication.following=true`, the expected

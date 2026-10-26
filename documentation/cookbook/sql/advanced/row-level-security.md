@@ -40,13 +40,15 @@ CREATE GROUP lmax_desk;
 GRANT SELECT ON lmax_trades TO lmax_desk;
 ```
 
-Members of `lmax_desk` can read `lmax_trades` but get "access denied" on
-`fx_trades`. The grant covers the view only, and reading the view does not
-require any permission on the base table:
+Members of `lmax_desk` can read `lmax_trades`, but they hold no permission on
+`fx_trades`, so the table is
+[hidden](/docs/security/rbac/#object-visibility) from them and querying it
+fails as if it did not exist. The grant covers the view only, and reading the
+view does not require any permission on the base table:
 
 ```questdb-sql title="What the desk can and cannot read"
 SELECT * FROM lmax_trades; -- works, LMAX rows only
-SELECT * FROM fx_trades;   -- access denied
+SELECT * FROM fx_trades;   -- table does not exist [table=fx_trades]
 ```
 
 ## Scale with a master view and an overridable filter
@@ -110,8 +112,8 @@ DECLARE @ecn := 'EBS' SELECT * FROM lmax_trades;
 ```
 
 The overridable `@ecn` lives on the master view, which the desk never has access
-to. Querying it directly is also denied, so there is no path to the unfiltered
-rows.
+to. Querying it directly fails as if it did not exist, so there is no path to
+the unfiltered rows.
 
 ## Grant to users and service accounts
 
