@@ -189,7 +189,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
 | `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |

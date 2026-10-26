@@ -6,7 +6,8 @@ description:
 
 QWP is QuestDB's columnar binary protocol for high-throughput data ingestion
 (`/write/v4`) and streaming query results (`/read/v1`) over WebSocket and UDP.
-These properties control protocol limits and the UDP receiver. WebSocket
+These properties control protocol limits, browser connections, and the UDP
+receiver. WebSocket
 ingestion and egress share the HTTP server's network settings (port, TLS,
 worker threads); see
 [HTTP server configuration](/docs/configuration/http-server/) for those.
@@ -39,6 +40,49 @@ Maximum number of rows that may sit uncommitted in WAL writers across
 `FLAG_DEFER_COMMIT` frames before the server forces a commit. This is the
 server-side bound on the batch-splitting mechanism described in the
 [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#flag_defer_commit).
+
+## Browser connections
+
+A browser sends an `Origin` header with every WebSocket upgrade. QuestDB
+accepts browser upgrades on the QWP routes when the page has the same origin as
+QuestDB, and rejects other origins unless they are listed here. These settings
+are used by web applications built on the
+[browser client](/docs/connect/clients/browser/). Clients that send no `Origin`
+header, such as the Node.js client, are not affected.
+
+### qwp.browser.allowed.origins
+
+- **Default**: empty
+- **Reloadable**: yes
+
+Comma-separated list of browser origins, besides QuestDB's own, that may open
+QWP WebSockets on `/write/v4` and `/read/v1`, for example
+`https://app.example.com,https://desk.example.com:8443`. Write each origin
+exactly as browsers send it: scheme and lowercase host, a port only when it is
+not the default for the scheme, and no path, trailing slash, or wildcard. An
+entry in any other form stops the server from starting. A change applied with
+`reload_config()` that contains such an entry is ignored, the previous list
+stays in force, and the error appears only in the server log.
+
+With authentication enabled, an upgrade from a listed origin must carry its
+credential in the WebSocket subprotocol, which the browser client sends when
+configured with `auth`. QuestDB ignores session cookies on these cross-origin
+upgrades. List only trusted applications: a listed origin can open
+authenticated connections to the server. The setting does not enable CORS on
+the REST API.
+
+### qwp.browser.tls.termination.enabled
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Treats plain HTTP connections as secure when checking whether a browser upgrade
+is same-origin. Enable it when a reverse proxy terminates TLS and forwards to
+QuestDB over plain HTTP: otherwise the page's `https://` origin does not match
+the plain connection, and browser upgrades fail. The proxy must forward the
+browser's original `Host` header, port included, because QuestDB compares it
+with the `Origin` header. Enable this setting only when QuestDB's HTTP port is
+reachable through the proxy alone.
 
 ## Egress
 

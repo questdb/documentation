@@ -29,10 +29,12 @@ for performance. Our recommendation is to use the `pg` client for most use cases
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
-querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/connect/clients/nodejs/) for data
-ingestion using ILP.
+For data ingestion, use QuestDB's first-party clients instead of PGWire. The
+official [Node.js client](/docs/connect/clients/nodejs/) ingests data and
+streams SQL query results over QWP, and the
+[browser client](/docs/connect/clients/browser/) does the same from web
+applications. PGWire suits tools and libraries that already speak the
+PostgreSQL protocol.
 
 :::
 

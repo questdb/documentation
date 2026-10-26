@@ -31,8 +31,8 @@ clients, see [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-we
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/connect/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP to JavaScript, Rust, Ruby, .NET, or an embedded runtime that the existing
-clients don't cover).
+QWP to Ruby, PHP, or an embedded runtime that the existing clients don't
+cover).
 
 Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
 QWP trades a denser binary encoding for higher throughput and lower CPU on

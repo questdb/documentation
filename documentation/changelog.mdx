@@ -16,6 +16,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Browser client](/docs/connect/clients/browser/) - New page for `@questdb/browser-client`, which writes rows and streams SQL query results over QWP WebSockets directly from web applications. Covers same-origin deployment behind a reverse proxy, applications on their own origin listed in `qwp.browser.allowed.origins`, session-cookie and per-connection credential authentication with refreshed OIDC tokens, in-memory replay, failover, and the differences from the Node.js client
 - [Merge-append partitions](/docs/concepts/merge-append-partitions/) - Reduce copying for backdated ingestion, monitor partition pieces and dead rows, and safely disable the layout before downgrading or converting to non-WAL
 - [Persisted metrics](/docs/operations/logging-metrics/#persisted-metrics) - New section on the `sys.metrics` table, where QuestDB keeps a history of its own metrics, with example queries
 - [Databento connector](/docs/connect/connectors/databento/) - New page for the QuestDB Enterprise Databento connector, which streams Live feeds and runs Historical backfills into QuestDB. Covers installation, TOML configuration, table mappings, storage policies, candles from a materialized view, a session VWAP live view, live dashboards in a Web Console notebook or Grafana, checkpointed recovery, and Prometheus metrics
@@ -25,6 +26,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- Added the [`qwp.browser.allowed.origins`](/docs/configuration/qwp/#qwpbrowserallowedorigins) and [`qwp.browser.tls.termination.enabled`](/docs/configuration/qwp/#qwpbrowsertlsterminationenabled) settings, which control the browser origins allowed to open QWP WebSockets and same-origin checks behind a TLS-terminating proxy
 - Added [merge-append and partition compaction settings](/docs/configuration/cairo-engine/#partition-compaction) and the `deadRows`, `lastWriteTimestamp` and `pieceCount` columns in [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) and [`table_partitions()`](/docs/query/functions/meta/#table_partitions)
 - Added [`metrics.enabled`](/docs/configuration/logging-metrics/#metricsenabled) and the [`metrics.persist.*`](/docs/configuration/logging-metrics/#persisted-metrics) settings for `sys.metrics`
 - Added the dedicated live view refresh worker pool settings [`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount), `.affinity`, `.haltOnError`, `.nap.threshold`, `.sleep.threshold`, `.sleep.timeout`, and `.yield.threshold`, plus [`cairo.live.view.checkpoint.purge.interval`](/docs/configuration/live-views/#cairoliveviewcheckpointpurgeinterval). Live views run on their own refresh pool, not the materialized view pool as previously documented
@@ -37,6 +39,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Node.js client](/docs/connect/clients/nodejs/) - Rewritten for client 5.0.0, which speaks QWP: ingestion through `Sender` with `ws::` connect strings, the pooled `connectQwpNodeClient()` handle, compiled object-row writers, every QWP column type, streaming SQL queries with bind parameters, store-and-forward, failover, error payloads, and a migration guide from ILP. The [connect string reference](/docs/connect/clients/connect-string/) now lists the Node.js defaults and differences
 - [Partition splitting](/docs/concepts/partitions/#partition-splitting-and-squashing) - Documented WAL split retention and background merging of idle splits and reclamation of Parquet dead space, including when merge-append is disabled
 - [HORIZON JOIN](/docs/query/sql/horizon-join/#queries-without-aggregate-functions) - Breaking change in QuestDB 10.1.0: a HORIZON JOIN without aggregate functions now returns one row per left-hand row and offset instead of grouping by the selected columns. Documented the row order, the designated timestamp of the result, how `SELECT DISTINCT` or an explicit `GROUP BY` restores the previous result, the [upgrade steps](/docs/query/sql/horizon-join/#upgrading-to-questdb-1010) for queries, outer aggregation, views, `INSERT INTO ... SELECT`, and `CREATE TABLE AS SELECT`, and the new execution plan names
 - [HORIZON JOIN](/docs/query/sql/horizon-join/#filtering-right-hand-tables) - Breaking change in QuestDB 10.1.0: documented right-hand filters, written in the `ON` clause, as a `(table WHERE ...)` subquery, or as a `SELECT` of the table's columns, which apply before the ASOF match. Earlier versions ignored `ON` predicates other than the join keys. Added a grammar for the right-hand side, including CTEs, and documented the `ORDER BY` limitation
