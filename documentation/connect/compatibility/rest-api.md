@@ -887,3 +887,43 @@ curl -G --data-urlencode "query=SELECT 1;" \
 
 Refer to the [user management](/docs/security/rbac/#user-management) page to
 learn more on how to generate a REST API token.
+
+### HTTP sessions
+
+A client can authenticate once, then send a session cookie instead of its
+credentials, as the Web Console does. To open a session, add `session=true` to
+an authenticated request: QuestDB returns the session ID in the `qdb_session`
+cookie. A later request that carries the cookie and no `Authorization` header
+runs as the user who opened the session. To close the session, add
+`session=false` to a request.
+
+```bash
+# authenticate with the credentials in QDB_USER and QDB_PASSWORD, open a
+# session, and store its cookie in cookies.txt
+curl -G -c cookies.txt -u "$QDB_USER:$QDB_PASSWORD" \
+    --data-urlencode "query=SELECT 1;" \
+    --data-urlencode "session=true" \
+    http://localhost:9000/api/v1/sql/execute
+
+# send the cookie instead of the credentials
+curl -G -b cookies.txt -c cookies.txt \
+    --data-urlencode "query=SELECT current_user();" \
+    http://localhost:9000/api/v1/sql/execute
+```
+
+QuestDB Open Source opens sessions only when `http.user` and `http.password`
+are set. A session ends when it has been idle for
+[`http.session.timeout`](/docs/configuration/http-server/#httpsessiontimeout),
+30 minutes by default. QuestDB also replaces the session ID from time to time,
+so store the cookie that each response sets, as `-c` does above.
+
+Since QuestDB 10.1.0 and QuestDB Enterprise 4.1.0, a request that carries both
+the cookie and an `Authorization` header is authenticated with the header.
+When QuestDB rejects the credential, the request fails with
+`401 Unauthorized`, and the session ends. Earlier versions served such a
+request from the session, so a wrong password or an expired token kept working
+for as long as the cookie did. Only the requests that QuestDB authorizes keep a
+session alive, but a refused request with `session=false` still closes it. In
+QuestDB Enterprise 4.1.0 and later, a session also ends when the credential
+that opened it is revoked, as described in
+[HTTP sessions](/docs/security/rbac/#http-sessions) of the RBAC reference.
