@@ -153,6 +153,11 @@ filesystem overhead. The target remains 30 to 80 million rows per
 partition. See
 [Choosing a partition interval](/docs/concepts/partitions/#choosing-a-partition-interval).
 
+### WAL apply block size
+
+Larger [WAL apply blocks](/docs/configuration/wal/#adaptive-wal-apply-blocks)
+reduce the number of O3 merges.
+
 ### O3 memory page size
 
 The `cairo.o3.column.memory.size` configuration controls how much memory the
