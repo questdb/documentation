@@ -539,6 +539,11 @@ Materialized view queries:
 - Must use `SAMPLE BY` or `GROUP BY` with a designated timestamp column
 - Must not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Must not use non-deterministic functions (`now()`, `rnd_uuid4()`)
+- Must not use Enterprise administrative functions, which check the
+  permissions of the calling session and so cannot run in a background
+  refresh: `active_grants()`, `active_permissions()`, `backup_instance_name()`,
+  `backup_status()`, `backups()`, `permissions()`, `reload_tick_calendars()`,
+  and `reload_tls()`
 - Must use join conditions compatible with incremental refresh
 - When the base table uses [deduplication](/docs/concepts/deduplication/), non-aggregate
   columns must be a subset of the `DEDUP` keys

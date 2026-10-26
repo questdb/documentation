@@ -408,6 +408,11 @@ SELECT * FROM sensitive_sales; -- Access denied!
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
 
+Access control functions such as `active_grants()` and `active_permissions()`
+are an exception: in a view, they check the permissions of the user who queries
+the view, not those of its definer. See
+[access control functions](/docs/query/functions/access-control/#limitations).
+
 ### No column-level permissions on views
 
 Unlike tables, views do **not** support column-level permissions. You can only

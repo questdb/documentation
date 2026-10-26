@@ -265,6 +265,10 @@ The view query is validated at creation time and must:
   `WHERE` predicates are supported.
 - Not use non-deterministic functions such as `now()`, `sysdate()`,
   `systimestamp()`, or `rnd_*()`.
+- Not use Enterprise administrative functions, which check the permissions of
+  the calling session: `active_grants()`, `active_permissions()`,
+  `backup_instance_name()`, `backup_status()`, `backups()`, `permissions()`,
+  `reload_tick_calendars()`, and `reload_tls()`.
 - Not read another live view.
 
 ## Examples
@@ -463,6 +467,7 @@ the query.
 | `wildcard column select is not allowed in live view queries` | The top-level projection contains `*` |
 | `live view select cannot filter on the designated timestamp yet` | The `WHERE` clause filters the designated timestamp |
 | `non-deterministic function cannot be used in live view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
+| `administrative function cannot be used in live view: <function>` | The query calls an Enterprise administrative function, such as `permissions()` or `reload_tls()` |
 
 ### Window errors
 
