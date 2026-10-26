@@ -129,7 +129,7 @@ curl -s -G "https://source:9000/api/v1/sql/execute" \
 
 The ACL categories each require the matching `LIST` or `USER DETAILS`
 permission, while the schema categories need none, so a user with only `SELECT`
-can still dump the structure of the objects it can see.
+can still dump the structure of the objects they can see.
 
 Passwords and tokens are never dumped, so `CREATE USER` and
 `CREATE SERVICE ACCOUNT` statements replay without credentials. Set those on the
