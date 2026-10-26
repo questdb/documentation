@@ -133,6 +133,11 @@ session that submitted it. The outcome is visible through `SWITCH STATUS`,
 `GET /lifecycle`, and the server log. See
 [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
 
+With [resource groups](/docs/concepts/resource-groups/) enabled, a promotion is
+also refused when the node has not yet received the resource group catalog. The
+server log names `RESOURCE_GROUP_CATALOG_UNAVAILABLE` with the reason. See
+[Replication and catalog lag](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
+
 ## Examples
 
 A planned switchover runs on two instances, in this order:
