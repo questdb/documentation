@@ -328,6 +328,8 @@ Materialized view queries must:
 - Not use non-deterministic functions (`now()`, `rnd_*`)
 - Not read [catalogue functions](#catalogue-functions) through a regular view,
   and in QuestDB Enterprise call them only with `SYSTEM ADMIN`
+- Not use Enterprise administrative functions, such as `permissions()` or
+  `backups()`
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.
@@ -437,6 +439,7 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
 | `catalogue function from view <view> cannot be used in materialized view: <function>` | A regular view the query reads calls a [catalogue function](#catalogue-functions). A `SHOW` statement reports `catalogue statement from view` |
 | `catalogue function cannot be used in materialized view without SYSTEM ADMIN: <function>` | The query calls a catalogue function and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
+| `administrative function cannot be used in materialized view: <function>` | The query calls an Enterprise administrative function, such as `active_permissions()` or `backups()` |
 | `permission denied` | Missing required permission (Enterprise) |
 
 ## See also

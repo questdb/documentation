@@ -543,6 +543,11 @@ Materialized view queries:
   [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions),
   such as `tables()`, through a regular view. In QuestDB Enterprise, calling
   them in the view's own query requires `SYSTEM ADMIN`
+- Must not use Enterprise administrative functions, which check the
+  permissions of the calling session and so cannot run in a background
+  refresh: `active_grants()`, `active_permissions()`, `backup_instance_name()`,
+  `backup_status()`, `backups()`, `permissions()`, `reload_tick_calendars()`,
+  and `reload_tls()`
 - Must use join conditions compatible with incremental refresh
 - When the base table uses [deduplication](/docs/concepts/deduplication/), non-aggregate
   columns must be a subset of the `DEDUP` keys

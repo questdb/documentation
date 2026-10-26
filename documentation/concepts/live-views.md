@@ -533,6 +533,11 @@ in [Base table lifecycle](#base-table-lifecycle).
   objects, such as `tables()`, follow the
   [materialized view rules](/docs/query/sql/create-mat-view/#catalogue-functions):
   in QuestDB Enterprise, only a creator with `SYSTEM ADMIN` can use them.
+- **No administrative functions.** Enterprise functions that check the
+  caller's permissions, such as `permissions()` and `backup_instance_name()`,
+  are rejected, since a live view refreshes in the background. See
+  [query constraints](/docs/query/sql/create-live-view/#query-constraints) for
+  the full list.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Base-table retention does not shrink the view, because `DROP PARTITION`,
   `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.

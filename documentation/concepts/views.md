@@ -418,6 +418,11 @@ they can read through `views()` and `SHOW CREATE VIEW`, still names the table.
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
 
+Access control functions such as `active_grants()` and `active_permissions()`
+are an exception: in a view, they check the permissions of the user who queries
+the view, not those of its definer. See
+[access control functions](/docs/query/functions/access-control/#limitations).
+
 ### Metadata functions in views (Enterprise) {#metadata-functions-in-views}
 
 The table-name functions `table_columns()`, `table_partitions()`,
