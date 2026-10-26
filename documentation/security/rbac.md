@@ -1,8 +1,9 @@
 ---
 title: Role-based Access Control (RBAC)
 description:
-  Users, groups, service accounts, and permissions from database down to column
-  and row level, plus per-principal query memory limits, in QuestDB Enterprise.
+  Users, groups, service accounts, and permissions down to column and row level,
+  which tables each principal can see, and query memory limits in QuestDB
+  Enterprise.
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -83,7 +84,7 @@ via `ILP`.
 Restrict users to see only certain columns:
 
 ```questdb-sql
--- User can only see timestamp and price, not quantity or trader_id
+-- User can read only ts and price, not quantity or trader_id
 GRANT SELECT ON trades(ts, price) TO analyst;
 ```
 
@@ -116,7 +117,9 @@ GRANT SELECT ON aapl_trades TO aapl_analyst;
 ```
 
 The user `aapl_analyst` can only see AAPL trades. They have no access to the
-underlying `trades` table.
+underlying `trades` table, and since they hold no permission on it, the table is
+[hidden](#object-visibility) from them: it is missing from `SHOW TABLES`, and
+querying it fails with `table does not exist [table=trades]`.
 
 To also record who read the view, and with which parameters, create it as an
 [audited view](/docs/security/audited-views/).
@@ -190,8 +193,14 @@ GRANT HTTP, PGWIRE TO auditor;
 
 -- Grant access to non-sensitive columns only
 GRANT SELECT ON employees(id, name, department, hire_date) TO auditor;
--- Columns salary and ssn are not granted = invisible to auditor
+-- salary and ssn are not granted, so auditor cannot read them
 ```
+
+The auditor can still see that `salary` and `ssn` exist, and their types,
+because any permission on a table discloses its whole schema (see
+[object visibility](#object-visibility)). To hide the columns themselves,
+expose a [view](#row-level-access-with-views) that leaves them out instead of
+the table.
 
 ### Row-level security (multi-tenant)
 
@@ -253,6 +262,51 @@ GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
 `DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
 `node_role()` and `GET /lifecycle` are open to any authenticated principal. See
 [Failover and role switch](/docs/high-availability/failover/).
+
+### Monitoring account
+
+A service account that watches the health of every table, view, materialized
+view, and live view, such as
+[suspended tables](/docs/operations/monitoring-alerting/#detect-suspended-tables),
+without reading table data:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT health_monitor WITH PASSWORD 'pwd';
+GRANT HTTP TO health_monitor;          -- REST API queries
+GRANT SYSTEM ADMIN TO health_monitor;  -- sees every object, reads no rows
+```
+
+The account polls the WAL status of every object:
+
+```questdb-sql
+SELECT name, errorTag, errorMessage FROM wal_tables() WHERE suspended;
+```
+
+With `SYSTEM ADMIN`, the account [sees](#object-visibility) every unprotected
+object in `tables()` and `wal_tables()`, also sees the protected access control
+tables in `wal_tables()`, and can call `reader_pool()` and `writer_pool()`. It
+still cannot read rows: `SELECT * FROM trades` fails with `Access denied`.
+
+`SYSTEM ADMIN` is an administrative permission, so protect the account's
+credentials like an administrator's. Besides visibility, it authorizes:
+
+- [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/), which
+  discards a table's pending WAL, and
+  [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/)
+- System functions, such as `hydrate_table_metadata()` and `reload_tls()`
+- `files()` and `glob()` on any directory of the server
+
+An account that does not need `reader_pool()`, `writer_pool()`, or the protected
+tables can hold a single table-level permission granted `ON ALL TABLES` instead.
+It makes every unprotected object visible, including objects created later,
+without `SYSTEM ADMIN`:
+
+```questdb-sql
+GRANT RESUME WAL ON ALL TABLES TO health_monitor;  -- can also resume WAL
+```
+
+An account granted a permission on specific tables only sees those tables, so
+a suspended table hidden from it raises no alert.
 
 ## Core concepts
 
@@ -458,6 +512,180 @@ When a user creates a table, they automatically receive all permissions on it
 with the GRANT option. This ownership does not persist - if revoked, they cannot
 get it back without someone re-granting it.
 
+## Object visibility {#object-visibility}
+
+QuestDB Enterprise hides tables, views, materialized views, and live views from
+principals that hold no permission on them, so that users and applications
+cannot list the objects they have no access to, or read their schema through
+SQL. To such a principal, a hidden object looks like a missing one: catalogue
+queries such as `tables()`, `SHOW TABLES`, `information_schema`, and
+`pg_catalog` leave it out, and statements that name it fail with the error a
+missing object returns. A few paths still reveal a hidden object, see
+[Limitations](#limitations). Object visibility is available since QuestDB
+Enterprise 4.1.0 and applies whenever access control is enabled.
+
+:::warning Breaking change
+
+Before QuestDB Enterprise 4.1.0, every principal could list every object and
+read its schema through catalogue queries, `SHOW` statements, and functions
+such as `table_columns()`, and statements that read or changed an object it
+held no permission on failed with `Access denied` or `Grant denied`. Both now
+behave as for a missing object: catalogue queries leave the object out,
+statements fail with the [errors for hidden objects](#errors-for-hidden-objects),
+and the `IF EXISTS` forms do nothing. Over the REST API, a `does not exist`
+error returns HTTP status 400, where `Access denied` returned 403. Clients and
+tests that read the schema of such objects, or match the old messages, must
+expect the missing-object behavior instead, or the principal needs a permission
+on the object. See the
+[4.1.0 upgrade checklist](/docs/operations/upgrade/#upgrading-to-410).
+
+:::
+
+### Visibility rules
+
+A principal sees an object when any of the following holds:
+
+- It is the [built-in admin](#built-in-admin) and has not assumed a service
+  account.
+- It holds `DATABASE ADMIN` or `SYSTEM ADMIN`.
+- It holds any permission granted `ON ALL TABLES`, such as
+  `GRANT INSERT ON ALL TABLES`.
+- It holds any permission on the object itself, granted on the table or on any
+  one of its columns.
+- The object is public. The telemetry tables and the
+  [`storage_policies`](/docs/query/functions/meta/#storage_policies) view are
+  visible to every principal.
+
+Protected tables are the exception. These system tables, such as
+`sys.acl_entities` and `sys.acl_permissions`, store principals, credentials,
+and grants, and only the built-in admin sees them. To every other principal,
+including one holding `DATABASE ADMIN`, they look missing. For recovery,
+`DATABASE ADMIN` and `SYSTEM ADMIN` holders still see them in
+[`wal_tables()`](/docs/query/functions/meta/#wal_tables), `wal_transactions()`,
+and `wait_wal_table()`, and WAL recovery statements such as
+[`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/) reach them
+for principals that hold the permission the statement requires.
+
+Permissions count from every source the principal is authorized with: its own
+grants and those of its groups or, after
+[`ASSUME SERVICE ACCOUNT`](/docs/query/sql/acl/assume-service-account/), the
+grants of the assumed service account. Database-level permissions that do not
+apply to objects, such as `HTTP`, `CREATE TABLE`, or `LIST USERS`, make no
+object visible. A principal that creates an object sees it through its
+[owner grants](#owner-grants). A `GRANT` or `REVOKE` changes what a principal
+sees from its next query, including on connections that are already open.
+
+### What visibility discloses
+
+Any permission on an object makes its metadata visible, even a permission that
+reads no data. This includes the object's name, every column and its type, its
+DDL through `SHOW CREATE`, and statistics such as row counts, timestamp ranges,
+and partition sizes from `tables()`, `table_partitions()`, and
+`table_storage()`. A grant on a single column discloses every column of the
+table, including those the principal cannot read.
+
+Visibility grants no access by itself. Statements on a visible object are
+authorized as before, so an operation the principal holds no permission for
+still fails with `Access denied`. For example, a service account that only
+inserts into `positions`:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT positions_feed WITH PASSWORD 'pwd';
+GRANT HTTP TO positions_feed;
+GRANT INSERT ON positions TO positions_feed;
+```
+
+sees `positions`, with all of its columns, and no other table:
+
+```questdb-sql title="Connected as positions_feed"
+-- Lists positions only
+SHOW TABLES;
+
+-- Every column of positions, with its type
+SHOW COLUMNS FROM positions;
+
+-- Access denied for positions_feed [SELECT on positions(timestamp)]
+SELECT * FROM positions;
+
+-- table does not exist [table=risk_limits]
+SELECT * FROM risk_limits;
+```
+
+### Errors for hidden objects
+
+A statement that names a hidden object fails with the same message and error
+position as it does for a missing object. The most common errors are:
+
+| Error                                          | Statements                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `table does not exist [table=name]`            | `SELECT`, `EXPLAIN`, `UPDATE`, `ALTER TABLE`, `DROP TABLE`, `TRUNCATE TABLE`, `RENAME TABLE`, `SHOW COLUMNS`, `SHOW PARTITIONS`, `SHOW CREATE TABLE`, `REVOKE`, `table_columns()`, `table_partitions()`, and `GRANT` with a `*` column list |
+| `view does not exist [view=name]`              | `ALTER VIEW`, `COMPILE VIEW`, `DROP VIEW`, `SHOW CREATE VIEW`                                                                                                                                                                               |
+| `materialized view does not exist [view=name]` | `DROP MATERIALIZED VIEW`, `REFRESH MATERIALIZED VIEW`, `SHOW CREATE MATERIALIZED VIEW`                                                                                                                                                      |
+| `live view does not exist`                     | `DROP LIVE VIEW`, `SHOW CREATE LIVE VIEW`                                                                                                                                                                                                   |
+| `Invalid table name`                           | `INSERT`, and `GRANT` without a `*` column list                                                                                                                                                                                             |
+
+The `IF EXISTS` forms, such as `DROP TABLE IF EXISTS`, do nothing for a hidden
+object, and [`DROP ALL TABLES`](/docs/query/sql/drop/) leaves hidden objects in
+place without naming them in its error report.
+
+### Views
+
+A principal with `SELECT` on a [view](/docs/concepts/views/) reads its rows
+while the objects the view reads stay hidden, as in the
+[row-level access](#row-level-access-with-views) example. The view's
+definition, visible through `views()`, `SHOW CREATE VIEW`, and `EXPLAIN`, still
+names those objects. In a view's definition, table-name functions such as
+`table_columns()` and `SHOW` statements that name an object, such as
+`SHOW COLUMNS`, can also publish the metadata of a table hidden from the view's
+readers, as described in
+[metadata functions in views](/docs/concepts/views/#metadata-functions-in-views).
+Functions and statements that list objects, such as `tables()` and
+`SHOW TABLES`, list only what the reader can see, also inside a view.
+
+### Administrative and catalogue functions
+
+`reader_pool()`, `writer_pool()`, `files()`, and `glob()` list objects whether
+or not the caller can see them. They require `SYSTEM ADMIN`, `glob()` only with
+an absolute pattern outside
+[`cairo.sql.copy.root`](/docs/configuration/copy-settings/#cairosqlcopyroot),
+and otherwise fail with `Access denied for <principal> [SYSTEM ADMIN]`.
+
+Materialized and live views refresh under a context that sees every object, so
+they accept catalogue functions and `SHOW` statements only in their own query,
+and only from a principal with `SYSTEM ADMIN`. See
+[catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions).
+
+### Limitations
+
+Visibility keeps hidden objects out of catalogue queries and SQL statements,
+but some paths still reveal that an object exists, and ILP writes reveal the
+columns of a hidden table:
+
+- Any principal can test whether a name is taken, because the name is checked
+  before the permission to create. Creating an object fails when a hidden
+  object already has its name, whether through `CREATE` or
+  `RENAME TABLE ... TO`: `CREATE TABLE` fails with `table already exists`,
+  where a free name fails with `Access denied` for a principal without
+  `CREATE TABLE`. `CREATE ... IF NOT EXISTS` returns without creating anything
+  when the hidden object is of the same kind. Otherwise it fails with an error
+  such as `view or materialized view with the requested name already exists`.
+  `COPY ... FROM` and CSV import into a hidden table fail with
+  `Access denied for <principal> [INSERT on <table>]`.
+- An ILP over HTTP write to a hidden table fails with
+  `Access denied for <principal> [INSERT on <table>]` when the table has every
+  column the line writes, and with `[ADD COLUMN on <table>]` when it lacks one.
+  A value of the wrong type fails with a cast error that names the column and
+  its type. A principal that knows a hidden table's name can therefore probe
+  its column names and types.
+- `USER DETAILS` holders see the object names in other principals' grants,
+  through `SHOW PERMISSIONS`, and `SQL ENGINE ADMIN` holders see the text of
+  every running query in
+  [`query_activity()`](/docs/query/functions/meta/#query_activity).
+- Table ids are allocated database-wide, so gaps between visible ids reveal
+  that other tables exist. The public `sys.telemetry_wal` table records every
+  WAL write by table id, with its row count and timestamp range, so it also
+  shows how much data each hidden table receives.
+
 ## Advanced topics
 
 ### Permission re-adjustment {#permission-level-re-adjustment}
@@ -500,18 +728,23 @@ operations (SAMPLE BY, LATEST ON, etc.) work correctly.
 
 ### Granting on non-existent objects {#grant-verification}
 
-You can grant permissions on tables/columns that don't exist yet:
+You can grant permissions on tables and columns that don't exist yet:
 
 ```questdb-sql
 GRANT INSERT ON future_table TO app;
 -- Permission activates when future_table is created
 ```
 
-Use `WITH VERIFICATION` to catch typos:
+Only the built-in admin can grant on a table that doesn't exist yet. Any other
+granter, including one holding `DATABASE ADMIN`, gets `Invalid table name`, the
+same error as for a table it [cannot see](#object-visibility).
+
+`GRANT` does not check that the grantee exists either. Use `WITH VERIFICATION`
+to catch a misspelled user, group, or service account:
 
 ```questdb-sql
-GRANT SELECT ON trdaes TO user WITH VERIFICATION;
--- Fails immediately because 'trdaes' doesn't exist
+GRANT SELECT ON trades TO anlayst WITH VERIFICATION;
+-- Fails: Grantee does not exist [name=anlayst]
 ```
 
 ### Service account assumption
@@ -527,6 +760,24 @@ ASSUME SERVICE ACCOUNT ingest_app;
 -- ... debug with app's permissions ...
 EXIT SERVICE ACCOUNT;
 ```
+
+### Access control on replicas {#replicas}
+
+Users, groups, service accounts, and their permissions are managed on the
+primary. A read-only [replica](/docs/high-availability/overview/) rejects
+statements such as `CREATE USER` and `GRANT`, and receives the changes through
+replication instead. Before it authorizes a statement, the replica reloads its
+access lists if new changes have arrived.
+
+A statement that finds another session already reloading waits for that reload
+for up to 30 seconds. If the access lists are still out of date after that, the
+statement fails instead of being authorized against outdated permissions:
+
+```text
+timed out waiting for the access lists to refresh [timeout=30000ms]
+```
+
+Retry the statement.
 
 ## User management reference {#user-management}
 
@@ -660,11 +911,22 @@ JWK Token    false
 REST Token   true
 ```
 
+To audit permissions across all users, groups, and service accounts in one
+query, use the
+[access control functions](/docs/query/functions/access-control/):
+
+```questdb-sql
+SELECT * FROM active_permissions();  -- Effective, including group permissions
+SELECT * FROM active_grants();       -- Direct grants only
+```
+
 :::note
 
 Viewing other users' information requires `LIST USERS` (to list all) or
 `USER DETAILS` (to see details) permissions. Users can always view their own
-information without these permissions.
+information without these permissions. `active_permissions()` and
+`active_grants()` list the permissions of every entity, so they require both,
+even to read your own rows.
 
 :::
 
@@ -827,8 +1089,8 @@ the limit it logged in with until it reconnects.
   `memory_limit` column of `query_activity`, which always lists the caller's
   own queries.
 - The stored value is persisted on the `sys.acl_entities` system table. That
-  table is protected: only the built-in admin can read it, and an ACL principal
-  holding `DATABASE ADMIN` is still denied.
+  table is [protected](#visibility-rules): only the built-in admin can see and
+  read it, and to an ACL principal holding `DATABASE ADMIN` it looks missing.
 
 ### Upgrading {#memory-limit-upgrade}
 
@@ -877,7 +1139,8 @@ again at startup.
 
 ## Permissions reference {#permissions}
 
-Use `all_permissions()` to see all available permissions:
+Use [`all_permissions()`](/docs/query/functions/access-control/#all_permissions)
+to list all available permissions and the levels they can be granted at:
 
 ```questdb-sql
 SELECT * FROM all_permissions();
@@ -928,7 +1191,7 @@ SELECT * FROM all_permissions();
 | SNAPSHOT                  | Database                            | Create snapshots                        |
 | SQL ENGINE ADMIN          | Database                            | List/cancel running queries             |
 | SWITCH ROLE               | Database                            | Switch the replication role, read SWITCH STATUS |
-| SYSTEM ADMIN              | Database                            | System functions (reload_tls, etc.)     |
+| SYSTEM ADMIN              | Database                            | System functions (reload_tls, reader_pool, etc.); makes objects [visible](#object-visibility) |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
 | UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
 | VACUUM TABLE              | Database &#124; Table               | Reclaim storage                         |
@@ -966,7 +1229,7 @@ SELECT * FROM all_permissions();
 | ALL            | All permissions at the granted level (database/table/column). At database level, includes `DATABASE ADMIN` since Enterprise 2.3.1: see [Database administrator](#database-administrator) |
 | DATABASE ADMIN | All permissions including future ones; can assume any service account |
 
-A few operations are reserved for database administrators and are not grantable as permissions at all:
+A few operations have no permission of their own. They require `SYSTEM ADMIN`, which the built-in admin and `DATABASE ADMIN` holders have:
 
 | Operation                                                               | Notes                                                                                       |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |

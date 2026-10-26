@@ -106,13 +106,13 @@ ALTER VIEW trades_filtered AS (
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist [view=name]` | View with specified name doesn't exist |
-| `table does not exist [table=name]` | Referenced table in new query doesn't exist |
+| `view does not exist [view=name]` | View with specified name doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise) |
+| `table does not exist [table=name]` | Referenced table in new query doesn't exist, or is hidden from the user (Enterprise) |
 | `Invalid column` | Column in new query doesn't exist |
 | `circular dependency detected` | New definition would create circular reference |
 | `Access denied [ALTER VIEW on view_name]` | User lacks `ALTER VIEW` permission (Enterprise) |
 | `Access denied [AUDIT VIEW]` | The view is audited and the user lacks the `AUDIT VIEW` permission (Enterprise) |
-| `Access denied [SELECT on table_name]` | User lacks SELECT on tables in new definition (Enterprise) |
+| `Access denied [SELECT on table_name]` | User can see a table in the new definition but lacks SELECT on it (Enterprise) |
 
 ## Behavior
 
@@ -164,8 +164,13 @@ You cannot use `ALTER VIEW` to access tables you don't have permission for:
 ```questdb-sql
 -- This fails if user doesn't have SELECT on secret_table
 ALTER VIEW my_view AS (SELECT * FROM secret_table);
--- Error: Access denied for username [SELECT on secret_table]
 ```
+
+A user that holds no permission on `secret_table` cannot
+[see it](/docs/security/rbac/#object-visibility), so the statement fails with
+`table does not exist [table=secret_table]`. A user that holds another
+permission on the table, but not `SELECT`, gets
+`Access denied for username [SELECT on secret_table(column)]`.
 
 ## See also
 
