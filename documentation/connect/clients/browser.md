@@ -954,7 +954,10 @@ try {
   [pooled leases](#the-pooled-client).
 - A positive `initialCredit` limits how far the server streams ahead of your
   code, which matters in browsers: the browser buffers incoming WebSocket
-  frames before JavaScript reads them. The default, `0`, is unlimited.
+  frames before JavaScript reads them. It also lets a cancellation or timeout
+  stop a streaming query, as
+  [Cancellation, timeouts, and failover](#cancellation-timeouts-and-failover)
+  explains. The default, `0`, is unlimited.
 
 ### Bind parameters
 
@@ -1042,7 +1045,9 @@ chart a `TIMESTAMP`, convert it with `new Date(Number(micros / 1000n))`.
 ### Cancellation, timeouts, and failover
 
 A query timeout covers the whole query, from the `query()` call until the last
-batch is consumed:
+batch is consumed. Like a cancellation, it needs a positive `initialCredit` to
+stop a query that is streaming its result, and the session from
+[Running a query](#running-a-query) sets one:
 
 ```typescript
 import { QwpEgressQueryTimeoutError } from "@questdb/browser-client";
@@ -1067,11 +1072,31 @@ try {
 - `query.cancel()` cancels explicitly: iteration then throws a
   `QwpEgressQueryError` with `status` `10`. Leaving a `for await` loop early
   also cancels, and rejects `completion` with `QwpEgressQueryAbandonedError`.
-- The session stays usable after a timeout, a cancellation, or a query error.
+- The session stays usable after a query error, and, with a positive
+  `initialCredit`, after a timeout or a cancellation.
 - After a connection failure the session reconnects and runs the active query
   again from the start, so rows you already consumed arrive again. Clear
-  accumulated results in the query's `onFailoverReset` callback. See
+  accumulated results in the query's `onFailoverReset` callback. An `INSERT` or
+  `UPDATE` runs again too, and can take effect twice. See
   [Failover and reconnect](#failover-and-reconnect).
+
+:::caution Set `initialCredit` on queries you may stop early
+
+As of QuestDB 10.1, the server does not see a cancellation while it streams a
+result faster than your code reads it. Without a positive `initialCredit`, a
+`cancel()`, an expired timeout, or leaving a `for await` loop early does not
+stop such a query. The client then waits up to `cancelDrainTimeoutMs` (5
+seconds by default) for the query to end, and fails the session with
+`QwpEgressQueryCancelTimeoutError` if it does not. A failed session runs no
+further queries: close it and open another. A pooled lease's `close()` blocks
+for several seconds while this happens, and the pool then replaces the
+connection.
+
+With a positive `initialCredit`, the server stops whenever it is that many
+bytes ahead of your code and waits for more credit, so it sees the
+cancellation, and the query ends at once.
+
+:::
 
 ### Zero-copy views and compression
 
@@ -1245,6 +1270,15 @@ After a failover, a query restarts from its first row. Batches you already
 consumed are delivered again, so code that accumulates results sees duplicate
 rows unless it clears them in `onFailoverReset`.
 
+A statement such as an `INSERT` or `UPDATE` runs again too. If QuestDB had
+already completed it before the connection failed, it takes effect twice and
+still reports `exec-done`: `UPDATE trades SET amount = amount - 1` subtracts
+twice. For a statement that must not run twice, use one that a second run does
+not change, such as one that sets a value rather than adjusting it. Or run it
+on a session with `reconnect: false`: a lost connection then fails the
+statement, which may still have taken effect, so check the table before
+running it again.
+
 :::
 
 ```typescript
@@ -1314,15 +1348,15 @@ await sender.close();
 
 ### Errors from calls
 
-| Where                                 | What you get                                                                                    | What to do                                         |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                          | Fix the value. Only that row is discarded          |
-| Connecting                            | `QwpUpgradeError`, usually of kind `"opaque"`, or `QwpBrowserSessionBootstrapError`             | Check the URL, origin allowlist, and credentials   |
-| `connectQwpBrowserClient()`           | `QwpPoolResourceError`, with the connection error as `cause`                                    | As for connecting                                  |
-| `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload                                              | See [Server rejections](#server-rejections)        |
-| `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`                                                             | Slow the producer, or raise the limits             |
-| Query iteration and `completion`      | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`             | See [Query errors](#query-errors)                  |
-| `close()`                             | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                        | The unacknowledged rows are lost                   |
+| Where                                | What you get                                                                                                            | What to do                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| A column setter, `at()`, `row()`     | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                                                  | Fix the value. Only that row is discarded        |
+| Connecting                           | `QwpUpgradeError`, usually of kind `"opaque"`, or `QwpBrowserSessionBootstrapError`                                     | Check the URL, origin allowlist, and credentials |
+| `connectQwpBrowserClient()`          | `QwpPoolResourceError`, with the connection error as `cause`                                                            | As for connecting                                |
+| `flushAndWait()`, `waitForAck()`     | `QwpIngressNackError` with a `senderError` payload                                                                      | See [Server rejections](#server-rejections)      |
+| `flush()`, `at()` under backpressure | `QwpMemoryReplayAppendTimeoutError`                                                                                     | Slow the producer, or raise the limits           |
+| Query iteration and `completion`     | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError` | See [Query errors](#query-errors)                |
+| `close()`                            | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                                                | The unacknowledged rows are lost                 |
 
 A browser hides the HTTP response of a failed WebSocket upgrade. A wrong URL,
 an origin missing from the allowlist, and a rejected `auth` credential all fail

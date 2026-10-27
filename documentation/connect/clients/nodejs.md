@@ -913,6 +913,9 @@ ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
   [Recovering a journal after a crash](#recovering-a-journal-after-a-crash).
 - With `initial_connect_retry=async`, a sender starts while QuestDB is
   unreachable, and rows wait in the journal until it connects.
+- A batch that QuestDB rejects, such as one with a string for a `DOUBLE`
+  column, stays in the journal and stops delivery from it until you fix the
+  cause or move the journal aside. See [Errors from calls](#errors-from-calls).
 - Store-and-forward is Node.js only. The browser client replays from memory.
 
 | Key                         | Default  | Purpose                                                                                                     |
@@ -1187,10 +1190,31 @@ try {
 `QwpEgressQueryError`. Use `INSERT` for occasional writes and the sender for
 streams of rows.
 
+:::warning A statement can run twice after a reconnect
+
+When the connection fails before the reply to a statement arrives, the session
+runs the statement again on the next connection, as it does with a query. If
+QuestDB had already completed it, the statement takes effect twice and still
+reports `exec-done`: an `INSERT` adds its rows again, and
+`UPDATE trades SET amount = amount - 1` subtracts twice. For a statement that
+must not run twice, use one of these:
+
+- A statement that a second run does not change, such as one that sets a value
+  rather than adjusting it.
+- A session with failover off, through `failover=off` or `reconnect: false`. A
+  lost reply then fails the statement, which may still have taken effect, so
+  check the table before running it again.
+- The [sender](#data-ingestion), writing to a table with
+  [deduplication](/docs/concepts/deduplication/).
+
+:::
+
 ### Cancellation and timeouts
 
 A query timeout covers the whole query, from the `query()` call until the last
-batch is consumed. When it expires, the client cancels the query on the server:
+batch is consumed. When it expires, the client cancels the query on the server.
+Stopping a query while it streams its result needs a positive `initialCredit`,
+as the caution below explains:
 
 ```typescript
 import {
@@ -1201,6 +1225,7 @@ import {
 const session = await connectQwpNodeEgress({
   url: "ws://localhost:9000/read/v1",
   queryTimeoutMs: 30_000, // default for every query on this session
+  initialCredit: 1024 * 1024, // lets a timeout stop a streaming query
 });
 try {
   const query = await session.query(
@@ -1217,6 +1242,23 @@ try {
 }
 ```
 
+:::caution Set `initialCredit` on queries you may stop early
+
+As of QuestDB 10.1, the server does not see a cancellation while it streams a
+result faster than your code reads it. Without a positive `initialCredit`, a
+`cancel()`, an expired timeout, or leaving a `for await` loop early does not
+stop such a query. The client then waits up to `cancelDrainTimeoutMs` for the
+query to end, and fails the session with `QwpEgressQueryCancelTimeoutError` if
+it does not. A failed session runs no further queries: close it and open
+another. A pooled lease's `close()` blocks for several seconds while this
+happens, and the pool then replaces the connection.
+
+With a positive `initialCredit`, the server stops whenever it is that many
+bytes ahead of your code and waits for more credit, so it sees the
+cancellation, and the query ends at once.
+
+:::
+
 - `queryTimeoutMs` (`query_timeout_ms`) sets the session default. `0`, the
   default, disables it, and a per-query `timeoutMs` overrides it.
 - `query.cancel()` cancels explicitly. Iteration then throws a
@@ -1226,16 +1268,22 @@ try {
   `QwpEgressQueryAbandonedError`.
 - `query.awaitCompletion(timeoutMs)` waits without cancelling, and resolves
   `false` if the query is still running.
-- The session stays usable after a timeout, a cancellation, or a query error.
-  A statement that the server completes despite the timeout still succeeds,
-  so a statement that took effect is never reported as timed out.
+- `cancelDrainTimeoutMs` (`query_close_timeout_ms`, default `5000`) bounds how
+  long a cancelled, timed-out, or abandoned query may take to end before the
+  session fails.
+- The session stays usable after a query error, and, with a positive
+  `initialCredit`, after a timeout or a cancellation. A statement that the
+  server completes despite the timeout still succeeds, so a statement that
+  took effect is never reported as timed out.
 
 ### Flow control and buffering
 
 By default the server streams results as fast as the network allows. A
 positive `initialCredit` caps how many bytes the server sends ahead of your
 code. The client replenishes the credit as you consume each batch, so set it
-on queries with large results when memory is limited:
+on queries with large results when memory is limited, and on queries you may
+cancel, time out, or abandon, as
+[Cancellation and timeouts](#cancellation-and-timeouts) explains:
 
 ```typescript
 // session: from connectQwpNodeEgress(), as in Running a query
@@ -1533,7 +1581,9 @@ trigger failover.
 
 After a failover, the query restarts from its first row. Batches you already
 consumed are delivered again, so code that accumulates results sees duplicate
-rows unless it clears them in `onFailoverReset`.
+rows unless it clears them in `onFailoverReset`. A statement such as an
+`INSERT` or `UPDATE` runs again too, and can take effect twice: see
+[DDL and DML](#ddl-and-dml).
 
 :::
 
@@ -1638,14 +1688,14 @@ query restarts from its first row: clear rows you accumulated in
 
 ### Errors from calls
 
-| Where                                 | What you get                                                                                         | What to do                                                    |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                               | Fix the value. Only that row is discarded                     |
-| `connect()`, the first flush or query | `QwpUpgradeError` with `kind` and, for HTTP rejections, `statusCode`; or `QwpFailoverError`         | Check the address, credentials, and server version            |
-| `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload                                                   | See [Server rejections](#server-rejections)                   |
-| `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`, or a `QwpReplayStore*Error` with store-and-forward              | Slow the producer, or raise the limits                        |
-| Query iteration and `completion`      | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`                  | See [Query errors](#query-errors)                             |
-| `close()`                             | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                             | Unacknowledged data is lost, unless store-and-forward kept it |
+| Where                                 | What you get                                                                                                            | What to do                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                                                  | Fix the value. Only that row is discarded                     |
+| `connect()`, the first flush or query | `QwpUpgradeError` with `kind` and, for HTTP rejections, `statusCode`; or `QwpFailoverError`                             | Check the address, credentials, and server version            |
+| `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload                                                                      | See [Server rejections](#server-rejections)                   |
+| `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`, or a `QwpReplayStore*Error` with store-and-forward                                 | Slow the producer, or raise the limits                        |
+| Query iteration and `completion`      | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError` | See [Query errors](#query-errors)                             |
+| `close()`                             | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                                                | Unacknowledged data is lost, unless store-and-forward kept it |
 
 `QwpUpgradeError.kind` is one of `authentication`, `role-rejected`,
 `http-rejected`, `version-mismatch`, `capability-mismatch`, `timeout`, or
@@ -1657,6 +1707,22 @@ finished. Every later call, `close()` included, rejects with the
 same error. Close it, catching the error, and create a new sender. Rows staged
 on the failed sender are lost. A pooled lease is replaced automatically on the
 next `borrowSender()`.
+
+With store-and-forward, the journal keeps a batch that QuestDB rejected, so a
+new sender with the same `sf_dir` and `sender_id` sends it again and fails the
+same way. Delivery from that journal stops until you act, so alert on terminal
+failures, for example on an `onError` event with `terminal` set. Then either:
+
+- Fix the cause, for example the column type, so that QuestDB accepts the
+  batch, and start a new sender. It delivers the rejected batch and every
+  batch journalled after it.
+- Move the journal directory, `<sf_dir>/<sender_id>`, out of `sf_dir`, and
+  start a new sender with an empty journal. QuestDB never receives the batches
+  in the moved journal, including those journalled after the rejected one.
+
+Validate rows before you write them to avoid most terminal rejections: QuestDB
+rejects a value of the wrong type for an existing column, and a designated
+timestamp before 1970.
 
 ### Server rejections
 
@@ -1706,6 +1772,8 @@ try {
 
 - **`terminal`**: schema mismatches, parse errors, and security errors cannot
   succeed on replay. The sender stops, and later calls reject with the error.
+  With store-and-forward, the rejected batch stays in the journal: see
+  [Errors from calls](#errors-from-calls).
 - **`retriable`** and **`retriable-other`**: the client reconnects, to another
   endpoint for `retriable-other`, and replays from the last acknowledgement.
 - **`abandoned`**: store-and-forward recovery could not replay data, which is
@@ -1767,27 +1835,29 @@ sanitize the text before showing it to end users, since it can quote SQL.
 
 ### Error classes
 
-| Class                                 | Raised when                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------ |
-| `QwpUpgradeError`                     | A WebSocket upgrade fails. `kind` gives the reason                             |
-| `QwpFailoverError`                    | Every endpoint of one connection attempt failed. `attempts` lists them         |
-| `QwpReconnectExhaustedError`          | A `sync` first connection or a query failover ran out of its limits           |
-| `QwpDurableAckUnavailableError`       | Durable acknowledgement was requested but the server does not support it       |
-| `QwpIngressNackError`                 | QuestDB rejected a batch. `senderError` holds the details                      |
-| `QwpReplayRejectedError`              | A rejected batch ended the sender; later calls reject with it                  |
-| `QwpBatchTooLargeError`               | One row is larger than the server's batch limit                                |
-| `QwpWriterRowError`                   | A compiled writer rejected a row                                               |
-| `QwpMemoryReplayAppendTimeoutError`   | The memory queue stayed full past its deadline                                 |
-| `QwpReplayStoreAppendTimeoutError`    | The store-and-forward journal stayed full past its deadline                   |
-| `QwpReplayStoreFullError`             | The journal is full and `backpressurePolicy` is `"error"`                      |
-| `QwpReplayStoreLockedError`           | Another process owns the journal, or a crashed one left its lock               |
-| `QwpSenderCloseTimeoutError`          | `close()` timed out waiting for acknowledgements                               |
-| `QwpEgressQueryError`                 | The server reported a query error. `status` gives the code                     |
-| `QwpEgressQueryTimeoutError`          | A query ran past its timeout and was cancelled                                 |
-| `QwpEgressQueryAbandonedError`        | Iteration stopped before the query finished                                    |
-| `QwpPoolAcquireTimeoutError`          | No pooled connection became free within `acquire_timeout_ms`                   |
-| `QwpPoolResourceError`                | The pool could not open a connection                                           |
-| `QwpClientClosedError`                | The pooled client or a lease is already closed                                 |
+| Class                               | Raised when                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `QwpUpgradeError`                   | A WebSocket upgrade fails. `kind` gives the reason                               |
+| `QwpFailoverError`                  | Every endpoint of one connection attempt failed. `attempts` lists them           |
+| `QwpReconnectExhaustedError`        | A `sync` first connection or a query failover ran out of its limits              |
+| `QwpDurableAckUnavailableError`     | Durable acknowledgement was requested but the server does not support it         |
+| `QwpIngressNackError`               | QuestDB rejected a batch. `senderError` holds the details                        |
+| `QwpReplayRejectedError`            | A rejected batch ended the sender; later calls reject with it                    |
+| `QwpBatchTooLargeError`             | One row is larger than the server's batch limit                                  |
+| `QwpWriterRowError`                 | A compiled writer rejected a row                                                 |
+| `QwpMemoryReplayAppendTimeoutError` | The memory queue stayed full past its deadline                                   |
+| `QwpReplayStoreAppendTimeoutError`  | The store-and-forward journal stayed full past its deadline                      |
+| `QwpReplayStoreFullError`           | The journal is full and `backpressurePolicy` is `"error"`                        |
+| `QwpReplayStoreLockedError`         | Another process owns the journal, or a crashed one left its lock                 |
+| `QwpSenderCloseTimeoutError`        | `close()` timed out waiting for acknowledgements                                 |
+| `QwpEgressQueryError`               | The server reported a query error. `status` gives the code                       |
+| `QwpEgressQueryTimeoutError`        | A query ran past its timeout and was cancelled                                   |
+| `QwpEgressQueryAbandonedError`      | Iteration stopped before the query finished                                      |
+| `QwpEgressQueryCancelTimeoutError`  | A stopped query did not end within `cancelDrainTimeoutMs`, so the session failed |
+| `QwpEgressSessionClosedError`       | The query session or its connection is closed                                    |
+| `QwpPoolAcquireTimeoutError`        | No pooled connection became free within `acquire_timeout_ms`                     |
+| `QwpPoolResourceError`              | The pool could not open a connection                                             |
+| `QwpClientClosedError`              | The pooled client or a lease is already closed                                   |
 
 The [API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
 lists every exported class.
@@ -1966,6 +2036,11 @@ With `sf_durability=append`, `flush()` resolves only after the batch is synced
 to disk, so a batch committed upstream survives a power loss as well as a
 process crash. With the default `memory` durability, a host crash can lose
 batches in the journal: commit upstream after `flushAndWait()` instead.
+
+A terminal rejection, such as a schema mismatch, makes the next `at()` or
+`flush()` reject and ends `ingest()`. The rejected batch stays in the journal,
+so a restart sends it again and fails the same way until you
+[fix the cause or move the journal aside](#errors-from-calls).
 
 End the feed on `SIGTERM` so that `ingest()` drains and closes the sender. The
 journal under `sf_dir` keeps every unacknowledged batch, so a restart with the
