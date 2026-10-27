@@ -704,7 +704,9 @@ failure, to ride out a rolling upgrade, and the other rejections as terminal
 only before the sender first connects. A Java sender that has connected keeps
 retrying all of them, and reports each failed attempt in its connection
 health. It also reports the rejections other than a version mismatch to its
-error handler. See
+error handler. A Node.js sender that uses store-and-forward or
+`initial_connect_retry=async` also keeps retrying all of them once it has
+connected, and reports each failed attempt as a connection event. See
 [How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
 and, for orphan drainers,
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).

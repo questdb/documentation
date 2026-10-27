@@ -1176,9 +1176,11 @@ Key behaviors:
   connect string shared with egress clients works unchanged on ingress.
 - **Authentication errors end the endpoint walk** at any host (`401`/`403`):
   the client does not try the other hosts. Startup fails. In most clients,
-  the reconnect loop does not continue past them either. A Java sender that
-  has connected keeps retrying instead, and a Java client with a token
-  provider first retries the same host once after a `401`, with a new token.
+  the reconnect loop does not continue past them either. A sender that has
+  connected keeps retrying instead in the Java client, and in the Node.js and
+  browser clients when it was started with `async` or, in Node.js, uses
+  store-and-forward. A Java client with a token provider first retries the
+  same host once after a `401`, with a new token.
   See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is

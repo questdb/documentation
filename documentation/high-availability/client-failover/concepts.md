@@ -246,6 +246,12 @@ its error handler, so ingestion resumes once QuestDB accepts the credential
 again, such as after a token renewal. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
+The Node.js and browser clients also treat a rejected credential like an
+outage, for a sender that has connected before and was started with `async`
+or, in Node.js, uses store-and-forward: it keeps retrying with backoff,
+buffering rows, and reports each rejected attempt as an `auth-failed`
+connection event.
+
 If your deployment has per-host credentials, that is unsupported and outside
 the failover model — split the workload into one connect string per credential.
 

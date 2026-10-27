@@ -359,8 +359,11 @@ try {
 `sessionBootstrap` sends the same credential before every connection attempt.
 Once QuestDB rejects it, for example after an OIDC access token expires, the
 next reconnect fails with a `QwpBrowserSessionBootstrapError` of kind
-`"authentication"`. That error is not retried: it ends the sender or query
-session, and rows the sender has not delivered are lost. Reconnects are
+`"authentication"`. That error ends a query session. It also ends a sender,
+and rows the sender has not delivered are lost, unless the sender was started
+with `initialConnectMode: "async"`. An `"async"` sender keeps retrying instead
+and reports `auth-failed` on every attempt, but no attempt succeeds with the
+rejected credential, so its rows stay in memory undelivered. Reconnects are
 frequent, because QuestDB closes [idle connections](#idle-connections) after 5
 minutes.
 

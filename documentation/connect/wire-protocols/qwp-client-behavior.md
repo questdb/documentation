@@ -386,7 +386,10 @@ and apply back-pressure to the producer rather than dropping data.
 :::
 
 ⚠ In the Java client, a running sender also retries authentication failures.
-Other clients treat them as terminal. See
+So does a Node.js sender that uses store-and-forward or
+`initial_connect_retry=async`, and a browser sender started with
+`initialConnectMode: "async"`, once it has connected. Other senders treat them
+as terminal. See
 [Authentication failures and token providers](#authentication-failures-and-token-providers).
 
 ### Authentication failures and token providers
