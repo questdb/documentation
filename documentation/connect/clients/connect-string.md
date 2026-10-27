@@ -516,12 +516,9 @@ equivalent — same architecture, no durability across restarts.
 
 :::note Go client
 
-The Go client accepts `sf_max_segment_bytes`, `sf_max_total_bytes`,
-`sf_durability`, and `sf_append_deadline_millis` only when `sf_dir` is set.
-Without `sf_dir`, its buffer is fixed at 128 MiB and its append deadline at 30
-seconds. With `sf_dir`, an OS crash or power loss costs at most rows from the
-end of the segment being written, with weaker guarantees on macOS and Windows.
-See [What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
+The Go client accepts only `sf_durability=memory`, and every store-and-forward
+key except `sf_dir` requires `sf_dir`. See
+[What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
 
 :::
 
@@ -561,8 +558,8 @@ See [What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
   process-crash durable but **not** host-crash durable, because the page cache
   is lost on power failure.
 
-  The .NET client is the exception: it accepts only `memory` and rejects
-  anything else at parse time.
+  The .NET and Go clients accept only `memory` and reject anything else at
+  parse time.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a
@@ -793,7 +790,9 @@ egress side; the Sender silently accepts even a value the
   of a connect string shared with them. Whether `Exec` runs a statement again
   after the connection fails mid-statement. `off` (default) returns the error
   instead, because the server may already have applied the statement. Set it
-  to `on` only if your statements are safe to run twice.
+  to `on` only if your statements are safe to run twice. It doesn't affect
+  `Query`, which always resends; see
+  [Go query failover](/docs/connect/clients/go/#query-failover).
 - `buffer_pool_size` — number of decoded result-batch buffers the I/O
   thread keeps in rotation. Sets the in-flight window between the
   receive/decode loop and the user's `onBatch` callback: the I/O thread

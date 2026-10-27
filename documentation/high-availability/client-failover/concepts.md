@@ -211,15 +211,9 @@ receive failures, `404` / `426` / `503` on upgrade, version mismatches
 peers), and generic frame-decode errors. The client records `TransportError`
 and walks to the next host.
 
-The Go query client narrows the frame-decode case. A result batch it cannot
-decode fails over as described above. It reports the error without
-resubmitting the query when it cannot decode a final response (row count,
-error, or end of results), cannot read a message's header or type, or receives
-a message over its frame size limit. In those cases the server has finished
-the statement, or the client cannot tell whether it has, so a resubmit could
-run it twice. See
-[Query failover](/docs/connect/clients/go/#query-failover) for what the
-application does next.
+The Go query client doesn't resubmit after a server response it can't read
+that may have ended the statement; see
+[Query failover](/docs/connect/clients/go/#query-failover).
 
 When a round exhausts with transient errors, the client sleeps for the
 backoff interval and starts the next round. On the ingress sender the rounds

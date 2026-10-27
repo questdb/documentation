@@ -436,7 +436,10 @@ sender, err := db.BorrowSender(ctx)
 if err != nil {
 	return err
 }
-sender.Table("trades").Float64Column("price", 42.0).AtNow(ctx)
+defer sender.Close(ctx) // returns the sender if a step below fails
+if err := sender.Table("trades").Float64Column("price", 42.0).AtNow(ctx); err != nil {
+	return err
+}
 if err := sender.Close(ctx); err != nil { // flush + return to the pool
 	return err
 }
@@ -461,7 +464,7 @@ The sender stays in the pool and still delivers the rows that earlier borrowers
 queued. Until a borrower queues rows on it again, the pool lends it only if no
 healthy sender is free and the pool can't open a new one. During an outage, the
 pool can therefore grow to `sender_pool_max` senders, each with its own buffer:
-128 MiB in memory mode, or up to `sf_max_total_bytes` on disk with
+128 MiB without `sf_dir`, or up to `sf_max_total_bytes` on disk with
 store-and-forward. Size memory or the `sf_dir` volume for that many full
 buffers. A borrow can also take up to the acquire timeout while the pool opens a
 sender.
@@ -477,8 +480,8 @@ The `Close` signatures differ by object:
   the [append deadline](#when-rows-cant-be-queued) for each frame it queues, so
   a large batch can take several times that long.
 - A query session's `Close()` and a cursor's `Close()` take no context. Closing
-  a session with an unread result waits up to `query_close_timeout_ms` to finish
-  reading it.
+  a session with an unread result waits a bounded time (5 s by default) to
+  finish reading it.
 
 ### Acquire timeout
 
@@ -803,8 +806,7 @@ err = qs.
 
 `DecimalColumn` serializes a 256-bit value, while `Decimal64Column`,
 `Decimal128Column`, and `Decimal256Column` (on `QwpSender`) target the matching
-column width. `DecimalColumnFromString` lets the server parse a validated
-literal, and `DecimalColumnShopspring` accepts
+column width. `DecimalColumnFromString` parses a decimal string, and `DecimalColumnShopspring` accepts
 [github.com/shopspring/decimal](https://github.com/shopspring/decimal) values.
 
 ### Flushing
@@ -869,7 +871,7 @@ sender itself keeps working:
 
 - `ErrBackpressureTimeout`: the send buffer stayed full for the append deadline.
   The server is unreachable or not keeping up, or the buffer is too small to
-  cover the outage. In memory mode, the buffer holds 128 MiB and the append
+  cover the outage. Without `sf_dir`, the buffer holds 128 MiB and the append
   deadline is 30 seconds. With store-and-forward, `sf_max_total_bytes` (default
   10 GiB) and `sf_append_deadline_millis` (default 30 seconds) set them.
 - `ErrSfDurability`: local storage failed, usually because the disk is full,
@@ -922,7 +924,7 @@ the RAM buffer caps how much data can accumulate.
 <SfDedupWarning />
 
 **`sf_max_total_bytes` and `sf_append_deadline_millis` require `sf_dir`.** A
-memory-mode sender always uses a 128 MiB buffer and a 30-second append deadline.
+sender without `sf_dir` always uses a 128 MiB buffer and a 30-second append deadline.
 When the buffer is full, producers wait; see
 [When rows can't be queued](#when-rows-cant-be-queued).
 
@@ -1033,8 +1035,8 @@ equivalent option form, `qdb.WithRequestDurableAck(true)`, applies to a standalo
 With durable-ack on, the sender advances its acknowledged watermark on the
 server's `STATUS_DURABLE_ACK` (object-storage upload) instead of the ordinary OK
 ACK (WAL commit) — so `FlushAndGetSequence` / `AwaitAckedFsn` confirm *durable*
-upload, not just commit. This is independent of store-and-forward: it works in
-memory mode, and combined with `sf_dir` it keeps unacknowledged data on disk until
+upload, not just commit. This is independent of store-and-forward: it works
+without `sf_dir`, and combined with `sf_dir` it keeps unacknowledged data on disk until
 the upload is confirmed, surviving a sender restart. `QwpSender.TotalDurableAcks()`
 and `TotalDurableTrimAdvances()` expose durable-ack progress; on a standalone
 sender, `qdb.WithProgressHandler` reports each watermark advance.
@@ -1154,12 +1156,12 @@ that caches the column layout once, and `Int64Range` / `Float64Range` decode a
 row range into a caller-owned slice in one shot:
 
 ```go
-buf := make([]int64, 0, 4096)
+buf := make([]float64, 0, 4096)
 for batch, err := range cursor.Batches() {
 	if err != nil {
 		return err
 	}
-	buf = batch.Column(1).Int64Range(0, batch.RowCount(), buf[:0])
+	buf = batch.Column(2).Float64Range(0, batch.RowCount(), buf[:0]) // price
 	for _, v := range buf {
 		// ...
 	}
@@ -1257,20 +1259,10 @@ INSERT from UPDATE from pure DDL.
 :::caution Send each statement through the matching method
 
 The server runs a statement before the client learns whether it returns rows,
-so a statement sent through the wrong method has already run when its error
-arrives:
-
-- A statement that doesn't return rows, passed to `Query`: `Batches()` yields an
-  error saying the server has already executed it, with its `op_type` and
-  `rows_affected`. Don't rerun it through `Exec`.
-- A statement that returns rows, passed to `Exec`: `Exec` returns an error
-  telling you to use `Query`. If the statement also has side effects, such as
-  `COPY`, don't repeat it.
-
-Both are plain errors with no exported sentinel to match with `errors.Is`.
-`Query` treats every statement as safe to resend: with failover on, it resends
-the SQL after a connection failure, so a non-SELECT passed to `Query` can run
-twice.
+so when `Query` rejects a non-SELECT, or `Exec` rejects a statement that returns
+rows, the statement has already run. Don't run it again if it has side effects,
+such as an `INSERT` or a `COPY`. With failover on, `Query` also resends its SQL
+after a connection failure, so a non-SELECT passed to `Query` can run twice.
 
 :::
 
@@ -1283,11 +1275,7 @@ For a non-idempotent `INSERT`, re-issuing it may double-apply, so decide per
 statement whether replay is safe. To make `Exec` retry transparently (only for
 idempotent statements), set `replay_exec=on` in the connect string (or
 `qdb.WithQwpQueryReplayExec(true)` on a standalone
-[`QwpQueryClient`](#qwpqueryclient-low-level-primitive)). Even then, `Exec`
-doesn't replay after the server responses listed in
-[Query failover](#query-failover), such as a row count the client cannot
-decode: the server has finished the statement, or the client cannot tell
-whether it has, so a replay could run it twice.
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive)).
 
 :::
 
@@ -1551,10 +1539,8 @@ exactly three things beyond the single-host code. This is the whole list:
    [Query failover](#query-failover).
 3. **DDL/DML: `Exec` is not retried by default.** An error from `Exec` after a
    mid-statement disconnect means the statement was not confirmed, not that it
-   succeeded. Re-issue it only if it is idempotent, or opt into `replay_exec=on`,
-   which still doesn't replay after
-   [some server responses](#query-failover). Details:
-   [the Exec caution](#ddl-and-dml-statements).
+   succeeded. Re-issue it only if it is idempotent, or opt into `replay_exec=on`.
+   Details: [the Exec caution](#ddl-and-dml-statements).
 
 Everything below is the detail behind these three points.
 
@@ -1578,7 +1564,7 @@ on a wall clock. Configure the backoff via the connect string:
 
 | Key                                | Default  | Description                          |
 | ---------------------------------- | -------- | ------------------------------------ |
-| `reconnect_max_duration_millis`    | `300000` | Budget for the **blocking sync initial connect** only (`initial_connect_retry=sync`); the running loop never consults it |
+| `reconnect_max_duration_millis`    | `300000` | Budget for the **blocking sync initial connect** (`initial_connect_retry=sync`); also the minimum time a repeatedly rejected frame takes to turn terminal |
 | `reconnect_initial_backoff_millis` | `100`    | First post-failure sleep             |
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
 | `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor up to `reconnect_max_duration_millis`; `async` returns immediately, buffers, and retries indefinitely |
@@ -1599,21 +1585,14 @@ not just store-and-forward ones:
 The query pool drives a per-query reconnect loop. On a mid-stream transport error
 it reconnects and replays the query.
 
-Some server responses end the query without a replay, because the server has
-finished the statement, or the client cannot tell whether it has, and a replay
-could run it twice. These are a final response the client cannot decode (row
-count, error, or end of results), a message whose header or type it cannot
-read, and a message over its frame size limit. `Batches()` or `Exec` returns
-the error, and no other endpoint is tried. The pool discards that query session
-when you `Close` it. A standalone
-[`QwpQueryClient`](#qwpqueryclient-low-level-primitive) stays unusable, so close
-it and build a new one. A result batch the client cannot decode is replayed
-like a dropped connection.
+Some server responses the client can't read end the query with an error
+instead of a replay, because the statement may already have run. Close the
+session; the pool replaces it.
 
 | Key                           | Default | Description                       |
 | ----------------------------- | ------- | --------------------------------- |
 | `failover`                    | `on`    | Master switch for reconnect       |
-| `failover_max_attempts`       | `8`     | Max reconnect attempts per query  |
+| `failover_max_attempts`       | `8`     | Max attempts per query, including the first |
 | `failover_backoff_initial_ms` | `50`    | First post-failure sleep          |
 | `failover_backoff_max_ms`     | `1000`  | Cap on per-attempt sleep          |
 | `failover_max_duration_ms`    | `30000` | Total wall-clock failover budget per query (`0` = unbounded) |
@@ -1693,8 +1672,7 @@ db, err := qdb.NewQuestDB(ctx, "wss::addr=db-1:9000,db-2:9000;",
 `SenderReconnected`, `SenderFailedOver`, `SenderEndpointAttemptFailed`,
 `SenderAllEndpointsUnreachable`, or `SenderAuthFailed`. There is deliberately no
 budget-exhausted kind: a running sender retries transport outages indefinitely
-and only genuine terminals (an auth reject, a durable-ack capability mismatch)
-stop it. The event also carries `Host`/`Port` (and
+and only terminal errors stop it. The event also carries `Host`/`Port` (and
 `PreviousHost`/`PreviousPort` for a failover), `AttemptNumber`, `RoundNumber`,
 `Cause` (for failure/terminal kinds), and `TimestampMillis`.
 
@@ -1821,10 +1799,13 @@ Construct a standalone query client from a connect string or the options API:
 
 ```go
 client, err := qdb.QwpQueryClientFromConf(ctx, "ws::addr=localhost:9000;")
-
-client, err := qdb.NewQwpQueryClient(ctx,
-	qdb.WithQwpQueryAddress("localhost:9000"),
-	qdb.WithQwpQueryInitialCredit(256*1024))
+// or, with the options API:
+// client, err := qdb.NewQwpQueryClient(ctx,
+// 	qdb.WithQwpQueryAddress("localhost:9000"),
+// 	qdb.WithQwpQueryInitialCredit(256*1024))
+if err != nil {
+	return err
+}
 defer client.Close(ctx)
 
 cursor := client.Query(ctx, "SELECT * FROM trades LIMIT 10")
@@ -1872,7 +1853,7 @@ full list.
 | `auto_flush_bytes`              | `8388608`| Bytes before auto-flush (QWP 8 MiB; HTTP disabled) |
 | `sf_dir`                        | unset    | Store-and-forward directory          |
 | `sender_id`                     | `default`| Sender slot identity for SF          |
-| `sf_max_total_bytes`            | `10 GiB` | Store-and-forward buffer cap per sender; requires `sf_dir` (memory mode is fixed at 128 MiB). When full, producers [wait](#when-rows-cant-be-queued) |
+| `sf_max_total_bytes`            | `10 GiB` | Store-and-forward buffer cap per sender; requires `sf_dir` (fixed at 128 MiB without it). When full, producers [wait](#when-rows-cant-be-queued) |
 | `request_durable_ack`           | `off`    | Wait for durable object-storage upload ACK (Enterprise, QWP, replication primary) |
 | `durable_ack_keepalive_interval_millis` | `200` | Durable-ack keepalive ping pacing (`0` disables) |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget (running loop retries unbounded); also the minimum time a repeatedly rejected frame takes to turn terminal |
@@ -1880,7 +1861,6 @@ full list.
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
-| `query_close_timeout_ms`        | `5000`   | Close-path cleanup drain bound on a query session |
 | `error_inbox_capacity`          | `256`    | Error-notification inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `connection_listener_inbox_capacity` | `256` | Connection-event inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `client_id`                     | `go/<ver>` | `X-QWP-Client-Id` on the query-side upgrade (ingest always sends the default) |
