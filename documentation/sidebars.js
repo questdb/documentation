@@ -81,7 +81,7 @@ module.exports = {
             {
               id: "connect/clients/browser",
               type: "doc",
-              label: "Browser",
+              label: "Browser (JavaScript)",
             },
             {
               id: "connect/clients/c-and-cpp",

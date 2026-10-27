@@ -1,17 +1,17 @@
 ---
 slug: /connect/clients/browser
-title: Browser client for QuestDB
-sidebar_label: Browser
+title: Browser JavaScript client for QuestDB
+sidebar_label: Browser (JavaScript)
 description:
-  "Use the QuestDB browser client to ingest data and stream SQL query results
-  over QWP WebSockets directly from web applications, with session-cookie or
-  token authentication."
+  "QuestDB browser client for JavaScript and TypeScript web apps: ingest data
+  and stream SQL query results over QWP WebSockets, with cookie or token auth."
 ---
 
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
-The QuestDB browser client, `@questdb/browser-client`, lets a web application
-write rows to QuestDB and stream SQL query results over
+The QuestDB browser client, `@questdb/browser-client`, lets a JavaScript or
+TypeScript web application, such as a React or Vue front end, write rows to
+QuestDB and stream SQL query results over
 [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), the QuestDB Wire
 Protocol, with no backend service in between. It runs on the browser's native
 `WebSocket` and `fetch` and contains no Node.js modules or polyfills, which
@@ -235,8 +235,13 @@ location ~ ^/(write/v4|read/v1|exec)$ {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $http_host;
+    proxy_read_timeout 600s;
 }
 ```
+
+Set `proxy_read_timeout` above QuestDB's own idle limit of 5 minutes. nginx
+otherwise closes a WebSocket that carries no traffic after 60 seconds, so the
+client reconnects every minute. See [Idle connections](#idle-connections).
 
 `/exec` is needed only for [session cookies](#session-cookies). When the proxy
 terminates TLS and reaches QuestDB over plain HTTP, set
@@ -278,7 +283,10 @@ client authenticates in one of two ways:
 Both take a credential in one of two forms: `{ type: "bearer", token }` for a
 QuestDB Enterprise REST token or an OIDC access token, or
 `{ type: "basic", username, password }`. A connection uses one mechanism:
-`auth` cannot be combined with `sessionBootstrap`.
+`auth` cannot be combined with `sessionBootstrap`. `sessionBootstrap` cannot
+refresh a credential that expires while the page is open, such as an OIDC
+access token: use an `auth` function for such credentials, on QuestDB's own
+origin as well.
 
 ### Session cookies
 
@@ -290,8 +298,8 @@ the WebSocket upgrade:
 ```typescript
 import { connectQwpBrowserSender } from "@questdb/browser-client";
 
-// Your application's OIDC access token or QuestDB REST token
-declare const accessToken: string;
+// A QuestDB REST token that stays valid while the page is open
+declare const restToken: string;
 
 const url = new URL("/write/v4", window.location.href);
 url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -299,7 +307,7 @@ url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 const sender = await connectQwpBrowserSender({
   url,
   sessionBootstrap: {
-    authentication: { type: "bearer", token: accessToken },
+    authentication: { type: "bearer", token: restToken },
     // QuestDB Enterprise: act as this service account. Optional.
     serviceAccount: "dashboard_writer",
   },
@@ -318,7 +326,8 @@ await sender.close();
 - `bootstrapQwpBrowserSession({ url, authentication })` runs the same request
   once, and a sender or session opened afterwards uses the cookie it set.
   Unlike `sessionBootstrap`, it does not run again before a reconnect, so
-  prefer the option for long-lived connections.
+  prefer the option for long-lived connections, with a credential that stays
+  valid for as long as they do.
 
 A rejected bootstrap fails the connection with a
 `QwpBrowserSessionBootstrapError`, whose `statusCode` and `responseBody` show
@@ -344,6 +353,25 @@ try {
   throw error;
 }
 ```
+
+:::caution Expiring credentials
+
+`sessionBootstrap` sends the same credential before every connection attempt.
+Once QuestDB rejects it, for example after an OIDC access token expires, the
+next reconnect fails with a `QwpBrowserSessionBootstrapError` of kind
+`"authentication"`. That error is not retried: it ends the sender or query
+session, and rows the sender has not delivered are lost. Reconnects are
+frequent, because QuestDB closes [idle connections](#idle-connections) after 5
+minutes.
+
+For a credential that expires while the page is open, use
+[`auth`](#credentials-for-applications-on-another-origin) with a function,
+which supplies a fresh credential before every attempt. It works on QuestDB's
+own origin too, once that origin is listed in `qwp.browser.allowed.origins`.
+Otherwise, close and re-create the client with a fresh credential before the
+old one expires.
+
+:::
 
 ### Credentials for applications on another origin
 
@@ -394,11 +422,13 @@ accordingly:
 - **Per-user OIDC access tokens** (QuestDB Enterprise) are the right choice for
   applications used by people. Your application obtains them with its identity
   provider's SDK, using the Authorization Code flow with PKCE, and QuestDB
-  applies each user's own permissions. See
+  applies each user's own permissions. Pass them with an `auth` function, so
+  that every connection attempt gets a current token. See
   [OpenID Connect](/docs/security/oidc/).
 - **REST tokens** suit internal tools. Issue short-lived tokens for an account
   with only the permissions the application needs: `HTTP`, plus `SELECT` or
-  `INSERT` on its tables.
+  `INSERT` on its tables. A token that can expire while the page is open needs
+  an `auth` function as well.
 - **Basic authentication** sends a password the user can read. Keep it for
   development and trusted internal tools.
 
@@ -816,23 +846,41 @@ as a URL parameter, and the decoder is part of the package.
 ## The pooled client
 
 `connectQwpBrowserClient()` returns a `QwpClient`: one handle with a pool of
-sender connections and a pool of query connections. Endpoints and
-authentication go in `cluster`, and side-specific options in `ingress`,
-`egress`, and `pool`:
+sender connections and a pool of query connections. Endpoints, authentication,
+and the connection settings both sides share go in `cluster`. Callbacks such
+as `onSenderError`, `reconnect` with its `onEvent`, and other side-specific
+options go in `ingress` and `egress`, and pool sizes in `pool`:
 
 ```typescript
 import { connectQwpBrowserClient } from "@questdb/browser-client";
 
-declare const accessToken: string;
+// Your identity provider SDK: returns a current OIDC access token.
+declare function getAccessToken(signal: AbortSignal): Promise<string>;
 
 const db = await connectQwpBrowserClient({
   cluster: {
     url: "wss://questdb-a.example.com:9000",
     failoverUrls: ["wss://questdb-b.example.com:9000"],
-    auth: { type: "bearer", token: accessToken },
+    // Called before every connection attempt, so a token can expire safely
+    auth: async ({ signal }) => ({
+      type: "bearer",
+      token: await getAccessToken(signal),
+    }),
   },
-  ingress: { autoFlushRows: 5_000 },
-  egress: { compression: "zstd", initialCredit: 1024 * 1024 },
+  ingress: {
+    autoFlushRows: 5_000,
+    onSenderError: (error) => console.error("rejected:", error.category),
+    reconnect: {
+      onEvent: (event) => console.info("ingestion connection:", event.kind),
+    },
+  },
+  egress: {
+    compression: "zstd",
+    initialCredit: 1024 * 1024,
+    reconnect: {
+      onEvent: (event) => console.info("query connection:", event.kind),
+    },
+  },
   pool: { senderPoolMax: 2, queryPoolMax: 4 },
 });
 try {
@@ -853,6 +901,9 @@ try {
   proxy, or an endpoint. Each pool derives its own route, `/write/v4` or
   `/read/v1`, and a `sessionBootstrap` without a `url` derives `/exec` for
   every endpoint.
+- Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
+  `cluster`, TypeScript rejects them and plain JavaScript ignores them without
+  an error.
 - `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows
   and returns the connection without waiting for acknowledgements, so call
   `flushAndWait()` first where you need them.
@@ -940,13 +991,31 @@ for await (const batch of query) rows.push(...batch.rows());
 await query.completion;
 ```
 
+### Connection events
+
 `reconnect.onEvent` reports connection changes on senders and query sessions,
 with `kind` set to `connected`, `disconnected`, `reconnected`, `failed-over`,
-`endpoint-attempt-failed`, `all-endpoints-unreachable`, or `auth-failed`. In a
-browser, `auth-failed` comes only from a rejected `sessionBootstrap` request:
-other authentication failures surface as `endpoint-attempt-failed`. When a
-query session reconnects, its active query restarts from the first row, so
-clear accumulated rows in `onFailoverReset`.
+`endpoint-attempt-failed`, `all-endpoints-unreachable`, or `auth-failed`. Each
+event also has `attempt`, `timestampMs`, `endpoint`, `previousEndpoint`, and
+`cause`. In a browser, `auth-failed` comes only from a rejected
+`sessionBootstrap` request: other authentication failures surface as
+`endpoint-attempt-failed`. When a query session reconnects, its active query
+restarts from the first row, so clear accumulated rows in `onFailoverReset`.
+On the pooled client, set `reconnect` per side, under `ingress` and `egress`:
+see [The pooled client](#the-pooled-client).
+
+### Idle connections
+
+QuestDB closes a connection that carries no traffic for
+[`http.net.connection.timeout`](/docs/configuration/http-server/#httpnetconnectiontimeout),
+5 minutes by default, and a reverse proxy may close it sooner. The client then
+reconnects at once and reports `disconnected` followed by `reconnected`. With
+`sessionBootstrap`, every reconnect repeats the REST login, and with an `auth`
+function, every reconnect calls it.
+
+A `disconnected` event alone therefore does not mean that QuestDB is down. To
+show an outage, wait for `all-endpoints-unreachable`, which fires each time a
+reconnect sweep reaches no endpoint:
 
 ```typescript
 import { connectQwpBrowserSender } from "@questdb/browser-client";
@@ -959,8 +1028,9 @@ const sender = await connectQwpBrowserSender({
   url: "wss://questdb.example.com:9000/write/v4",
   reconnect: {
     onEvent: (event) => {
-      if (event.kind === "disconnected") showBanner("Reconnecting to QuestDB");
-      if (event.kind === "reconnected" || event.kind === "failed-over") {
+      if (event.kind === "all-endpoints-unreachable") {
+        showBanner("Reconnecting to QuestDB");
+      } else if (event.kind === "reconnected" || event.kind === "failed-over") {
         hideBanner();
       }
     },
@@ -1041,8 +1111,10 @@ try {
 A `terminal` rejection, such as a schema mismatch, parse error, or security
 error, stops the sender. For `retriable` and `retriable-other`, the client
 reconnects and replays from the last acknowledgement. Without `onSenderError`,
-the client logs rejections to the browser console. `onError` additionally
-receives an event for each rejection and for terminal session failures.
+the client logs rejections to the browser console. `onError`, set next to
+`onSenderError` (in the sender options, or under `ingress` for the pooled
+client), additionally receives an event for each rejection and for terminal
+session failures.
 
 Dispatch on `category`, not on the message. Messages are English text written
 by the server, may change between versions, and can quote table names, column

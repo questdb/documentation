@@ -3,15 +3,17 @@ slug: /connect/clients/nodejs
 title: Node.js client for QuestDB
 sidebar_label: Node.js
 description:
-  "Use the QuestDB Node.js client for high-throughput ingestion and streaming
-  SQL queries over QWP, with failover, store-and-forward, and TypeScript types."
+  "QuestDB Node.js client for JavaScript and TypeScript: high-throughput
+  ingestion and streaming SQL queries over QWP, with failover and
+  store-and-forward."
 ---
 
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
-The QuestDB Node.js client, `@questdb/nodejs-client`, ingests data and runs SQL
-queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), the
-QuestDB Wire Protocol: a columnar binary protocol carried over WebSocket. One
+The QuestDB Node.js client, `@questdb/nodejs-client`, lets JavaScript and
+TypeScript applications ingest data and run SQL queries over
+[QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), the QuestDB Wire
+Protocol: a columnar binary protocol carried over WebSocket. One
 `ws::` or `wss::` connect string configures both directions. Ingestion batches
 rows in the background, tracks server acknowledgements, and replays
 unacknowledged data after a reconnect or failover, optionally from an on-disk
@@ -1340,7 +1342,11 @@ unreachable. Senders connect in the background and queue rows meanwhile, and
 query connections open on the first query. A standalone `Sender` ignores the
 key: set `initial_connect_retry=async` for it instead.
 
-The second argument takes typed options for each side, such as callbacks:
+The second argument takes typed options for each side. `ingress` takes the
+options a standalone `Sender` takes under `qwp.webSocket`, such as
+`onSenderError`, `onError`, and `reconnect`, and `egress` takes the
+query-session options. Endpoints and `authorization` belong to `cluster`. Each
+side has its own `reconnect`, with its own `onEvent`:
 
 ```typescript
 import { connectQwpNodeClient } from "@questdb/nodejs-client";
@@ -1349,13 +1355,26 @@ const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
   ingress: {
     onSenderError: (error) =>
       console.error("rejected:", error.category, error.serverMessage),
+    onError: (event) => {
+      if (event.terminal) console.error("pooled sender failed:", event.error);
+    },
+    reconnect: {
+      onEvent: (event) => console.info("ingestion connection:", event.kind),
+    },
   },
   egress: {
     queryTimeoutMs: 30_000,
+    reconnect: {
+      onEvent: (event) => console.info("query connection:", event.kind),
+    },
   },
 });
 await db.close();
 ```
+
+Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
+`cluster`, TypeScript rejects them and plain JavaScript ignores them without
+an error.
 
 The pooled client also accepts one options object, with the endpoints in
 `cluster`:
@@ -1498,7 +1517,15 @@ failover keys go in `reconnect` (`failoverMaxAttempts` and so on), and
 `reconnect.onEvent` reports connection changes on both senders and query
 sessions. Callbacks run on a later event-loop turn, outside the protocol code,
 and a bounded inbox of 64 events (`connection_listener_inbox_capacity`) drops
-the oldest event when a callback falls behind:
+the oldest event when a callback falls behind.
+
+A `disconnected` event alone does not mean that QuestDB is down. QuestDB closes
+a connection that carries no traffic for
+[`http.net.connection.timeout`](/docs/configuration/http-server/#httpnetconnectiontimeout),
+5 minutes by default, and a proxy or load balancer in between may close it
+sooner. The client then reconnects at once and reports `disconnected` followed
+by `reconnected`. To detect an outage, watch for `all-endpoints-unreachable`,
+which fires each time a reconnect sweep reaches no endpoint:
 
 ```typescript
 import { Sender } from "@questdb/nodejs-client";
@@ -1511,12 +1538,15 @@ const sender = await Sender.fromConfig(
         reconnect: {
           onEvent: (event) => {
             const endpoint = event.endpoint ? String(event.endpoint) : "";
-            if (event.kind === "disconnected") {
-              console.warn("QuestDB connection lost", event.cause);
+            if (event.kind === "all-endpoints-unreachable") {
+              console.warn("QuestDB is unreachable; rows stay queued", event.cause);
             } else if (event.kind === "failed-over") {
               console.info(`failed over to ${endpoint}`);
             } else if (event.kind === "auth-failed") {
               console.error("credentials rejected; fix them and restart");
+            } else {
+              // Includes the disconnected/reconnected pair of an idle close
+              console.info("QuestDB connection:", event.kind, endpoint);
             }
           },
         },
@@ -1530,7 +1560,7 @@ await sender.close();
 | `kind`                      | Fired when                                                  |
 | --------------------------- | ----------------------------------------------------------- |
 | `connected`                 | The first connection succeeds                               |
-| `disconnected`              | An established connection is lost, once per outage          |
+| `disconnected`              | An established connection closes: once per outage, and after an idle close |
 | `reconnected`               | A reconnect reaches the endpoint used before                |
 | `failed-over`               | A reconnect reaches a different endpoint                    |
 | `endpoint-attempt-failed`   | One endpoint fails during a sweep                           |
@@ -1622,9 +1652,10 @@ try {
   kept at `quarantinedPath` when possible.
 
 Without `onSenderError`, the client logs each rejection to the console:
-retriable ones as warnings, the others as errors. `onError`
-additionally receives an event for each rejection and for terminal session
-failures, with `error`, `terminal`, and a `metrics` snapshot.
+retriable ones as warnings, the others as errors. `onError`, set next to
+`onSenderError` (under `qwp.webSocket` for a `Sender`, under `ingress` for the
+pooled client), additionally receives an event for each rejection and for
+terminal session failures, with `error`, `terminal`, and a `metrics` snapshot.
 
 Dispatch on `category`, not on the message. Messages are English text written
 by the server, may change between versions, and can quote table names, column
@@ -1767,13 +1798,39 @@ server must enable the UDP receiver with
 ## Production example: TLS, token, and multiple hosts
 
 A long-running ingestion service with TLS, a bearer token, two endpoints, a
-disk journal, error and connection callbacks, and a clean shutdown. `ingest()`
-writes every trade its feed yields and drains when the feed ends:
+disk journal, error and connection callbacks, and a clean shutdown. It consumes
+trades in batches from an upstream queue, such as a Kafka topic, and commits
+each batch upstream once the batch is on disk in the store-and-forward journal.
+
+Create `trades` before the first start. Replay after a reconnect or a restart
+is at least once, so the table deduplicates on the identity of a trade: the
+designated timestamp, the symbol, and the venue's trade ID. Keys without the
+trade ID would merge distinct trades of one symbol that share a timestamp:
+
+```questdb-sql
+CREATE TABLE trades (
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  amount DOUBLE,
+  trade_id LONG,
+  timestamp TIMESTAMP
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, symbol, trade_id);
+```
+
+For an existing table, add the column with
+`ALTER TABLE trades ADD COLUMN trade_id LONG`, then enable deduplication with
+[`ALTER TABLE trades DEDUP ENABLE UPSERT KEYS(timestamp, symbol, trade_id)`](/docs/query/sql/alter-table-enable-deduplication/).
+
+`ingest()` writes every batch its feed yields, flushes it, commits it upstream,
+and drains when the feed ends:
 
 ```typescript
 import { Sender } from "@questdb/nodejs-client";
 
 interface Trade {
+  tradeId: bigint; // the venue's trade ID
   symbol: string;
   side: string;
   price: number;
@@ -1781,7 +1838,12 @@ interface Trade {
   timestamp: number; // milliseconds since the epoch
 }
 
-export async function ingest(feed: AsyncIterable<Trade>): Promise<void> {
+interface TradeBatch {
+  trades: Trade[];
+  commit(): Promise<void>; // acknowledges the batch upstream
+}
+
+export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
   const token = process.env.QUESTDB_TOKEN;
   if (!token) throw new Error("QUESTDB_TOKEN is not set");
 
@@ -1789,7 +1851,7 @@ export async function ingest(feed: AsyncIterable<Trade>): Promise<void> {
     "wss::addr=db-a.example.com:9000,db-b.example.com:9000;" +
       `token=${token};` +
       "sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;" +
-      "initial_connect_retry=async;",
+      "sf_durability=append;initial_connect_retry=async;",
     {
       qwp: {
         webSocket: {
@@ -1815,14 +1877,22 @@ export async function ingest(feed: AsyncIterable<Trade>): Promise<void> {
   await sender.connect(); // returns at once: initial_connect_retry=async
 
   try {
-    for await (const trade of feed) {
-      await sender
-        .table("trades")
-        .symbol("symbol", trade.symbol)
-        .symbol("side", trade.side)
-        .floatColumn("price", trade.price)
-        .floatColumn("amount", trade.amount)
-        .at(trade.timestamp, "ms");
+    for await (const batch of feed) {
+      for (const trade of batch.trades) {
+        await sender
+          .table("trades")
+          .symbol("symbol", trade.symbol)
+          .symbol("side", trade.side)
+          .floatColumn("price", trade.price)
+          .floatColumn("amount", trade.amount)
+          .intColumn("trade_id", trade.tradeId)
+          .at(trade.timestamp, "ms");
+      }
+      // Auto-flush runs only when a row completes, so flush the end of each
+      // batch. Otherwise its last rows wait for the next trade.
+      await sender.flush();
+      // The batch is on disk in the journal, so the commit cannot lose it.
+      await batch.commit();
     }
     // Rows still unacknowledged stay in the journal for the next start.
     await sender.flushAndWait(10_000);
@@ -1832,11 +1902,15 @@ export async function ingest(feed: AsyncIterable<Trade>): Promise<void> {
 }
 ```
 
+With `sf_durability=append`, `flush()` resolves only after the batch is synced
+to disk, so a batch committed upstream survives a power loss as well as a
+process crash. With the default `memory` durability, a host crash can lose
+batches in the journal: commit upstream after `flushAndWait()` instead.
+
 End the feed on `SIGTERM` so that `ingest()` drains and closes the sender. The
 journal under `sf_dir` keeps every unacknowledged batch, so a restart with the
-same `sender_id` delivers what this process did not. Declare
-[DEDUP UPSERT KEYS](/docs/concepts/deduplication/) on `trades` so that replays
-cannot duplicate rows.
+same `sender_id` delivers what this process did not, and the deduplication
+keys discard rows that QuestDB had already stored.
 
 ## Migrating from ILP
 

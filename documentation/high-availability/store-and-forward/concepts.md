@@ -194,6 +194,10 @@ timeout fires, a `WARN` is logged and:
   next sender on the same slot;
 - in **memory mode**, the un-acked tail is lost.
 
+The Node.js client reports the timeout differently: `close()` rejects with
+`QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
+data. Its pooled client logs a warning when a sender it closes times out.
+
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
 Even in this branch, the slot lock is released and segments are unmapped

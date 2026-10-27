@@ -57,10 +57,12 @@ Highlights:
 - **Automatic failover** — ingress and egress fail over without application
   intervention.
 - **Store-and-forward** — survives server outages, including full server
-  destruction. Sub-200 ns offload latency.
+  destruction. Sub-200 ns offload latency. The browser client replays from
+  memory instead.
 - **One configuration** — a single
   [connect string](/docs/connect/clients/connect-string/) drives every
-  option, portable across all languages.
+  option, portable across all languages. The browser client takes its
+  settings as an options object instead.
 - **Schema-flexible** — automatic table creation and on-the-fly column
   additions.
 

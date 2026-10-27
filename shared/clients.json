@@ -57,9 +57,9 @@
   },
   {
     "href": "/docs/connect/clients/browser",
-    "name": "Browser",
+    "name": "Browser (JavaScript)",
     "description":
-      "Ingestion and streaming SQL from web applications over QWP WebSockets. Beta.",
+      "Ingestion and streaming SQL from JavaScript web applications over QWP WebSockets. Beta.",
     "logo": "/images/logos/javascript.svg",
     "protocol": "QWP"
   },
