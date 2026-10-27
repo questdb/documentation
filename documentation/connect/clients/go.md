@@ -1096,7 +1096,10 @@ how fast the server pushes with [flow control](#flow-control).
 ### Executing SELECT queries
 
 The simple, single-host idiom is to treat any non-`nil` error from the iteration
-as terminal. This is always safe, including under failover:
+as terminal. For a SELECT this is always safe, including under failover. Send
+statements that don't return rows through `Exec` instead: `Query` resends its SQL
+after a connection failure, so a non-SELECT passed to it can run twice (see
+[DDL and DML statements](#ddl-and-dml-statements)).
 
 ```go
 type Trade struct {
@@ -1251,6 +1254,26 @@ fmt.Println(res.OpType, res.RowsAffected)
 0. `OpType` is the server's statement discriminator, useful for distinguishing
 INSERT from UPDATE from pure DDL.
 
+:::caution Send each statement through the matching method
+
+The server runs a statement before the client learns whether it returns rows,
+so a statement sent through the wrong method has already run when its error
+arrives:
+
+- A statement that doesn't return rows, passed to `Query`: `Batches()` yields an
+  error saying the server has already executed it, with its `op_type` and
+  `rows_affected`. Don't rerun it through `Exec`.
+- A statement that returns rows, passed to `Exec`: `Exec` returns an error
+  telling you to use `Query`. If the statement also has side effects, such as
+  `COPY`, don't repeat it.
+
+Both are plain errors with no exported sentinel to match with `errors.Is`.
+`Query` treats every statement as safe to resend: with failover on, it resends
+the SQL after a connection failure, so a non-SELECT passed to `Query` can run
+twice.
+
+:::
+
 :::caution `Exec` is not retried across a reconnect by default
 
 If the connection drops mid-statement, `Exec` returns an error — the transport
@@ -1260,7 +1283,11 @@ For a non-idempotent `INSERT`, re-issuing it may double-apply, so decide per
 statement whether replay is safe. To make `Exec` retry transparently (only for
 idempotent statements), set `replay_exec=on` in the connect string (or
 `qdb.WithQwpQueryReplayExec(true)` on a standalone
-[`QwpQueryClient`](#qwpqueryclient-low-level-primitive)).
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive)). Even then, `Exec`
+doesn't replay after the server responses listed in
+[Query failover](#query-failover), such as a row count the client cannot
+decode: the server has finished the statement, or the client cannot tell
+whether it has, so a replay could run it twice.
 
 :::
 
@@ -1524,8 +1551,10 @@ exactly three things beyond the single-host code. This is the whole list:
    [Query failover](#query-failover).
 3. **DDL/DML: `Exec` is not retried by default.** An error from `Exec` after a
    mid-statement disconnect means the statement was not confirmed, not that it
-   succeeded. Re-issue it only if it is idempotent, or opt into `replay_exec=on`.
-   Details: [the Exec caution](#ddl-and-dml-statements).
+   succeeded. Re-issue it only if it is idempotent, or opt into `replay_exec=on`,
+   which still doesn't replay after
+   [some server responses](#query-failover). Details:
+   [the Exec caution](#ddl-and-dml-statements).
 
 Everything below is the detail behind these three points.
 
@@ -1569,6 +1598,17 @@ not just store-and-forward ones:
 
 The query pool drives a per-query reconnect loop. On a mid-stream transport error
 it reconnects and replays the query.
+
+Some server responses end the query without a replay, because the server has
+finished the statement, or the client cannot tell whether it has, and a replay
+could run it twice. These are a final response the client cannot decode (row
+count, error, or end of results), a message whose header or type it cannot
+read, and a message over its frame size limit. `Batches()` or `Exec` returns
+the error, and no other endpoint is tried. The pool discards that query session
+when you `Close` it. A standalone
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive) stays unusable, so close
+it and build a new one. A result batch the client cannot decode is replayed
+like a dropped connection.
 
 | Key                           | Default | Description                       |
 | ----------------------------- | ------- | --------------------------------- |
