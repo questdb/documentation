@@ -796,8 +796,11 @@ section of the connect string reference. The shared failover primitives
 
 Key behaviors:
 
-- Authentication errors are terminal at any host; the reconnect loop does not
-  continue past them.
+- An authentication error at any host fails the query; the reconnect loop does
+  not continue past it. A Java client with a token provider first retries the
+  same host once after a `401`, with a new token, and its next query connects
+  again. See
+  [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - A `CANCEL` acknowledged with `QUERY_ERROR(CANCELLED)` routes through the
   normal error path, not the transport-error path, so it never triggers
   failover.

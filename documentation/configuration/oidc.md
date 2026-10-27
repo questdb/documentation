@@ -26,6 +26,11 @@ For detailed information about OIDC, see the
 OAuth2 audience as set on the tokens issued by the OIDC Provider. Defaults
 to the client ID if not set.
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB accepts a token only
+when its `aud` claim contains this value. The ID tokens that the Web Console
+sends carry the client ID, so keep the default when users sign in to the Web
+Console. See [Token validation](/docs/security/oidc/#token-validation).
+
 ### acl.oidc.client.id
 
 - **Default**: none
@@ -64,6 +69,53 @@ configuration URL is set.
 - **Reloadable**: no
 
 OIDC provider HTTP request timeout in milliseconds.
+
+### acl.oidc.issuer
+
+- **Default**: none
+- **Reloadable**: no
+
+The issuer that the `iss` claim of a token must match when
+`acl.oidc.groups.encoded.in.token` is `true`, in QuestDB Enterprise 4.1.0 and
+later. When not set, QuestDB uses the `issuer` field of the discovery document
+that it downloads from
+[`acl.oidc.configuration.url`](#acloidcconfigurationurl). When set, it takes
+precedence over the discovery document. The comparison is exact and
+case-sensitive, and includes the path and any trailing slash.
+
+Set it when QuestDB has no discovery document, because it uses
+[`acl.oidc.host`](#acloidchost) and the endpoint settings, or when the
+discovery document names a template instead of an issuer, such as
+`https://login.microsoftonline.com/{tenantid}/v2.0` for the multi-tenant
+endpoints of Microsoft Entra ID. Set the issuer of your tenant, never a
+template or a wildcard. With issuer validation enabled, QuestDB refuses to
+start in token mode without an expected issuer:
+
+```text
+required to set acl.oidc.issuer or provide an issuer in the OIDC discovery document when acl.oidc.groups.encoded.in.token and acl.oidc.issuer.validation.enabled are true
+```
+
+See [Token validation](/docs/security/oidc/#token-validation).
+
+### acl.oidc.issuer.validation.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Whether QuestDB checks the `iss` claim of a token when
+`acl.oidc.groups.encoded.in.token` is `true`, in QuestDB Enterprise 4.1.0 and
+later. With `false`, QuestDB neither requires nor compares the `iss` claim,
+even when [`acl.oidc.issuer`](#acloidcissuer) is set, and logs an advisory at
+startup. It still checks the signature, the audience, the expiry, and the
+`sub` claim of a token.
+
+Disable it only for a provider whose tokens carry no `iss` claim. Without the
+check, QuestDB accepts the token of any issuer or tenant that the provider
+signs with a key that QuestDB trusts, for the expected audience.
+
+Accepts `true` or `false`, in any letter case. Any other value, an empty one
+included, stops QuestDB from starting, even when OIDC is disabled:
+`invalid configuration value [key=acl.oidc.issuer.validation.enabled, value=...]`.
 
 ### acl.oidc.port
 
@@ -196,37 +248,77 @@ which it connects.
 
 ## User and group claims
 
+QuestDB reads the principal and the group memberships of an external user
+from the user information: the response of the User Info endpoint, or, when
+`acl.oidc.groups.encoded.in.token` is `true`, the payload of the token. For
+how QuestDB picks the claims, see
+[User and group claims](/docs/security/oidc/#user-and-group-claims) in the
+OIDC guide.
+
 ### acl.oidc.cache.ttl
 
 - **Default**: `30000`
 - **Reloadable**: no
 
-User info cache entry TTL in milliseconds. QuestDB caches user info responses
-for each valid access token. This setting controls how often the access token
-is validated and user info refreshed.
+How long QuestDB caches the result of checking a token, in milliseconds: the
+User Info response, or, when `acl.oidc.groups.encoded.in.token` is `true`, the
+result of validating the token. QuestDB checks the token again once its cache
+entry expires, so in User Info mode, this setting also controls how soon a
+change in the Identity Provider, such as a disabled user, takes effect. `0`
+disables the cache.
+
+In QuestDB Enterprise 4.1.0 and later, the same interval applies to HTTP
+sessions, even with OIDC disabled. A session reuses the check of a password
+that QuestDB verifies itself, the password of a database user or of the
+built-in admin, until this interval has passed since the session last checked
+it. A session never reuses the check of a REST token or an OIDC credential.
+See [HTTP sessions](/docs/security/rbac/#http-sessions).
 
 ### acl.oidc.groups.claim
 
-- **Default**: `groups`
+- **Default**: none
 - **Reloadable**: no
 
-The name of the custom claim in the user information that contains the
-group memberships of the user.
+The claim in the user information that contains the group memberships of the
+user, as an array of group names or as a single name. Required when OIDC is
+enabled.
+
+In QuestDB Enterprise 4.1.0 and later, accepts a comma-separated list of claim
+names in priority order, such as `roles,groups`. QuestDB takes the groups from
+the first claim on the list that holds at least one group name, and does not
+combine the groups of several claims. QuestDB refuses to start when the list
+is empty, names a claim twice, or names a claim that
+[`acl.oidc.sub.claim`](#acloidcsubclaim) also lists. See
+[User and group claims](/docs/security/oidc/#user-and-group-claims).
 
 ### acl.oidc.groups.encoded.in.token
 
 - **Default**: `false`
 - **Reloadable**: no
 
-When `true`, QuestDB looks for group memberships in the ID token instead of
-calling the User Info endpoint. Set to `true` if the OIDC Provider encodes
-group memberships directly into the token.
+When `true`, QuestDB reads the principal and the group memberships from a
+JWT, such as the ID token, instead of calling the User Info endpoint, and
+validates the token itself. Set to `true` if the OIDC Provider encodes group
+memberships directly into the token, as Microsoft Entra ID does. In QuestDB
+Enterprise 4.1.0 and later, the validation includes the issuer of the token.
+See [Token validation](/docs/security/oidc/#token-validation).
 
 ### acl.oidc.sub.claim
 
 - **Default**: `sub`
 - **Reloadable**: no
 
-The name of the claim in the user information that contains the user's name.
-Could be a username, full name, or email. Displayed in the Web Console and
-logged for audit purposes.
+The claim in the user information that contains the principal of the user,
+such as a username, an email address, or an object ID. `current_user()`
+returns the principal, the Web Console displays it, and QuestDB logs it for
+audit purposes. Pick a claim whose value the Identity Provider never gives to
+anyone else: users who share a principal share their permissions. Avoid
+display names, such as the `name` claim.
+
+In QuestDB Enterprise 4.1.0 and later, accepts a comma-separated list of claim
+names in priority order, such as `preferred_username,oid`. QuestDB takes the
+principal from the first claim on the list that holds a non-empty value.
+QuestDB refuses to start when the list is empty, names a claim twice, or names
+a claim that [`acl.oidc.groups.claim`](#acloidcgroupsclaim) also lists. An
+empty value does not fall back to the default `sub`. See
+[User and group claims](/docs/security/oidc/#user-and-group-claims).
