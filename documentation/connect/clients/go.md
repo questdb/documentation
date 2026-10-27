@@ -480,8 +480,8 @@ The `Close` signatures differ by object:
   the [append deadline](#when-rows-cant-be-queued) for each frame it queues, so
   a large batch can take several times that long.
 - A query session's `Close()` and a cursor's `Close()` take no context. Closing
-  a session with an unread result waits a bounded time (5 s by default) to
-  finish reading it.
+  a session with an unread result waits up to `query_close_timeout_ms` (5 s by
+  default) to finish reading it.
 
 ### Acquire timeout
 
@@ -1861,6 +1861,7 @@ full list.
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
+| `query_close_timeout_ms`        | `5000`   | Close-path cleanup drain bound on a query session |
 | `error_inbox_capacity`          | `256`    | Error-notification inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `connection_listener_inbox_capacity` | `256` | Connection-event inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `client_id`                     | `go/<ver>` | `X-QWP-Client-Id` on the query-side upgrade (ingest always sends the default) |
