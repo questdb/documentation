@@ -130,6 +130,19 @@ WHERE timestamp IN '$now-1h..$now'
 LIMIT -20;
 ```
 
+To name the list once, or make it a view parameter, declare it as a
+[value list](/docs/query/sql/declare/#value-lists):
+
+```questdb-sql title="Declared list"
+DECLARE @symbols := ('BTC-USDT', 'ETH-USDT')
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now' AND symbol IN @symbols;
+```
+
+To pass a list of any length in a prepared statement, bind one text array as
+the whole list, `symbol IN $1`, not mixed with other values. See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
+
 ## Numeric
 
 QuestDB can filter numeric values based on equality, inequality, comparison, and

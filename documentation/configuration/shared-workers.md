@@ -8,7 +8,8 @@ be sized independently, letting you balance CPU resources between network I/O,
 query execution, and write operations based on your workload profile.
 
 - **Network pool**: handles HTTP, PostgreSQL, and ILP server I/O
-- **Query pool**: executes parallel query operations (filters, group-by)
+- **Query pool**: executes parallel query operations, such as filters, GROUP BY
+  and SAMPLE BY, GROUP BY over hash joins, HORIZON JOIN and WINDOW JOIN
 - **Write pool**: manages table writes and housekeeping tasks, and WAL apply
   jobs when `wal.apply.worker.count` is `0`
 
@@ -57,6 +58,22 @@ Number of worker threads for the network pool, which handles HTTP, PostgreSQL,
 and ILP server I/O. Increasing this value raises network I/O parallelism at
 the expense of CPU resources available to queries and writes.
 
+## shared.network.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the network pool in Fiber mode, where a query can suspend and release its
+worker instead of holding it until it finishes. Setting this to `false` puts the
+pool in legacy mode.
+
+QuestDB Enterprise [resource groups](/docs/concepts/resource-groups/) require
+Fiber mode on every pool that executes SQL. HTTP and PostgreSQL run on this pool
+whenever their own worker counts are zero, which is the default, so this is
+usually the setting that matters. With the pool in legacy mode, resource groups
+left at their default disable themselves at startup and log the pool and setting
+responsible, while `resource.groups.enabled=true` set explicitly fails startup.
+
 ## shared.query.worker.affinity
 
 - **Default**: none
@@ -71,9 +88,26 @@ Comma-delimited list of CPU ids, one per thread specified in
 - **Reloadable**: no
 
 Number of worker threads for the query pool, which executes parallel query
-operations such as filters and group-by. Increasing this value raises query
+operations such as filters, GROUP BY and SAMPLE BY,
+[GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins),
+[HORIZON JOIN](/docs/query/sql/horizon-join/#parallel-execution) and
+[WINDOW JOIN](/docs/query/sql/window-join/). Increasing this value raises query
 parallelism at the expense of CPU resources available to network I/O and
 writes.
+
+## shared.query.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the query pool in Fiber mode, where parallel query work can suspend and
+release its worker instead of holding it until it finishes. Setting this to
+`false` puts the pool in legacy mode.
+
+QuestDB Enterprise [resource groups](/docs/concepts/resource-groups/) require
+Fiber mode here whenever this pool has workers and HTTP or PostgreSQL is
+enabled. A query pool set to zero workers turns parallel SQL off and needs no
+check of its own.
 
 ## shared.worker.haltOnError
 

@@ -110,23 +110,24 @@ SAMPLE BY 1h;
 
 ### Cost by size bucket
 
-How does execution cost scale with order size? Bucket fills by quantity, then use [HORIZON JOIN](/docs/query/sql/horizon-join/) with `PIVOT` to see markout and spread at multiple horizons in a single wide row per symbol and bucket:
+How does execution cost scale with order size? Bucket fills by quantity and use [HORIZON JOIN](/docs/query/sql/horizon-join/) to compute markout and spread per symbol, bucket and horizon. Then use `PIVOT` to turn the horizons into columns, giving a single wide row per symbol and bucket:
 
 ```questdb-sql title="Cost by size bucket — pivoted (buy side)" demo
 WITH fills AS (
     SELECT
         t.symbol,
-        t.price,
-        t.quantity,
-        h.offset,
-        (m.best_bid + m.best_ask) / 2 AS mid,
-        m.best_ask - m.best_bid AS spread,
         CASE
             WHEN t.quantity < 100000    THEN 'S'
             WHEN t.quantity < 1000000   THEN 'M'
             WHEN t.quantity < 10000000  THEN 'L'
             ELSE 'XL'
-        END AS size_bucket
+        END AS size_bucket,
+        h.offset,
+        count() AS n,
+        avg(((m.best_bid + m.best_ask) / 2 - t.price)
+            / t.price * 10000) AS markout_bps,
+        avg((m.best_ask - m.best_bid)
+            / ((m.best_bid + m.best_ask) / 2) * 10000) AS spread_bps
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -135,14 +136,16 @@ WITH fills AS (
 )
 SELECT * FROM fills
 PIVOT (
-    count() AS n,
-    avg((mid - price) / price * 10000) AS markout_bps,
-    avg(spread / mid * 10000) AS spread_bps
+    first(n) AS n,
+    first(markout_bps) AS markout_bps,
+    first(spread_bps) AS spread_bps
     FOR offset IN (0 AS at_fill, 5000000000 AS t_5s, 60000000000 AS t_1m)
     GROUP BY symbol, size_bucket
 )
 ORDER BY symbol, size_bucket;
 ```
+
+The HORIZON JOIN aggregates on the query workers in parallel and returns one row per symbol, bucket and offset, so `PIVOT` only reshapes it, with `first()` picking the single value for each offset. The variations below follow the same pattern.
 
 The result has columns like `at_fill_n`, `at_fill_markout_bps`, `t_5s_markout_bps`, `t_1m_spread_bps`, etc. Compare across size buckets:
 
@@ -163,12 +166,11 @@ WITH cp_costs AS (
         t.counterparty,
         t.ecn,
         t.passive,
-        t.price,
-        t.quantity,
         h.offset,
-        m.best_bid,
-        m.best_ask,
-        (m.best_bid + m.best_ask) / 2 AS mid
+        count() AS fills,
+        sum(t.quantity) AS volume,
+        avg(((m.best_bid + m.best_ask) / 2 - t.price)
+            / t.price * 10000) AS markout_bps
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -177,9 +179,9 @@ WITH cp_costs AS (
 )
 SELECT * FROM cp_costs
 PIVOT (
-    count() AS fills,
-    sum(quantity) AS volume,
-    avg((mid - price) / price * 10000) AS markout_bps
+    first(fills) AS fills,
+    first(volume) AS volume,
+    first(markout_bps) AS markout_bps
     FOR offset IN (0 AS at_fill, 5000000000 AS t_5s, 60000000000 AS t_1m)
     GROUP BY symbol, counterparty, ecn, passive
 )
@@ -200,13 +202,13 @@ When is it cheapest to trade? Group by `hour(t.timestamp)` and pivot across hori
 WITH hourly AS (
     SELECT
         t.symbol,
-        t.price,
-        t.quantity,
         hour(t.timestamp) AS hour_utc,
         h.offset,
-        m.best_bid,
-        m.best_ask,
-        (m.best_bid + m.best_ask) / 2 AS mid
+        count() AS n,
+        avg(((m.best_bid + m.best_ask) / 2 - t.price)
+            / t.price * 10000) AS markout_bps,
+        avg((m.best_ask - m.best_bid)
+            / ((m.best_bid + m.best_ask) / 2) * 10000) AS spread_bps
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -215,9 +217,9 @@ WITH hourly AS (
 )
 SELECT * FROM hourly
 PIVOT (
-    count() AS n,
-    avg((mid - price) / price * 10000) AS markout_bps,
-    avg((best_ask - best_bid) / mid * 10000) AS spread_bps
+    first(n) AS n,
+    first(markout_bps) AS markout_bps,
+    first(spread_bps) AS spread_bps
     FOR offset IN (0 AS at_fill, 5000000000 AS t_5s, 60000000000 AS t_1m)
     GROUP BY symbol, hour_utc
 )
@@ -237,13 +239,13 @@ Roll up execution costs into a daily P&L view per symbol and ECN. Unlike the bps
 ```questdb-sql title="Daily P&L attribution (buy side)" demo
 WITH daily AS (
     SELECT
+        timestamp_floor('1d', t.timestamp) AS trade_date,
         t.symbol,
         t.ecn,
-        t.price,
-        t.quantity,
-        t.timestamp::date AS trade_date,
         h.offset,
-        (m.best_bid + m.best_ask) / 2 AS mid
+        count() AS fills,
+        sum(t.quantity) AS volume,
+        sum(((m.best_bid + m.best_ask) / 2 - t.price) * t.quantity) AS pnl
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 1m, 5m) AS h
@@ -252,16 +254,16 @@ WITH daily AS (
 )
 SELECT * FROM daily
 PIVOT (
-    count() AS fills,
-    sum(quantity) AS volume,
-    sum((mid - price) * quantity) AS pnl
+    first(fills) AS fills,
+    first(volume) AS volume,
+    first(pnl) AS pnl
     FOR offset IN (0 AS at_fill, 60000000000 AS t_1m, 300000000000 AS t_5m)
     GROUP BY trade_date, symbol, ecn
 )
 ORDER BY trade_date, symbol, ecn;
 ```
 
-Each row is one date-symbol-ECN combination. The three P&L columns tell different stories:
+Each row is one date-symbol-ECN combination. `timestamp_floor('1d', ...)` truncates the trade timestamp to the start of its day. A cast to `DATE` would not, since a `DATE` keeps milliseconds. The three P&L columns tell different stories:
 
 - **`at_fill_pnl`** — immediate spread cost. How much you lost to the bid-ask spread at the moment of execution.
 - **`t_5m_pnl`** — realized P&L including short-term market impact. This is the more complete measure of execution cost.

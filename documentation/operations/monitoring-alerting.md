@@ -11,6 +11,8 @@ GitHub.
 
 For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
 see the [Prometheus integration guide](/docs/integrations/other/prometheus/).
+To chart metric history with SQL instead, query the built-in
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics) table.
 
 ## Basic health check
 
@@ -55,6 +57,16 @@ detailed per-table monitoring, use the [`tables()`](/docs/query/functions/meta/#
 function which returns real-time statistics including WAL status, memory pressure,
 and performance histograms. The function is lightweight and fully in-memory,
 suitable for frequent polling.
+
+:::note
+
+In QuestDB Enterprise, `tables()` and `wal_tables()` list only the tables the
+querying principal [can see](/docs/security/rbac/#object-visibility), so a
+suspended table hidden from the monitoring account raises no alert. See
+[monitoring account](/docs/security/rbac/#monitoring-account) for the grants
+that let it see every table.
+
+:::
 
 ### Health dashboard query
 

@@ -148,6 +148,13 @@ Supported methods:
 A failed authentication results in a `401` or `403` HTTP response before the
 WebSocket connection is established. No QWP-level auth handshake exists.
 
+The credential is checked only on the upgrade request: QuestDB never
+authenticates an established connection again, so a connection stays open
+when its token expires. A client with an expiring token must present a valid
+one on its next connect, such as a reconnect or a failover. The
+[Java client](/docs/connect/clients/java/#token-providers) can request and
+renew tokens with a token provider for this.
+
 ## Client lifecycle
 
 The end-to-end shape of a QWP client session, before the encoding details:
@@ -420,7 +427,7 @@ columns, which keeps every message self-contained for store-and-forward replay.
 | 9    | `0x09` | SYMBOL          | var     | Dictionary-encoded string          |
 | 10   | `0x0A` | TIMESTAMP       | 8       | Microseconds since Unix epoch      |
 | 11   | `0x0B` | DATE            | 8       | Milliseconds since Unix epoch      |
-| 12   | `0x0C` | UUID            | 16      | RFC 4122 UUID                      |
+| 12   | `0x0C` | UUID            | 16      | UUID, two LE int64 halves, lo first |
 | 13   | `0x0D` | LONG256         | 32      | 256-bit integer                    |
 | 14   | `0x0E` | GEOHASH         | var     | Geospatial hash                    |
 | 15   | `0x0F` | VARCHAR         | var     | Length-prefixed UTF-8              |
@@ -812,7 +819,15 @@ uncompressed mode.
 ### UUID
 
 16 bytes per value: 8 bytes for the low 64 bits, then 8 bytes for the high
-64 bits, both little-endian.
+64 bits, both little-endian. Reverse all 16 bytes and you get the canonical
+RFC 4122 order.
+
+The C, C++, and Rust clients take RFC 4122 bytes in their APIs, so
+they reverse each value on the way to the wire and again on the way back. The
+one exception is the row-buffer call that takes the two 64-bit halves
+directly — `line_sender_buffer_column_uuid(buffer, name, lo, hi, err)` and
+its Rust equivalent — which is already in wire order and is passed through
+unchanged.
 
 ### LONG256
 
@@ -1159,8 +1174,13 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+- **Authentication errors end the endpoint walk** at any host (`401`/`403`):
+  the client does not try the other hosts. Startup fails. In most clients,
+  the reconnect loop does not continue past them either. A Java sender that
+  has connected keeps retrying instead, and a Java client with a token
+  provider first retries the same host once after a `401`, with a new token.
+  See
+  [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **All other upgrade errors are transient** and feed into the reconnect loop,

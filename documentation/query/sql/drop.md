@@ -6,6 +6,10 @@ description: DROP TABLE SQL keyword reference documentation.
 
 `DROP TABLE` permanently deletes a table and its contents. `DROP ALL TABLES`
 permanently deletes all tables, all materialized views, and their contents on disk.
+It also drops views, and skips system tables. In QuestDB Enterprise, dropping an
+[audited view](/docs/security/audited-views/#permissions) this way also needs
+the `AUDIT VIEW` permission. Anything it cannot drop is listed in the error,
+and the rest is still dropped.
 
 :::note
 
@@ -28,6 +32,11 @@ DROP ALL TABLES;
 An optional `IF EXISTS` clause may be added directly after the `DROP TABLE`
 keywords to indicate that the selected table should be dropped only if it exists.
 Without `IF EXISTS`, QuestDB will throw an error if the table does not exist.
+
+In QuestDB Enterprise, a table
+[hidden](/docs/security/rbac/#object-visibility) from the user counts as
+missing: `DROP TABLE IF EXISTS` does nothing, and `DROP ALL TABLES` leaves
+hidden tables and views in place.
 
 ## Description
 
