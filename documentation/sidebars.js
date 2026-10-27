@@ -89,6 +89,11 @@ module.exports = {
               label: ".NET",
             },
             {
+              id: "connect/clients/ruby",
+              type: "doc",
+              label: "Ruby",
+            },
+            {
               id: "connect/clients/date-to-timestamp-conversion",
               type: "doc",
               label: "Date to Timestamp",
