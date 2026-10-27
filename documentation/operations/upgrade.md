@@ -101,6 +101,98 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
+### Upgrading to 4.1.0
+
+QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no
+permission on them, see
+[object visibility](/docs/security/rbac/#object-visibility). The behavior
+applies whenever access control is enabled and cannot be turned off. Check the
+following before upgrading:
+
+- Catalogue queries such as `tables()` and `SHOW TABLES` list only the objects
+  a principal holds a permission on. Statements that name any other object fail
+  with the missing-object error, such as `table does not exist [table=trades]`,
+  instead of `Access denied`. Update clients and tests that match the old
+  message.
+- `reader_pool()`, `writer_pool()`, `files()`, and `glob()` with a pattern
+  outside `cairo.sql.copy.root` require `SYSTEM ADMIN`. Monitoring accounts
+  that call them need it, which also makes every unprotected object
+  [visible](/docs/security/rbac/#visibility-rules) to them.
+- Monitoring accounts that poll `tables()` or `wal_tables()`, for example to
+  [detect suspended tables](/docs/operations/monitoring-alerting/#detect-suspended-tables),
+  see only the tables they hold a permission on, so a suspended table hidden
+  from them raises no alert. Grant such an account `SYSTEM ADMIN`, or a
+  permission on every table it watches, see
+  [monitoring account](/docs/security/rbac/#monitoring-account). Only
+  `SYSTEM ADMIN` and `DATABASE ADMIN` holders also see the protected access
+  control tables in `wal_tables()`.
+- Creating a materialized or live view that calls a
+  [catalogue function](/docs/query/sql/create-mat-view/#catalogue-functions),
+  such as `tables()`, requires `SYSTEM ADMIN`. An existing materialized view
+  that reads one through a regular view is invalidated at its first refresh.
+- Existing materialized and live views that call a catalogue function in their
+  own query keep refreshing, even when their creator does not hold
+  `SYSTEM ADMIN`. Their refresh sees every object, so every principal with
+  `SELECT` on such a view reads what the function lists, including objects
+  hidden from it. Review who can read these views, and drop or rewrite the ones
+  whose readers should not see every object.
+- A view created on an earlier version that calls a table-name function, such
+  as `table_columns('trades')`, resolves that table with the permissions of
+  each reader. A reader that holds no permission on the table gets
+  `table does not exist` from the view until you redefine the view after the
+  upgrade, see
+  [metadata functions in views](/docs/concepts/views/#metadata-functions-in-views).
+- Compiled statements in the query caches are no longer shared between
+  principals, so cache hit rates can drop when many principals run the same
+  SQL.
+
+#### Authentication changes in 4.1.0
+
+QuestDB Enterprise 4.1.0 checks credentials more strictly. Before you upgrade,
+check how these changes affect your users and clients:
+
+- **HTTP sessions end with their credential.** A request that carries a
+  session cookie and a credential that QuestDB rejects fails with
+  `401 Unauthorized`, and ends the session, instead of being served from the
+  session. A session also ends when its password changes, its REST token is
+  dropped or expires, or its user is disabled or dropped. This applies to
+  passwords and REST tokens, not only to OIDC. See
+  [HTTP sessions](/docs/security/rbac/#http-sessions).
+- **Expired OIDC tokens are rejected.** With
+  `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token that has no
+  `exp` claim, or whose `exp` has passed, with 60 seconds of allowed clock
+  skew. Earlier versions never checked the expiry, so a token kept working
+  after it expired. A client that sends a fixed token, such as
+  `token=<ID token>` in a connect string, stops working once that token
+  expires, and an orphan drainer that presents an expired token sets its
+  store-and-forward slot aside, and reports data loss, instead of draining
+  it. Such a client must switch to a new token before the old one expires,
+  or use a
+  [token provider](/docs/connect/clients/java/#token-providers) in the Java
+  client. See [Token validation](/docs/security/oidc/#token-validation).
+- **OIDC tokens must come from the expected issuer.** With
+  `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token whose `iss`
+  claim is missing or is not the expected issuer, and refuses to start without
+  an expected issuer, such as with `acl.oidc.host` and no `acl.oidc.issuer`.
+  With Microsoft Entra ID, v1.0 access tokens fail the check. See
+  [Token validation](/docs/security/oidc/#token-validation).
+- **Web Console users need a refresh token.** The session no longer keeps a
+  Web Console logged in after its token expires. Without a refresh token, the
+  user is logged out at that point. With Microsoft Entra ID, include
+  `offline_access` in `acl.oidc.scope`. See
+  [Web Console token renewal](/docs/security/oidc/#web-console-token-renewal).
+- **Claim lists need every node on 4.1.0.** `acl.oidc.sub.claim` and
+  `acl.oidc.groups.claim` accept comma-separated lists of claim names. Earlier
+  versions read a list as one claim name, and reject every OIDC login, so in a
+  replicated cluster, upgrade every node before you set a list. See
+  [Fallback claim lists](/docs/security/oidc/#fallback-claim-lists).
+- **Stricter claims.** A `null` or empty claim counts as missing, so a login
+  that earlier versions accepted with the principal `null`, or with a group
+  named `null`, is rejected. QuestDB also refuses to start with an empty
+  `acl.oidc.sub.claim`, or with a claim listed in both settings: earlier
+  versions started with them, then rejected every OIDC login. See
+  [Startup validation](/docs/security/oidc/#startup-validation).
+
 ### QuestDB Enterprise BYOC
 
 For QuestDB Enterprise BYOC customers, QuestDB manages the upgrade process. The

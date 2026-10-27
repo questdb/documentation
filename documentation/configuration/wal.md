@@ -10,6 +10,43 @@ files.
 To cap the native memory a single WAL apply batch may allocate, see
 [`cairo.wal.apply.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
 
+## Adaptive WAL apply blocks
+
+With adaptive blocks enabled, QuestDB derives the initial row limit from the
+byte size configured by `cairo.wal.apply.block.size`. This row limit doubles
+whenever it cuts a block short, while the block fits its memory budget. The
+grown limit resets when the table writer reopens. The look-ahead transaction count starts
+at `cairo.wal.apply.look.ahead.txn.count` and adapts to one block's worth of
+transactions.
+
+When adaptive blocks are disabled, blocks are sized by `cairo.wal.max.lag.size`
+and `cairo.wal.squash.uncommitted.rows.multiplier`.
+
+## cairo.wal.apply.block.size
+
+- **Default**: `75M`
+- **Reloadable**: no
+
+Starting data size in bytes for an adaptive WAL apply block.
+Set to `0` to disable adaptive blocks.
+
+## cairo.wal.apply.block.memory.percent
+
+- **Default**: `25`
+- **Reloadable**: no
+
+Percentage of the RSS limit (`ram.usage.limit.bytes` / `ram.usage.limit.percent`) split across WAL apply workers
+as the budget for growth beyond the starting block size. With no RSS limit, or with this set to `0`,
+the row limit does not grow.
+
+## cairo.wal.apply.block.max.rows
+
+- **Default**: `100000000`
+- **Reloadable**: no
+
+Hard row cap for both the starting block size and its growth, from 1 to 2,000,000,000.
+Has no effect when adaptive blocks are disabled.
+
 ## cairo.wal.apply.parallel.sql.enabled
 
 - **Default**: `true`
@@ -74,12 +111,9 @@ threshold is reached first).
 - **Default**: `20.0`
 - **Reloadable**: no
 
-Multiplier applied to `cairo.max.uncommitted.rows` to calculate the limit of
-rows that can be kept invisible when writing to a WAL table under heavy load,
-when multiple transactions are being applied. This reduces the number of
-out-of-order (O3) commits by squashing multiple commits together. Setting it
-too low can increase O3 commit frequency and decrease throughput. Setting it
-too high may cause excessive memory usage and increase latency.
+Multiplier for `cairo.max.uncommitted.rows` limiting invisible WAL rows under heavy load;
+lower values can increase O3 commits, while higher values can increase memory use and latency.
+It sizes blocks only when `cairo.wal.apply.block.size=0`.
 
 ## wal.apply.worker.affinity
 

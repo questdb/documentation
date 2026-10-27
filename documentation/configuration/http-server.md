@@ -63,6 +63,22 @@ worker count.
 Number of threads in the private HTTP worker pool. When `0`, the HTTP server
 uses the shared worker pool. Values above `0` enable a private pool.
 
+### http.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the private HTTP worker pool in Fiber mode, where a query can suspend and
+release its worker instead of holding it until it finishes. Setting this to
+`false` puts the pool in legacy mode.
+
+This applies only when `http.worker.count` is above `0`. With the default of
+`0`, HTTP runs on the shared network pool and
+[`shared.network.worker.fiber.enabled`](/docs/configuration/shared-workers/#sharednetworkworkerfiberenabled)
+is the setting that governs it instead. QuestDB Enterprise
+[resource groups](/docs/concepts/resource-groups/) require Fiber mode on
+whichever pool actually serves HTTP.
+
 ### http.worker.haltOnError
 
 - **Default**: `false`
@@ -80,6 +96,22 @@ occurs. Changing the default value is strongly discouraged.
 
 Password for HTTP Basic Authentication in QuestDB Open Source. QuestDB
 Enterprise supports more advanced authentication via RBAC.
+
+### http.session.timeout
+
+- **Default**: `30m`
+- **Reloadable**: no
+
+How long an HTTP session stays valid without a request. A client opens a
+session, identified by the `qdb_session` cookie, by sending `session=true`, as
+the Web Console does at login. Every request that QuestDB authorizes restarts
+the timer, so a session in use does not expire. QuestDB Open Source opens
+sessions only when `http.user` and `http.password` are set. See
+[HTTP sessions](/docs/connect/compatibility/rest-api/#http-sessions).
+
+The value is a duration with a unit suffix, such as `90s`, `30m`, or `1h`. A
+number without a suffix is read as microseconds, so `1800000` is 1.8 seconds,
+not 30 minutes.
 
 ### http.user
 
