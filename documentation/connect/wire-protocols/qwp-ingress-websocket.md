@@ -1177,10 +1177,15 @@ Key behaviors:
 - **Authentication errors end the endpoint walk** at any host (`401`/`403`):
   the client does not try the other hosts. Startup fails. In most clients,
   the reconnect loop does not continue past them either. A sender that has
-  connected keeps retrying instead in the Java client, and in the Node.js and
-  browser clients when it was started with `async` or, in Node.js, uses
-  store-and-forward. A Java client with a token provider first retries the
-  same host once after a `401`, with a new token.
+  connected keeps retrying instead in the Java client, in the Node.js client
+  when it uses store-and-forward or was started with `async`, and in the
+  browser client when it authenticates with `sessionBootstrap` and was started
+  with `async`. A browser cannot see the status of a failed upgrade, so a
+  credential sent with the browser client's `auth` option does not end the
+  walk when QuestDB rejects it: it looks like an unreachable host, and a
+  sender that has connected keeps retrying it whatever its mode. A Java client
+  with a token provider first retries the same host once after a `401`, with
+  a new token.
   See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is

@@ -387,9 +387,13 @@ and apply back-pressure to the producer rather than dropping data.
 
 ⚠ In the Java client, a running sender also retries authentication failures.
 So does a Node.js sender that uses store-and-forward or
-`initial_connect_retry=async`, and a browser sender started with
-`initialConnectMode: "async"`, once it has connected. Other senders treat them
-as terminal. See
+`initial_connect_retry=async`, and a browser sender that authenticates with
+`sessionBootstrap` and was started with `initialConnectMode: "async"`, once it
+has connected. A browser sender that authenticates with `auth` cannot see why
+an upgrade failed, so once it has connected it retries a rejected credential
+like an outage, whatever its mode, and reports `endpoint-attempt-failed`
+rather than `auth-failed`. Other senders treat authentication failures as
+terminal. See
 [Authentication failures and token providers](#authentication-failures-and-token-providers).
 
 ### Authentication failures and token providers
@@ -429,7 +433,11 @@ retriable `SECURITY_ERROR`, and in its connection health, so an application
 that prefers a hard failure can close the sender itself. A query that fails
 names the failure class in its error, and the next query connects again.
 
-⚠ This is the behaviour of the Java client 1.3.11 and later. The other
+⚠ This is the behaviour of the Java client 1.3.11 and later. The browser
+client's `auth` option also accepts a function that supplies a credential
+before every connection attempt, and some Node.js and browser senders retry a
+rejected credential once they have connected, as described in
+[Reconnect and outage handling](#reconnect-and-outage-handling). The other
 clients send fixed credentials only, and treat a `401` or `403` as terminal in
 every phase.
 

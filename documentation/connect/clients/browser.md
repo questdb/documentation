@@ -105,6 +105,7 @@ try {
   }
 
   // Ingest: borrow a sender, write a row, wait for the acknowledgement.
+  const timestamp = Date.now(); // identifies this run's row
   const sender = await db.borrowSender();
   try {
     await sender
@@ -113,7 +114,7 @@ try {
       .symbol("side", "buy")
       .floatColumn("price", 2615.54)
       .floatColumn("amount", 0.5)
-      .at(Date.now(), "ms");
+      .at(timestamp, "ms");
     if (!(await sender.flushAndWait(10_000))) {
       throw new Error("QuestDB did not acknowledge the row in 10 seconds");
     }
@@ -121,20 +122,27 @@ try {
     await sender.close(); // returns the sender to the pool
   }
 
-  // Query: an acknowledged row becomes visible shortly afterwards, so poll.
+  // Query: an acknowledged row becomes visible shortly afterwards, so poll
+  // until this row, matched by its timestamp, is returned.
   const lease = await db.borrowQuery();
   try {
     const deadline = Date.now() + 10_000;
     for (;;) {
       const query = await lease.query(
         "SELECT symbol, side, price, amount, timestamp FROM trades " +
-          "WHERE symbol = $1 LIMIT -5",
-        { binds: (binds) => binds.setVarchar(0, "ETH-USDT") },
+          "WHERE symbol = $1 AND timestamp = $2",
+        {
+          binds: (binds) =>
+            binds
+              .setVarchar(0, "ETH-USDT")
+              .setTimestampMicros(1, BigInt(timestamp) * 1000n),
+        },
       );
       let rows = 0;
       for await (const batch of query) {
         for (const row of batch.rows()) {
-          // [ 'ETH-USDT', 'buy', 2615.54, 0.5, 1735689600000000n ]
+          // [ 'ETH-USDT', 'buy', 2615.54, 0.5, 1735689600000000n ], where the
+          // last value is this row's timestamp in microseconds
           console.log(row);
           rows++;
         }
@@ -197,14 +205,71 @@ are still delivered.
 
 The browser client takes options objects, not connect strings, and has no
 `QDB_CLIENT_CONF` environment variable: pass settings from your application's
-own configuration. Option names match the typed options of the Node.js client:
-`url`, `failoverUrls`, `autoFlushRows`, `queryTimeoutMs`, and so on. `createQwpBrowserSender()` and
-`createQwpBrowserClient()` build the same objects as their `connect*`
+own configuration. [Options](#options) lists them. `createQwpBrowserSender()`
+and `createQwpBrowserClient()` build the same objects as their `connect*`
 counterparts without opening a connection.
 
 A standalone sender or query session takes the full endpoint URL:
 `/write/v4` for ingestion and `/read/v1` for queries. The pooled client takes
 the origin, or a base path under a reverse proxy, and derives both routes.
+
+### Options
+
+A standalone sender takes the `cluster` and `ingress` options below in one
+object, and a standalone query session the `cluster` and `egress` options. The
+pooled client takes them in those groups, and its pool sizes in `pool`, as
+[The pooled client](#the-pooled-client) shows. There, `ingress` and `egress`
+can also override a `cluster` option other than `url`, `failoverUrls`, `auth`,
+and `sessionBootstrap`. Shared options have the same names as the typed options
+of the Node.js client.
+
+| Option                         | Group               | Default     | Purpose                                                                                         |
+| ------------------------------ | ------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `url`                          | `cluster`           | required    | Endpoint. The pooled client also takes an origin or a base path                                 |
+| `failoverUrls`                 | `cluster`           | none        | Further endpoints, tried in order                                                               |
+| `auth`                         | `cluster`           | none        | [Credential](#credentials-for-applications-on-another-origin) sent with every WebSocket upgrade |
+| `sessionBootstrap`             | `cluster`           | none        | [Session cookie](#session-cookies) requested before every connection attempt                    |
+| `connectTimeoutMs`             | `cluster`           | `15000`     | Deadline for opening a connection, authentication included                                      |
+| `sendTimeoutMs`                | `cluster`           | `15000`     | How long one send may wait in the WebSocket                                                     |
+| `closeTimeoutMs`               | `cluster`           | `15000`     | Deadline for closing the WebSocket                                                              |
+| `autoFlushRows`                | `ingress`           | `1000`      | Rows that trigger a flush. `0` disables the trigger                                             |
+| `autoFlushIntervalMs`          | `ingress`           | `100`       | Milliseconds since the last flush that trigger one. `0` disables it                             |
+| `autoFlushBytes`               | `ingress`           | `0`         | Estimated batch bytes that trigger a flush. `0` disables it                                     |
+| `autoFlush`                    | `ingress`           | `true`      | `false` disables all three triggers                                                             |
+| `transactional`                | `ingress`           | `false`     | See [Transactions](#transactions)                                                               |
+| `requestDurableAck`            | `ingress`           | `false`     | See [Durable acknowledgement](#durable-acknowledgement)                                         |
+| `ackTimeoutMs`                 | `ingress`           | `15000`     | Default timeout of `flushAndWait()` and `waitForAck()`                                          |
+| `closeFlushTimeoutMs`          | `ingress`           | `5000`      | How long `close()` waits for acknowledgements                                                   |
+| `memoryReplayMaxBytes`         | `ingress`           | 128 MiB     | Size of the replay queue                                                                        |
+| `memoryReplayAppendDeadlineMs` | `ingress`           | `30000`     | How long a flush waits for space in a full replay queue                                         |
+| `maxBatchSizeBytes`            | `ingress`           | none        | Batch size limit. The smaller of this and the server's limit applies                            |
+| `initialConnectMode`           | `ingress`           | `"off"`     | `"off"`, `"sync"`, or `"async"`. See [Failover and reconnect](#failover-and-reconnect)          |
+| `onSenderError`                | `ingress`           | console log | See [Server rejections](#server-rejections)                                                     |
+| `onError`                      | `ingress`           | none        | Server rejections and terminal sender failures                                                  |
+| `queryTimeoutMs`               | `egress`            | `0`         | Default timeout of every query. `0` disables it                                                 |
+| `cancelDrainTimeoutMs`         | `egress`            | `5000`      | How long a cancelled or timed-out query may take to end                                         |
+| `initialCredit`                | `egress`            | `0`         | Bytes the server may send ahead of your code. `0` is unlimited                                  |
+| `bufferPoolSize`               | `egress`            | `4`         | Decoded batches that may wait for your code                                                     |
+| `maxBatchRows`                 | `egress`            | none        | Most rows in one result batch, from 1 to 1,048,576                                              |
+| `compression`                  | `egress`            | `"raw"`     | `"zstd"` compresses result batches                                                              |
+| `compressionLevel`             | `egress`            | `1`         | Zstd level, from 1 to 22                                                                        |
+| `target`                       | `egress`            | `"any"`     | Server role a query accepts: `"any"`, `"primary"`, or `"replica"`                               |
+| `zone`                         | `egress`            | none        | Preferred zone. Endpoints in other zones remain a fallback                                      |
+| `onFailoverReset`              | `egress`            | none        | Called before a query runs again after a failover                                               |
+| `reconnect`                    | `ingress`, `egress` | enabled     | Reconnect settings, listed below, or `false` for one fixed connection                           |
+
+Under `reconnect`, a sender takes `reconnectInitialBackoffMs` (`100`),
+`reconnectMaxBackoffMs` (`5000`), `reconnectMaxDurationMs` (`300000`),
+`maxFrameRejections` (`4`), `poisonMinEscalationWindowMs` (`5000`), and
+`onEvent`. A query session takes `failoverMaxAttempts` (`8`),
+`failoverBackoffInitialMs` (`50`), `failoverBackoffMaxMs` (`1000`),
+`failoverMaxDurationMs` (`30000`), and `onEvent`. `query()` and `queryViews()`
+also take `binds`, `timeoutMs`, `initialCredit`, `autoCredit` (default
+`true`), and `onFailoverReset` for a single query. Every class and type,
+including `QwpClient` and the option types, is exported from the package root.
+The
+[API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_browser-client.html)
+lists every option.
 
 ## Deployment
 
@@ -381,7 +446,8 @@ old one expires.
 With `auth`, the client sends the credential with every WebSocket upgrade, in
 the `Sec-WebSocket-Protocol` header that browser JavaScript can set. Pass a
 function to supply a fresh OIDC access token before every connection attempt,
-so a long-lived sender or query session survives token expiry:
+so a long-lived sender or query session survives token expiry, as long as
+QuestDB accepts each new token:
 
 ```typescript
 import { connectQwpBrowserSender } from "@questdb/browser-client";
@@ -404,8 +470,9 @@ await sender.close();
   failover. Its `signal` aborts when the attempt is abandoned, and its time
   counts against `connectTimeoutMs`.
 - A function that throws fails the attempt with a `QwpUpgradeError` of kind
-  `"authentication"`, with the thrown error as `cause`. Reconnects retry it
-  with backoff, unless the thrown error has `retryable: false`.
+  `"authentication"`, with the thrown error as `cause`, and connection events
+  report it as `endpoint-attempt-failed`. Reconnects retry it with backoff,
+  unless the thrown error has `retryable: false`, as shown below.
 - The credential is base64url-encoded, not encrypted: use `wss:`.
 - QuestDB accepts the credential only from an origin in
   `qwp.browser.allowed.origins`, including QuestDB's own origin if a page
@@ -416,6 +483,47 @@ await sender.close();
 A credential QuestDB rejects fails the upgrade with an opaque
 `QwpUpgradeError` (kind `"opaque"`), because browsers hide the HTTP status of a
 failed WebSocket upgrade.
+
+The client therefore cannot tell a rejected credential from an outage. A
+sender or query session that has connected before retries it like one,
+whatever its `initialConnectMode`, and reports `endpoint-attempt-failed` and
+`all-endpoints-unreachable`, never `auth-failed`. A banner driven by
+[connection events](#idle-connections) then shows an outage. A sender keeps
+its rows in the replay queue meanwhile, and its `close()` times out and drops
+the rows QuestDB has not acknowledged. A query session gives up after its
+[failover limits](#failover-and-reconnect) with `QwpReconnectExhaustedError`.
+
+When your application knows that no valid token can come, for example because
+the user's session with the identity provider has ended, throw an error with
+`retryable: false` from the `auth` function. The attempt then fails at once
+instead of retrying: a sender ends, and the rows QuestDB has not acknowledged
+are lost, so call `flushAndWait()` wherever rows must be stored. Ask the user
+to log in again, then create a new sender or client:
+
+```typescript
+import {
+  connectQwpBrowserSender,
+  type QwpBrowserAuthProvider,
+} from "@questdb/browser-client";
+
+// Your identity provider SDK: a current OIDC access token, or null once only
+// an interactive login can get a new one.
+declare function getAccessToken(signal: AbortSignal): Promise<string | null>;
+
+const auth: QwpBrowserAuthProvider = async ({ signal }) => {
+  const token = await getAccessToken(signal);
+  if (token === null) {
+    throw Object.assign(new Error("login required"), { retryable: false });
+  }
+  return { type: "bearer", token };
+};
+
+const sender = await connectQwpBrowserSender({
+  url: "wss://questdb.example.com:9000/write/v4",
+  auth,
+});
+await sender.close();
+```
 
 ### Choosing credentials
 
@@ -568,10 +676,37 @@ await sender
 
 `at(value, unit)` sets the
 [designated timestamp](/docs/concepts/designated-timestamp/) from your data, and
-`atNow()` lets the server assign the time the row arrives. The unit is `"ns"`,
-`"us"`, or `"ms"`, and defaults to `"us"`. A `Date` is not accepted: pass
-`date.getTime()` with `"ms"`. Nanoseconds need a `bigint` and create a
-`TIMESTAMP_NS` column on a new table.
+`atNow()` lets the server assign the time the row arrives:
+
+```typescript
+// sender: a QwpSender, created as in Writing rows
+
+// Milliseconds, as returned by Date.now() and Date.prototype.getTime()
+await sender
+  .table("trades")
+  .symbol("symbol", "ETH-USDT")
+  .floatColumn("price", 2615.54)
+  .at(Date.now(), "ms");
+
+// Nanoseconds as a bigint: a new table gets a TIMESTAMP_NS column
+await sender
+  .table("trades_ns")
+  .symbol("symbol", "ETH-USDT")
+  .floatColumn("price", 2615.54)
+  .at(1_735_689_600_123_456_789n, "ns");
+
+// Server-assigned timestamp
+await sender
+  .table("trades")
+  .symbol("symbol", "ETH-USDT")
+  .floatColumn("price", 2615.54)
+  .atNow();
+```
+
+The unit is `"ns"`, `"us"`, or `"ms"`, and defaults to `"us"`. A `Date` is not
+accepted: pass `date.getTime()` with `"ms"`. Prefer the event's own timestamp
+over `atNow()`: [deduplication](/docs/concepts/deduplication/) relies on it to
+discard rows replayed after a reconnect.
 
 ### Compiled object-row writers
 
@@ -615,12 +750,37 @@ A writer validates every field before it stages a row. A field that is absent,
 `null`, or `undefined` writes `NULL`, and the `designatedTimestamp()` field is
 required in every row. An invalid row is rejected with a `QwpWriterRowError`
 that names the table, the column, and, for `rows()`, the row index. Writers
-offer a field for every column type: `symbol()`, `varchar()`, `char()`,
-`bool()`, `byte()`, `short()`, `int32()`, `long()`, `float32()`, `double()`,
-`timestamp(unit)`, `designatedTimestamp(unit)`, `date()`, `binary()`,
-`uuid()`, `long256()`, `ipv4()`, `geohash(precisionBits)`,
-`decimal64(scale)`, `decimal128(scale)`, `decimal256(scale)`, `doubleArray()`,
-and `longArray()`.
+offer a field for every column type:
+
+| Field                       | QuestDB type                   | Accepted values                                                       |
+| --------------------------- | ------------------------------ | --------------------------------------------------------------------- |
+| `symbol()`                  | `SYMBOL`                       | `string`                                                              |
+| `varchar()`                 | `VARCHAR`                      | `string`                                                              |
+| `char()`                    | `CHAR`                         | `string` of one UTF-16 code unit                                      |
+| `bool()`                    | `BOOLEAN`                      | `boolean`                                                             |
+| `byte()`, `short()`         | `BYTE`, `SHORT`                | `number`                                                              |
+| `int32()`                   | `INT`                          | `number`                                                              |
+| `int64()`, `long()`         | `LONG`                         | `bigint`                                                              |
+| `float32()`                 | `FLOAT`                        | `number`                                                              |
+| `float64()`, `double()`     | `DOUBLE`                       | `number`                                                              |
+| `timestamp(unit)`           | `TIMESTAMP`, `TIMESTAMP_NS`    | `number` or `bigint`; `"ns"` needs a `bigint`                         |
+| `designatedTimestamp(unit)` | Designated timestamp           | As `timestamp()`, required in every row                               |
+| `date()`                    | `DATE`                         | Milliseconds since the epoch                                          |
+| `binary()`                  | `BINARY`                       | `Uint8Array`                                                          |
+| `uuid()`                    | `UUID`                         | Canonical text, 16 bytes in RFC 4122 order, or `{ low, high }`        |
+| `long256()`                 | `LONG256`                      | Unsigned 256-bit `bigint`, `0x` hex text, four words, or `{ words }`  |
+| `ipv4()`                    | `IPV4`                         | Dotted-quad text or the packed address                                |
+| `geohash(precisionBits)`    | `GEOHASH`                      | Raw `bigint` bits, base-32 text, or `{ bits, precisionBits }`         |
+| `decimal64(scale)`          | `DECIMAL`, up to 18 digits     | Unscaled `bigint`, decimal text, `number`, or `{ unscaled, scale }`   |
+| `decimal128(scale)`         | `DECIMAL`, up to 38 digits     | As `decimal64()`                                                      |
+| `decimal256(scale)`         | `DECIMAL`, up to 76 digits     | As `decimal64()`                                                      |
+| `doubleArray()`             | `DOUBLE[]`                     | Rectangular nested arrays, or `{ dimensions, values }`                |
+| `longArray()`               | `LONG[]`                       | Current QuestDB servers reject it                                     |
+
+The object forms are the values queries return, so a result row can be written
+back without conversion. Decimal text is rescaled to the field's scale when that
+is exact and rejected when it would round: at `decimal64(2)`, `"1.50"` is
+accepted and `"1.005"` is rejected.
 
 ## Flushing and acknowledgements
 
@@ -649,7 +809,7 @@ is committed to the [write-ahead log](/docs/concepts/write-ahead-log/).
 | ----------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ |
 | `flush()`                           | The batch is in the replay queue                    | `true` if it published anything                                          |
 | `flushAndWait(timeoutMs?)`          | QuestDB acknowledged everything published so far    | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s) |
-| `flushAndGetSequence()`             | The batch is in the replay queue                    | Highest frame sequence it published as a `bigint`, or `-1n`             |
+| `flushAndGetSequence()`             | The batch is in the replay queue                    | Highest frame sequence this call published, or `-1n` if it published none |
 | `waitForAck(sequence, timeoutMs?)`  | The acknowledged sequence reaches `sequence`        | `true`, or `false` when acknowledgements stalled for `timeoutMs`        |
 
 Waiting is optional: a sender that never waits still delivers every row in
@@ -660,6 +820,13 @@ tab, and the browser does not wait for `close()` during unload. Call
 submits an order ticket. A `false` result means only that the wait ran out: the
 rows are still queued, and sending them again would duplicate them.
 
+To wait with `waitForAck()` instead, pass it `sender.publishedSequence` after
+`flush()`, which covers every row flushed so far. Do not pass it the result of
+`flushAndGetSequence()` unchecked: that is `-1n` when the call published
+nothing, for example because auto-flush had already sent every row, and
+`waitForAck(-1n)` resolves `true` at once, before QuestDB acknowledges
+anything.
+
 There is no store-and-forward in the browser. Data that must survive the page
 belongs in a backend service with the Node.js client's
 [store-and-forward](/docs/connect/clients/nodejs/#store-and-forward).
@@ -668,8 +835,38 @@ belongs in a backend service with the Node.js client's
 
 With `transactional: true`, auto-flushed batches stay in an open server-side
 transaction, and an explicit `flush()` or `flushAndWait()` commits them
-together. A transaction is atomic per table. `close()` does not commit: QuestDB
-rolls the open transaction back.
+together:
+
+```typescript
+import { connectQwpBrowserSender } from "@questdb/browser-client";
+
+// Rows your application collected, such as an imported blotter
+declare const trades: { symbol: string; price: number; timestamp: number }[];
+
+const url = new URL("/write/v4", window.location.href);
+url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+
+const sender = await connectQwpBrowserSender({
+  url,
+  transactional: true,
+  autoFlushRows: 10_000,
+});
+try {
+  for (const trade of trades) {
+    await sender
+      .table("trades")
+      .symbol("symbol", trade.symbol)
+      .floatColumn("price", trade.price)
+      .at(trade.timestamp, "ms");
+  }
+  await sender.flushAndWait(); // commits, then waits for the ACK
+} finally {
+  await sender.close();
+}
+```
+
+A transaction is atomic per table. `close()` does not commit: QuestDB rolls the
+open transaction back.
 
 ### Durable acknowledgement
 
@@ -763,7 +960,31 @@ try {
 
 Bind values to `$1`, `$2`, ... placeholders instead of building SQL strings.
 Index `0` binds `$1`, setters must run in ascending index order without gaps,
-and the `binds` callback must be synchronous.
+and the `binds` callback must be synchronous. Each setter returns the bind
+object, so calls chain:
+
+```typescript
+// session: from connectQwpBrowserEgress(), as in Running a query
+const since = BigInt(Date.now() - 3_600_000) * 1000n; // microseconds
+
+const query = await session.query(
+  "SELECT * FROM trades " +
+    "WHERE symbol = $1 AND price > $2 AND timestamp > $3 LIMIT $4",
+  {
+    binds: (binds) =>
+      binds
+        .setVarchar(0, "BTC-USDT")
+        .setDouble(1, 60_000)
+        .setTimestampMicros(2, since)
+        .setLong(3, 100),
+  },
+);
+for await (const batch of query) console.log(batch.rowCount);
+await query.completion;
+```
+
+`setLong()`, `setDate()`, `setTimestampMicros()`, and `setTimestampNanos()`
+take a safe-integer `number` or a `bigint`.
 
 | Setter                                                | Bind type                                          |
 | ----------------------------------------------------- | -------------------------------------------------- |
@@ -820,6 +1041,26 @@ chart a `TIMESTAMP`, convert it with `new Date(Number(micros / 1000n))`.
 
 ### Cancellation, timeouts, and failover
 
+A query timeout covers the whole query, from the `query()` call until the last
+batch is consumed:
+
+```typescript
+import { QwpEgressQueryTimeoutError } from "@questdb/browser-client";
+
+// session: from connectQwpBrowserEgress(), as in Running a query
+try {
+  const query = await session.query(
+    "SELECT * FROM trades WHERE timestamp IN '$today'",
+    { timeoutMs: 5_000 }, // overrides the session's queryTimeoutMs
+  );
+  for await (const batch of query) console.log(batch.rowCount);
+  await query.completion;
+} catch (error) {
+  if (!(error instanceof QwpEgressQueryTimeoutError)) throw error;
+  console.warn(`gave up after ${error.timeoutMs} ms`);
+}
+```
+
 - `queryTimeoutMs` sets a session default, and `timeoutMs` per query overrides
   it. An expired query is cancelled and rejects with
   `QwpEgressQueryTimeoutError`.
@@ -835,10 +1076,33 @@ chart a `TIMESTAMP`, convert it with `new Date(Number(micros / 1000n))`.
 ### Zero-copy views and compression
 
 `session.queryViews(sql, onBatch, options)` passes each batch to a callback as
-reusable column views instead of building JavaScript arrays. The views are
-valid only until the callback returns: copy what you keep, or call
-`batch.materialize()`. The Node.js client page lists the
-[view accessors](/docs/connect/clients/nodejs/#zero-copy-result-views), which
+reusable column views instead of building JavaScript arrays:
+
+```typescript
+// session: from connectQwpBrowserEgress(), as in Running a query
+const query = await session.queryViews(
+  "SELECT timestamp, symbol, price FROM trades WHERE timestamp IN '$today'",
+  (batch) => {
+    const symbol = batch.column(1);
+    const price = batch.column(2);
+    for (let row = 0; row < batch.rowCount; row++) {
+      if (!price.isNull(row)) {
+        console.log(symbol.getSymbol(row), price.getDouble(row));
+      }
+    }
+  },
+);
+await query.completion;
+```
+
+The views are valid only until the callback returns: copy what you keep, or
+call `batch.materialize()`. Typed accessors such as `getDouble()`,
+`getLong()`, which returns a `bigint`, `getString()`, and `getSymbol()` read
+values in place, and `get()` returns the value described in
+[Result values](#result-values). A `NULL` reads as a zero value, `NaN`, or
+`null`, depending on the accessor, so check `isNull()` first. The Node.js
+client page lists every
+[view accessor](/docs/connect/clients/nodejs/#zero-copy-result-views), which
 are the same in the browser.
 
 `compression: "zstd"` asks the server to compress result batches, and
@@ -943,11 +1207,15 @@ a terminal error, and rows published meanwhile wait in the replay queue.
 
 - **Endpoints**: `url` plus `failoverUrls`, or `cluster.url` plus
   `cluster.failoverUrls` for the pooled client.
-- **First connection**: `initialConnectMode` chooses. `"off"`, the default,
-  tries each endpoint once. `"sync"` retries for up to
+- **First connection**: `initialConnectMode` chooses. `"off"` tries each
+  endpoint once. `"sync"` retries for up to
   `reconnect.reconnectMaxDurationMs` (5 minutes) and then rejects with
   `QwpReconnectExhaustedError`. `"async"` returns at once and connects in the
-  background.
+  background. The default is `"off"`, but setting
+  `reconnectInitialBackoffMs`, `reconnectMaxBackoffMs`, or
+  `reconnectMaxDurationMs` under `reconnect` without `initialConnectMode`
+  selects `"sync"`. On the pooled client, `initialConnectMode` goes under
+  `ingress`.
 - **Fixed connection**: `reconnect: false` disables reconnecting.
 - **Ingestion endpoints**: only the primary accepts writes, and a browser
   cannot see why an upgrade failed, so it cannot tell a replica's refusal from
@@ -1193,13 +1461,13 @@ when the component that owns it unmounts:
 | Unacknowledged data                       | Memory only, lost with the page                      | Memory, or store-and-forward to disk   |
 | HTTP status of a failed upgrade           | Hidden by the browser                                | Reported on `QwpUpgradeError`          |
 | TLS settings                              | The browser's own                                    | `tls_roots`, `tls_verify`, custom agents |
-| Connection deadlines                      | `connectTimeoutMs` covers the whole opening          | `connectTimeoutMs` and `authTimeoutMs` |
+| Connection deadlines                      | `connectTimeoutMs` covers the whole opening          | `connect_timeout` for TCP and TLS, `auth_timeout_ms` for the upgrade |
 | UDP ingestion                             | Not available                                        | `udp::`                                |
 | ILP transports and the `Sender` class     | Not available                                        | `http::`, `https::`, `tcp::`, `tcps::` |
 
 The [Node.js client](/docs/connect/clients/nodejs/) page describes the shared
-API in more depth: the full compiled-writer schema table, flow control, and
-the error classes.
+API in more depth: flow control, the zero-copy view accessors, and the error
+classes.
 
 ## Next steps
 

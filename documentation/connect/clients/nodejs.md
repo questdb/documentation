@@ -88,6 +88,7 @@ try {
   }
 
   // Ingest: borrow a sender, write a row, wait for the acknowledgement.
+  const timestamp = Date.now(); // identifies this run's row
   const sender = await db.borrowSender();
   try {
     await sender
@@ -96,7 +97,7 @@ try {
       .symbol("side", "buy")
       .floatColumn("price", 2615.54)
       .floatColumn("amount", 0.5)
-      .at(Date.now(), "ms");
+      .at(timestamp, "ms");
     if (!(await sender.flushAndWait(10_000))) {
       throw new Error("QuestDB did not acknowledge the row in 10 seconds");
     }
@@ -104,20 +105,27 @@ try {
     await sender.close(); // returns the sender to the pool
   }
 
-  // Query: an acknowledged row becomes visible shortly afterwards, so poll.
+  // Query: an acknowledged row becomes visible shortly afterwards, so poll
+  // until this row, matched by its timestamp, is returned.
   const lease = await db.borrowQuery();
   try {
     const deadline = Date.now() + 10_000;
     for (;;) {
       const query = await lease.query(
         "SELECT symbol, side, price, amount, timestamp FROM trades " +
-          "WHERE symbol = $1 LIMIT 5",
-        { binds: (binds) => binds.setVarchar(0, "ETH-USDT") },
+          "WHERE symbol = $1 AND timestamp = $2",
+        {
+          binds: (binds) =>
+            binds
+              .setVarchar(0, "ETH-USDT")
+              .setTimestampMicros(1, BigInt(timestamp) * 1000n),
+        },
       );
       let rows = 0;
       for await (const batch of query) {
         for (const row of batch.rows()) {
-          // [ 'ETH-USDT', 'buy', 2615.54, 0.5, 1735689600000000n ]
+          // [ 'ETH-USDT', 'buy', 2615.54, 0.5, 1735689600000000n ], where the
+          // last value is this row's timestamp in microseconds
           console.log(row);
           rows++;
         }
@@ -242,6 +250,7 @@ often:
 | `initial_connect_retry`      | `off`               | `sync` or `async` to retry the first connection                        |
 | `close_flush_timeout_millis` | `5000`              | How long `close()` waits for acknowledgements                          |
 | `connect_timeout`            | `15000`             | Milliseconds for the TCP and TLS connection to one endpoint            |
+| `auth_timeout_ms`            | `connect_timeout`   | Milliseconds for authentication and the WebSocket upgrade              |
 
 The [connect string reference](/docs/connect/clients/connect-string/) lists
 every key.
@@ -343,7 +352,8 @@ wss::addr=db.example.com:9000;token=YOUR_TOKEN;
 
 Rejected credentials fail the connection with a `QwpUpgradeError` whose `kind`
 is `"authentication"` and whose `statusCode` is `401` or `403`. The client does
-not retry it, because every node of a cluster would reject the same credential:
+not try the other endpoints or retry the first connection, because every node
+of a cluster would reject the same credential:
 
 ```typescript
 import { QwpUpgradeError, Sender } from "@questdb/nodejs-client";
@@ -362,6 +372,14 @@ try {
   await sender.close();
 }
 ```
+
+A rejected credential also ends a sender that has already connected, unless
+the sender uses [store-and-forward](#store-and-forward) or
+`initial_connect_retry=async`, which the pooled client's `lazy_connect=on` also
+selects. Such a sender keeps retrying with backoff and
+keeps its queued rows, so ingestion resumes once QuestDB accepts the
+credential again. It reports each rejected attempt as an `auth-failed`
+[connection event](#connection-events).
 
 On QuestDB Enterprise, give a service the permissions it needs and a REST
 token, then pass the token as `token=`. `HTTP` is the endpoint permission QWP
@@ -758,20 +776,32 @@ to the [write-ahead log](/docs/concepts/write-ahead-log/).
 | ----------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `flush()`                           | The batch is in the replay queue                         | `true` if it published anything                                           |
 | `flushAndWait(timeoutMs?)`          | QuestDB acknowledged everything published so far         | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s)  |
-| `flushAndGetSequence()`             | The batch is in the replay queue                         | Highest frame sequence it published as a `bigint`, or `-1n`              |
+| `flushAndGetSequence()`             | The batch is in the replay queue                         | Highest frame sequence this call published, or `-1n` if it published none |
 | `waitForAck(sequence, timeoutMs?)`  | The acknowledged sequence reaches `sequence`             | `true`, or `false` when acknowledgements stalled for `timeoutMs`         |
 
-`publishedSequence` and `ackedSequence` report the two watermarks without
-waiting. `flushAndWait()` and `waitForAck()` correspond to `drain()` and
-`awaitAckedFsn()` in the Java client.
+Sequences are `bigint` values. `publishedSequence` and `ackedSequence` report
+the two watermarks without waiting. `flushAndWait()` and `waitForAck()`
+correspond to `drain()` and `awaitAckedFsn()` in the Java client.
+
+To wait for everything written so far, flush, then wait for the published
+watermark. `flushAndWait()` does the same in one call:
 
 ```typescript
 // sender: a Sender or QwpSender, created as in Writing rows
-const sequence = await sender.flushAndGetSequence();
+await sender.flush();
+// Covers this flush and every earlier one, auto-flushes included
+const sequence = sender.publishedSequence;
 if (!(await sender.waitForAck(sequence, 5_000))) {
   // No acknowledgement progress for 5 seconds. The rows stay queued.
 }
 ```
+
+Do not pass the result of `flushAndGetSequence()` to `waitForAck()` unchecked.
+It is `-1n` when that call published nothing, for example because auto-flush
+had already sent every row, and `waitForAck(-1n)` resolves `true` at once,
+before QuestDB acknowledges anything. Use `flushAndGetSequence()` to learn
+which frames a flush produced, for example to match them with the `fromFsn`
+and `toFsn` of a [server rejection](#server-rejections).
 
 Waiting is optional. A sender that never waits still delivers every row in
 order and replays unacknowledged data after a reconnect. Waiting decides what
@@ -867,7 +897,8 @@ if (ingress && ingress.waitingMemoryReplayAppends > 0) {
 Setting `sf_dir` journals every batch to disk before it is sent. `flush()` then
 resolves once the batch is in the journal, and unacknowledged data survives a
 process crash or restart: a new sender with the same `sf_dir` and `sender_id`
-replays it.
+replays it. After a crash in a container, the new sender may first need a
+[manual step](#recovering-a-journal-after-a-crash).
 
 ```text
 ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
@@ -877,7 +908,9 @@ ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
   defaults to `default`. Each pooled sender uses `<sf_dir>/<sender_id>-<index>`.
 - One live sender owns a journal. A second process that opens it fails with
   `QwpReplayStoreLockedError`, so give concurrent senders distinct `sender_id`
-  values. `sender_id` allows letters, digits, `_`, and `-`.
+  values. `sender_id` allows letters, digits, `_`, and `-`. The same error
+  after a crash means that the crashed process's lock was not released: see
+  [Recovering a journal after a crash](#recovering-a-journal-after-a-crash).
 - With `initial_connect_retry=async`, a sender starts while QuestDB is
   unreachable, and rows wait in the journal until it connects.
 - Store-and-forward is Node.js only. The browser client replays from memory.
@@ -922,6 +955,32 @@ must never open the same `sf_dir` at the same time.
 
 See [store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/)
 for the delivery model.
+
+### Recovering a journal after a crash
+
+`close()` releases the journal's lock. After a crash, such as an out-of-memory
+kill, the lock stays on disk, and a new sender takes it over only when it names
+a process on the same host that no longer exists. In containers that is often
+not the case:
+
+- A restarted container usually gives the application the same process ID as
+  before, often `1`, so the lock seems to belong to a live process.
+- A pod rescheduled to another node, with the same volume, has a new host name.
+
+The new sender then fails with `QwpReplayStoreLockedError`, and the journal
+stays on disk unsent. To recover, make sure that no other process uses the
+journal, delete its `.lock.owner` directory, and start the sender again. It
+replays the journal:
+
+```shell
+# sf_dir=/var/lib/trade-feed/qdb-sf, sender_id=feed-1
+rm -r /var/lib/trade-feed/qdb-sf/feed-1/.lock.owner
+```
+
+A pooled sender's lock is `<sf_dir>/<sender_id>-<index>/.lock.owner`. A
+container can run this step at startup only if no other container mounts the
+volume that holds `sf_dir`: deleting the lock of a journal that another process
+still uses lets both processes write to it and corrupt it.
 
 ## Querying
 
@@ -1592,8 +1651,9 @@ query restarts from its first row: clear rows you accumulated in
 `http-rejected`, `version-mismatch`, `capability-mismatch`, `timeout`, or
 `transport`. `retryable` tells whether a later attempt can succeed.
 
-After a terminal failure, such as a schema mismatch or rejected credentials,
-the sender is finished. Every later call, `close()` included, rejects with the
+After a terminal failure, such as a schema mismatch, or rejected credentials on
+a sender that does not [retry them](#authentication-and-tls), the sender is
+finished. Every later call, `close()` included, rejects with the
 same error. Close it, catching the error, and create a new sender. Rows staged
 on the failed sender are lost. A pooled lease is replaced automatically on the
 next `borrowSender()`.
@@ -1720,7 +1780,7 @@ sanitize the text before showing it to end users, since it can quote SQL.
 | `QwpMemoryReplayAppendTimeoutError`   | The memory queue stayed full past its deadline                                 |
 | `QwpReplayStoreAppendTimeoutError`    | The store-and-forward journal stayed full past its deadline                   |
 | `QwpReplayStoreFullError`             | The journal is full and `backpressurePolicy` is `"error"`                      |
-| `QwpReplayStoreLockedError`           | Another process owns the journal                                               |
+| `QwpReplayStoreLockedError`           | Another process owns the journal, or a crashed one left its lock               |
 | `QwpSenderCloseTimeoutError`          | `close()` timed out waiting for acknowledgements                               |
 | `QwpEgressQueryError`                 | The server reported a query error. `status` gives the code                     |
 | `QwpEgressQueryTimeoutError`          | A query ran past its timeout and was cancelled                                 |
@@ -1910,7 +1970,9 @@ batches in the journal: commit upstream after `flushAndWait()` instead.
 End the feed on `SIGTERM` so that `ingest()` drains and closes the sender. The
 journal under `sf_dir` keeps every unacknowledged batch, so a restart with the
 same `sender_id` delivers what this process did not, and the deduplication
-keys discard rows that QuestDB had already stored.
+keys discard rows that QuestDB had already stored. After a crash, a restarted
+container may first need the
+[lock recovery step](#recovering-a-journal-after-a-crash).
 
 ## Migrating from ILP
 
