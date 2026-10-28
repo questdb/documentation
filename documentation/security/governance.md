@@ -214,6 +214,12 @@ Once `DROP LOCAL` runs, a partition is
 inserts and updates that target it are not applied, and removing the policy does
 not unseal it. Partitions in cold storage remain queryable with normal SQL.
 
+To check that retention is applied,
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) lists the
+policy on each table, including system tables such as `sys.view_audit`, and
+[`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions)
+shows which partitions of a table are uploaded and sealed.
+
 In QuestDB open source, [TTL](/docs/concepts/ttl/) drops partitions older than a set
 age. QuestDB Enterprise rejects TTL on user tables in favor of storage
 policies. See [data retention](/docs/operations/data-retention/) for the manual
