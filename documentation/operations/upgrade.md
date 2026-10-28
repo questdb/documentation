@@ -134,21 +134,31 @@ WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'DETACH PARTITION',
 
 If the built-in admin is disabled,
 [`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
-no principal can run these statements after the upgrade. Before you upgrade, set
-the storage policy the trail should keep, on the primary, as a principal that
-holds `SET STORAGE POLICY` on it. The policy replicates, and keeps pruning the
-trail of every node:
+no principal can run these statements after the upgrade, not even the
+administrators that replace the admin. A storage policy with a `DROP LOCAL`
+stage keeps pruning the trail without any principal, so set one before you
+upgrade, on the primary, as a principal that holds `SET STORAGE POLICY` on the
+trail. The policy replicates, and keeps pruning the trail of every node:
 
 ```questdb-sql title="On 4.1.0: keep 90 days of trail on every node"
 ALTER TABLE 'sys.view_audit'
     SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
 ```
 
+A TTL on the trail blocks the policy: clear it first with
+`ALTER TABLE 'sys.view_audit' SET TTL 0 HOURS`. When upgrading from a release
+before 4.1.0, which has no trail yet, set
+[`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
+on every node instead, for example to `TO PARQUET 1d, DROP LOCAL 90d`: the
+server creates the trail with it on the first start. Its default,
+`TO PARQUET 1d`, never deletes a row.
+
 After the upgrade, a principal that holds `DISABLE STORAGE POLICY` or
 `REMOVE STORAGE POLICY` can still pause or remove the policy, but only the
-built-in admin can enable it again or set another. To do that, or to remove rows
-by hand, enable the admin: set `acl.admin.user.enabled=true`, with a strong
-`acl.admin.password`, and restart, since the setting is not reloadable. See
+built-in admin can enable it again or set another. To do that, to remove rows
+by hand, or to repair the trail with `FORCE DROP PARTITION`, enable the admin:
+set `acl.admin.user.enabled=true`, with a strong `acl.admin.password`, and
+restart, since the setting is not reloadable. See
 [Tamper protection](/docs/security/audited-views/#protection).
 
 ### Upgrading to 4.1.0

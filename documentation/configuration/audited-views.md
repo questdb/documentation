@@ -91,6 +91,12 @@ Parquet one day after the partition ends, and never deletes a row.
   built-in admin can do that, with
   [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/):
   see [Retention](/docs/security/audited-views/#retention).
+- If you disable the built-in admin,
+  [`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
+  include a `DROP LOCAL` stage, as in `TO PARQUET 1d, DROP LOCAL 90d`, and set
+  the property on every node before the first start. Once the table exists,
+  only that admin can change its policy, and a replica that becomes primary
+  before the primary's table reaches it creates a table of its own.
 - Set the property to an empty value to create the table with no storage
   policy. If the server rejects the policy, it logs the error and creates the
   table without one.

@@ -389,12 +389,24 @@ that these statements ran.
 
 With the built-in admin disabled,
 [`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
-no principal can set the trail's storage policy or remove its rows. Settle
-retention before you disable the admin: set the storage policy the trail should
-keep, or set `view.audit.storage.policy` before the server first creates the
-table. The policy keeps pruning the trail without the admin. To change it later,
-enable the admin again, which takes a restart, since `acl.admin.user.enabled`
-is not reloadable.
+no principal can set the trail's storage policy or remove its rows, not even
+the administrators that replace the admin. This is deliberate: the trail
+records their reads too. Settle retention before you disable the admin. A
+policy with a `DROP LOCAL` stage keeps pruning the trail without the admin,
+while the default, `TO PARQUET 1d`, never deletes a row. Set one:
+
+- Before the server first creates the table, as on a new deployment, set
+  [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
+  on every node, for example to `TO PARQUET 1d, DROP LOCAL 90d`. After the
+  first start, check that the table carries the policy with
+  `SHOW CREATE TABLE 'sys.view_audit'`. The server can create the table
+  without one, for example when it rejects the policy, and logs why.
+- Once the table exists, the built-in admin sets the policy with
+  `ALTER TABLE SET STORAGE POLICY`, as above.
+
+To change the policy later, remove rows by hand, or repair the table with
+`FORCE DROP PARTITION`, enable the admin again, which takes a restart, since
+`acl.admin.user.enabled` is not reloadable.
 
 :::
 
