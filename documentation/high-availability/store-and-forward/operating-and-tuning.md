@@ -49,6 +49,16 @@ PID file is overwritten on every successful acquire; an absent or empty
 Neither `.lock` nor `.lock.pid` is deleted on clean shutdown. Stale
 files are harmless — the next acquirer silently overwrites them.
 
+The Node.js client writes the same `.lock` and `.lock.pid` files, but takes
+the lock with a `.lock.owner` directory beside them instead of `flock`. A
+crash leaves that directory behind, and a new sender takes it over only when
+it names a process on the same host that no longer exists. In a container, a
+restart often reuses the process ID or changes the host name, so the slot
+stays locked until you delete `.lock.owner`: see
+[Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
+The two locks do not interoperate, so a Node.js and a Java process must never
+open one slot at the same time.
+
 **Cross-platform interop:** a POSIX client and a Windows client must
 **not** share a slot on a network filesystem. Their lock primitives are
 incompatible.
@@ -90,7 +100,8 @@ A common cause is a redeploy where the old process hasn't fully exited
 when the new one comes up. Solutions:
 
 - Wait for the old process to release the lock (the kernel releases on
-  exit; `kill -9` is sufficient).
+  exit; `kill -9` is sufficient). A crashed Node.js sender can leave its
+  `.lock.owner` directory behind, as described above.
 - Use a deployment unit that orders shutdown before startup.
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.

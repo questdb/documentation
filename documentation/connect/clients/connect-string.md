@@ -605,7 +605,12 @@ exit, SIGKILL, host crash, or reboot — instantiate a new sender with the
    Windows). If the previous process is still alive and holds the lock,
    the new sender fails fast with `sf slot already in use`. The kernel
    releases the lock on process exit, even after SIGKILL, so a crashed
-   sender does not leave the slot stuck.
+   sender does not leave the slot stuck. The Node.js client locks the slot
+   with a `.lock.owner` directory instead, which a crash leaves behind. A
+   new sender takes it over only when it names a process on the same host
+   that no longer exists, so a restarted container can find the slot
+   locked: see
+   [Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
 2. Recovery reads the persisted ack watermark and replays every on-disk
    segment past it against the server. Replay runs on the I/O thread in
    parallel with the application's new `append()` calls — it does not

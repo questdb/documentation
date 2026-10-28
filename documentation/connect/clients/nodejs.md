@@ -179,16 +179,25 @@ queued and are still delivered.
 
 ## Choose an API
 
+Start a new service with [`connectQwpNodeClient()`](#the-pooled-client), also
+one that only ingests or only queries. It takes one connect string,
+credentials included, for both directions, and lends senders and query leases
+from a pool. A service that only ingests sets `query_pool_min=0`, and one that
+only queries sets `sender_pool_min=0`, so the unused side opens no connection.
+It is also the only entry point that queries with a connect string:
+`connectQwpNodeEgress()` takes an [options object](#options-objects), with
+credentials in `authorization` rather than `token`.
+
 All entry points share one QWP implementation:
 
-| You need                                              | Use                                   | Returns                                                 |
-| ----------------------------------------------------- | ------------------------------------- | ------------------------------------------------------- |
-| Ingestion and queries in one service                  | `connectQwpNodeClient(connectString)` | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
-| Ingestion only, or code written for the ILP `Sender`  | `Sender.fromConfig("ws::...")`        | `Sender`                                                |
-| One ingestion connection configured by an object      | `connectQwpNodeSender({ url, ... })`  | `QwpSender`                                             |
-| One query connection configured by an object          | `connectQwpNodeEgress({ url, ... })`  | `QwpEgressSession`                                      |
-| Repeated object rows with a fixed schema              | `sender.writer(table, schema)`        | `QwpTableWriter`                                        |
-| Fire-and-forget datagrams on a trusted network        | `Sender.fromConfig("udp::...")`       | `Sender`                                                |
+| You need                                                         | Use                                   | Returns                                                 |
+| ---------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------- |
+| A new service that ingests, queries, or both                     | `connectQwpNodeClient(connectString)` | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
+| Code written for the ILP `Sender`, or one ingestion connection   | `Sender.fromConfig("ws::...")`        | `Sender`                                                |
+| One ingestion connection configured by an object                 | `connectQwpNodeSender({ url, ... })`  | `QwpSender`                                             |
+| One query connection configured by an object                     | `connectQwpNodeEgress({ url, ... })`  | `QwpEgressSession`                                      |
+| Repeated object rows with a fixed schema                         | `sender.writer(table, schema)`        | `QwpTableWriter`                                        |
+| Fire-and-forget datagrams on a trusted network                   | `Sender.fromConfig("udp::...")`       | `Sender`                                                |
 
 `Sender` and `QwpSender` share the row API. `Sender` implements the nine
 column setters it also supports over ILP, while `QwpSender` adds a setter for
@@ -333,6 +342,150 @@ const sender = await Sender.fromConfig("ws::addr=localhost:9000;", {
 await sender.close();
 ```
 
+## The pooled client
+
+`connectQwpNodeClient()` returns a `QwpClient`: one handle that keeps a pool of
+sender connections and a pool of query connections, configured by one connect
+string. Create one per process and share it.
+
+```typescript
+import {
+  connectQwpNodeClient,
+  type QwpQueryLease,
+} from "@questdb/nodejs-client";
+
+const db = await connectQwpNodeClient(
+  "ws::addr=localhost:9000;sender_pool_max=4;query_pool_max=8;",
+);
+try {
+  const sender = await db.borrowSender();
+  try {
+    await sender
+      .table("trades")
+      .symbol("symbol", "BTC-USDT")
+      .symbol("side", "sell")
+      .floatColumn("price", 65432.1)
+      .floatColumn("amount", 0.0012)
+      .at(Date.now(), "ms");
+    await sender.flushAndWait();
+  } finally {
+    await sender.close(); // flushes and returns the connection to the pool
+  }
+
+  // Each lease runs one query at a time, so borrow one per concurrent query.
+  const [prices, volumes] = await Promise.all([
+    db.borrowQuery(),
+    db.borrowQuery(),
+  ]);
+  try {
+    const collect = async (lease: QwpQueryLease, sql: string) => {
+      const query = await lease.query(sql);
+      const rows: unknown[] = [];
+      for await (const batch of query) rows.push(...batch.rows());
+      await query.completion;
+      return rows;
+    };
+    const [latest, volume] = await Promise.all([
+      collect(prices, "SELECT symbol, last(price) FROM trades"),
+      collect(volumes, "SELECT symbol, sum(amount) FROM trades"),
+    ]);
+    console.log(latest, volume);
+  } finally {
+    await Promise.all([prices.close(), volumes.close()]);
+  }
+} finally {
+  await db.close();
+}
+```
+
+- `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows,
+  discards an unfinished row with a warning, and returns the connection. It
+  does not wait for acknowledgements, so call `flushAndWait()` first where you
+  need them.
+- `borrowQuery()` lends a `QwpQueryLease` with `query()` and `queryViews()`.
+  Its `close()` cancels an unfinished query and returns the connection.
+- Every endpoint in `addr` serves both pools, and each pool derives its route,
+  `/write/v4` or `/read/v1`, from it.
+- `connectQwpNodeClient()` opens the configured minimum of connections before
+  it resolves, and rejects with `QwpPoolResourceError` when it cannot.
+  `createQwpNodeClient()` returns without connecting.
+- A lease used after `close()` throws `QwpClientClosedError`.
+
+| Key                       | Default   | Purpose                                                                       |
+| ------------------------- | --------- | ----------------------------------------------------------------------------- |
+| `sender_pool_min`         | `1`       | Sender connections kept open when idle. `0` opens none until a borrow          |
+| `sender_pool_max`         | `4`       | Most sender connections                                                       |
+| `query_pool_min`          | `1`       | Query connections kept open when idle. `0` opens none until a borrow           |
+| `query_pool_max`          | `4`       | Most query connections, and so the most concurrent queries                    |
+| `acquire_timeout_ms`      | `5000`    | How long a borrow waits for a free connection, then `QwpPoolAcquireTimeoutError` |
+| `idle_timeout_ms`         | `60000`   | Idle time before a connection above the minimum closes. `0` keeps it          |
+| `max_lifetime_ms`         | `1800000` | Age at which an idle connection is replaced. `0` disables it                  |
+| `housekeeper_interval_ms` | `5000`    | How often idle and old connections are checked                                |
+| `lazy_connect`            | `off`     | Start without connecting, so the client starts while QuestDB is down          |
+
+`lazy_connect=on` lets `connectQwpNodeClient()` resolve while QuestDB is
+unreachable. Senders connect in the background and queue rows meanwhile, and
+query connections open on the first query. A standalone `Sender` ignores the
+key: set `initial_connect_retry=async` for it instead.
+
+The second argument takes typed options for each side. `ingress` takes the
+options a standalone `Sender` takes under `qwp.webSocket`, such as
+[`onSenderError`](#server-rejections), `onError`, and
+[`reconnect`](#connection-events), and `egress` takes the
+[query-session options](#querying). Endpoints and `authorization` belong to
+`cluster`. Each side has its own `reconnect`, with its own `onEvent`:
+
+```typescript
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
+
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
+  ingress: {
+    onSenderError: (error) =>
+      console.error("rejected:", error.category, error.serverMessage),
+    onError: (event) => {
+      if (event.terminal) console.error("pooled sender failed:", event.error);
+    },
+    reconnect: {
+      onEvent: (event) => console.info("ingestion connection:", event.kind),
+    },
+  },
+  egress: {
+    queryTimeoutMs: 30_000,
+    reconnect: {
+      onEvent: (event) => console.info("query connection:", event.kind),
+    },
+  },
+});
+await db.close();
+```
+
+Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
+`cluster`, TypeScript rejects them and plain JavaScript ignores them without
+an error.
+
+The pooled client also accepts one options object, with the endpoints in
+`cluster`:
+
+```typescript
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
+
+const db = await connectQwpNodeClient({
+  cluster: {
+    url: "wss://db.example.com:9000",
+    authorization: `Bearer ${process.env.QUESTDB_TOKEN}`,
+  },
+  ingress: { autoFlushRows: 5_000 },
+  egress: { queryTimeoutMs: 30_000 },
+  pool: { senderPoolMax: 2, queryPoolMax: 8 },
+});
+await db.close();
+```
+
+`db.close()` waits briefly for borrowed senders, cancels running queries, and
+closes every connection. Closing a pooled sender is best effort: if its
+acknowledgement wait times out, the client logs a warning instead of
+rejecting.
+
 ## Authentication and TLS
 
 Credentials go in the connect string and are sent on every WebSocket upgrade:
@@ -471,22 +624,29 @@ The same methods exist on a `QwpSender` from `borrowSender()` or
 `connectQwpNodeSender()`. A sender is not safe to share between independent
 producers: give each producer its own. See [Concurrency](#concurrency).
 
-A setter that rejects a value throws, and `at()` rejects with the error. Either
-way, the sender discards the row in progress, including its table selection,
-and keeps the rows completed before it, so the next row starts again from
-`table()`:
+A setter that rejects a value throws, and the sender discards the row in
+progress, including its table selection. It keeps the rows completed before
+it, so the next row starts again from `table()`. `at()` rejects an invalid
+timestamp the same way, but it also rejects when the auto-flush that the row
+triggered fails, for example while QuestDB is unreachable. That row is
+complete and stays queued for the next flush, so writing it again would
+duplicate it. Catch row errors around the setters, and let a rejected `at()`
+propagate:
 
 ```typescript
 for (const trade of trades) {
   try {
-    await sender
+    sender
       .table("trades")
       .symbol("symbol", trade.symbol)
-      .floatColumn("price", trade.price) // TypeError if price is a string
-      .at(Date.now(), "ms");
+      .floatColumn("price", trade.price); // TypeError if price is a string
   } catch (error) {
     console.warn("skipped a trade:", error); // only this row is dropped
+    continue;
   }
+  // Rejects if the auto-flush this row triggered fails. The row is then
+  // queued, not dropped, so the error propagates instead of being skipped.
+  await sender.at(Date.now(), "ms");
 }
 ```
 
@@ -568,7 +728,7 @@ await sender
 
 The [designated timestamp](/docs/concepts/designated-timestamp/) orders and
 partitions a table. `at(value, unit)` sets it from your data, and `atNow()`
-lets the server assign the time the row arrives:
+lets the server assign the time the batch arrives:
 
 ```typescript
 // sender: a Sender or QwpSender, created as in Writing rows
@@ -587,7 +747,7 @@ await sender
   .floatColumn("price", 2615.54)
   .at(1_735_689_600_123_456_789n, "ns");
 
-// Server-assigned timestamp
+// Server-assigned timestamp, shared by every row of the batch
 await sender
   .table("trades")
   .symbol("symbol", "ETH-USDT")
@@ -596,9 +756,15 @@ await sender
 ```
 
 The unit is `"ns"`, `"us"`, or `"ms"`, and defaults to `"us"`. A `Date` is not
-accepted: pass `date.getTime()` with `"ms"`. Prefer the event's own timestamp
-over `atNow()`: [deduplication](/docs/concepts/deduplication/) relies on it to
-discard rows replayed after a reconnect.
+accepted: pass `date.getTime()` with `"ms"`.
+
+`atNow()` gives every row of a batch the same timestamp: the time QuestDB
+receives the batch, not the time each row was written. On a table with
+[deduplication](/docs/concepts/deduplication/), rows flushed together can then
+share a key, and QuestDB keeps only one of them: with
+`DEDUP UPSERT KEYS(timestamp, symbol)`, two trades of one symbol in a batch
+become one row. Use the event's own timestamp with `at()` instead.
+Deduplication also relies on it to discard rows replayed after a reconnect.
 
 ### Compiled object-row writers
 
@@ -994,20 +1160,20 @@ still uses lets both processes write to it and corrupt it.
 
 ### Running a query
 
-A query session runs SQL over its own WebSocket. Results stream as batches of
-rows:
+A query runs SQL over a query connection: a lease from the
+[pooled client](#the-pooled-client), or a standalone session. Results stream
+as batches of rows:
 
 ```typescript
 import {
   QwpEgressQueryError,
-  connectQwpNodeEgress,
+  connectQwpNodeClient,
 } from "@questdb/nodejs-client";
 
-const session = await connectQwpNodeEgress({
-  url: "ws://localhost:9000/read/v1",
-});
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+const lease = await db.borrowQuery();
 try {
-  const query = await session.query(
+  const query = await lease.query(
     "SELECT symbol, side, price, amount, timestamp FROM trades " +
       "WHERE timestamp IN '$now-1h..$now' AND symbol = $1",
     { binds: (binds) => binds.setVarchar(0, "ETH-USDT") },
@@ -1025,7 +1191,8 @@ try {
   if (!(error instanceof QwpEgressQueryError)) throw error;
   console.error(`query failed with status ${error.status}: ${error.message}`);
 } finally {
-  await session.close();
+  await lease.close(); // returns the connection to the pool
+  await db.close();
 }
 ```
 
@@ -1039,14 +1206,14 @@ try {
   for a statement that returns no rows.
 - Consume or cancel every result before awaiting `completion`. The client
   stops reading from the server once four decoded batches are waiting.
-- A session runs one query at a time. Starting another while one is active
-  rejects with `a QWP query is already active on this connection`. Run
-  concurrent queries on separate sessions or
-  [pooled leases](#the-pooled-client).
-- To query with a connect string, use the pooled client's `borrowQuery()`.
+- A lease runs one query at a time. Starting another while one is active
+  rejects with `a QWP query is already active on this connection`. Borrow a
+  lease per concurrent query.
 
-`connectQwpNodeEgress()` accepts the [connection options](#options-objects)
-plus the query options in this section.
+A standalone session from `connectQwpNodeEgress()` has the same `query()` and
+`queryViews()` methods. It takes an [options object](#options-objects) instead
+of a connect string, and the query options in this section as session
+defaults.
 
 ### Bind parameters
 
@@ -1056,10 +1223,10 @@ setters must run in ascending index order without gaps, and the callback must
 be synchronous:
 
 ```typescript
-// session: from connectQwpNodeEgress(), as in Running a query
+// lease: from db.borrowQuery(), as in Running a query
 const since = BigInt(Date.now() - 3_600_000) * 1000n; // microseconds
 
-const query = await session.query(
+const query = await lease.query(
   "SELECT * FROM trades " +
     "WHERE symbol = $1 AND price > $2 AND timestamp > $3 LIMIT $4",
   {
@@ -1157,20 +1324,19 @@ same `query()` call. They return no batches, and `completion` resolves with
 `kind: "exec-done"` and the affected row count:
 
 ```typescript
-import { connectQwpNodeEgress } from "@questdb/nodejs-client";
+import { connectQwpNodeClient } from "@questdb/nodejs-client";
 
-const session = await connectQwpNodeEgress({
-  url: "ws://localhost:9000/read/v1",
-});
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+const lease = await db.borrowQuery();
 try {
-  const create = await session.query(`
+  const create = await lease.query(`
     CREATE TABLE IF NOT EXISTS trades (
       symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE,
       timestamp TIMESTAMP
     ) TIMESTAMP(timestamp) PARTITION BY DAY`);
   await create.completion;
 
-  const insert = await session.query(
+  const insert = await lease.query(
     "INSERT INTO trades (symbol, side, price, amount, timestamp) " +
       "VALUES ($1, $2, $3, $4, now())",
     {
@@ -1187,7 +1353,8 @@ try {
     console.log(`inserted ${done.rowsAffected} row(s)`); // a bigint
   }
 } finally {
-  await session.close();
+  await lease.close();
+  await db.close();
 }
 ```
 
@@ -1206,9 +1373,9 @@ must not run twice, use one of these:
 
 - A statement that a second run does not change, such as one that sets a value
   rather than adjusting it.
-- A session with failover off, through `failover=off` or `reconnect: false`. A
-  lost reply then fails the statement, which may still have taken effect, so
-  check the table before running it again.
+- A connection with failover off, through `failover=off` or
+  `reconnect: false`. A lost reply then fails the statement, which may still
+  have taken effect, so check the table before running it again.
 - The [sender](#data-ingestion), writing to a table with
   [deduplication](/docs/concepts/deduplication/).
 
@@ -1224,18 +1391,19 @@ as the caution below explains:
 ```typescript
 import {
   QwpEgressQueryTimeoutError,
-  connectQwpNodeEgress,
+  connectQwpNodeClient,
 } from "@questdb/nodejs-client";
 
-const session = await connectQwpNodeEgress({
-  url: "ws://localhost:9000/read/v1",
-  queryTimeoutMs: 30_000, // default for every query on this session
-  initialCredit: 1024 * 1024, // lets a timeout stop a streaming query
-});
+const db = await connectQwpNodeClient(
+  "ws::addr=localhost:9000;" +
+    "query_timeout_ms=30000;" + // default for every query of this client
+    "initial_credit=1048576;", // lets a timeout stop a streaming query
+);
+const lease = await db.borrowQuery();
 try {
-  const query = await session.query(
+  const query = await lease.query(
     "SELECT * FROM trades WHERE timestamp IN '$today'",
-    { timeoutMs: 5_000 }, // overrides the session default
+    { timeoutMs: 5_000 }, // overrides the default
   );
   for await (const batch of query) console.log(batch.rowCount);
   await query.completion;
@@ -1243,7 +1411,8 @@ try {
   if (!(error instanceof QwpEgressQueryTimeoutError)) throw error;
   console.warn(`gave up after ${error.timeoutMs} ms`);
 } finally {
-  await session.close();
+  await lease.close();
+  await db.close();
 }
 ```
 
@@ -1264,8 +1433,9 @@ cancellation, and the query ends at once.
 
 :::
 
-- `queryTimeoutMs` (`query_timeout_ms`) sets the session default. `0`, the
-  default, disables it, and a per-query `timeoutMs` overrides it.
+- `query_timeout_ms` (`queryTimeoutMs` as an option) sets the default for
+  every query. `0`, the default, disables it, and a per-query `timeoutMs`
+  overrides it.
 - `query.cancel()` cancels explicitly. Iteration then throws a
   `QwpEgressQueryError` with `status` `10` (`CANCELLED`).
 - Leaving a `for await` loop early, with `break`, `return`, or an exception,
@@ -1276,7 +1446,7 @@ cancellation, and the query ends at once.
 - `cancelDrainTimeoutMs` (`query_close_timeout_ms`, default `5000`) bounds how
   long a cancelled, timed-out, or abandoned query may take to end before the
   session fails.
-- The session stays usable after a query error, and, with a positive
+- The lease or session stays usable after a query error, and, with a positive
   `initialCredit`, after a timeout or a cancellation. A statement that the
   server completes despite the timeout still succeeds, so a statement that
   took effect is never reported as timed out.
@@ -1291,8 +1461,8 @@ cancel, time out, or abandon, as
 [Cancellation and timeouts](#cancellation-and-timeouts) explains:
 
 ```typescript
-// session: from connectQwpNodeEgress(), as in Running a query
-const query = await session.query("SELECT * FROM trades", {
+// lease: from db.borrowQuery(), as in Running a query
+const query = await lease.query("SELECT * FROM trades", {
   initialCredit: 1024 * 1024, // at most 1 MiB in flight
 });
 for await (const batch of query) console.log(batch.rowCount);
@@ -1313,8 +1483,8 @@ without building a JavaScript array per column. Typed accessors read values
 straight from the received bytes:
 
 ```typescript
-// session: from connectQwpNodeEgress(), as in Running a query
-const query = await session.queryViews(
+// lease: from db.borrowQuery(), as in Running a query
+const query = await lease.queryViews(
   "SELECT timestamp, symbol, price FROM trades",
   (batch) => {
     const symbol = batch.column(1);
@@ -1366,150 +1536,7 @@ batches, which helps on slow links and wide results. `compression_level` sets
 the level, from 1 (the default, lowest CPU cost) to 22, and the server may
 cap it. The default, `raw`, sends results uncompressed. `auto` accepts
 compression when the server offers it.
-`session.negotiatedCompression` reports what the server chose.
-
-## The pooled client
-
-`connectQwpNodeClient()` returns a `QwpClient`: one handle that keeps a pool of
-sender connections and a pool of query connections, configured by one connect
-string. Create one per process and share it.
-
-```typescript
-import {
-  connectQwpNodeClient,
-  type QwpQueryLease,
-} from "@questdb/nodejs-client";
-
-const db = await connectQwpNodeClient(
-  "ws::addr=localhost:9000;sender_pool_max=4;query_pool_max=8;",
-);
-try {
-  const sender = await db.borrowSender();
-  try {
-    await sender
-      .table("trades")
-      .symbol("symbol", "BTC-USDT")
-      .symbol("side", "sell")
-      .floatColumn("price", 65432.1)
-      .floatColumn("amount", 0.0012)
-      .at(Date.now(), "ms");
-    await sender.flushAndWait();
-  } finally {
-    await sender.close(); // flushes and returns the connection to the pool
-  }
-
-  // Each lease runs one query at a time, so borrow one per concurrent query.
-  const [prices, volumes] = await Promise.all([
-    db.borrowQuery(),
-    db.borrowQuery(),
-  ]);
-  try {
-    const collect = async (lease: QwpQueryLease, sql: string) => {
-      const query = await lease.query(sql);
-      const rows: unknown[] = [];
-      for await (const batch of query) rows.push(...batch.rows());
-      await query.completion;
-      return rows;
-    };
-    const [latest, volume] = await Promise.all([
-      collect(prices, "SELECT symbol, last(price) FROM trades"),
-      collect(volumes, "SELECT symbol, sum(amount) FROM trades"),
-    ]);
-    console.log(latest, volume);
-  } finally {
-    await Promise.all([prices.close(), volumes.close()]);
-  }
-} finally {
-  await db.close();
-}
-```
-
-- `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows,
-  discards an unfinished row with a warning, and returns the connection. It
-  does not wait for acknowledgements, so call `flushAndWait()` first where you
-  need them.
-- `borrowQuery()` lends a `QwpQueryLease` with `query()` and `queryViews()`.
-  Its `close()` cancels an unfinished query and returns the connection.
-- Every endpoint in `addr` serves both pools, and each pool derives its route,
-  `/write/v4` or `/read/v1`, from it.
-- `connectQwpNodeClient()` opens the configured minimum of connections before
-  it resolves, and rejects with `QwpPoolResourceError` when it cannot.
-  `createQwpNodeClient()` returns without connecting.
-- A lease used after `close()` throws `QwpClientClosedError`.
-
-| Key                       | Default   | Purpose                                                                       |
-| ------------------------- | --------- | ----------------------------------------------------------------------------- |
-| `sender_pool_min`         | `1`       | Sender connections kept open when idle                                        |
-| `sender_pool_max`         | `4`       | Most sender connections                                                       |
-| `query_pool_min`          | `1`       | Query connections kept open when idle                                         |
-| `query_pool_max`          | `4`       | Most query connections, and so the most concurrent queries                    |
-| `acquire_timeout_ms`      | `5000`    | How long a borrow waits for a free connection, then `QwpPoolAcquireTimeoutError` |
-| `idle_timeout_ms`         | `60000`   | Idle time before a connection above the minimum closes. `0` keeps it          |
-| `max_lifetime_ms`         | `1800000` | Age at which an idle connection is replaced. `0` disables it                  |
-| `housekeeper_interval_ms` | `5000`    | How often idle and old connections are checked                                |
-| `lazy_connect`            | `off`     | Start without connecting, so the client starts while QuestDB is down          |
-
-`lazy_connect=on` lets `connectQwpNodeClient()` resolve while QuestDB is
-unreachable. Senders connect in the background and queue rows meanwhile, and
-query connections open on the first query. A standalone `Sender` ignores the
-key: set `initial_connect_retry=async` for it instead.
-
-The second argument takes typed options for each side. `ingress` takes the
-options a standalone `Sender` takes under `qwp.webSocket`, such as
-`onSenderError`, `onError`, and `reconnect`, and `egress` takes the
-query-session options. Endpoints and `authorization` belong to `cluster`. Each
-side has its own `reconnect`, with its own `onEvent`:
-
-```typescript
-import { connectQwpNodeClient } from "@questdb/nodejs-client";
-
-const db = await connectQwpNodeClient("ws::addr=localhost:9000;", {
-  ingress: {
-    onSenderError: (error) =>
-      console.error("rejected:", error.category, error.serverMessage),
-    onError: (event) => {
-      if (event.terminal) console.error("pooled sender failed:", event.error);
-    },
-    reconnect: {
-      onEvent: (event) => console.info("ingestion connection:", event.kind),
-    },
-  },
-  egress: {
-    queryTimeoutMs: 30_000,
-    reconnect: {
-      onEvent: (event) => console.info("query connection:", event.kind),
-    },
-  },
-});
-await db.close();
-```
-
-Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
-`cluster`, TypeScript rejects them and plain JavaScript ignores them without
-an error.
-
-The pooled client also accepts one options object, with the endpoints in
-`cluster`:
-
-```typescript
-import { connectQwpNodeClient } from "@questdb/nodejs-client";
-
-const db = await connectQwpNodeClient({
-  cluster: {
-    url: "wss://db.example.com:9000",
-    authorization: `Bearer ${process.env.QUESTDB_TOKEN}`,
-  },
-  ingress: { autoFlushRows: 5_000 },
-  egress: { queryTimeoutMs: 30_000 },
-  pool: { senderPoolMax: 2, queryPoolMax: 8 },
-});
-await db.close();
-```
-
-`db.close()` waits briefly for borrowed senders, cancels running queries, and
-closes every connection. Closing a pooled sender is best effort: if its
-acknowledgement wait times out, the client logs a warning instead of
-rejecting.
+A lease's or session's `negotiatedCompression` reports what the server chose.
 
 ## Concurrency
 
@@ -1593,9 +1620,9 @@ rows unless it clears them in `onFailoverReset`. A statement such as an
 :::
 
 ```typescript
-// session: from connectQwpNodeEgress() or a borrowQuery() lease
+// lease: from db.borrowQuery(), or a session from connectQwpNodeEgress()
 let rows: unknown[] = [];
-const query = await session.query(
+const query = await lease.query(
   "SELECT * FROM trades WHERE timestamp IN '$today'",
   {
     onFailoverReset: () => {
@@ -1607,8 +1634,9 @@ for await (const batch of query) rows.push(...batch.rows());
 await query.completion;
 ```
 
-The callback runs before the query is sent again, and can be async. A session
-option of the same name applies to queries without their own.
+The callback runs before the query is sent again, and can be async. An
+`egress` or session option of the same name applies to queries without their
+own.
 
 | Key                           | Default | Purpose                                                         |
 | ----------------------------- | ------- | --------------------------------------------------------------- |
@@ -1818,19 +1846,18 @@ A query that fails on the server throws a `QwpEgressQueryError` from the
 iteration and rejects `completion`. It has `status`, `message`, and the
 session-local `requestId`. For SQL errors the message starts with the position
 of the error, as in `[14] table does not exist [table=no_such_table]`. The
-session remains usable:
+lease remains usable:
 
 ```typescript
 import {
   QwpEgressQueryError,
-  connectQwpNodeEgress,
+  connectQwpNodeClient,
 } from "@questdb/nodejs-client";
 
-const session = await connectQwpNodeEgress({
-  url: "ws://localhost:9000/read/v1",
-});
+const db = await connectQwpNodeClient("ws::addr=localhost:9000;");
+const lease = await db.borrowQuery();
 try {
-  const query = await session.query("SELECT * FROM no_such_table");
+  const query = await lease.query("SELECT * FROM no_such_table");
   for await (const batch of query) console.log(batch.rowCount);
   await query.completion;
 } catch (error) {
@@ -1838,7 +1865,8 @@ try {
   // status 5: [14] table does not exist [table=no_such_table]
   console.error(`status ${error.status}: ${error.message}`);
 } finally {
-  await session.close();
+  await lease.close();
+  await db.close();
 }
 ```
 

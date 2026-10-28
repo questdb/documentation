@@ -352,7 +352,10 @@ capability mismatch, the poison-frame detector, or the producer hitting
 `sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
 `append()`. ⚠ The Java client treats an authentication rejection or a
 durable-ack capability mismatch as terminal only before the sender first
-connects, and retries them afterwards.
+connects, and retries them afterwards. A Node.js sender that uses
+store-and-forward or `initial_connect_retry=async` does the same once it has
+connected, as do some browser senders: see
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
 
@@ -437,9 +440,11 @@ names the failure class in its error, and the next query connects again.
 client's `auth` option also accepts a function that supplies a credential
 before every connection attempt, and some Node.js and browser senders retry a
 rejected credential once they have connected, as described in
-[Reconnect and outage handling](#reconnect-and-outage-handling). The other
-clients send fixed credentials only, and treat a `401` or `403` as terminal in
-every phase.
+[Reconnect and outage handling](#reconnect-and-outage-handling). A browser
+query session that authenticates with `auth` cannot see the status of a failed
+upgrade, so instead of failing the query it fails over as it would during an
+outage, until its failover limits run out. The other clients send fixed credentials only,
+and treat a `401` or `403` as terminal in every phase.
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 

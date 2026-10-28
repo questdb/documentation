@@ -215,11 +215,18 @@ are still delivered.
 
 ## Choose an API
 
+Create one [pooled client](#the-pooled-client) per application with
+`connectQwpBrowserClient()`, and share it between the components that write
+and read: it lends senders and query leases from pools that one set of options
+configures, as the quick start shows. A standalone sender or query session
+takes the same connection and authentication options, for a page that needs
+one connection.
+
 | You need                                     | Use                                      | Returns                                                 |
 | -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
-| Ingestion and queries in one component       | `connectQwpBrowserClient(options)`       | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
-| Ingestion only                               | `connectQwpBrowserSender(options)`       | `QwpSender`                                             |
-| Queries only, such as a dashboard            | `connectQwpBrowserEgress(options)`       | `QwpEgressSession`                                      |
+| An application that ingests, queries, or both | `connectQwpBrowserClient(options)`      | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
+| One ingestion connection                     | `connectQwpBrowserSender(options)`       | `QwpSender`                                             |
+| One query connection                         | `connectQwpBrowserEgress(options)`       | `QwpEgressSession`                                      |
 | Repeated object rows with a fixed schema     | `sender.writer(table, schema)`           | `QwpTableWriter`                                        |
 | A session cookie before connecting           | `bootstrapQwpBrowserSession(options)`    | `{ url, status, serviceAccount }`                       |
 
@@ -334,6 +341,18 @@ terminates TLS and reaches QuestDB over plain HTTP, set
 on QuestDB, or the `https://` origin fails the same-origin check. Enable it only
 when QuestDB's HTTP port is reachable through the proxy alone.
 
+QuestDB sets its session cookie, `qdb_session`, with `HttpOnly`,
+`SameSite=Strict`, and a 30-day `Max-Age`, and adds `Secure` only when it
+serves TLS itself. Behind a proxy that terminates TLS, the cookie therefore
+lacks `Secure`, and the browser also sends it over plain HTTP. Mark it
+`Secure` at the proxy, in the `location` block above:
+
+```nginx
+proxy_cookie_flags qdb_session secure;
+# QuestDB Enterprise, when sessionBootstrap sets a serviceAccount
+proxy_cookie_flags qdbServiceAccount secure;
+```
+
 ### Applications on another origin
 
 An application served from its own origin, such as
@@ -360,20 +379,22 @@ TLS: put a reverse proxy that terminates TLS in front of it, or use the
 ## Authentication
 
 A browser cannot add an `Authorization` header to a WebSocket upgrade, so the
-client authenticates in one of two ways:
+client authenticates with a session cookie or with a credential sent in every
+upgrade. Choose by where the page is served and by whether its credential can
+expire while the page is open:
 
-| Application                                                 | Mechanism                                                  | Option                                              |
-| ----------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------- |
-| On QuestDB's origin, usually through a reverse proxy        | An HttpOnly session cookie, created by a REST request      | `sessionBootstrap`, or `bootstrapQwpBrowserSession()` |
-| On its own origin, listed in `qwp.browser.allowed.origins`  | A credential sent with every WebSocket upgrade             | `auth`                                              |
+| Page origin                                      | Credential                                                       | Use                                                                                  | `qwp.browser.allowed.origins` |
+| ------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------- |
+| QuestDB's own, usually through a reverse proxy   | Stays valid while the page is open, such as a REST token         | `sessionBootstrap` or `bootstrapQwpBrowserSession()`, which set a session cookie     | Not needed                    |
+| QuestDB's own                                    | Expires while the page is open, such as a per-user OIDC token    | `auth` with a function that returns a fresh credential                               | Must list QuestDB's own origin |
+| Its own                                          | Any, with a function for one that expires                        | `auth`                                                                               | Must list the page's origin   |
 
 Both take a credential in one of two forms: `{ type: "bearer", token }` for a
 QuestDB Enterprise REST token or an OIDC access token, or
 `{ type: "basic", username, password }`. A connection uses one mechanism:
-`auth` cannot be combined with `sessionBootstrap`. `sessionBootstrap` cannot
-refresh a credential that expires while the page is open, such as an OIDC
-access token: use an `auth` function for such credentials, on QuestDB's own
-origin as well.
+`auth` cannot be combined with `sessionBootstrap`. `sessionBootstrap` sends the
+same credential before every connection attempt, so once that credential
+expires, reconnects fail: see [Session cookies](#session-cookies).
 
 ### Session cookies
 
@@ -584,6 +605,82 @@ queries keep working, while DDL and ingestion fail on the whole HTTP port.
 | Service account with `auth`                | Not available: `auth` creates no session                       | Use `sessionBootstrap` with `serviceAccount`, or authenticate as the service account       |
 | Mutual TLS (client certificates)           | Not supported. QuestDB does not negotiate client certificates  | Use a token over `wss`                                                                     |
 
+## The pooled client
+
+`connectQwpBrowserClient()` returns a `QwpClient`: one handle with a pool of
+sender connections and a pool of query connections. Endpoints, authentication,
+and the connection settings both sides share go in `cluster`. Callbacks such
+as [`onSenderError`](#server-rejections),
+[`reconnect`](#failover-and-reconnect) with its `onEvent`, and other
+side-specific options go in `ingress` and `egress`, and pool sizes in `pool`:
+
+```typescript
+import { connectQwpBrowserClient } from "@questdb/browser-client";
+
+// Your identity provider SDK: returns a current OIDC access token.
+declare function getAccessToken(signal: AbortSignal): Promise<string>;
+
+const db = await connectQwpBrowserClient({
+  cluster: {
+    url: "wss://questdb-a.example.com:9000",
+    failoverUrls: ["wss://questdb-b.example.com:9000"],
+    // Called before every connection attempt, so a token can expire safely
+    auth: async ({ signal }) => ({
+      type: "bearer",
+      token: await getAccessToken(signal),
+    }),
+  },
+  ingress: {
+    autoFlushRows: 5_000,
+    onSenderError: (error) => console.error("rejected:", error.category),
+    reconnect: {
+      onEvent: (event) => console.info("ingestion connection:", event.kind),
+    },
+  },
+  egress: {
+    compression: "zstd",
+    initialCredit: 1024 * 1024,
+    reconnect: {
+      onEvent: (event) => console.info("query connection:", event.kind),
+    },
+  },
+  pool: { senderPoolMax: 2, queryPoolMax: 4 },
+});
+try {
+  const lease = await db.borrowQuery();
+  try {
+    const query = await lease.query("SELECT count() FROM trades");
+    for await (const batch of query) console.log(batch.get(0, 0));
+    await query.completion;
+  } finally {
+    await lease.close();
+  }
+} finally {
+  await db.close();
+}
+```
+
+- `cluster.url` and `failoverUrls` take an origin, a base path under a reverse
+  proxy, or an endpoint. Each pool derives its own route, `/write/v4` or
+  `/read/v1`, and a `sessionBootstrap` without a `url` derives `/exec` for
+  every endpoint.
+- Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
+  `cluster`, TypeScript rejects them and plain JavaScript ignores them without
+  an error.
+- `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows
+  and returns the connection without waiting for acknowledgements, so call
+  `flushAndWait()` first where you need them.
+- `borrowQuery()` lends a `QwpQueryLease` with `query()` and `queryViews()`.
+  Each lease runs one query at a time: borrow one per concurrent query.
+- Pool options: `senderPoolMin` and `queryPoolMin` (`1`, and `0` opens no
+  connection until a borrow), `senderPoolMax` and
+  `queryPoolMax` (`4`), `acquireTimeoutMs` (`5000`), `idleTimeoutMs`
+  (`60000`), and `maxLifetimeMs` (`1800000`). A borrow that waits longer than
+  `acquireTimeoutMs` rejects with `QwpPoolAcquireTimeoutError`.
+- `connectQwpBrowserClient()` rejects with `QwpPoolResourceError` when it
+  cannot open the minimum connections. `createQwpBrowserClient()` returns
+  without connecting.
+
 ## Data ingestion
 
 ### Writing rows
@@ -634,11 +731,33 @@ producer down when the queue is full. A sender is not safe to share between
 independent producers: give each producer its own. See
 [Concurrency](#concurrency).
 
-A setter that rejects a value throws, and `at()` rejects with the error. Either
-way, the sender discards the row in progress, including its table selection,
-and keeps the rows completed before it. `cancelRow()` discards the row in
-progress without an error, and `reset()` also discards every row not yet
-flushed.
+A setter that rejects a value throws, and the sender discards the row in
+progress, including its table selection, and keeps the rows completed before
+it. `at()` rejects an invalid timestamp the same way, but it also rejects when
+the auto-flush that the row triggered fails. That row is complete and stays
+queued for the next flush, so writing it again would duplicate it. Catch row
+errors around the setters, and let a rejected `at()` propagate:
+
+```typescript
+// sender and trades: as in the example above
+for (const trade of trades) {
+  try {
+    sender
+      .table("trades")
+      .symbol("symbol", trade.symbol)
+      .floatColumn("price", trade.price); // TypeError if price is a string
+  } catch (error) {
+    console.warn("skipped a trade:", error); // only this row is dropped
+    continue;
+  }
+  // Rejects if the auto-flush this row triggered fails. The row is then
+  // queued, not dropped, so the error propagates instead of being skipped.
+  await sender.at(Date.now(), "ms");
+}
+```
+
+`cancelRow()` discards the row in progress without an error, and `reset()`
+also discards every row not yet flushed.
 
 ### Column types
 
@@ -710,7 +829,7 @@ await sender
 
 `at(value, unit)` sets the
 [designated timestamp](/docs/concepts/designated-timestamp/) from your data, and
-`atNow()` lets the server assign the time the row arrives:
+`atNow()` lets the server assign the time the batch arrives:
 
 ```typescript
 // sender: a QwpSender, created as in Writing rows
@@ -729,7 +848,7 @@ await sender
   .floatColumn("price", 2615.54)
   .at(1_735_689_600_123_456_789n, "ns");
 
-// Server-assigned timestamp
+// Server-assigned timestamp, shared by every row of the batch
 await sender
   .table("trades")
   .symbol("symbol", "ETH-USDT")
@@ -738,9 +857,15 @@ await sender
 ```
 
 The unit is `"ns"`, `"us"`, or `"ms"`, and defaults to `"us"`. A `Date` is not
-accepted: pass `date.getTime()` with `"ms"`. Prefer the event's own timestamp
-over `atNow()`: [deduplication](/docs/concepts/deduplication/) relies on it to
-discard rows replayed after a reconnect.
+accepted: pass `date.getTime()` with `"ms"`.
+
+`atNow()` gives every row of a batch the same timestamp: the time QuestDB
+receives the batch, not the time each row was written. On a table with
+[deduplication](/docs/concepts/deduplication/), rows flushed together can then
+share a key, and QuestDB keeps only one of them: with
+`DEDUP UPSERT KEYS(timestamp, symbol)`, two trades of one symbol in a batch
+become one row. Use the event's own timestamp with `at()` instead.
+Deduplication also relies on it to discard rows replayed after a reconnect.
 
 ### Compiled object-row writers
 
@@ -1169,79 +1294,112 @@ are the same in the browser.
 as a URL parameter, and the decoder is part of the package.
 `session.negotiatedCompression` reports what the server chose.
 
-## The pooled client
+## Using the client in UI components
 
-`connectQwpBrowserClient()` returns a `QwpClient`: one handle with a pool of
-sender connections and a pool of query connections. Endpoints, authentication,
-and the connection settings both sides share go in `cluster`. Callbacks such
-as `onSenderError`, `reconnect` with its `onEvent`, and other side-specific
-options go in `ingress` and `egress`, and pool sizes in `pool`:
+In a React, Vue, or similar application, create the pooled client once and
+share it: a client per component multiplies connections, and one created in a
+component is created again on every mount. Each component borrows a query
+lease for its own queries and stops them when it unmounts. There is no live
+subscription: a view that must stay current runs its query again, on a timer
+or after the data changes.
 
 ```typescript
-import { connectQwpBrowserClient } from "@questdb/browser-client";
+import {
+  connectQwpBrowserClient,
+  type QwpBrowserAuthProvider,
+  type QwpClient,
+} from "@questdb/browser-client";
 
-// Your identity provider SDK: returns a current OIDC access token.
-declare function getAccessToken(signal: AbortSignal): Promise<string>;
+// Your credential provider, as in Authentication
+declare const auth: QwpBrowserAuthProvider;
 
-const db = await connectQwpBrowserClient({
-  cluster: {
-    url: "wss://questdb-a.example.com:9000",
-    failoverUrls: ["wss://questdb-b.example.com:9000"],
-    // Called before every connection attempt, so a token can expire safely
-    auth: async ({ signal }) => ({
-      type: "bearer",
-      token: await getAccessToken(signal),
-    }),
-  },
-  ingress: {
-    autoFlushRows: 5_000,
-    onSenderError: (error) => console.error("rejected:", error.category),
-    reconnect: {
-      onEvent: (event) => console.info("ingestion connection:", event.kind),
-    },
-  },
-  egress: {
-    compression: "zstd",
-    initialCredit: 1024 * 1024,
-    reconnect: {
-      onEvent: (event) => console.info("query connection:", event.kind),
-    },
-  },
-  pool: { senderPoolMax: 2, queryPoolMax: 4 },
-});
-try {
-  const lease = await db.borrowQuery();
-  try {
-    const query = await lease.query("SELECT count() FROM trades");
-    for await (const batch of query) console.log(batch.get(0, 0));
-    await query.completion;
-  } finally {
-    await lease.close();
-  }
-} finally {
-  await db.close();
+// One client for the application, created on first use. A failed connection
+// is forgotten, so the next call tries again.
+let client: Promise<QwpClient> | undefined;
+
+export function questdb(): Promise<QwpClient> {
+  client ??= connectQwpBrowserClient({
+    cluster: { url: "wss://questdb.example.com:9000", auth },
+    egress: { initialCredit: 1024 * 1024 }, // lets cancel() stop a query
+  }).catch((error) => {
+    client = undefined;
+    throw error;
+  });
+  return client;
+}
+
+// Call on logout, or when the application shuts down.
+export async function closeQuestDB(): Promise<void> {
+  const closing = client;
+  client = undefined;
+  const db = await closing?.catch(() => undefined);
+  await db?.close();
+}
+
+// Runs the query every intervalMs and passes each result to onRows, until the
+// returned function is called, such as when the component unmounts.
+export function watchCandles(
+  symbol: string,
+  onRows: (rows: unknown[]) => void,
+  intervalMs = 5_000,
+): () => void {
+  let stopped = false;
+  let running: { cancel(): Promise<void> } | undefined;
+  const refresh = async () => {
+    const lease = await (await questdb()).borrowQuery();
+    try {
+      const rows: unknown[] = [];
+      const query = await lease.query(
+        "SELECT timestamp, first(price) AS open, last(price) AS close " +
+          "FROM trades WHERE timestamp IN '$today' AND symbol = $1 " +
+          "SAMPLE BY 1m",
+        {
+          binds: (binds) => binds.setVarchar(0, symbol),
+          onFailoverReset: () => {
+            rows.length = 0; // the query restarts from its first row
+          },
+        },
+      );
+      running = query;
+      for await (const batch of query) rows.push(...batch.rows());
+      await query.completion;
+      if (!stopped) onRows(rows);
+    } finally {
+      running = undefined;
+      await lease.close();
+    }
+  };
+  const loop = async () => {
+    while (!stopped) {
+      // A failed round, such as one while QuestDB is unreachable, is retried
+      await refresh().catch((error) => {
+        if (!stopped) console.error("candles failed:", error);
+      });
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  };
+  void loop();
+  return () => {
+    stopped = true;
+    running?.cancel().catch(() => {});
+  };
 }
 ```
 
-- `cluster.url` and `failoverUrls` take an origin, a base path under a reverse
-  proxy, or an endpoint. Each pool derives its own route, `/write/v4` or
-  `/read/v1`, and a `sessionBootstrap` without a `url` derives `/exec` for
-  every endpoint.
-- Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
-  `cluster`, TypeScript rejects them and plain JavaScript ignores them without
-  an error.
-- `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows
-  and returns the connection without waiting for acknowledgements, so call
-  `flushAndWait()` first where you need them.
-- `borrowQuery()` lends a `QwpQueryLease` with `query()` and `queryViews()`.
-  Each lease runs one query at a time: borrow one per concurrent query.
-- Pool options: `senderPoolMin` and `queryPoolMin` (`1`), `senderPoolMax` and
-  `queryPoolMax` (`4`), `acquireTimeoutMs` (`5000`), `idleTimeoutMs`
-  (`60000`), and `maxLifetimeMs` (`1800000`). A borrow that waits longer than
-  `acquireTimeoutMs` rejects with `QwpPoolAcquireTimeoutError`.
-- `connectQwpBrowserClient()` rejects with `QwpPoolResourceError` when it
-  cannot open the minimum connections. `createQwpBrowserClient()` returns
-  without connecting.
+- `watchCandles()` returns its own cleanup, so a React effect is one line:
+  `useEffect(() => watchCandles(symbol, setCandles), [symbol])`. In
+  development, React's StrictMode mounts each effect twice: the second call
+  reuses the shared client, and the first cleanup stops the first loop.
+- `cancel()` stops a running query at once because the client sets a positive
+  `initialCredit`, as
+  [Cancellation, timeouts, and failover](#cancellation-timeouts-and-failover)
+  explains.
+- `onFailoverReset` clears the rows of an attempt that a failover interrupted,
+  so a result never holds rows twice.
+- Call `closeQuestDB()` on logout or when the application shuts down, not when
+  a component unmounts. The browser does not wait for `close()` while a page
+  unloads, so call `flushAndWait()` wherever rows must be stored, as
+  [Waiting for acknowledgements](#waiting-for-acknowledgements) describes.
 
 ## Concurrency
 
