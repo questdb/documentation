@@ -787,6 +787,11 @@ module.exports = {
       type: "category",
       items: [
         {
+          id: "security/governance",
+          type: "doc",
+          label: "Governance and auditing",
+        },
+        {
           id: "security/rbac",
           type: "doc",
           label: "Role-Based Access Control (RBAC)",
