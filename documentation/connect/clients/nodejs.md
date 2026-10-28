@@ -163,6 +163,12 @@ queued and are still delivered.
   after `flush()` has returned. Register `onSenderError` to observe it, and
   expect a terminal rejection to end the sender. See
   [Server rejections](#server-rejections).
+- **Delivery is at least once.** After a reconnect, a sender replays every
+  batch that QuestDB has not acknowledged, and QuestDB may already have stored
+  some of them. If a table must not hold duplicate rows, declare
+  [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) on the columns that
+  identify a row, as the
+  [production example](#production-example-tls-token-and-multiple-hosts) does.
 - **An acknowledgement is not visibility.** QuestDB applies acknowledged rows
   to the table shortly afterwards, so a query issued straight after
   `flushAndWait()` can miss them. Poll with a deadline, as above.
@@ -179,21 +185,35 @@ queued and are still delivered.
 
 ## Choose an API
 
-Start a new service with [`connectQwpNodeClient()`](#the-pooled-client), also
-one that only ingests or only queries. It takes one connect string,
-credentials included, for both directions, and lends senders and query leases
-from a pool. A service that only ingests sets `query_pool_min=0`, and one that
-only queries sets `sender_pool_min=0`, so the unused side opens no connection.
-It is also the only entry point that queries with a connect string:
-`connectQwpNodeEgress()` takes an [options object](#options-objects), with
-credentials in `authorization` rather than `token`.
+Pick the entry point by what the service does:
 
-All entry points share one QWP implementation:
+- **It queries, or it writes from several concurrent tasks:**
+  [`connectQwpNodeClient()`](#the-pooled-client). One connect string,
+  credentials included, configures both directions, and the client lends each
+  task its own sender or query lease from a pool. A service that only queries
+  sets `sender_pool_min=0`, and one that only writes sets `query_pool_min=0`,
+  so the unused side opens no connection.
+- **It writes from one producer:** a standalone sender, from
+  `Sender.fromConfig()` with a connect string or `connectQwpNodeSender()` with
+  an options object. Its `close()` waits for QuestDB to acknowledge the
+  remaining rows and rejects when they do not arrive in time. A borrowed
+  sender's `close()` returns without waiting, and `db.close()` logs a warning
+  instead of rejecting when acknowledgements are missing. With
+  [store-and-forward](#store-and-forward), a standalone sender's journal is
+  `<sf_dir>/<sender_id>`, while each pooled sender has its own
+  `<sf_dir>/<sender_id>-<index>`. The
+  [production example](#production-example-tls-token-and-multiple-hosts) is
+  such a service.
+
+`connectQwpNodeClient()` is the only entry point that queries with a connect
+string: `connectQwpNodeEgress()` takes an [options object](#options-objects),
+with credentials in `authorization` rather than `token`. All entry points share
+one QWP implementation:
 
 | You need                                                         | Use                                   | Returns                                                 |
 | ---------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------- |
-| A new service that ingests, queries, or both                     | `connectQwpNodeClient(connectString)` | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
-| Code written for the ILP `Sender`, or one ingestion connection   | `Sender.fromConfig("ws::...")`        | `Sender`                                                |
+| A service that queries, or writes from several concurrent tasks  | `connectQwpNodeClient(connectString)` | `QwpClient`, which lends `QwpSender` and `QwpQueryLease` |
+| One ingestion producer, or code written for the ILP `Sender`     | `Sender.fromConfig("ws::...")`        | `Sender`                                                |
 | One ingestion connection configured by an object                 | `connectQwpNodeSender({ url, ... })`  | `QwpSender`                                             |
 | One query connection configured by an object                     | `connectQwpNodeEgress({ url, ... })`  | `QwpEgressSession`                                      |
 | Repeated object rows with a fixed schema                         | `sender.writer(table, schema)`        | `QwpTableWriter`                                        |
@@ -229,7 +249,7 @@ The format is `schema::key=value;key=value;`:
 
 - `ws` selects plain WebSocket, `wss` selects TLS. Both default to port `9000`.
 - `addr=host:port` names the server. List several hosts for
-  [failover](#failover-and-high-availability), comma-separated or as repeated
+  [failover](#reconnection-and-failover), comma-separated or as repeated
   `addr` keys.
 - Keys are case-sensitive. A literal `;` inside a value is written `;;`.
 - Sizes accept the suffixes `k`, `m`, `g`, and `t`, as in `sf_max_total_bytes=10g`.
@@ -1585,26 +1605,31 @@ tasks:
 
 The `QwpClient` handle itself is safe to share across tasks.
 
-## Failover and high availability
+## Reconnection and failover
+
+Senders and query sessions reconnect on their own when a connection drops,
+for example when QuestDB restarts, the network fails, or QuestDB closes an
+idle connection. This applies to a single open source server as well as to a
+cluster, and so do the rules below for replayed rows, re-executed queries, and
+retry limits.
 
 :::note Enterprise
 
-Failing over between QuestDB hosts requires QuestDB Enterprise with
-replication. Open source QuestDB runs as a single node.
+Failing over to another QuestDB host requires QuestDB Enterprise with
+replication. Open source QuestDB runs as a single node, and the client
+reconnects to it.
 
 Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
-List every node of the cluster in `addr`:
+To fail over between the nodes of a cluster, list every node in `addr`:
 
 ```text
 wss::addr=db-a:9000,db-b:9000,db-c:9000;token=YOUR_TOKEN;
 ```
 
-### Ingestion failover
+### Ingestion reconnects and failover
 
-- **Writes find the primary.** A replica rejects the upgrade, and the sender
-  moves on to the next endpoint until it reaches the primary.
 - **A connected sender never gives up.** After an outage it retries with
   jittered exponential backoff, from `reconnect_initial_backoff_millis` (100)
   up to `reconnect_max_backoff_millis` (5000), until `close()` or a terminal
@@ -1625,18 +1650,21 @@ wss::addr=db-a:9000,db-b:9000,db-c:9000;token=YOUR_TOKEN;
 - **A batch the server keeps rejecting** becomes terminal after
   `max_frame_rejections` (4) consecutive rejections over at least
   `poison_min_escalation_window_millis` (5000) of connected time.
+- **Writes find the primary.** With several endpoints, a replica rejects the
+  upgrade, and the sender moves on to the next endpoint until it reaches the
+  primary.
 
 <SfDedupWarning />
 
-### Query failover
+### Query reconnects and failover
 
-A query session reconnects to the next healthy endpoint when its connection
-fails, and runs the active query again from the start. SQL errors do not
-trigger failover.
+A query session reconnects when its connection fails, to the next healthy
+endpoint when `addr` lists several, and runs the active query again from the
+start. SQL errors do not trigger a reconnect.
 
 :::warning Re-executed queries deliver rows again
 
-After a failover, the query restarts from its first row. Batches you already
+After a reconnect, the query restarts from its first row. Batches you already
 consumed are delivered again, so code that accumulates results sees duplicate
 rows unless it clears them in `onFailoverReset`. A statement such as an
 `INSERT` or `UPDATE` runs again too, and can take effect twice: see
@@ -1666,10 +1694,10 @@ own.
 | Key                           | Default | Purpose                                                         |
 | ----------------------------- | ------- | --------------------------------------------------------------- |
 | `failover`                    | `on`    | `off` surfaces connection failures without reconnecting         |
-| `failover_max_attempts`       | `8`     | Endpoint sweeps per failover                                    |
+| `failover_max_attempts`       | `8`     | Endpoint sweeps per reconnect                                   |
 | `failover_backoff_initial_ms` | `50`    | First delay between sweeps                                      |
 | `failover_backoff_max_ms`     | `1000`  | Longest delay between sweeps                                    |
-| `failover_max_duration_ms`    | `30000` | Time limit per failover. `0` disables it                        |
+| `failover_max_duration_ms`    | `30000` | Time limit per reconnect. `0` disables it                       |
 | `target`                      | `any`   | Server role a query accepts: `any`, `primary`, or `replica`     |
 | `zone`                        | unset   | Preferred zone. Endpoints in other zones remain a fallback      |
 
@@ -1683,7 +1711,8 @@ Close that lease and borrow again, and the pool opens a new connection.
 
 `target` and `zone` route queries only, because writes always go to the
 primary. As options, the failover keys go in `reconnect`
-(`failoverMaxAttempts` and so on), and `reconnect: false` turns failover off.
+(`failoverMaxAttempts` and so on), and `reconnect: false` turns reconnecting
+off.
 
 ### Connection events
 
@@ -1746,7 +1775,7 @@ await sender.close();
 Each event has `kind`, `attempt`, `timestampMs`, `endpoint`,
 `previousEndpoint`, and `cause`. When a query session reconnects, the active
 query restarts from its first row: clear rows you accumulated in
-[`onFailoverReset`](#query-failover), or they appear twice.
+[`onFailoverReset`](#query-reconnects-and-failover), or they appear twice.
 
 ## Error handling
 
@@ -2011,6 +2040,11 @@ A long-running ingestion service with TLS, a bearer token, two endpoints, a
 disk journal, error and connection callbacks, and a clean shutdown. It consumes
 trades in batches from an upstream queue, such as a Kafka topic, and commits
 each batch upstream once the batch is on disk in the store-and-forward journal.
+
+The service has one producer and runs no queries, so it uses a standalone
+`Sender` rather than the pooled client, as [Choose an API](#choose-an-api)
+recommends. Its journal is `<sf_dir>/feed-1`, and its `close()` rejects when
+acknowledgements are missing instead of logging a warning.
 
 Create `trades` before the first start. Replay after a reconnect or a restart
 is at least once, so the table deduplicates on the identity of a trade: the

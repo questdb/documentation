@@ -198,6 +198,11 @@ are still delivered.
   after `flush()` has returned. Register `onSenderError` to observe it, and
   expect a terminal rejection to end the sender. See
   [Server rejections](#server-rejections).
+- **Delivery is at least once.** After a reconnect, a sender replays every
+  batch that QuestDB has not acknowledged, and QuestDB may already have stored
+  some of them. If a table must not hold duplicate rows, declare
+  [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) on the columns that
+  identify a row, such as the timestamp, the symbol, and an order ID.
 - **An acknowledgement is not visibility.** QuestDB applies acknowledged rows
   to the table shortly afterwards, so a query issued straight after
   `flushAndWait()` can miss them. Poll with a deadline, as above.
@@ -300,19 +305,30 @@ lists every option.
 
 ## Deployment
 
-QuestDB accepts a browser's WebSocket upgrade when the page has the same
-origin as QuestDB, or when the page's origin is listed in
-`qwp.browser.allowed.origins`. It rejects every other origin, which protects
-the server from cross-site WebSocket hijacking.
+QuestDB accepts a browser's WebSocket upgrade on its QWP routes, `/write/v4`
+and `/read/v1`, when the page has the same origin as QuestDB, or when the
+page's origin is listed in `qwp.browser.allowed.origins`. It treats a page as
+same-origin when the upgrade's `Origin` header matches its `Host` header. It
+rejects every other origin, which protects the server from cross-site
+WebSocket hijacking.
 
 :::warning Enable authentication before you expose QuestDB
 
-The origin check stops other web pages from using a visitor's browser to reach
-QuestDB. It does not stop other clients, which can leave out the `Origin`
-header or send any value. A reverse proxy or an allowed origin makes QuestDB
-reachable from wherever your application is. Without authentication, anyone
-who reaches it there can read, change, and drop every table, through `/exec` or
-a QWP query. QuestDB open source runs without authentication unless
+The origin check is not access control:
+
+- It covers only the QWP routes. `/exec` and QuestDB's other REST endpoints
+  do not check the origin: any web page can make a visitor's browser send them
+  a request, and without authentication QuestDB runs it.
+- It compares the `Origin` header with the `Host` header, so a DNS-rebinding
+  attack, which reaches QuestDB under the attacker's own host name, gets
+  through.
+- Clients other than browsers can leave out the `Origin` header or send any
+  value.
+
+A reverse proxy or an allowed origin makes QuestDB reachable from wherever
+your application is. Without authentication, anyone who reaches it there can
+read, change, and drop every table, through `/exec` or a QWP query. QuestDB
+open source runs without authentication unless
 [`http.user` and `http.password`](/docs/configuration/http-server/#authentication)
 are set. Enable authentication before you expose QuestDB beyond a trusted
 network, and choose credentials as
