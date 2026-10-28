@@ -110,7 +110,7 @@ rows from `sys.view_audit`, the audit trail of
 4.1.0, a principal granted the permission a statement needs, on the table or
 `ON ALL TABLES`, could run it. After the upgrade, every other principal is
 refused them, whatever it holds, with
-`only the built-in admin can erase rows of the view audit table`:
+`only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
 
 - `TRUNCATE TABLE`
 - `ALTER TABLE DROP PARTITION`, `SQUASH PARTITIONS`, and `DETACH PARTITION`

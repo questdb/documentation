@@ -436,7 +436,7 @@ Only the [built-in admin](/docs/security/rbac/#built-in-admin) can remove rows,
 or set the table up to remove them. Every other principal is refused these
 statements, whatever it holds, including `DATABASE ADMIN` and grants
 `ON ALL TABLES`. Each fails with
-`only the built-in admin can erase rows of the view audit table`:
+`only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
 
 - [`TRUNCATE TABLE`](/docs/query/sql/truncate/)
 - [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
