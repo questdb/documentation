@@ -76,8 +76,8 @@ token.
 The following module creates a table, writes a trade, waits for QuestDB to
 acknowledge it, and reads it back. It assumes that the page and QuestDB share
 an origin, which a reverse proxy provides, and that QuestDB authentication is
-off. Later sections cover [deployment](#deployment) and
-[authentication](#authentication).
+off, as on a development machine. Later sections cover
+[deployment](#deployment) and [authentication](#authentication).
 
 :::tip Local development
 
@@ -305,6 +305,21 @@ origin as QuestDB, or when the page's origin is listed in
 `qwp.browser.allowed.origins`. It rejects every other origin, which protects
 the server from cross-site WebSocket hijacking.
 
+:::warning Enable authentication before you expose QuestDB
+
+The origin check stops other web pages from using a visitor's browser to reach
+QuestDB. It does not stop other clients, which can leave out the `Origin`
+header or send any value. A reverse proxy or an allowed origin makes QuestDB
+reachable from wherever your application is. Without authentication, anyone
+who reaches it there can read, change, and drop every table, through `/exec` or
+a QWP query. QuestDB open source runs without authentication unless
+[`http.user` and `http.password`](/docs/configuration/http-server/#authentication)
+are set. Enable authentication before you expose QuestDB beyond a trusted
+network, and choose credentials as
+[Choosing credentials](#choosing-credentials) describes.
+
+:::
+
 ### Same-origin applications
 
 A reverse proxy serves the application and forwards QuestDB's routes on the
@@ -515,7 +530,11 @@ await sender.close();
 - A function that throws fails the attempt with a `QwpUpgradeError` of kind
   `"authentication"`, with the thrown error as `cause`, and connection events
   report it as `endpoint-attempt-failed`. Reconnects retry it with backoff,
-  unless the thrown error has `retryable: false`, as shown below.
+  unless the thrown error has `retryable: false`, as shown below. Such a
+  failure stops the sweep before it reaches an endpoint, so it never raises
+  `all-endpoints-unreachable`. An outage of your identity provider therefore
+  does not show in a banner driven by that event: report it from the function
+  itself.
 - The credential is base64url-encoded, not encrypted: use `wss:`.
 - QuestDB accepts the credential only from an origin in
   `qwp.browser.allowed.origins`, including QuestDB's own origin if a page
@@ -665,8 +684,8 @@ try {
   `/read/v1`, and a `sessionBootstrap` without a `url` derives `/exec` for
   every endpoint.
 - Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
-  `cluster`, TypeScript rejects them and plain JavaScript ignores them without
-  an error.
+  `cluster`, TypeScript rejects them, and plain JavaScript passes them to both
+  sides: a `reconnect` there applies to the senders and the query sessions.
 - `borrowSender()` lends a `QwpSender`. Its `close()` publishes completed rows
   and returns the connection without waiting for acknowledgements, so call
   `flushAndWait()` first where you need them.
@@ -1026,6 +1045,13 @@ try {
 
 A transaction is atomic per table. `close()` does not commit: QuestDB rolls the
 open transaction back.
+
+QuestDB acknowledges the batches of an open transaction only when it commits,
+so they stay in the replay queue until then. A transaction must fit in that
+queue, 128 MiB by default (`memoryReplayMaxBytes`). A larger one makes `at()`
+and `flush()` wait for space, as in [Backpressure](#backpressure), and then
+reject with `QwpMemoryReplayAppendTimeoutError`, and none of its rows are
+committed. Commit large imports in parts.
 
 ### Durable acknowledgement
 
@@ -1543,6 +1569,12 @@ const sender = await connectQwpBrowserSender({
 await sender.close();
 ```
 
+This banner does not show an outage of your identity provider. An `auth`
+function that throws stops the sweep before it reaches an endpoint, and reports
+`endpoint-attempt-failed` only, as
+[Credentials for applications on another origin](#credentials-for-applications-on-another-origin)
+describes.
+
 ## Error handling
 
 ### Errors from calls
@@ -1551,7 +1583,7 @@ await sender.close();
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | A column setter, `at()`, `row()`     | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value. A plain `Error` for a setter called before `table()`, or for a column this sender wrote with another type | Fix the value. Only that row is discarded        |
 | Connecting                           | `QwpUpgradeError`, usually of kind `"opaque"`, or `QwpBrowserSessionBootstrapError`. With `failoverUrls`, `QwpFailoverError`. With `initialConnectMode: "sync"`, `QwpReconnectExhaustedError` | Check the URL, origin allowlist, and credentials |
-| `connectQwpBrowserClient()`          | `QwpPoolResourceError`, with the connection error as `cause`                                                                                                                  | As for connecting                                |
+| `connectQwpBrowserClient()`, a borrow that opens a connection | `QwpPoolResourceError`, with the connection error as `cause`                                                                                                 | As for connecting                                |
 | `flushAndWait()`, `waitForAck()`     | `QwpIngressNackError` with a `senderError` payload, when QuestDB rejects a batch during the wait                                                                              | See [Server rejections](#server-rejections)      |
 | Any later call, `close()` included   | `QwpReplayRejectedError`, once a rejected batch has ended the sender                                                                                                          | Close the sender and create a new one. See below |
 | `flush()`, `at()` under backpressure | `QwpMemoryReplayAppendTimeoutError`                                                                                                                                           | Slow the producer, or raise the limits           |

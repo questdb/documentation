@@ -844,7 +844,9 @@ explicit setter always wins over the string.
   forever. Default: `60000`.
 - `max_lifetime_ms` — maximum age of a connection; the housekeeper closes and
   reopens older ones once idle. `0` means no age limit. Default: `1800000`
-  (30 min).
+  (30 min). The Node.js client applies it only to idle connections above
+  `sender_pool_min` and `query_pool_min`, and closes them without opening
+  replacements.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
 - `lazy_connect` — when `on`, the pool defers opening its first connection

@@ -407,7 +407,10 @@ try {
 - Every endpoint in `addr` serves both pools, and each pool derives its route,
   `/write/v4` or `/read/v1`, from it.
 - `connectQwpNodeClient()` opens the configured minimum of connections before
-  it resolves, and rejects with `QwpPoolResourceError` when it cannot.
+  it resolves, and rejects with `QwpPoolResourceError` when it cannot. A borrow
+  that has to open a connection rejects the same way. The error's `cause` holds
+  the original failure, such as a `QwpUpgradeError` for rejected credentials or
+  a `QwpReplayStoreLockedError` for a locked journal.
   `createQwpNodeClient()` returns without connecting.
 - A lease used after `close()` throws `QwpClientClosedError`.
 
@@ -419,14 +422,21 @@ try {
 | `query_pool_max`          | `4`       | Most query connections, and so the most concurrent queries                    |
 | `acquire_timeout_ms`      | `5000`    | How long a borrow waits for a free connection, then `QwpPoolAcquireTimeoutError` |
 | `idle_timeout_ms`         | `60000`   | Idle time before a connection above the minimum closes. `0` keeps it          |
-| `max_lifetime_ms`         | `1800000` | Age at which an idle connection is replaced. `0` disables it                  |
+| `max_lifetime_ms`         | `1800000` | Age at which an idle connection above the minimum closes. `0` disables it     |
 | `housekeeper_interval_ms` | `5000`    | How often idle and old connections are checked                                |
 | `lazy_connect`            | `off`     | Start without connecting, so the client starts while QuestDB is down          |
 
+`idle_timeout_ms` and `max_lifetime_ms` close only connections above the pool
+minimum, and open no replacements. The minimum connections are never recycled.
+
 `lazy_connect=on` lets `connectQwpNodeClient()` resolve while QuestDB is
-unreachable. Senders connect in the background and queue rows meanwhile, and
-query connections open on the first query. A standalone `Sender` ignores the
-key: set `initial_connect_retry=async` for it instead.
+unreachable. It starts the senders with `initial_connect_retry=async`, so they
+connect in the background and queue rows meanwhile, and it sets
+`query_pool_min=0`, so query connections open on the first query. It therefore
+rejects a positive `query_pool_min`, an `initial_connect_retry` other than
+`async`, and `reconnect: false` under `ingress` with a `RangeError`. A
+standalone `Sender` ignores the key: set `initial_connect_retry=async` for it
+instead.
 
 The second argument takes typed options for each side. `ingress` takes the
 options a standalone `Sender` takes under `qwp.webSocket`, such as
@@ -460,8 +470,8 @@ await db.close();
 ```
 
 Callbacks and `reconnect` belong under `ingress` and `egress`. Placed under
-`cluster`, TypeScript rejects them and plain JavaScript ignores them without
-an error.
+`cluster`, TypeScript rejects them, and plain JavaScript passes them to both
+sides: a `reconnect` there applies to the senders and the query sessions.
 
 The pooled client also accepts one options object, with the endpoints in
 `cluster`:
@@ -525,6 +535,10 @@ try {
   await sender.close();
 }
 ```
+
+The pooled client wraps this error: `connectQwpNodeClient()`, and a borrow
+that opens a connection, reject with a `QwpPoolResourceError` whose `cause` is
+the `QwpUpgradeError`.
 
 A rejected credential also ends a sender that has already connected, unless
 the sender uses [store-and-forward](#store-and-forward) or
@@ -1015,6 +1029,15 @@ A transaction is atomic per table: a flush that writes several tables commits
 each one separately. `close()` does not commit. It publishes the remaining
 rows, and QuestDB rolls the open transaction back when the connection closes.
 
+QuestDB acknowledges the batches of an open transaction only when it commits,
+so they stay in the replay queue until then. A transaction must fit in that
+queue, which `sf_max_total_bytes` sizes: 128 MiB by default, or 10 GiB with
+[store-and-forward](#store-and-forward). A larger one makes `at()` and
+`flush()` wait for space, as in [Backpressure](#backpressure), and then reject
+with `QwpMemoryReplayAppendTimeoutError`, or `QwpReplayStoreAppendTimeoutError`
+with store-and-forward, and none of its rows are committed. Commit large
+imports in parts.
+
 ### Durable acknowledgement
 
 :::note Enterprise
@@ -1078,7 +1101,8 @@ ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
 - The journal of a standalone sender is `<sf_dir>/<sender_id>`, and `sender_id`
   defaults to `default`. Each pooled sender uses `<sf_dir>/<sender_id>-<index>`.
 - One live sender owns a journal. A second process that opens it fails with
-  `QwpReplayStoreLockedError`, so give concurrent senders distinct `sender_id`
+  `QwpReplayStoreLockedError`, which the pooled client reports as the `cause`
+  of a `QwpPoolResourceError`, so give concurrent senders distinct `sender_id`
   values. `sender_id` allows letters, digits, `_`, and `-`. The same error
   after a crash means that the crashed process's lock was not released: see
   [Recovering a journal after a crash](#recovering-a-journal-after-a-crash).
@@ -1141,10 +1165,11 @@ not the case:
   before, often `1`, so the lock seems to belong to a live process.
 - A pod rescheduled to another node, with the same volume, has a new host name.
 
-The new sender then fails with `QwpReplayStoreLockedError`, and the journal
-stays on disk unsent. To recover, make sure that no other process uses the
-journal, delete its `.lock.owner` directory, and start the sender again. It
-replays the journal:
+The new sender then fails with `QwpReplayStoreLockedError`, and
+`connectQwpNodeClient()` with a `QwpPoolResourceError` whose `cause` is that
+error. The journal stays on disk unsent. To recover, make sure that no other
+process uses the journal, delete its `.lock.owner` directory, and start the
+sender again. It replays the journal:
 
 ```shell
 # sf_dir=/var/lib/trade-feed/qdb-sf, sender_id=feed-1
@@ -1731,6 +1756,7 @@ query restarts from its first row: clear rows you accumulated in
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value. A plain `Error` for a setter called before `table()`, or for a column this sender wrote with another type | Fix the value. Only that row is discarded                     |
 | `connect()`, the first flush or query | `QwpUpgradeError` with `kind` and, for HTTP rejections, `statusCode`; or `QwpFailoverError`                                                                                   | Check the address, credentials, and server version            |
+| `connectQwpNodeClient()`, a borrow that opens a connection | `QwpPoolResourceError`, with the connection error, such as a `QwpUpgradeError` or a `QwpReplayStoreLockedError`, as `cause`                                     | Handle `cause` as for a standalone sender                     |
 | `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload, when QuestDB rejects a batch during the wait                                                                              | See [Server rejections](#server-rejections)                   |
 | Any later call, `close()` included    | `QwpReplayRejectedError`, once a rejected batch has ended the sender                                                                                                          | Close the sender and create a new one. See below              |
 | `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`, or a `QwpReplayStore*Error` with store-and-forward                                                                                       | Slow the producer, or raise the limits                        |
@@ -1908,7 +1934,7 @@ server fault.
 | `QwpEgressQueryCancelTimeoutError`  | A stopped query did not end within `cancelDrainTimeoutMs`, so the session failed |
 | `QwpEgressSessionClosedError`       | The query session or its connection is closed                                    |
 | `QwpPoolAcquireTimeoutError`        | No pooled connection became free within `acquire_timeout_ms`                     |
-| `QwpPoolResourceError`              | The pool could not open a connection                                             |
+| `QwpPoolResourceError`              | The pool could not open a connection. `cause` holds the connection error         |
 | `QwpClientClosedError`              | The pooled client or a lease is already closed                                   |
 
 The [API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_nodejs-client.html)
