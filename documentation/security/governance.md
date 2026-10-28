@@ -61,6 +61,13 @@ can be limited to ILP ingestion only. A grant carries the
 [grant option](/docs/security/rbac/#the-grant-option) only when you say so,
 which keeps delegation explicit.
 
+QuestDB stores no owner for an object. Its creator, or the user or group named
+in [`OWNED BY`](/docs/query/sql/create-table/#owned-by), receives all
+permissions on it with the grant option, and from then on these are ordinary
+grants. To find who controls an object, look for the principals that hold
+permissions on it with the grant option, as shown in
+[Review entitlements](#review-entitlements).
+
 Column-level grants hide sensitive columns from a principal:
 
 ```questdb-sql title="Every column of fx_trades except the counterparty"
