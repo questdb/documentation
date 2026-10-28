@@ -3,7 +3,7 @@ title: Data governance and auditing
 sidebar_label: Governance and auditing
 description:
   How QuestDB controls who can reach your data, records who read it, traces
-  where derived data comes from, and retains and recovers it, with links to
+  the lineage of derived data, and retains and recovers it, with links to
   each feature.
 ---
 
