@@ -276,8 +276,9 @@ compliance control:
   and revokes, and authentication attempts are not recorded in a queryable
   table. Snapshots from `SHOW CREATE DATABASE` and the server log are the
   closest substitutes.
-- **There is no session listing.** `query_activity()` shows running queries,
-  not idle connections.
+- **There is no session listing.** `sys.metrics` counts open connections per
+  protocol, idle ones included, but not who holds them, and
+  `query_activity()` shows only running queries.
 - **There is no encryption at rest or data masking.** Use storage-level
   encryption for data at rest, and column grants or views to keep sensitive
   values from a principal.
