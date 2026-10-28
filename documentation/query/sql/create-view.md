@@ -26,7 +26,7 @@ CREATE [ OR REPLACE ] VIEW [ IF NOT EXISTS ] viewName AS ( query )
 | `viewName` | Name of the view (case-insensitive, Unicode supported) |
 | `query` | SELECT statement defining the view |
 | `WITH AUDIT` | Enterprise only. Records each read of the view in an audit trail. See [WITH AUDIT](#with-audit-enterprise) |
-| `OWNED BY` | Enterprise only. Assigns the view's owner. See [OWNED BY](#owned-by-enterprise) |
+| `OWNED BY` | Enterprise only. Gives the creator's permissions on the view to another user, group, or service account. See [OWNED BY](#owned-by-enterprise) |
 
 `WITH AUDIT` and `OWNED BY` may appear in either order.
 
@@ -222,8 +222,10 @@ CREATE VIEW 'My View' AS (...)   -- Quoted name with spaces
 ## OWNED BY (Enterprise)
 
 When a user creates a new view, they are automatically assigned all view level
-permissions with the `GRANT` option for that view. This behavior can be
-overridden using `OWNED BY`.
+permissions with the `GRANT` option for that view. With `OWNED BY`, these
+permissions go to the user, group, or service account named in the clause
+instead. QuestDB stores no owner for the view: afterwards they are ordinary
+grants that can be revoked like any other.
 
 ```questdb-sql
 CREATE GROUP analysts;
