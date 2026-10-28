@@ -87,9 +87,10 @@ Parquet one day after the partition ends, and never deletes a row.
 
 - The setting applies only when the server creates the table. Replicas take the
   table, and its policy, from the primary.
-- It does not change the policy of a table that already exists. Use
-  [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
-  for that.
+- It does not change the policy of a table that already exists. Only the
+  built-in admin can do that, with
+  [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/):
+  see [Retention](/docs/security/audited-views/#retention).
 - Set the property to an empty value to create the table with no storage
   policy. If the server rejects the policy, it logs the error and creates the
   table without one.

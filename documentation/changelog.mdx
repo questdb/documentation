@@ -68,6 +68,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Audited views](/docs/security/audited-views/#protection) - From QuestDB Enterprise 4.1.1, only the built-in admin can remove rows from `sys.view_audit`, or set its storage policy or TTL. `TRUNCATE TABLE`, partition drops and detaches, `SET TTL`, `SET PARAM`, `SET STORAGE POLICY`, and `ENABLE STORAGE POLICY` on the trail are refused to every other principal, whatever it holds. Documented how to keep the trail pruned with the built-in admin disabled, and the [upgrade steps](/docs/operations/upgrade/#upgrading-to-411)
 - [Upgrade QuestDB](/docs/operations/upgrade/#authentication-changes-in-410) - Authentication changes to check before upgrading to QuestDB Enterprise 4.1.0
 - [QWP client behaviour](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers) - Authentication failures by phase, and the retry with a new token after a `401`. The QWP ingress and egress, client failover, and connect string pages now describe how the Java client retries authentication failures
 - [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error categories and policies, that the `QuestDB` builder accepts an error handler, and the `AUTH_FAILED` connection event
