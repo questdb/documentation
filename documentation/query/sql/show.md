@@ -183,14 +183,17 @@ Filtering is applied per category, like `pg_dump -t`. Excluding a category that
 others depend on can leave dangling references, so a dump that omits a base
 table does not replay cleanly for the views built on it.
 
-:::note
+To select individual objects, such as the objects of a single tenant, wrap the
+statement in parentheses and filter the `ddl` column with `WHERE`. Each row
+starts with `CREATE`, so match the object name with a leading wildcard:
 
-Filtering the dump rows with a `WHERE` clause, for example
-`(SHOW CREATE DATABASE) WHERE ddl ILIKE 'fx_%'` to select the objects of a
-single tenant, is not supported yet. Row-level filtering is planned for a future
-QuestDB release.
+```questdb-sql title="Objects whose DDL mentions fx_" demo
+(SHOW CREATE DATABASE) WHERE ddl ILIKE '%fx_%';
+```
 
-:::
+The filtered rows keep dependency order. A pattern also matches views that read
+a matching table, so check that every object a filtered dump depends on is
+included before replaying it.
 
 #### Enterprise: access control
 
