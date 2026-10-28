@@ -27,7 +27,7 @@ The first two modes accept the same set of optional clauses:
   [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
 - [`WITH`](#with-table-parameter) - table parameters
 - [`IN VOLUME`](#table-target-volume) - target volume for storage
-- [`OWNED BY`](#owned-by) - Enterprise RBAC owner
+- [`OWNED BY`](#owned-by) - who receives the creator's permissions (Enterprise)
 
 ## Syntax
 
@@ -825,6 +825,10 @@ When a user creates a new table, they automatically get all table level
 permissions with the `GRANT` option for that table. However, if the `OWNED BY`
 clause is used, the permissions instead go to the user, group, or service
 account named in that clause.
+
+QuestDB stores no owner for the table. `OWNED BY` only decides who receives
+these permissions when the table is created, and afterwards they are ordinary
+grants that can be revoked like any other.
 
 The `OWNED BY` clause cannot be omitted if the table is created by an external
 user, because permissions cannot be granted to them.

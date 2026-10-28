@@ -406,9 +406,9 @@ replaying it:
 - If the view was created with a trailing `;`, the saved query keeps it inside
   `AS ( ... )` and replaying fails with `')' expected`. Remove that `;`.
 - On QuestDB Enterprise, the saved `OWNED BY` names the user running
-  `SHOW CREATE`, not necessarily the view's owner, and dropping the view
-  removes its grants. Set `OWNED BY` to the intended owner and grant
-  permissions on the new view again.
+  `SHOW CREATE`, and dropping the view removes its grants. Set `OWNED BY` to
+  the user or group that should receive the creator's permissions, and grant
+  the other permissions on the new view again.
 
 Dropping the invalid view removes its materialized rows, including rows whose
 source history is no longer retained by the base table.

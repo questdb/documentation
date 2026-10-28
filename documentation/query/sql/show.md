@@ -205,8 +205,14 @@ memberships, and permissions alongside the tables and views:
 - Memberships, as `ADD USER ... TO ...` and `ASSUME SERVICE ACCOUNT ... TO ...`.
 - Grants, as `GRANT <permissions> [ON ...] TO ... [WITH GRANT OPTION]`.
 
-`CREATE TABLE`, `CREATE VIEW`, and `CREATE MATERIALIZED VIEW` statements in an
-Enterprise dump also carry the `OWNED BY` clause identifying the owner.
+QuestDB stores no owner for an object, so the `GRANT` statements are what
+recreate its permissions. The `CREATE TABLE`, `CREATE VIEW`, and
+`CREATE MATERIALIZED VIEW` statements in an Enterprise dump also carry an
+`OWNED BY` clause, which names the principal that ran the dump, as in
+[`SHOW CREATE TABLE`](#enterprise-variant). Replaying the dump gives that
+principal all permissions on each of these objects, with the `GRANT` option, on
+top of the dumped grants. Edit or remove the clause before replaying if that
+principal should not hold them.
 
 Credentials are never dumped: the `CREATE USER` and `CREATE SERVICE ACCOUNT`
 statements carry no password or token, so set these after replaying the dump.
@@ -233,8 +239,8 @@ SHOW CREATE LIVE VIEW trades_ma;
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
 `IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`,
-not necessarily the view's owner.
+output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`.
+See the [Enterprise variant](#enterprise-variant) of `SHOW CREATE TABLE`.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -332,10 +338,14 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause
-naming the user running `SHOW CREATE`, not necessarily the table's owner.
+In [QuestDB Enterprise](/enterprise/), `SHOW CREATE TABLE`, `SHOW CREATE VIEW`,
+`SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW` add an `OWNED BY`
+clause naming the user running `SHOW CREATE`. QuestDB stores no owner for an
+object, so the clause does not tell you who created it or who holds permissions
+on it. To see the permissions on an object, use
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 
-For example,
+For example, run as `admin`:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -349,10 +359,10 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```
 
-This clause assigns permissions for the table to that user.
-
-If permissions should be assigned to a different user, please modify this clause
-appropriately.
+When the statement is replayed, the clause gives that user all permissions on
+the new table, with the `GRANT` option. To give them to a different user, group,
+or service account, change the clause before replaying it. See
+[OWNED BY](/docs/query/sql/create-table/#owned-by).
 
 ### SHOW CREATE VIEW
 

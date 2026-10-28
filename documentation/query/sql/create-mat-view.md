@@ -43,7 +43,7 @@ Where:
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
-| `OWNED BY` | Assign ownership (Enterprise) |
+| `OWNED BY` | Gives the creator's permissions to another user, group, or service account (Enterprise) |
 
 ## Rules and defaults
 
@@ -398,7 +398,10 @@ it (including `DROP MATERIALIZED VIEW` and `REFRESH MATERIALIZED VIEW`) with the
 
 ### OWNED BY clause
 
-Assign ownership to a user, group, or service account:
+The creator of a materialized view receives all permissions on it, with the
+`GRANT` option. `OWNED BY` gives these permissions to a user, group, or service
+account instead. QuestDB stores no owner for the view: afterwards they are
+ordinary grants that can be revoked like any other.
 
 ```questdb-sql
 CREATE GROUP analysts;
