@@ -79,6 +79,26 @@ an origin, which a reverse proxy provides, and that QuestDB authentication is
 off. Later sections cover [deployment](#deployment) and
 [authentication](#authentication).
 
+:::tip Local development
+
+A development server, such as Vite's on `http://localhost:5173`, does not share
+QuestDB's origin, so QuestDB rejects its WebSocket upgrades. List the
+development server's origin in QuestDB's `server.conf`, then restart QuestDB or
+run `SELECT reload_config();`:
+
+```ini title="server.conf"
+qwp.browser.allowed.origins=http://localhost:5173
+```
+
+Then connect to QuestDB directly, with `cluster: { url: "ws://localhost:9000" }`
+in place of the page's origin. With QuestDB authentication on, pass the
+credential with [`auth`](#credentials-for-applications-on-another-origin),
+because QuestDB ignores cookies from another origin. Alternatively, have the
+development server proxy `/write/v4` and `/read/v1` to QuestDB, forwarding
+WebSocket upgrades and keeping the `Host` header that the browser sent.
+
+:::
+
 ```typescript
 import { connectQwpBrowserClient } from "@questdb/browser-client";
 
@@ -333,7 +353,9 @@ QuestDB's REST API. QuestDB ignores cookies on these cross-origin upgrades, so
 an authenticated application passes a credential with [`auth`](#credentials-for-applications-on-another-origin).
 
 Pages served over `https:` must connect with `wss:`, because browsers block
-plain `ws:` connections from secure pages.
+plain `ws:` connections from secure pages. QuestDB open source does not serve
+TLS: put a reverse proxy that terminates TLS in front of it, or use the
+[TLS support](/docs/security/tls/) of QuestDB Enterprise.
 
 ## Authentication
 
@@ -534,14 +556,24 @@ accordingly:
   applications used by people. Your application obtains them with its identity
   provider's SDK, using the Authorization Code flow with PKCE, and QuestDB
   applies each user's own permissions. Pass them with an `auth` function, so
-  that every connection attempt gets a current token. See
-  [OpenID Connect](/docs/security/oidc/).
-- **REST tokens** suit internal tools. Issue short-lived tokens for an account
-  with only the permissions the application needs: `HTTP`, plus `SELECT` or
-  `INSERT` on its tables. A token that can expire while the page is open needs
-  an `auth` function as well.
+  that every connection attempt gets a current token. Ingestion cannot create
+  tables or add columns for OIDC users, so create the tables the application
+  writes in advance. See [OpenID Connect](/docs/security/oidc/).
+- **REST tokens** (QuestDB Enterprise) suit internal tools. Issue short-lived
+  tokens for an account with only the permissions the application needs:
+  `HTTP`, plus `SELECT` or `INSERT` on its tables. A token that can expire
+  while the page is open needs an `auth` function as well.
 - **Basic authentication** sends a password the user can read. Keep it for
   development and trusted internal tools.
+
+QuestDB open source has one HTTP user, set with
+[`http.user` and `http.password`](/docs/configuration/http-server/#authentication),
+and that user has full access, DDL included. The browser client authenticates
+as this user with a `basic` credential, through `sessionBootstrap` or `auth`,
+so every user of the application can read a password that controls the whole
+database. For a read-only dashboard, set
+[`http.security.readonly=true`](/docs/configuration/http-server/#httpsecurityreadonly):
+queries keep working, while DDL and ingestion fail on the whole HTTP port.
 
 ### Unsupported authentication paths
 
@@ -592,8 +624,10 @@ try {
 }
 ```
 
-QuestDB creates missing tables and columns from the first row that uses them.
-The designated timestamp column of an auto-created table is named `timestamp`.
+QuestDB creates missing tables and columns from the first row that uses them,
+if the connection's principal has permission to. With per-user OIDC tokens it
+never does: see [Choosing credentials](#choosing-credentials). The designated
+timestamp column of an auto-created table is named `timestamp`.
 `at()` and `atNow()` return a promise that settles once any auto-flush the row
 triggered has been published, so awaiting them propagates errors and slows the
 producer down when the queue is full. A sender is not safe to share between
@@ -1260,9 +1294,16 @@ Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 A query session fails over within limits: `reconnect.failoverMaxAttempts` (8
 sweeps), `failoverBackoffInitialMs` (50), `failoverBackoffMaxMs` (1000), and
 `failoverMaxDurationMs` (30 seconds). When they run out, the query rejects with
-`QwpReconnectExhaustedError`, and the session cannot be used again. `target`
-(`"any"`, `"primary"`, or `"replica"`) and `zone` route queries, and the client
-checks the server's role and zone after connecting.
+`QwpReconnectExhaustedError`, and the session cannot be used again. The limits
+also apply to an idle session, which reconnects as soon as its connection
+drops, so an outage of a few seconds, such as a QuestDB restart, can use them
+up. No connection event reports this: the session's next query rejects with
+`QwpReconnectExhaustedError`. A dashboard that keeps a session open should then
+close it and open another. A pooled client can lend such a connection once:
+close that lease and borrow again, and the pool opens a new connection.
+
+`target` (`"any"`, `"primary"`, or `"replica"`) and `zone` route queries, and
+the client checks the server's role and zone after connecting.
 
 :::warning Re-executed queries deliver rows again
 
@@ -1348,25 +1389,33 @@ await sender.close();
 
 ### Errors from calls
 
-| Where                                | What you get                                                                                                            | What to do                                       |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| A column setter, `at()`, `row()`     | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                                                  | Fix the value. Only that row is discarded        |
-| Connecting                           | `QwpUpgradeError`, usually of kind `"opaque"`, or `QwpBrowserSessionBootstrapError`                                     | Check the URL, origin allowlist, and credentials |
-| `connectQwpBrowserClient()`          | `QwpPoolResourceError`, with the connection error as `cause`                                                            | As for connecting                                |
-| `flushAndWait()`, `waitForAck()`     | `QwpIngressNackError` with a `senderError` payload                                                                      | See [Server rejections](#server-rejections)      |
-| `flush()`, `at()` under backpressure | `QwpMemoryReplayAppendTimeoutError`                                                                                     | Slow the producer, or raise the limits           |
-| Query iteration and `completion`     | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError` | See [Query errors](#query-errors)                |
-| `close()`                            | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                                                | The unacknowledged rows are lost                 |
+| Where                                | What you get                                                                                                                                                                  | What to do                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| A column setter, `at()`, `row()`     | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value. A plain `Error` for a setter called before `table()`, or for a column this sender wrote with another type | Fix the value. Only that row is discarded        |
+| Connecting                           | `QwpUpgradeError`, usually of kind `"opaque"`, or `QwpBrowserSessionBootstrapError`. With `failoverUrls`, `QwpFailoverError`. With `initialConnectMode: "sync"`, `QwpReconnectExhaustedError` | Check the URL, origin allowlist, and credentials |
+| `connectQwpBrowserClient()`          | `QwpPoolResourceError`, with the connection error as `cause`                                                                                                                  | As for connecting                                |
+| `flushAndWait()`, `waitForAck()`     | `QwpIngressNackError` with a `senderError` payload, when QuestDB rejects a batch during the wait                                                                              | See [Server rejections](#server-rejections)      |
+| Any later call, `close()` included   | `QwpReplayRejectedError`, once a rejected batch has ended the sender                                                                                                          | Close the sender and create a new one. See below |
+| `flush()`, `at()` under backpressure | `QwpMemoryReplayAppendTimeoutError`                                                                                                                                           | Slow the producer, or raise the limits           |
+| Query iteration and `completion`     | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError`                                                       | See [Query errors](#query-errors)                |
+| `close()`                            | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time, or the error of publishing the remaining rows, such as `QwpMemoryReplayAppendTimeoutError`, when that fails first | The unacknowledged rows are lost                 |
 
 A browser hides the HTTP response of a failed WebSocket upgrade. A wrong URL,
 an origin missing from the allowlist, and a rejected `auth` credential all fail
 with `QwpUpgradeError` of kind `"opaque"`. Check the browser console and the
 QuestDB server log for the reason: QuestDB logs why it refused an upgrade.
 
-After a terminal failure, such as a schema mismatch, the sender is finished.
-Every later call, `close()` included, rejects with the same error. Close it,
-catching the error, and create a new sender. A pooled lease is replaced on the
-next `borrowSender()`.
+After a terminal failure, such as a schema mismatch, the sender is finished,
+and every later call, `close()` included, rejects. After a rejected batch, the
+error is a `QwpReplayRejectedError`. It carries the rejected `frameSequence`
+and `status` but no `senderError`, so read the details in `onSenderError`, or
+from the `QwpIngressNackError` of a wait that was running when the rejection
+arrived. Close the sender, catching the error, and create a new one. A pooled
+lease is replaced on the next `borrowSender()`.
+
+The failure discards every row that QuestDB has not acknowledged: the rejected
+batch, including its rows for other tables, every batch flushed after it, and
+the rows still staged. Call `flushAndWait()` wherever rows must be stored.
 
 ### Server rejections
 
@@ -1414,9 +1463,12 @@ try {
 | `detectedAtMs`     | `number` | Client time of the rejection                                                                             |
 
 A `terminal` rejection, such as a schema mismatch, parse error, or security
-error, stops the sender. For `retriable` and `retriable-other`, the client
-reconnects and replays from the last acknowledgement. Without `onSenderError`,
-the client logs rejections to the browser console. `onError`, set next to
+error, stops the sender: later calls reject with `QwpReplayRejectedError`, and
+every batch QuestDB has not acknowledged is lost, as
+[Errors from calls](#errors-from-calls) describes. For `retriable` and
+`retriable-other`, the client reconnects and replays from the last
+acknowledgement. Without `onSenderError`, the client logs rejections to the
+browser console. `onError`, set next to
 `onSenderError` (in the sender options, or under `ingress` for the pooled
 client), additionally receives an event for each rejection and for terminal
 session failures.
@@ -1461,14 +1513,45 @@ try {
 Dispatch on `status`, and sanitize the message before showing it to users,
 since it can quote SQL.
 
-| `status` | Name              | Meaning                                         |
-| -------- | ----------------- | ----------------------------------------------- |
-| `3`      | `SCHEMA_MISMATCH` | A bind value does not fit its placeholder       |
-| `5`      | `PARSE_ERROR`     | Invalid SQL, or a missing table or column       |
-| `6`      | `INTERNAL_ERROR`  | The server failed while running the query       |
-| `8`      | `SECURITY_ERROR`  | The principal lacks a permission                |
-| `10`     | `CANCELLED`       | The query was cancelled                         |
-| `11`     | `LIMIT_EXCEEDED`  | A protocol limit was reached                    |
+| `status` | Name              | Meaning                                                                                                                                          |
+| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `5`      | `PARSE_ERROR`     | Invalid SQL, a missing table or column, or a bind value the query cannot take, such as text for `LIMIT $1`                                       |
+| `6`      | `INTERNAL_ERROR`  | The server could not run the query, including a bind value it cannot convert, such as `abc` for a `DOUBLE` column, and a column type QWP cannot carry |
+| `8`      | `SECURITY_ERROR`  | The principal lacks a permission                                                                                                                 |
+| `10`     | `CANCELLED`       | The query was cancelled                                                                                                                          |
+| `11`     | `LIMIT_EXCEEDED`  | A server limit was reached: its query timeout, its memory limit, or a row larger than its send buffer                                            |
+
+QuestDB 10.1 does not send status `3` (`SCHEMA_MISMATCH`) for queries. A bind
+value of the wrong type arrives as `5` or `6`, so do not treat every `6` as a
+server fault.
+
+### Error classes
+
+| Class                               | Raised when                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `QwpUpgradeError`                   | A WebSocket upgrade fails. In a browser, usually of kind `"opaque"`                                |
+| `QwpBrowserSessionBootstrapError`   | The `sessionBootstrap` request failed. Extends `QwpUpgradeError`, with `statusCode` and `responseBody` |
+| `QwpFailoverError`                  | Every endpoint of one connection attempt failed. `attempts` lists each endpoint and its error      |
+| `QwpReconnectExhaustedError`        | A `"sync"` first connection or a query session's failover ran out of its limits                    |
+| `QwpDurableAckUnavailableError`     | Durable acknowledgement was requested but the server does not support it                           |
+| `QwpIngressNackError`               | QuestDB rejected a batch during a wait. `senderError` holds the details                            |
+| `QwpReplayRejectedError`            | A rejected batch ended the sender; later calls reject with it                                      |
+| `QwpBatchTooLargeError`             | One row is larger than the server's batch limit                                                    |
+| `QwpWriterRowError`                 | A compiled writer rejected a row                                                                   |
+| `QwpMemoryReplayAppendTimeoutError` | The replay queue stayed full past its deadline                                                     |
+| `QwpSenderCloseTimeoutError`        | `close()` timed out waiting for acknowledgements                                                   |
+| `QwpEgressQueryError`               | The server reported a query error. `status` gives the code                                         |
+| `QwpEgressQueryTimeoutError`        | A query ran past its timeout and was cancelled                                                     |
+| `QwpEgressQueryAbandonedError`      | Iteration stopped before the query finished                                                        |
+| `QwpEgressQueryCancelTimeoutError`  | A stopped query did not end within `cancelDrainTimeoutMs`, so the session failed                   |
+| `QwpEgressSessionClosedError`       | The query session or its connection is closed                                                      |
+| `QwpPoolAcquireTimeoutError`        | No pooled connection became free within `acquireTimeoutMs`                                         |
+| `QwpPoolResourceError`              | The pool could not open a connection                                                               |
+| `QwpClientClosedError`              | The pooled client or a lease is already closed                                                     |
+
+Every class is exported from the package root. The
+[API reference](https://questdb.github.io/nodejs-questdb-client/modules/_questdb_browser-client.html)
+documents their fields.
 
 ## Closing
 
@@ -1478,8 +1561,10 @@ when the component that owns it unmounts:
 - **`QwpSender.close()`** publishes completed rows, then waits up to
   `closeFlushTimeoutMs` (5 seconds) for QuestDB to acknowledge everything. If
   it does not, `close()` rejects with `QwpSenderCloseTimeoutError` and the
-  unacknowledged rows are lost. An unfinished row is discarded with a warning,
-  and an open transaction is rolled back.
+  unacknowledged rows are lost. If publishing the remaining rows fails first,
+  for example because the replay queue is full, `close()` rejects with that
+  error instead and logs the timeout. An unfinished row is discarded with a
+  warning, and an open transaction is rolled back.
 - **A borrowed sender's `close()`** publishes and returns the connection
   without waiting.
 - **`QwpEgressSession.close()`** closes the connection, ending a running query.
@@ -1500,8 +1585,9 @@ when the component that owns it unmounts:
 | ILP transports and the `Sender` class     | Not available                                        | `http::`, `https::`, `tcp::`, `tcps::` |
 
 The [Node.js client](/docs/connect/clients/nodejs/) page describes the shared
-API in more depth: flow control, the zero-copy view accessors, and the error
-classes.
+API in more depth: [flow control](/docs/connect/clients/nodejs/#flow-control-and-buffering)
+and the
+[zero-copy view accessors](/docs/connect/clients/nodejs/#zero-copy-result-views).
 
 ## Next steps
 

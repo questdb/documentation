@@ -256,7 +256,9 @@ with `initialConnectMode: "async"`. A browser cannot see why an upgrade
 failed, so a browser sender that authenticates with
 [`auth`](/docs/connect/clients/browser/#credentials-for-applications-on-another-origin)
 retries a rejected credential like an outage once it has connected, whatever
-its mode, and reports `endpoint-attempt-failed` instead.
+its mode, and reports `endpoint-attempt-failed` instead. For the same reason,
+such a rejection does not end the endpoint walk: the browser client tries the
+other hosts, as it would for an unreachable one.
 
 If your deployment has per-host credentials, that is unsupported and outside
 the failover model — split the workload into one connect string per credential.

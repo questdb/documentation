@@ -183,14 +183,14 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
-| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
 | `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 | `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
-| `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
+| `connect_timeout` | unset (Node.js: `15000`) — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
 | `poison_min_escalation_window_millis` | `5000` |
@@ -455,6 +455,10 @@ every phase.
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |
+
+A browser cannot see the status of a failed upgrade, so the browser client
+handles a credential that QuestDB rejects from its `auth` option like an
+unreachable endpoint, and tries the next one.
 
 ### Query client initial connect
 

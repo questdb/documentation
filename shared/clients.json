@@ -51,7 +51,7 @@
     "href": "/docs/connect/clients/nodejs",
     "name": "Node.js",
     "description":
-      "QWP ingestion with store-and-forward and streaming SQL for JavaScript and TypeScript. Beta.",
+      "QWP ingestion with store-and-forward and streaming SQL for JavaScript and TypeScript.",
     "logo": "/images/logos/nodejs-light.svg",
     "protocol": "QWP"
   },
@@ -59,7 +59,7 @@
     "href": "/docs/connect/clients/browser",
     "name": "Browser (JavaScript)",
     "description":
-      "Ingestion and streaming SQL from JavaScript web applications over QWP WebSockets. Beta.",
+      "Ingestion and streaming SQL from JavaScript web applications over QWP WebSockets.",
     "logo": "/images/logos/javascript.svg",
     "protocol": "QWP"
   },

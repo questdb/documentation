@@ -10,8 +10,10 @@ A single connect string configures the QuestDB native client. The same
 string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
 multi-host failover, and the store-and-forward substrate. All language
 implementations share one option vocabulary, so the same connect string can
-configure both ingress and egress in any client. Where an implementation
-deviates, the affected key section and client page call it out.
+configure both ingress and egress in any client. The
+[browser client](/docs/connect/clients/browser/#options) is the exception: it
+takes its settings as an options object, not a connect string. Where an
+implementation deviates, the affected key section and client page call it out.
 
 One `ws::` / `wss::` connect string serves both the ingress sender and the
 egress query client. Each direction reads the keys relevant to it and
@@ -561,7 +563,8 @@ equivalent — same architecture, no durability across restarts.
 - `sf_durability` — disk durability mode. `memory` (the default) and
   `periodic` both ship. `periodic` requires `sf_dir` and checkpoints published
   frames in the background at `sf_sync_interval_millis`. `flush` and `append`
-  are reserved: they parse but are rejected at `build()`.
+  are reserved: they parse but are rejected at `build()`, except in the Node.js
+  client, as described below.
 
   Reach for `periodic` when you must survive host loss. `memory` mode is
   process-crash durable but **not** host-crash durable, because the page cache
@@ -569,7 +572,8 @@ equivalent — same architecture, no durability across restarts.
 
   The .NET client is the exception: it accepts only `memory` and rejects
   anything else at parse time. The Node.js client also accepts `append`,
-  which makes every frame durable before its append completes.
+  which makes every frame durable before its append completes, rejects `flush`
+  at parse time, and requires `sf_dir` for every value.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a

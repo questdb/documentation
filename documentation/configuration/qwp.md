@@ -66,10 +66,11 @@ stays in force, and the error appears only in the server log.
 
 With authentication enabled, an upgrade from a listed origin must carry its
 credential in the WebSocket subprotocol, which the browser client sends when
-configured with `auth`. QuestDB ignores session cookies on these cross-origin
-upgrades. List only trusted applications: a listed origin can open
-authenticated connections to the server. The setting does not enable CORS on
-the REST API.
+configured with `auth`. QuestDB accepts that credential only from a listed
+origin, so a page served from QuestDB's own origin that uses `auth` must list
+that origin too. QuestDB ignores session cookies on cross-origin upgrades. List
+only trusted applications: a listed origin can open authenticated connections
+to the server. The setting does not enable CORS on the REST API.
 
 ### qwp.browser.tls.termination.enabled
 

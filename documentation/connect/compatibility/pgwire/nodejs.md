@@ -783,8 +783,8 @@ QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard Ja
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
 We recommend the `pg` client for querying.
-For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
-throughput.
+For data ingestion, use QuestDB's first-party clients, such as the
+[Node.js client](/docs/connect/clients/nodejs/), which ingest over QWP.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
 `SAMPLE BY` and `LATEST ON` for efficient queries.

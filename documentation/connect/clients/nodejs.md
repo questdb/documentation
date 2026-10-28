@@ -810,8 +810,12 @@ your application knows:
 - Rows that are only queued in memory are lost if the process exits. Wait, or
   use store-and-forward, before you acknowledge the data upstream, for example
   before committing a message-queue offset.
-- A rejection of rows you did not wait for reaches only `onSenderError`.
-  `flushAndWait()` and `waitForAck()` reject with it instead.
+- A rejection of rows you did not wait for reaches only `onSenderError`. A
+  `flushAndWait()` or `waitForAck()` that is waiting when it arrives also
+  rejects, with a `QwpIngressNackError`.
+- Without store-and-forward, a terminal rejection discards every batch that
+  QuestDB has not acknowledged, including batches flushed after the rejected
+  one. See [Errors from calls](#errors-from-calls).
 - A `false` result means only that the wait ran out. The rows are still queued
   and will be delivered, so sending them again would duplicate them.
 
@@ -874,9 +878,10 @@ ignore it.
 Without store-and-forward, published data waits in a 128 MiB memory queue
 until QuestDB acknowledges it. When the queue is full, `flush()` and the
 `at()` that triggered an auto-flush wait up to 30 seconds for acknowledgements
-to free space, then reject with `QwpMemoryReplayAppendTimeoutError`. Awaiting
-those calls is what slows a producer down when QuestDB cannot keep up or is
-unreachable.
+to free space, then reject with `QwpMemoryReplayAppendTimeoutError`. The rows
+stay staged, and the next `flush()` tries to publish them again, so do not
+write them a second time. Awaiting those calls is what slows a producer down
+when QuestDB cannot keep up or is unreachable.
 
 `sf_max_total_bytes` and `sf_append_deadline_millis` resize the queue and
 change the wait (`memoryReplayMaxBytes` and `memoryReplayAppendDeadlineMs` as
@@ -1616,10 +1621,16 @@ option of the same name applies to queries without their own.
 | `zone`                        | unset   | Preferred zone. Endpoints in other zones remain a fallback      |
 
 When the limits run out, the query rejects with `QwpReconnectExhaustedError`
-and the session stays failed: close it and open another. `target` and `zone`
-route queries only, because writes always go to the primary. As options, the
-failover keys go in `reconnect` (`failoverMaxAttempts` and so on), and
-`reconnect: false` turns failover off.
+and the session stays failed: close it and open another. The limits also apply
+to an idle session, which reconnects as soon as its connection drops, so an
+outage of a few seconds, such as a QuestDB restart, can use them up. No
+connection event reports this: the session's next query rejects with
+`QwpReconnectExhaustedError`. A pooled client can lend such a connection once.
+Close that lease and borrow again, and the pool opens a new connection.
+
+`target` and `zone` route queries only, because writes always go to the
+primary. As options, the failover keys go in `reconnect`
+(`failoverMaxAttempts` and so on), and `reconnect: false` turns failover off.
 
 ### Connection events
 
@@ -1688,14 +1699,15 @@ query restarts from its first row: clear rows you accumulated in
 
 ### Errors from calls
 
-| Where                                 | What you get                                                                                                            | What to do                                                    |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value                                                  | Fix the value. Only that row is discarded                     |
-| `connect()`, the first flush or query | `QwpUpgradeError` with `kind` and, for HTTP rejections, `statusCode`; or `QwpFailoverError`                             | Check the address, credentials, and server version            |
-| `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload                                                                      | See [Server rejections](#server-rejections)                   |
-| `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`, or a `QwpReplayStore*Error` with store-and-forward                                 | Slow the producer, or raise the limits                        |
-| Query iteration and `completion`      | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError` | See [Query errors](#query-errors)                             |
-| `close()`                             | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time                                                | Unacknowledged data is lost, unless store-and-forward kept it |
+| Where                                 | What you get                                                                                                                                                                  | What to do                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| A column setter, `at()`, `row()`      | `TypeError`, `RangeError`, or `QwpWriterRowError` for an invalid value. A plain `Error` for a setter called before `table()`, or for a column this sender wrote with another type | Fix the value. Only that row is discarded                     |
+| `connect()`, the first flush or query | `QwpUpgradeError` with `kind` and, for HTTP rejections, `statusCode`; or `QwpFailoverError`                                                                                   | Check the address, credentials, and server version            |
+| `flushAndWait()`, `waitForAck()`      | `QwpIngressNackError` with a `senderError` payload, when QuestDB rejects a batch during the wait                                                                              | See [Server rejections](#server-rejections)                   |
+| Any later call, `close()` included    | `QwpReplayRejectedError`, once a rejected batch has ended the sender                                                                                                          | Close the sender and create a new one. See below              |
+| `flush()`, `at()` under backpressure  | `QwpMemoryReplayAppendTimeoutError`, or a `QwpReplayStore*Error` with store-and-forward                                                                                       | Slow the producer, or raise the limits                        |
+| Query iteration and `completion`      | `QwpEgressQueryError`, `QwpEgressQueryTimeoutError`, `QwpEgressQueryAbandonedError`, `QwpEgressQueryCancelTimeoutError`                                                       | See [Query errors](#query-errors)                             |
+| `close()`                             | `QwpSenderCloseTimeoutError` when acknowledgements do not arrive in time, or the error of publishing the remaining rows, such as `QwpMemoryReplayAppendTimeoutError`, when that fails first | Unacknowledged data is lost, unless store-and-forward kept it |
 
 `QwpUpgradeError.kind` is one of `authentication`, `role-rejected`,
 `http-rejected`, `version-mismatch`, `capability-mismatch`, `timeout`, or
@@ -1703,10 +1715,18 @@ query restarts from its first row: clear rows you accumulated in
 
 After a terminal failure, such as a schema mismatch, or rejected credentials on
 a sender that does not [retry them](#authentication-and-tls), the sender is
-finished. Every later call, `close()` included, rejects with the
-same error. Close it, catching the error, and create a new sender. Rows staged
-on the failed sender are lost. A pooled lease is replaced automatically on the
-next `borrowSender()`.
+finished, and every later call, `close()` included, rejects. After a rejected
+batch, the error is a `QwpReplayRejectedError`. It carries the rejected
+`frameSequence` and `status` but no `senderError`, so read the details in
+`onSenderError`, or from the `QwpIngressNackError` of a wait that was running
+when the rejection arrived. Close the sender, catching the error, and create a
+new one. A pooled lease is replaced automatically on the next `borrowSender()`.
+
+Without store-and-forward, the failure discards every row that QuestDB has not
+acknowledged: the rejected batch, including its rows for other tables, every
+batch flushed after it, even though those `flush()` calls resolved, and the
+rows still staged. Wait for acknowledgements before you treat rows as stored,
+or use store-and-forward.
 
 With store-and-forward, the journal keeps a batch that QuestDB rejected, so a
 new sender with the same `sf_dir` and `sender_id` sends it again and fails the
@@ -1771,9 +1791,10 @@ try {
 | `quarantinedPath`  | `string` | For `data-loss`: where store-and-forward kept the bytes it could not replay                              |
 
 - **`terminal`**: schema mismatches, parse errors, and security errors cannot
-  succeed on replay. The sender stops, and later calls reject with the error.
-  With store-and-forward, the rejected batch stays in the journal: see
-  [Errors from calls](#errors-from-calls).
+  succeed on replay. The sender stops, and later calls reject with
+  `QwpReplayRejectedError`. Without store-and-forward, every batch QuestDB has
+  not acknowledged is lost. With store-and-forward, the rejected batch stays
+  in the journal. See [Errors from calls](#errors-from-calls).
 - **`retriable`** and **`retriable-other`**: the client reconnects, to another
   endpoint for `retriable-other`, and replays from the last acknowledgement.
 - **`abandoned`**: store-and-forward recovery could not replay data, which is
@@ -1824,14 +1845,17 @@ try {
 The same message rules apply as for ingestion: dispatch on `status`, and
 sanitize the text before showing it to end users, since it can quote SQL.
 
-| `status` | Name              | Meaning                                         |
-| -------- | ----------------- | ----------------------------------------------- |
-| `3`      | `SCHEMA_MISMATCH` | A bind value does not fit its placeholder       |
-| `5`      | `PARSE_ERROR`     | Invalid SQL, or a missing table or column       |
-| `6`      | `INTERNAL_ERROR`  | The server failed while running the query       |
-| `8`      | `SECURITY_ERROR`  | The principal lacks a permission                |
-| `10`     | `CANCELLED`       | The query was cancelled                         |
-| `11`     | `LIMIT_EXCEEDED`  | A protocol limit was reached                    |
+| `status` | Name              | Meaning                                                                                                                                          |
+| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `5`      | `PARSE_ERROR`     | Invalid SQL, a missing table or column, or a bind value the query cannot take, such as text for `LIMIT $1`                                       |
+| `6`      | `INTERNAL_ERROR`  | The server could not run the query, including a bind value it cannot convert, such as `abc` for a `DOUBLE` column, and a column type QWP cannot carry |
+| `8`      | `SECURITY_ERROR`  | The principal lacks a permission                                                                                                                 |
+| `10`     | `CANCELLED`       | The query was cancelled                                                                                                                          |
+| `11`     | `LIMIT_EXCEEDED`  | A server limit was reached: its query timeout, its memory limit, or a row larger than its send buffer                                            |
+
+QuestDB 10.1 does not send status `3` (`SCHEMA_MISMATCH`) for queries. A bind
+value of the wrong type arrives as `5` or `6`, so do not treat every `6` as a
+server fault.
 
 ### Error classes
 
@@ -1841,7 +1865,7 @@ sanitize the text before showing it to end users, since it can quote SQL.
 | `QwpFailoverError`                  | Every endpoint of one connection attempt failed. `attempts` lists them           |
 | `QwpReconnectExhaustedError`        | A `sync` first connection or a query failover ran out of its limits              |
 | `QwpDurableAckUnavailableError`     | Durable acknowledgement was requested but the server does not support it         |
-| `QwpIngressNackError`               | QuestDB rejected a batch. `senderError` holds the details                        |
+| `QwpIngressNackError`               | QuestDB rejected a batch during a wait. `senderError` holds the details          |
 | `QwpReplayRejectedError`            | A rejected batch ended the sender; later calls reject with it                    |
 | `QwpBatchTooLargeError`             | One row is larger than the server's batch limit                                  |
 | `QwpWriterRowError`                 | A compiled writer rejected a row                                                 |
@@ -1870,9 +1894,11 @@ Close every sender, session, and lease in a `finally` block:
   up to `close_flush_timeout_millis` (5 seconds) for QuestDB to acknowledge
   everything. If it does not, `close()` rejects with
   `QwpSenderCloseTimeoutError`: in memory mode the unacknowledged data is lost,
-  and with store-and-forward it stays on disk for the next sender. `0` skips the
-  wait. An unfinished row is discarded with a warning, and an open transaction
-  is rolled back.
+  and with store-and-forward it stays on disk for the next sender. If
+  publishing the remaining rows fails first, for example because the replay
+  queue is full, `close()` rejects with that error instead and logs the
+  timeout. `0` skips the wait. An unfinished row is discarded with a warning,
+  and an open transaction is rolled back.
 - **A borrowed sender's `close()`** publishes and returns the connection
   without waiting. Call `flushAndWait()` first where you need the
   acknowledgement.

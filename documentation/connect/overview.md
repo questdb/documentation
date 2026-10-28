@@ -44,11 +44,11 @@ QWP ships in every library below.
 | C & C++              | ✓ Stable    |
 | Rust                 | ✓ Stable    |
 | Python               | ✓ Stable    |
+| Node.js              | ✓ Stable    |
+| Browser (JavaScript) | ✓ Stable    |
 | .NET                 | Beta        |
 | Go                   | Beta        |
 | Ruby                 | Beta        |
-| Node.js              | Beta        |
-| Browser (JavaScript) | Beta        |
 
 Highlights:
 
