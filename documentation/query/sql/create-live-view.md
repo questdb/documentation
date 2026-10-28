@@ -56,7 +56,7 @@ the query. When `OWNED BY` is used, wrap the query in parentheses.
 | `PARTITION BY` | Partitioning unit for the view's disk tier. Defaults to the base table's scheme |
 | `START FROM` | Inclusive event-time boundary: `NOW`, `BEGINNING`, or a timestamp literal. Required |
 | `query` | A window-function `SELECT` over a single WAL-backed base table |
-| `OWNED BY` | Assign ownership (Enterprise) |
+| `OWNED BY` | Gives the creator's permissions to another user, group, or service account (Enterprise) |
 
 ## Clauses
 
@@ -404,13 +404,15 @@ GRANT SELECT ON trades TO user1;
 ```
 
 When you create a live view you automatically receive all permissions on it,
-including `DROP LIVE VIEW`, with the `GRANT` option. With `OWNED BY`, the named
-owner receives these permissions instead.
+including `DROP LIVE VIEW`, with the `GRANT` option. With `OWNED BY`, the user,
+group, or service account named in the clause receives these permissions
+instead. QuestDB stores no owner for the view: afterwards they are ordinary
+grants that can be revoked like any other.
 
 ### OWNED BY clause
 
-Assign ownership to a user, group, or service account. The query must be wrapped
-in parentheses:
+Give the creator's permissions to a user, group, or service account. The query
+must be wrapped in parentheses:
 
 ```questdb-sql
 CREATE GROUP analysts;
@@ -427,7 +429,7 @@ OWNED BY analysts;
 ```
 
 The example works as written for the built-in admin, which can name any
-existing user, group, or service account as the owner. Any other creator can
+existing user, group, or service account in `OWNED BY`. Any other creator can
 name only themselves or a group they are a member of; naming another group fails
 with `<user> is not part of group <group>`. External users must specify
 `OWNED BY` and can name only one of their groups.
