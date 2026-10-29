@@ -211,6 +211,10 @@ receive failures, `404` / `426` / `503` on upgrade, version mismatches
 peers), and generic frame-decode errors. The client records `TransportError`
 and walks to the next host.
 
+The Go query client doesn't resubmit after a server response it can't read
+that may have ended the statement; see
+[Query failover](/docs/connect/clients/go/#query-failover).
+
 When a round exhausts with transient errors, the client sleeps for the
 backoff interval and starts the next round. On the ingress sender the rounds
 continue indefinitely; on the egress query client they are bounded by

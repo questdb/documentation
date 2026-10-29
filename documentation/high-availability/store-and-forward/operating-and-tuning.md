@@ -80,6 +80,11 @@ when the mmap'd region writes into a hole. On filesystems where the
 native layer **must** fall back to `ftruncate`, size `sf_max_segment_bytes`
 conservatively against free space.
 
+**The Go client never falls back.** Where reservation isn't supported, such
+as on some network and FUSE filesystems and on Unix systems other than Linux
+and macOS, creating a Go sender fails with `ErrSfDurability`. Move `sf_dir`
+to a supported local filesystem.
+
 ## Lock collisions in practice
 
 Two `sender_id`s in the same `sf_dir` never collide — they are

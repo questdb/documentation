@@ -514,6 +514,14 @@ replays whatever is still on disk.
 To enable SF mode, set `sf_dir`. Without it, the client runs a memory-only
 equivalent — same architecture, no durability across restarts.
 
+:::note Go client
+
+The Go client accepts only `sf_durability=memory`, and every store-and-forward
+key except `sf_dir` requires `sf_dir`. See
+[What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
+
+:::
+
 ### Storage
 
 - `sf_dir` — parent directory under which the slot lives. The slot path is
@@ -550,8 +558,8 @@ equivalent — same architecture, no durability across restarts.
   process-crash durable but **not** host-crash durable, because the page cache
   is lost on power failure.
 
-  The .NET client is the exception: it accepts only `memory` and rejects
-  anything else at parse time.
+  The .NET and Go clients accept only `memory` and reject anything else at
+  parse time.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a
@@ -774,6 +782,17 @@ egress side; the Sender silently accepts even a value the
   cursor mid-result-set, breaking out of iteration) before the client
   declares the connection desynced and discards it. Positive integer
   milliseconds; default `5000` (5 s).
+- `server_info_timeout_ms` — **Go client only; other clients reject it,** so
+  leave it out of a connect string shared with them. How long the client waits
+  for the server's `SERVER_INFO` message after the WebSocket upgrade. Positive
+  integer milliseconds; default `5000` (5 s).
+- `replay_exec` — **Go client only; other clients reject it,** so leave it out
+  of a connect string shared with them. Whether `Exec` runs a statement again
+  after the connection fails mid-statement. `off` (default) returns the error
+  instead, because the server may already have applied the statement. Set it
+  to `on` only if your statements are safe to run twice. It doesn't affect
+  `Query`, which always resends; see
+  [Go query failover](/docs/connect/clients/go/#query-failover).
 - `buffer_pool_size` — number of decoded result-batch buffers the I/O
   thread keeps in rotation. Sets the in-flight window between the
   receive/decode loop and the user's `onBatch` callback: the I/O thread
@@ -951,10 +970,12 @@ description and behaviour notes.
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
+| `replay_exec`                           | enum (`on` / `off`)           | `off` (Go only)               | [Query client keys](#egress-keys)                             |
 | `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
+| `server_info_timeout_ms`                | int (ms)                      | `5000` (Go only)              | [Query client keys](#egress-keys)                             |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only) | [Store-and-forward](#sf-keys)                                |
