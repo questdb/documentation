@@ -1656,7 +1656,8 @@ wss::addr=db-a:9000,db-b:9000,db-c:9000;token=YOUR_TOKEN;
   `poison_min_escalation_window_millis` (5000) of connected time.
 - **Writes find the primary.** With several endpoints, a replica rejects the
   upgrade, and the sender moves on to the next endpoint until it reaches the
-  primary.
+  primary. The replica answers HTTP 421 Misdirected Request, which the client
+  reports as a `QwpUpgradeError` of kind `role-rejected`.
 
 <SfDedupWarning />
 
