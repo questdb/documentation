@@ -1642,7 +1642,11 @@ wss::addr=db-a:9000,db-b:9000,db-c:9000;token=YOUR_TOKEN;
   `reconnect_max_duration_millis` (5 minutes) and then rejects with
   `QwpReconnectExhaustedError`, and `async` returns at once and connects in the
   background. Setting a `reconnect_*` key without `initial_connect_retry`
-  selects `sync`.
+  selects `sync`. A process that starts while no primary is reachable, for
+  example during a failover when only replicas answer, fails this first
+  connection. To start anyway and queue rows until a primary appears, set
+  `lazy_connect=on` on the [pooled client](#the-pooled-client), or
+  `initial_connect_retry=async` on a `Sender`.
 - **Rejected credentials are not retried.** HTTP 401 or 403 ends the attempt
   for every endpoint, because a credential applies to the whole cluster. A
   store-and-forward sender, or one started with `async`, that has connected
