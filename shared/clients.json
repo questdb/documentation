@@ -35,7 +35,7 @@
     "href": "/docs/connect/clients/dotnet",
     "name": ".NET",
     "description":
-      "QWP sender and query client for .NET. Beta.",
+      "QWP sender and query client for .NET.",
     "logo": "/images/logos/dotnet.svg",
     "protocol": "QWP"
   },
@@ -43,8 +43,16 @@
     "href": "/docs/connect/clients/go",
     "name": "Go",
     "description":
-      "Pooled QWP ingestion and queries with store-and-forward durability. Beta.",
+      "Pooled QWP ingestion and queries with store-and-forward durability.",
     "logo": "/images/logos/go.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/ruby",
+    "name": "Ruby",
+    "description":
+      "Pooled QWP ingestion with row, columnar, and Arrow paths, plus SQL queries.",
+    "logo": "/images/logos/ruby.svg",
     "protocol": "QWP"
   },
   {
