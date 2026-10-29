@@ -34,22 +34,6 @@ The first-party libraries for **Java, Python, Go, Rust, Node.js, C & C++,
 speak the **QuestDB Wire Protocol (QWP)** and unify ingest and query under one
 configuration and one connection.
 
-### QWP support
-
-QWP ships in every library below.
-
-| Language             | QWP support |
-| -------------------- | ----------- |
-| Java                 | ✓ Stable    |
-| C & C++              | ✓ Stable    |
-| Rust                 | ✓ Stable    |
-| Python               | ✓ Stable    |
-| Node.js              | ✓ Stable    |
-| Browser (JavaScript) | ✓ Stable    |
-| .NET                 | Beta        |
-| Go                   | Beta        |
-| Ruby                 | Beta        |
-
 Highlights:
 
 - **Binary on the wire** — roughly half the size of ILP or HTTP.
