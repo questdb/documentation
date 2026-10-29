@@ -183,14 +183,14 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
-| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
 | `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
-| `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
+| `connect_timeout` | unset (Node.js: `15000`) — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
 | `poison_min_escalation_window_millis` | `5000` |
@@ -352,7 +352,10 @@ capability mismatch, the poison-frame detector, or the producer hitting
 `sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
 `append()`. ⚠ The Java client treats an authentication rejection or a
 durable-ack capability mismatch as terminal only before the sender first
-connects, and retries them afterwards.
+connects, and retries them afterwards. A Node.js sender that uses
+store-and-forward or `initial_connect_retry=async` does the same once it has
+connected, as do some browser senders: see
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
 
@@ -386,7 +389,14 @@ and apply back-pressure to the producer rather than dropping data.
 :::
 
 ⚠ In the Java client, a running sender also retries authentication failures.
-Other clients treat them as terminal. See
+So does a Node.js sender that uses store-and-forward or
+`initial_connect_retry=async`, and a browser sender that authenticates with
+`sessionBootstrap` and was started with `initialConnectMode: "async"`, once it
+has connected. A browser sender that authenticates with `auth` cannot see why
+an upgrade failed, so once it has connected it retries a rejected credential
+like an outage, whatever its mode, and reports `endpoint-attempt-failed`
+rather than `auth-failed`. Other senders treat authentication failures as
+terminal. See
 [Authentication failures and token providers](#authentication-failures-and-token-providers).
 
 ### Authentication failures and token providers
@@ -426,9 +436,15 @@ retriable `SECURITY_ERROR`, and in its connection health, so an application
 that prefers a hard failure can close the sender itself. A query that fails
 names the failure class in its error, and the next query connects again.
 
-⚠ This is the behaviour of the Java client 1.3.11 and later. The other
-clients send fixed credentials only, and treat a `401` or `403` as terminal in
-every phase.
+⚠ This is the behaviour of the Java client 1.3.11 and later. The browser
+client's `auth` option also accepts a function that supplies a credential
+before every connection attempt, and some Node.js and browser senders retry a
+rejected credential once they have connected, as described in
+[Reconnect and outage handling](#reconnect-and-outage-handling). A browser
+query session that authenticates with `auth` cannot see the status of a failed
+upgrade, so instead of failing the query it fails over as it would during an
+outage, until its failover limits run out. The other clients send fixed credentials only,
+and treat a `401` or `403` as terminal in every phase.
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
@@ -444,6 +460,10 @@ every phase.
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |
+
+A browser cannot see the status of a failed upgrade, so the browser client
+handles a credential that QuestDB rejects from its `auth` option like an
+unreachable endpoint, and tries the next one.
 
 ### Query client initial connect
 
