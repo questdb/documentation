@@ -1111,6 +1111,13 @@ if (ingress && ingress.waitingMemoryReplayAppends > 0) {
 }
 ```
 
+These fields describe the memory queue only. With
+[store-and-forward](#store-and-forward), `waitingMemoryReplayAppends` stays
+`0` and `memoryReplayUsedBytes` is `undefined`, even during an outage. To watch
+the backlog in either mode, read `pendingReplayFrames` and
+`pendingReplayBytes`, the frames and bytes that QuestDB has not acknowledged
+yet.
+
 ## Store-and-forward
 
 Setting `sf_dir` journals every batch to disk before it is sent. `flush()` then
