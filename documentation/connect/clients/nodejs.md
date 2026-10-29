@@ -983,6 +983,11 @@ Sequences are `bigint` values. `publishedSequence` and `ackedSequence` report
 the two watermarks without waiting. `flushAndWait()` and `waitForAck()`
 correspond to `drain()` and `awaitAckedFsn()` in the Java client.
 
+With [store-and-forward](#store-and-forward), a new sender continues the
+sequence of the unacknowledged frames it recovers from its journal, so the
+watermarks also count frames that an earlier process journalled. When there is
+nothing to recover, the sequence starts again from `0`.
+
 To wait for everything written so far, flush, then wait for the published
 watermark. `flushAndWait()` does the same in one call:
 
