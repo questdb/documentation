@@ -33,8 +33,7 @@ For data ingestion, see
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/query/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP query support to JavaScript, Rust, .NET, or runtimes that the existing
-clients don't cover).
+QWP query support to PHP or runtimes that the existing clients don't cover).
 
 Compared with the row-oriented HTTP `/exec` JSON endpoint, QWP egress trades
 a denser binary encoding for higher throughput and lower CPU on both ends:
@@ -799,7 +798,11 @@ Key behaviors:
 - An authentication error at any host fails the query; the reconnect loop does
   not continue past it. A Java client with a token provider first retries the
   same host once after a `401`, with a new token, and its next query connects
-  again. See
+  again. A browser query session that authenticates with the browser client's
+  `auth` option cannot see the status of a failed upgrade, so a rejected
+  credential looks like an unreachable host: it does not end the endpoint
+  walk, and a session that has connected before keeps failing over until its
+  failover limits run out. See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - A `CANCEL` acknowledged with `QUERY_ERROR(CANCELLED)` routes through the
   normal error path, not the transport-error path, so it never triggers

@@ -214,8 +214,9 @@ apply latency varies with load.
 
 This applies to every client, not just Java. See the equivalent poll in the
 [Python](/docs/connect/clients/python/),
-[Rust](/docs/connect/clients/rust/) and
-[Go](/docs/connect/clients/go/) quick starts.
+[Rust](/docs/connect/clients/rust/),
+[Go](/docs/connect/clients/go/), and
+[Node.js](/docs/connect/clients/nodejs/) quick starts.
 
 The `QuestDB` handle is a facade over two distinct kinds of client: a
 [`Sender`](#data-ingestion) for ingestion (`db.borrowSender()`) and a

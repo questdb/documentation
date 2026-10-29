@@ -20,6 +20,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Browser client](/docs/connect/clients/browser/) - New page for `@questdb/browser-client`, which writes rows and streams SQL query results over QWP WebSockets directly from web applications. Covers same-origin deployment behind a reverse proxy, applications on their own origin listed in `qwp.browser.allowed.origins`, session-cookie and per-connection credential authentication with refreshed OIDC tokens, in-memory replay, failover, and the differences from the Node.js client
 - [Token providers](/docs/connect/clients/java/#token-providers) - The Java client 1.3.11 requests and renews bearer tokens itself, with `token_provider=azure` for Microsoft Entra ID or a `RefreshingTokenProvider` for other identity providers. Covers the `questdb-client-azure` artifact, credential selection, failure classification, and how senders, queries, and orphan drainers handle token failures
 - [Connection health](/docs/connect/clients/java/#connection-health) - The Java client reports whether each sender and query client reaches the server, since when it has not, and its last failure
 - [Managed identities and service principals](/docs/security/oidc/#managed-identities-and-service-principals) - Authenticate Azure services to QuestDB Enterprise with Entra ID app-only tokens: app roles, v2.0 tokens, claim lists, group mappings, and the Java client
@@ -43,6 +44,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- Added the [`qwp.browser.allowed.origins`](/docs/configuration/qwp/#qwpbrowserallowedorigins) and [`qwp.browser.tls.termination.enabled`](/docs/configuration/qwp/#qwpbrowsertlsterminationenabled) settings, which control the browser origins allowed to open QWP WebSockets and same-origin checks behind a TLS-terminating proxy
 - [`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer) and [`acl.oidc.issuer.validation.enabled`](/docs/configuration/oidc/#acloidcissuervalidationenabled) - New settings for the expected issuer of a token
 - [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) and [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) - Documented claim lists and their startup validation, and corrected that `acl.oidc.groups.claim` has no default and is required
 - [`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl) - Documented that `0` disables the cache, and how long an HTTP session reuses a password check
@@ -68,6 +70,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Node.js client](/docs/connect/clients/nodejs/) - Rewritten for client 5.0.0, which speaks QWP: ingestion through `Sender` with `ws::` connect strings, the pooled `connectQwpNodeClient()` handle, compiled object-row writers, every QWP column type, streaming SQL queries with bind parameters, store-and-forward, failover, error payloads, and a migration guide from ILP. The [connect string reference](/docs/connect/clients/connect-string/) now lists the Node.js defaults and differences
 - [Upgrade QuestDB](/docs/operations/upgrade/#authentication-changes-in-410) - Authentication changes to check before upgrading to QuestDB Enterprise 4.1.0
 - [QWP client behaviour](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers) - Authentication failures by phase, and the retry with a new token after a `401`. The QWP ingress and egress, client failover, and connect string pages now describe how the Java client retries authentication failures
 - [Java client](/docs/connect/clients/java/#ingestion-errors) - Corrected the error categories and policies, that the `QuestDB` builder accepts an error handler, and the `AUTH_FAILED` connection event

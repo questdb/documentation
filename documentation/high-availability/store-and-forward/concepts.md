@@ -187,12 +187,16 @@ The exception message distinguishes the two scenarios:
 `close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
-C, C++ and Python. If the wait succeeds, all data is acked. If the timeout
-fires, a `WARN` is logged and:
+C, C++, Python, and Node.js. If the wait succeeds, all data is acked. If the
+timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
 - in **memory mode**, the un-acked tail is lost.
+
+The Node.js client reports the timeout differently: `close()` rejects with
+`QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
+data. Its pooled client logs a warning when a sender it closes times out.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.

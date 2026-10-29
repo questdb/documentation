@@ -31,8 +31,7 @@ clients, see [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-we
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/connect/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP to JavaScript, Rust, .NET, or an embedded runtime that the existing
-clients don't cover).
+QWP to PHP or an embedded runtime that the existing clients don't cover).
 
 Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
 QWP trades a denser binary encoding for higher throughput and lower CPU on
@@ -1176,9 +1175,16 @@ Key behaviors:
   connect string shared with egress clients works unchanged on ingress.
 - **Authentication errors end the endpoint walk** at any host (`401`/`403`):
   the client does not try the other hosts. Startup fails. In most clients,
-  the reconnect loop does not continue past them either. A Java sender that
-  has connected keeps retrying instead, and a Java client with a token
-  provider first retries the same host once after a `401`, with a new token.
+  the reconnect loop does not continue past them either. A sender that has
+  connected keeps retrying instead in the Java client, in the Node.js client
+  when it uses store-and-forward or was started with `async`, and in the
+  browser client when it authenticates with `sessionBootstrap` and was started
+  with `async`. A browser cannot see the status of a failed upgrade, so a
+  credential sent with the browser client's `auth` option does not end the
+  walk when QuestDB rejects it: it looks like an unreachable host, and a
+  sender that has connected keeps retrying it whatever its mode. A Java client
+  with a token provider first retries the same host once after a `401`, with
+  a new token.
   See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
