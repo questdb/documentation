@@ -111,6 +111,9 @@ This page tracks significant updates to the QuestDB documentation.
 - [Schema design](/docs/schema-design-essentials/#partitioning) - Partition interval advice now matches the partitions page: target 30 to 80 million rows per partition, with updated rows per day for each interval
 - [Query times histogram](/docs/cookbook/operations/query-times-histogram/) - The recipe now computes exact bucket thresholds with `percentile_disc()` instead of `approx_percentile()`
 - [Python client](/docs/connect/clients/python/) - Documented that a pooled sender lease leaves its buffered rows unpublished when an exception exits the `with` block
+- [OWNED BY](/docs/query/sql/create-table/#owned-by) - Clarified that QuestDB Enterprise stores no owner for tables, views, materialized views, live views, or columns. `OWNED BY` only decides who receives the creator's permissions at creation time, and those become ordinary grants. The CREATE TABLE, CREATE VIEW, CREATE MATERIALIZED VIEW, CREATE LIVE VIEW, and ALTER TABLE ADD COLUMN pages no longer describe it as assigning an owner. The `OWNED BY` clause in [SHOW CREATE](/docs/query/sql/show/#enterprise-variant) output and in `SHOW CREATE DATABASE` dumps names the principal running the statement, replaying it gives that principal all permissions on the object, and `active_grants()` is the way to see who holds permissions
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#filtering-by-category) - Corrected that filtering the dump with `WHERE` works: wrap the statement in parentheses and match the `ddl` column with a leading wildcard, as in `(SHOW CREATE DATABASE) WHERE ddl ILIKE '%fx_%'`, then check that the filtered dump includes every object it depends on before replaying it
+- [Connect to QuestDB](/docs/connect/overview/) - The overview lists Ruby among the client libraries and no longer labels the .NET and Go clients as beta
 
 ## September 2026
 
