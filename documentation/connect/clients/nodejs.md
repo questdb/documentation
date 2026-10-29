@@ -1787,7 +1787,7 @@ await sender.close();
 | `auth-failed`               | The server rejects the credentials with HTTP 401 or 403     |
 | `durable-ack-unavailable`   | A store-and-forward sender waits for an endpoint with durable acknowledgement |
 | `durable-ack-persistent-failure` | An orphan journal drain stopped waiting for durable acknowledgement |
-| `primary-unavailable`       | No reachable endpoint can act as the primary right now      |
+| `primary-unavailable`       | Every endpoint rejects an orphan journal drain with HTTP 421, so no primary is available. Senders report `all-endpoints-unreachable` instead |
 
 Each event has `kind`, `attempt`, `timestampMs`, `endpoint`,
 `previousEndpoint`, and `cause`. When a query session reconnects, the active
