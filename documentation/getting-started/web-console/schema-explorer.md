@@ -9,6 +9,9 @@ The **Schema Explorer** is the navigation panel on the left side of the Web Cons
 
 You can toggle the Schema Explorer by using the database icon on the left.
 
+In QuestDB Enterprise, the Schema Explorer lists only the tables and views the
+signed-in user [can see](/docs/security/rbac/#object-visibility).
+
 <Screenshot
   alt="Schema Explorer in the Web Console"
   src="images/docs/console/schema-explorer.webp"

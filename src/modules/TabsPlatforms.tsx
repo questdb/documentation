@@ -48,6 +48,15 @@ export const TabsPlatforms = ({ render, platforms }: Props) => {
     })
     .filter(Boolean) as Props["platforms"]
 
+  if (tabs.length === 0) {
+    return (
+      <p>
+        Download binaries from the{" "}
+        <a href={release.html_url}>QuestDB release page</a>.
+      </p>
+    )
+  }
+
   const defaultValue = detectOS()
 
   return (

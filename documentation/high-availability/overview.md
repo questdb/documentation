@@ -101,6 +101,11 @@ cases.
 Tables without timestamps (typically used for reference/lookup data) are not
 replicated automatically and should be populated separately on each instance.
 
+The audit trail of [audited views](/docs/security/audited-views/),
+`sys.view_audit`, is a WAL table whose definition and storage policy replicate,
+but whose rows do not: each node records the reads it serves. See
+[Replication, backups, and read-only instances](/docs/security/audited-views/#replication-backups-and-read-only-instances).
+
 ## Storage policies in a replicated cluster
 
 [Storage policy](/docs/concepts/storage-policy/) definitions are stored in
@@ -133,6 +138,17 @@ The remote stages behave differently from the local ones. [Cold storage](/docs/c
 - **Upgrade replicas before enabling a remote stage.** Older instances and open source nodes do not understand the partition seal event and suspend WAL apply rather than skipping it.
 
 See [Operating cold storage](/docs/operations/cold-storage/) for the manager handoff procedure and its preconditions.
+
+## Resource groups in a replicated cluster
+
+[Resource group](/docs/concepts/resource-groups/) policies and their principal
+mappings live in a WAL-backed system catalog, so they replicate to every
+instance through the same pipeline as user data. Enforcement then runs locally
+on each instance, against the catalog snapshot that instance holds.
+
+What that means while a replica is behind, including why a lagging replica
+cannot be promoted, is covered in
+[Replication and catalog lag](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
 
 ## Bring Your Own Cloud (BYOC)
 

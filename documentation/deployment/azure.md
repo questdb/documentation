@@ -15,7 +15,8 @@ import CodeBlock from "@theme/CodeBlock"
 |-----------|-------------|-------|
 | Instance | `D4s_v5` or `E8s_v5` | 4-8 vCPUs, 16-64 GiB RAM |
 | Storage | Premium SSD v2, 200+ GiB | 16000 IOPS / 1000 MBps |
-| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| File system | `ext4` or `xfs` | Compression is handled by Parquet, not the file system |
+| Compression | Storage policy with `TO PARQUET` | Add `TO REMOTE` to tier history to Blob Storage (Enterprise) |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
 ---
@@ -100,14 +101,32 @@ capacity to get required IOPS.
 
 **File system:**
 
-Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
-compression, `ext4` or `xfs` offer slightly better performance.
+Format the data disk as `ext4` or `xfs`. QuestDB compresses data itself, so the
+file system does not need to.
+
+**Compression and tiering:**
+
+QuestDB compresses data by storing older partitions as
+[Parquet](/docs/concepts/parquet/#data-compression), which uses `lz4_raw`
+compression by default and stays fully queryable. In QuestDB Enterprise, a
+[storage policy](/docs/concepts/storage-policy/) with a `TO PARQUET` stage
+converts partitions automatically as they age. In QuestDB open source, convert
+them manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
+
+For further savings in Enterprise, add a `TO REMOTE` stage so the policy also
+tiers Parquet partitions to Blob Storage
+[cold storage](/docs/concepts/cold-storage/). Blob Storage usually costs less
+than managed disks, the cluster keeps a single copy that every instance reads
+instead of one copy per replica, and history can grow beyond the size of a
+single disk.
 
 **Unsupported storage:**
 
 - **Azure NetApp Files** - Not supported as primary storage (NFS latency too high)
 - **blobfuse2** - Not supported for database workloads
-- **Blob Storage** - Supported for Enterprise replication only, not primary storage
+- **Blob Storage** - Supported for Enterprise replication and cold storage only,
+  not primary storage
 
 ### Networking
 
@@ -346,6 +365,10 @@ QuestDB Enterprise adds production features for Azure:
 
 For EntraID integration, see the
 [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
+Applications that run on Azure can authenticate as a managed identity or a
+service principal, without a user. The Java client requests and renews their
+Entra ID tokens with `token_provider=azure`. See
+[Managed identities and service principals](/docs/security/oidc/#managed-identities-and-service-principals).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
 
