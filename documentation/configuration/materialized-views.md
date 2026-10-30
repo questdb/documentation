@@ -6,8 +6,9 @@ description:
 ---
 
 These settings control materialized view SQL support and the background refresh
-job. Materialized views can use dedicated worker threads or share the server's
-common pool.
+job. Materialized views refresh on a dedicated worker pool sized by
+[`mat.view.refresh.worker.count`](#matviewrefreshworkercount); `0` disables
+refresh.
 
 To cap the native memory a single refresh may allocate, see
 [`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
@@ -72,18 +73,37 @@ has no effect; deferred out-of-memory retries use this backoff.
 
 ## mat.view.refresh.worker.affinity
 
-- **Default**: equal to the CPU core count
+- **Default**: none
 - **Reloadable**: no
 
-Comma-separated list of numerical CPU core indexes.
+Comma-separated list of numerical CPU core indexes, one per refresh worker.
 
 ## mat.view.refresh.worker.count
 
-- **Default**: `0`
+- **Default**: `2` on hosts with up to 8 CPU cores, `3` on up to 32 cores, `4`
+  on larger hosts. This is the same CPU-based default as
+  [`wal.apply.worker.count`](/docs/configuration/wal/#walapplyworkercount);
+  setting that key does not change this one.
 - **Reloadable**: no
 
-Number of dedicated worker threads assigned to refresh materialized views.
-When `0`, uses the shared worker pool.
+Number of dedicated worker threads assigned to refresh materialized views. A
+value of `0` disables materialized view refresh: `CREATE MATERIALIZED VIEW`
+still succeeds, but nothing refreshes the view. Live views use their own pool,
+sized by
+[`live.view.refresh.worker.count`](/docs/configuration/live-views/#liveviewrefreshworkercount).
+
+## mat.view.refresh.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the materialized view refresh pool in Fiber mode, where work can suspend
+and release its worker instead of holding it until it finishes. Setting this to
+`false` puts the pool in legacy mode.
+
+Unlike the pools that serve user queries, this one is not a prerequisite for
+QuestDB Enterprise [resource groups](/docs/concepts/resource-groups/), because
+materialized view refresh runs outside them.
 
 ## mat.view.refresh.worker.haltOnError
 

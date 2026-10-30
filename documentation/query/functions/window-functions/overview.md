@@ -63,6 +63,7 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`nth_value()`](reference.md#nth_value) | N-th value in window | Yes |
 | [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
 | [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
+| [`percentile_cont()` / `percentile_disc()`](reference.md#percentile) | Exact percentile of the whole partition | No (frame clause rejected) |
 | [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
 | [`row_number()`](reference.md#row_number) | Sequential row number | No |
 | [`sdt()`](reference.md#sdt) | SUBSAMPLE keep flag: Swinging Door Trending, error-bounded | No (frame clause rejected) |

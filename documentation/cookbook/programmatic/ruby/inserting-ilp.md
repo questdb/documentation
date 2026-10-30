@@ -4,13 +4,19 @@ sidebar_label: Inserting via ILP
 description: Send time-series data from Ruby to QuestDB using the InfluxDB Line Protocol over HTTP
 ---
 
-Send time-series data from Ruby to QuestDB using the InfluxDB Line Protocol (ILP). While QuestDB doesn't maintain an official Ruby client, you can easily use the official InfluxDB Ruby gem to send data via ILP over HTTP, which QuestDB fully supports.
+Send time-series data from Ruby to QuestDB using the InfluxDB Line Protocol (ILP), with the InfluxDB Ruby gem or a plain TCP socket.
+
+:::tip
+
+For QuestDB 10.0 and newer, use the official [QuestDB Ruby client](/docs/connect/clients/ruby/) instead. It speaks QWP, QuestDB's native protocol, and adds store-and-forward, failover, and SQL queries. The ILP approaches below remain useful for older servers.
+
+:::
 
 ## Available approaches
 
 Two methods for sending ILP data from Ruby:
 
-1. **InfluxDB v2 Ruby Client** (recommended)
+1. **InfluxDB v2 Ruby Client**
    - Official InfluxDB gem with clean API
    - Automatic batching and error handling
    - Compatible with QuestDB's ILP endpoint
@@ -24,7 +30,7 @@ Two methods for sending ILP data from Ruby:
 
 ## Using the InfluxDB v2 Ruby client
 
-The InfluxDB v2 client provides a convenient Point builder API that works with QuestDB.
+The InfluxDB v2 client provides a convenient `Point` builder API that works with QuestDB.
 
 ### Installation
 

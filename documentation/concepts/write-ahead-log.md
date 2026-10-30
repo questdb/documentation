@@ -88,6 +88,11 @@ If WAL transactions are suspended (rare), resume them:
 ALTER TABLE prices RESUME WAL;
 ```
 
+For a suspended materialized view or live view, use
+[`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/query/sql/alter-mat-view-resume-wal/)
+or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/)
+instead.
+
 ## How WAL works
 
 When data is written to a WAL table:
@@ -99,6 +104,11 @@ When data is written to a WAL table:
 
 This decouples the commit (fast) from storage application (background),
 enabling high write throughput.
+
+WAL apply sorts and commits many WAL transactions together as one block;
+larger blocks reduce out-of-order merges but use more memory per block.
+[Adaptive blocks](/docs/configuration/wal/#adaptive-wal-apply-blocks) are enabled
+by default and grow within a memory budget.
 
 <Screenshot
   alt="Diagram showing the sequencer allocating txn numbers to events chronologically"
@@ -122,6 +132,7 @@ WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
 - Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
+- Adaptive WAL apply blocks: [starting size](/docs/configuration/wal/#cairowalapplyblocksize), [row cap](/docs/configuration/wal/#cairowalapplyblockmaxrows), and [memory budget](/docs/configuration/wal/#cairowalapplyblockmemorypercent).
 - `cairo.wal.apply.memory.limit.bytes` — cap on the native memory a WAL apply
   batch may allocate; see [memory limits](/docs/configuration/cairo-engine/#memory-limits)
 

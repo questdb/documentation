@@ -5,7 +5,6 @@ description:
   This document explains what hardware to use, and how to provision QuestDB on Hetzner Cloud with storage volumes and automated backups.
 ---
 
-import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
 import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"

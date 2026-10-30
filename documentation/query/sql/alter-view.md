@@ -106,12 +106,13 @@ ALTER VIEW trades_filtered AS (
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist [view=name]` | View with specified name doesn't exist |
-| `table does not exist [table=name]` | Referenced table in new query doesn't exist |
+| `view does not exist [view=name]` | View with specified name doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise) |
+| `table does not exist [table=name]` | Referenced table in new query doesn't exist, or is hidden from the user (Enterprise) |
 | `Invalid column` | Column in new query doesn't exist |
 | `circular dependency detected` | New definition would create circular reference |
 | `Access denied [ALTER VIEW on view_name]` | User lacks `ALTER VIEW` permission (Enterprise) |
-| `Access denied [SELECT on table_name]` | User lacks SELECT on tables in new definition (Enterprise) |
+| `Access denied [AUDIT VIEW]` | The view is audited and the user lacks the `AUDIT VIEW` permission (Enterprise) |
+| `Access denied [SELECT on table_name]` | User can see a table in the new definition but lacks SELECT on it (Enterprise) |
 
 ## Behavior
 
@@ -120,15 +121,15 @@ ALTER VIEW trades_filtered AS (
 - Dependent views may become invalid if the altered view's output changes
 - Use `CREATE OR REPLACE VIEW` as an alternative if you want to create the view
   when it doesn't exist
+- An [audited view](/docs/security/audited-views/) stays audited, and altering
+  one also requires the database-level `AUDIT VIEW` permission (Enterprise)
 
 ### Definer permissions transfer (Enterprise)
 
-When a user alters a view, the view's **definer permissions** transfer to that
-user. This means:
-
-- The view now runs with the permissions of the user who performed the ALTER
-- Other users querying the view can access data the new definer has access to
-- The original creator's permissions no longer apply to the view
+When a user alters a view, the new body is checked against that user's
+permissions: they need `SELECT` on every table it reads, and they become the
+view's **definer**. Readers need only `SELECT` on the view, and later changes to
+the definer's own permissions do not affect them.
 
 ```questdb-sql title="Definer transfer example"
 -- UserA creates view on table1 (UserA has SELECT on table1)
@@ -139,8 +140,8 @@ CREATE VIEW my_view AS (SELECT * FROM table1);
 -- UserB becomes the new "definer"
 ALTER VIEW my_view AS (SELECT * FROM table2);
 
--- UserC (with SELECT on my_view) now sees table2 data
--- using UserB's permissions
+-- UserC (with SELECT on my_view) now sees table2 data,
+-- without SELECT on table2
 SELECT * FROM my_view;
 ```
 
@@ -150,6 +151,8 @@ Altering a view requires:
 
 1. `ALTER VIEW` permission on the view
 2. `SELECT` permission on all tables referenced in the **new** definition
+3. For an [audited view](/docs/security/audited-views/), the database-level
+   `AUDIT VIEW` permission
 
 ```questdb-sql
 -- Grant ALTER VIEW permission
@@ -161,8 +164,13 @@ You cannot use `ALTER VIEW` to access tables you don't have permission for:
 ```questdb-sql
 -- This fails if user doesn't have SELECT on secret_table
 ALTER VIEW my_view AS (SELECT * FROM secret_table);
--- Error: Access denied for username [SELECT on secret_table]
 ```
+
+A user that holds no permission on `secret_table` cannot
+[see it](/docs/security/rbac/#object-visibility), so the statement fails with
+`table does not exist [table=secret_table]`. A user that holds another
+permission on the table, but not `SELECT`, gets
+`Access denied for username [SELECT on secret_table(column)]`.
 
 ## See also
 

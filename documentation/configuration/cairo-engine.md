@@ -67,6 +67,11 @@ When `false`, disables the `reload_config()` SQL function.
 A global timeout for long-running queries, given as a duration: `500ms`, `120s`,
 `2m` and `1h` are all valid, and a plain number is read as milliseconds.
 
+The timer starts when the server receives the statement and includes any time
+the query spends queued for Resource Group admission. Over PGWire each `Execute`
+message restarts it, so a client that fetches a cursor in batches is timed per
+batch rather than across the whole result.
+
 This key replaces `query.timeout.sec`. When both are set, `query.timeout` takes
 precedence; when neither is set, queries time out after 60 seconds.
 
@@ -244,9 +249,9 @@ writers.
 
 ## Out-of-order (O3) ingestion
 
-These settings control the in-memory buffer used for out-of-order data
-ingestion. The buffer size is determined dynamically based on the shape of
-incoming data, within the bounds set here.
+These settings control out-of-order buffering, partition splits and the
+opt-in [merge-append layout](/docs/concepts/merge-append-partitions/).
+Buffer size adjusts to the shape of incoming data within the configured bounds.
 
 ### cairo.o3.column.memory.size
 
@@ -258,11 +263,9 @@ column (so the default effective size is 512KB per column).
 
 ### cairo.o3.last.partition.max.splits
 
-- **Default**: `20`
-- **Reloadable**: no
+**Default**: `20`; **Reloadable**: no
 
-Number of partition pieces allowed before the last piece is merged back into
-the physical partition.
+Deprecated fallback for `cairo.o3.partition.max.splits`, which takes precedence when both are set.
 
 ### cairo.o3.max.lag
 
@@ -271,12 +274,60 @@ the physical partition.
 
 Upper limit for the in-memory O3 buffer size, in milliseconds.
 
+### cairo.o3.mid.partition.max.splits
+
+**Default**: `1`; **Reloadable**: no
+
+Target folder count for older partitions of non-WAL tables only; values below 1 are clamped to 1.
+
 ### cairo.o3.min.lag
 
 - **Default**: `1 second`
 - **Reloadable**: no
 
 Lower limit for the in-memory O3 buffer size, in milliseconds.
+
+### cairo.o3.partition.cluster.bin.width
+
+**Default**: `1m`; **Reloadable**: no
+
+Finest timestamp bin width for finding gaps between incoming writes; narrower bins allow more precise cuts at greater per-commit cost.
+
+### cairo.o3.partition.cluster.max.bins
+
+**Default**: `4096`; **Reloadable**: no
+
+Maximum bins used to locate gaps for one partition, clamped to 1–1048576 to bound work and memory.
+
+### cairo.o3.partition.max.splits
+
+**Default**: `20`; **Reloadable**: no
+
+Target folder count for all WAL partitions and the latest non-WAL partition, falling back to `cairo.o3.last.partition.max.splits` if set; hot folders can temporarily exceed it and values below 1 are clamped to 1.
+
+### cairo.o3.partition.merge.append.enabled
+
+**Default**: `false`; **Reloadable**: no
+
+Enables [merge-append partitions](/docs/concepts/merge-append-partitions/) for WAL tables to reduce copying during backdated writes.
+
+### cairo.o3.partition.merge.append.frame.cache.size
+
+**Default**: `2`; **Reloadable**: no
+
+Partitions whose merge-append column files stay open between commits; lower this to reduce file descriptors on wide tables, or use 0 to reopen every time.
+
+### cairo.o3.partition.presplit.max.cuts
+
+**Default**: `10000`; **Reloadable**: no
+
+Maximum cuts per partition per commit in the row-based pre-split pass, excluding clustering and replace-range boundary cuts; clamped to at least 1.
+
+### cairo.o3.partition.presplit.min.piece.multiple
+
+**Default**: `2`; **Reloadable**: no
+
+Minimum existing rows an optional pre-split cut must spare, as a multiple of `cairo.partition.compaction.avg.rows.piece.lim`, clamped to at least 1; raise it to make fewer cuts.
 
 ### cairo.o3.partition.purge.list.initial.capacity
 
@@ -293,6 +344,165 @@ runtime.
 
 Estimated partition size on disk. This is one of the conditions that triggers
 [auto-partitioning](/docs/getting-started/capacity-planning/).
+
+## Partition compaction
+
+[Partition compaction](/docs/concepts/merge-append-partitions/#compaction)
+reclaims dead space and merges idle split folders, including when merge-append
+is disabled for new writes; the background sweep covers WAL tables only.
+Most users only need `cairo.partition.compaction.check.interval`,
+`cairo.partition.compaction.idle.timeout` and
+`cairo.partition.compaction.squash.idle.timeout`.
+
+### cairo.partition.compaction.avg.rows.piece.lim
+
+**Default**: `4096`; **Reloadable**: no
+
+Target average rows per piece used to scale the piece-count threshold, clamped to at least 1; raise it to trigger compaction with fewer pieces.
+
+### cairo.partition.compaction.check.interval
+
+**Default**: `120000`; **Reloadable**: no
+
+Milliseconds from the end of a WAL-table background sweep until the next starts; negative disables periodic sweeps but not requests from storage policies, and 0 checks continuously.
+
+### cairo.partition.compaction.dead.min.size
+
+**Default**: `50M`; **Reloadable**: no
+
+Minimum estimated dead bytes required along with `cairo.partition.compaction.dead.rows.ratio` to trigger the waste-ratio rule.
+
+### cairo.partition.compaction.dead.rows.ratio
+
+**Default**: `1.0`; **Reloadable**: no
+
+Dead rows as a multiple of live rows above which the waste-ratio rule fires, subject to the minimum dead size.
+
+### cairo.partition.compaction.decline.backoff.max
+
+**Default**: `60m`; **Reloadable**: no
+
+Maximum retry delay for a partition whose commit-time compaction was declined.
+
+### cairo.partition.compaction.decline.backoff.min
+
+**Default**: `1m`; **Reloadable**: no
+
+Initial retry delay after declined commit-time compaction, clamped between 0 and `cairo.partition.compaction.decline.backoff.max`; 0 disables backoff.
+
+### cairo.partition.compaction.decline.backoff.multiplier
+
+**Default**: `2`; **Reloadable**: no
+
+Multiplier for successive declined-compaction retry delays, clamped to at least 1 and limited by the maximum delay.
+
+### cairo.partition.compaction.hot.commits
+
+**Default**: `10`; **Reloadable**: no
+
+Recent-commit window protecting written folders from table-pressure rewrites and WAL split squashing; 0 disables this protection and negative values are clamped to 0.
+
+### cairo.partition.compaction.idle.timeout
+
+**Default**: `60m`; **Reloadable**: no
+
+Idle duration before individual merge-append folders or local Parquet partitions are candidates for background compaction, also used by commit-time age-based compaction.
+
+### cairo.partition.compaction.io.budget
+
+**Default**: `1G`; **Reloadable**: no
+
+Estimated read-plus-write bytes a background sweep may start copying; its first partition runs even if it exceeds the budget.
+
+### cairo.partition.compaction.io.cost.multiplier
+
+**Default**: `2`; **Reloadable**: no
+
+Multiplier of estimated live bytes charged against the sweep I/O budget, clamped to at least 1; 2 accounts for one read and one write.
+
+### cairo.partition.compaction.move.tail.dead.rows.percent
+
+**Default**: `10`; **Reloadable**: no
+
+Dead rows as a percentage of live rows above which a commit may split off the tail, also requiring dead bytes above `cairo.o3.partition.split.min.size`; 0 removes the percentage barrier.
+
+### cairo.partition.compaction.move.tail.piece.threshold
+
+**Default**: `1000`; **Reloadable**: no
+
+Piece count above which a commit may split off the tail even below the dead-row percentage trigger, still requiring the minimum dead bytes.
+
+### cairo.partition.compaction.move.tail.prefix.multiple
+
+**Default**: `2`; **Reloadable**: no
+
+The retained prefix must exceed this multiple of the copied tail plus incoming rows for a tail split, clamped to at least 1; raise it for rarer, cheaper splits.
+
+### cairo.partition.compaction.piece.threshold
+
+**Default**: `20`; **Reloadable**: no
+
+Minimum piece-count threshold, clamped to at least 1; compaction triggers above `max(piece.threshold, liveRows / avg.rows.piece.lim)` using the corresponding compaction settings.
+
+### cairo.partition.compaction.squash.idle.timeout
+
+**Default**: `30m`; **Reloadable**: no
+
+Idle duration required for every folder before the sweep merges a non-active split partition, clamped to at most `cairo.partition.compaction.idle.timeout`.
+
+### cairo.partition.compaction.squash.target.size.multiple
+
+**Default**: `4`; **Reloadable**: no
+
+Size threshold as a multiple of `cairo.o3.partition.split.min.size` below which a merge-append squash target is first rewritten to standard layout; 0 disables this preliminary rewrite.
+
+### cairo.partition.compaction.swap.timeout
+
+**Default**: `30m`; **Reloadable**: no
+
+Wait before a stalled compaction publication can be cleared after draining the writer queue, clamped to at least one microsecond.
+
+### cairo.partition.compaction.table.dead.stop.percent
+
+**Default**: `10`; **Reloadable**: no
+
+Dead rows as a percentage of live rows below which table-pressure compaction may stop, clamped to at most `cairo.partition.compaction.table.dead.threshold.percent`.
+
+### cairo.partition.compaction.table.dead.stop.trigger.percent
+
+**Default**: `50`; **Reloadable**: no
+
+Percentage of `cairo.partition.compaction.table.dead.trigger` that dead bytes must also fall to before table-pressure compaction stops, from 0 to 100.
+
+### cairo.partition.compaction.table.dead.threshold
+
+**Default**: `50M`; **Reloadable**: no
+
+Minimum estimated table dead bytes needed to activate table-pressure compaction through its dead-row percentage check.
+
+### cairo.partition.compaction.table.dead.threshold.percent
+
+**Default**: `50`; **Reloadable**: no
+
+Dead rows as a percentage of table live rows at which table-pressure compaction activates, subject to `cairo.partition.compaction.table.dead.threshold`, from 0 to 100.
+
+### cairo.partition.compaction.table.dead.trigger
+
+**Default**: `10G`; **Reloadable**: no
+
+Estimated table dead bytes above which table-pressure compaction activates regardless of its percentage threshold or minimum dead size.
+
+### cairo.partition.compaction.table.pressure.dead.ratio
+
+**Default**: `0.5`; **Reloadable**: no
+
+Dead-to-live row ratio for rewrites under table pressure, required to be finite, positive and below `cairo.partition.compaction.dead.rows.ratio`; its default is the smaller of 0.5 and half that ratio.
+
+### cairo.partition.compaction.time.budget
+
+**Default**: `1000`; **Reloadable**: no
+
+Milliseconds allowed per compaction housekeeping pass or background sweep, checked between operations rather than interrupting a copy.
 
 ## Symbol and indexing
 
@@ -833,8 +1043,9 @@ Maximum allowed native memory allocation for GROUP BY functions.
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables parallel GROUP BY execution. Requires at least 4 shared worker
-threads.
+Enables parallel GROUP BY execution. Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread.
 
 ### cairo.sql.parallel.groupby.merge.shard.queue.capacity
 
@@ -846,11 +1057,96 @@ merge shard hash tables.
 
 ### cairo.sql.parallel.groupby.sharding.threshold
 
-- **Default**: `100000`
+- **Default**: `10000`
 - **Reloadable**: no
 
 Row count threshold for parallel GROUP BY to shard the hash table holding
 the aggregates.
+
+## Parallel GROUP BY over hash joins
+
+### cairo.sql.parallel.hash.join.groupby.build.parallel.min.rows
+
+- **Default**: `300000`
+- **Reloadable**: no
+
+Minimum number of build-side rows for the join hash table to be built on the
+query workers. Smaller hash tables are built on the query's own thread.
+
+### cairo.sql.parallel.hash.join.groupby.build.rows.per.partition
+
+- **Default**: `32768`
+- **Reloadable**: no
+
+Target number of rows per partition of a join hash table built on the query
+workers.
+
+### cairo.sql.parallel.hash.join.groupby.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel GROUP BY over `INNER`, `LEFT` and `RIGHT` hash joins. Takes
+effect only when
+[`cairo.sql.parallel.groupby.enabled`](#cairosqlparallelgroupbyenabled) is also
+`true`.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.max.size
+
+- **Default**: `128M`
+- **Reloadable**: no
+
+Maximum size of the build-side column copy that speeds up probing of the join
+hash table. `0` disables the copy.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.min.probe.ratio
+
+- **Default**: `0.4`
+- **Reloadable**: no
+
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query's own thread to copy build-side columns.
+
+### cairo.sql.parallel.hash.join.groupby.payload.copy.parallel.min.probe.ratio
+
+- **Default**: `0.125`
+- **Reloadable**: no
+
+Minimum ratio of probe-side to build-side rows for a join hash table built on
+the query workers to copy build-side columns.
+
+## HORIZON JOIN
+
+These settings cap the offsets of a
+[HORIZON JOIN](/docs/query/sql/horizon-join/) and control whether it matches
+rows on the query workers.
+
+### cairo.sql.horizon.join.max.offsets
+
+- **Default**: `10000`
+- **Reloadable**: no
+
+Maximum number of offsets that the `RANGE` or `LIST` clause of a HORIZON JOIN
+can generate. A query that generates more fails with
+`RANGE generates too many offsets` or `LIST has too many offsets`. Every
+left-hand row is matched once per offset, so the limit stops a `RANGE` with a
+small `STEP` over a long span from multiplying the work and the result size.
+
+### cairo.sql.parallel.horizon.join.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables parallel HORIZON JOIN execution, shown in
+[`EXPLAIN`](/docs/query/sql/explain/) as an `Async [JIT] Horizon Join`,
+`Async Multi Horizon Join` or `Async [JIT] Horizon Join Projection` node.
+Takes effect only when the
+[query worker pool](/docs/configuration/shared-workers/#sharedqueryworkercount)
+has at least one thread. Set to `false` to match HORIZON JOIN rows on the
+query's own thread. A `WHERE` filter on the left-hand table can still run on
+the query workers, as an `Async Filter` or `Async JIT Filter` node below the
+HORIZON JOIN. See
+[Parallel execution](/docs/query/sql/horizon-join/#parallel-execution).
 
 ## SAMPLE BY
 
@@ -931,8 +1227,7 @@ edit `server.conf` and call
 materialized view refreshes, and WAL apply batches use the updated limits; work
 already running keeps its original limit. A live view acquires its limit when it
 is first compiled and keeps it across refreshes, so a reloaded value reaches an
-existing view only after a full teardown: invalidation, recreation, or a server
-restart.
+existing view only after the view is recreated or the server restarts.
 
 When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
 allocation that crossed the line and aborts that workload, while unrelated
@@ -1051,7 +1346,9 @@ you can reproduce as a plain query and measure the same way:
   the view retains between refreshes: the `IN MEMORY` tier, whose capacity
   [`live_views()`](/docs/query/functions/meta/#live_views) reports in its
   `in_mem_bytes` column, and the window state. Add these to the transient
-  figure, and keep the limit above the
+  figure. Window state grows with the number of distinct partition keys the
+  view has seen and does not shrink when keys go quiet, so leave headroom for
+  key growth, and keep the limit above the
   [allocation floor](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
   described with the key.
 

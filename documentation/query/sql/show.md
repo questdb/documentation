@@ -39,16 +39,16 @@ SHOW { COLUMNS FROM tableName
 
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
-- `SHOW CREATE DATABASE` returns DDL statements that recreate every object
-  in the database, one per row, ordered so dependencies come first.
+- `SHOW CREATE DATABASE` returns DDL statements that recreate every object in
+  the database, one per row, ordered so dependencies come first.
 - `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
   view.
 - `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
   recreate a materialized view.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
-- `SHOW GROUPS` lists all groups, or the groups a user belongs to, with each
-  group's external alias and memory limit (enterprise-only)
+- `SHOW GROUPS` lists all groups with their external alias, memory limit and
+  resource group mapping, or the groups a user belongs to (enterprise-only)
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
 - `SHOW PARTITIONS` returns the partition information for the selected table.
@@ -56,13 +56,20 @@ SHOW { COLUMNS FROM tableName
   (enterprise-only)
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
 - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
-- `SHOW SERVICE ACCOUNTS` lists all service accounts with their enabled flag and
-  memory limit, or those a user or group can assume with the grant option
-  (enterprise-only)
-- `SHOW TABLES` returns all the tables.
+- `SHOW SERVICE ACCOUNTS` lists all service accounts with their enabled flag,
+  memory limit and resource group, or those a user or group can assume with the
+  grant option (enterprise-only)
+- `SHOW TABLES` returns all tables, including views, materialized views, and
+  live views.
 - `SHOW USER` shows user secret (enterprise-only)
-- `SHOW USERS` lists all users with their enabled flag and memory limit
-  (enterprise-only)
+- `SHOW USERS` lists all users with their enabled flag, memory limit and
+  resource group (enterprise-only)
+
+In QuestDB Enterprise, `SHOW TABLES` and `SHOW CREATE DATABASE` cover only the
+objects you [can see](/docs/security/rbac/#object-visibility). The statements
+that name an object, such as `SHOW COLUMNS` or `SHOW CREATE TABLE`, fail with
+the missing-object error, for example `table does not exist [table=trades]`,
+for an object hidden from you.
 
 ## Examples
 
@@ -72,6 +79,7 @@ SHOW { COLUMNS FROM tableName
 SHOW COLUMNS FROM trades;
 
 ```
+
 | column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude |
 | --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- | --------- | ------------ |
 | symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |           |              |
@@ -81,10 +89,10 @@ SHOW COLUMNS FROM trades;
 | timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |              |
 
 The `indexType` column shows the index type (`POSTING`, `POSTING DELTA`,
-`POSTING EF`, `BITMAP`, or empty for non-indexed columns). The
-`indexInclude` column lists the names of columns included in a
-[posting index's](/docs/concepts/deep-dive/posting-index/) covering
-sidecar, as a comma-separated string.
+`POSTING EF`, `BITMAP`, or empty for non-indexed columns). The `indexInclude`
+column lists the names of columns included in a
+[posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar, as
+a comma-separated string.
 
 ### SHOW CREATE DATABASE
 
@@ -101,7 +109,7 @@ SHOW CREATE DATABASE
 An optional `INCLUDE` or `EXCLUDE` clause selects which object categories to
 dump. Each `category` is one of:
 
-- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`.
+- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`, `LIVE_VIEWS`.
 - **Access control** (Enterprise only): `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`,
   `PERMISSIONS`.
 - **Umbrellas**: `SCHEMA` (all schema objects), `ACL` (all access control
@@ -115,10 +123,9 @@ all valid. Called without a clause, the statement dumps the whole database:
 SHOW CREATE DATABASE;
 ```
 
-The result set has a single `ddl` column with one self-contained statement
-per row. Run against a database holding the
-[demo](https://demo.questdb.io) tables and materialized views, it returns one
-row per object:
+The result set has a single `ddl` column with one self-contained statement per
+row. Run against a database holding the [demo](https://demo.questdb.io) tables
+and materialized views, it returns one row per object:
 
 | ddl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -176,14 +183,17 @@ Filtering is applied per category, like `pg_dump -t`. Excluding a category that
 others depend on can leave dangling references, so a dump that omits a base
 table does not replay cleanly for the views built on it.
 
-:::note
+To select individual objects, such as the objects of a single tenant, wrap the
+statement in parentheses and filter the `ddl` column with `WHERE`. Each row
+starts with `CREATE`, so match the object name with a leading wildcard:
 
-Filtering the dump rows with a `WHERE` clause, for example
-`(SHOW CREATE DATABASE) WHERE ddl ILIKE 'fx_%'` to select the objects of a
-single tenant, is not supported yet. Row-level filtering is planned for a future
-QuestDB release.
+```questdb-sql title="Objects whose DDL mentions fx_" demo
+(SHOW CREATE DATABASE) WHERE ddl ILIKE '%fx_%';
+```
 
-:::
+The filtered rows keep dependency order. A pattern also matches views that read
+a matching table, so check that every object a filtered dump depends on is
+included before replaying it.
 
 #### Enterprise: access control
 
@@ -195,18 +205,26 @@ memberships, and permissions alongside the tables and views:
 - Memberships, as `ADD USER ... TO ...` and `ASSUME SERVICE ACCOUNT ... TO ...`.
 - Grants, as `GRANT <permissions> [ON ...] TO ... [WITH GRANT OPTION]`.
 
-`CREATE TABLE`, `CREATE VIEW`, and `CREATE MATERIALIZED VIEW` statements in an
-Enterprise dump also carry the `OWNED BY` clause identifying the owner.
+QuestDB stores no owner for an object, so the `GRANT` statements are what
+recreate its permissions. The `CREATE TABLE`, `CREATE VIEW`, and
+`CREATE MATERIALIZED VIEW` statements in an Enterprise dump also carry an
+`OWNED BY` clause, which names the principal that ran the dump, as in
+[`SHOW CREATE TABLE`](#enterprise-variant). Replaying the dump gives that
+principal all permissions on each of these objects, with the `GRANT` option, on
+top of the dumped grants. Edit or remove the clause before replaying if that
+principal should not hold them.
 
 Credentials are never dumped: the `CREATE USER` and `CREATE SERVICE ACCOUNT`
 statements carry no password or token, so set these after replaying the dump.
 
 The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
 `PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
-or `USER DETAILS` permission,
-while the schema categories need no access control permission, so a user with
-only `SELECT` can still dump the structure. When access control is disabled the
-command degrades to a schema-only dump.
+or `USER DETAILS` permission, while the schema categories need no access control
+permission, so a user with only `SELECT` can still dump the structure of the
+objects it can see. To dump the whole schema, run the statement as a principal
+that sees every object, such as the built-in admin or a user holding
+`DATABASE ADMIN`. When access control is disabled the command degrades to a
+schema-only dump.
 
 ### SHOW CREATE LIVE VIEW
 
@@ -221,7 +239,8 @@ SHOW CREATE LIVE VIEW trades_ma;
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
 `IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause identifying the view's owner.
+output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`.
+See the [Enterprise variant](#enterprise-variant) of `SHOW CREATE TABLE`.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -242,11 +261,12 @@ materialized view, including its base table, refresh strategy, and partitioning.
 SHOW CREATE TABLE trades;
 ```
 
-| ddl                                                                                                                                                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ddl                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
 
-This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
+This is printed with formatting, so when pasted into a text editor that support
+formatting characters, you will see:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -261,9 +281,9 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 
 #### Posting index with covering columns
 
-When a symbol column has a posting index with `INCLUDE`, the DDL reflects
-the index type and covered columns. The designated timestamp is appended
-to the `INCLUDE` list automatically, so a table created with
+When a symbol column has a posting index with `INCLUDE`, the DDL reflects the
+index type and covered columns. The designated timestamp is appended to the
+`INCLUDE` list automatically, so a table created with
 `INCLUDE (price, exchange)` round-trips as
 `INCLUDE (price, exchange, timestamp)`:
 
@@ -318,9 +338,14 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
+In [QuestDB Enterprise](/enterprise/), `SHOW CREATE TABLE`, `SHOW CREATE VIEW`,
+`SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW` add an `OWNED BY`
+clause naming the user running `SHOW CREATE`. QuestDB stores no owner for an
+object, so the clause does not tell you who created it or who holds permissions
+on it. To see the permissions on an object, use
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 
-For example,
+For example, run as `admin`:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -334,10 +359,10 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```
 
-This clause assigns permissions for the table to that user.
-
-If permissions should be assigned to a different user,
-please modify this clause appropriately.
+When the statement is replayed, the clause gives that user all permissions on
+the new table, with the `GRANT` option. To give them to a different user, group,
+or service account, change the clause before replaying it. See
+[OWNED BY](/docs/query/sql/create-table/#owned-by).
 
 ### SHOW CREATE VIEW
 
@@ -350,7 +375,9 @@ SHOW CREATE VIEW my_view;
 | CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades); |
 
 This returns the `CREATE VIEW` statement that would recreate the view,
-including any `DECLARE` parameters if the view is parameterized.
+including any `DECLARE` parameters if the view is parameterized. For an
+[audited view](/docs/security/audited-views/) (Enterprise), the statement has
+`WITH AUDIT` after the body. It is the way to check whether a view is audited.
 
 ### SHOW GROUPS
 
@@ -361,12 +388,21 @@ _Enterprise only._ Requires `LIST USERS`; filtering by another user requires
 SHOW GROUPS;
 ```
 
-| name       | external_alias | memory_limit |
-| ---------- | -------------- | ------------ |
-| management |                | 2147483648   |
+| name       | external_alias | memory_limit | resource_group | resource_group_priority |
+| ---------- | -------------- | ------------ | -------------- | ----------------------- |
+| management |                | null         | reporting      | 10                      |
+| analysts   | analysts-sso   | 1073741824   | null           | null                    |
 
-Filtering by a user lists the groups that user belongs to, with the same
-columns. Each row's `memory_limit` is that group's own limit:
+`memory_limit` is the group's own query memory limit in bytes (`1073741824` is 1
+GiB), `null` when none is set. `external_alias` is empty when the group is not
+mapped to an external group. `resource_group` and `resource_group_priority` are
+the group's
+[resource group](/docs/query/sql/acl/alter-group-set-resource-group/) mapping,
+`null` when the group is not mapped. See
+[memory limits](/docs/security/rbac/#memory-limits).
+
+Filtering by a user lists the groups that user belongs to, without the resource
+group columns. Each row's `memory_limit` is that group's own limit:
 
 ```questdb-sql
 SHOW GROUPS john;
@@ -374,12 +410,7 @@ SHOW GROUPS john;
 
 | name       | external_alias | memory_limit |
 | ---------- | -------------- | ------------ |
-| management |                | 2147483648   |
-
-The `memory_limit` column is reported in bytes (`2147483648` is 2 GiB) and is
-`null` when the group has no limit of its own. `external_alias` is empty when
-the group is not mapped to an external group. See
-[memory limits](/docs/security/rbac/#memory-limits).
+| management |                | null         |
 
 ### SHOW PARAMETERS
 
@@ -394,18 +425,18 @@ The output demonstrates:
 - `value`: the current value of the key
 - `value_source`: how the value is set (default, conf or env)
 - `sensitive`: if it is a sensitive value (passwords)
-- `reloadable`: if the value can be [reloaded without a server restart](/docs/configuration/overview/#reloadable-settings)
+- `reloadable`: if the value can be
+  [reloaded without a server restart](/docs/configuration/overview/#reloadable-settings)
 
-| property_path                                | env_var_name                                     | value  | value_source | sensitive | reloadable |
-| -------------------------------------------- | ------------------------------------------------ | ------ | ------------ | --------- | ---------- |
-| http.min.net.connection.limit                | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                | 64     | default      | false     | false      |
-| line.http.enabled                            | QDB_LINE_HTTP_ENABLED                            | true   | default      | false     | false      |
-| cairo.parquet.export.row.group.size          | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE          | 100000 | default      | false     | false      |
-| http.security.interrupt.on.closed.connection | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION | true   | conf         | false     | false      |
-| pg.readonly.user.enabled                     | QDB_PG_READONLY_USER_ENABLED                     | true   | conf         | false     | true       |
-| pg.readonly.password                         | QDB_PG_READONLY_PASSWORD                         | ****   | default      | true      | true       |
-| http.password                                | QDB_HTTP_PASSWORD                                | ****   | default      | true      | false      |
-
+| property_path                                | env_var_name                                     | value    | value_source | sensitive | reloadable |
+| -------------------------------------------- | ------------------------------------------------ | -------- | ------------ | --------- | ---------- |
+| http.min.net.connection.limit                | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                | 64       | default      | false     | false      |
+| line.http.enabled                            | QDB_LINE_HTTP_ENABLED                            | true     | default      | false     | false      |
+| cairo.parquet.export.row.group.size          | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE          | 100000   | default      | false     | false      |
+| http.security.interrupt.on.closed.connection | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION | true     | conf         | false     | false      |
+| pg.readonly.user.enabled                     | QDB_PG_READONLY_USER_ENABLED                     | true     | conf         | false     | true       |
+| pg.readonly.password                         | QDB_PG_READONLY_PASSWORD                         | \*\*\*\* | default      | true      | true       |
+| http.password                                | QDB_HTTP_PASSWORD                                | \*\*\*\* | default      | true      | false      |
 
 You can optionally chain `SHOW PARAMETERS` with other clauses:
 
@@ -429,6 +460,8 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 SHOW PARTITIONS FROM my_table;
 ```
 
+Selected columns are shown below; the three new trailing columns are omitted.
+
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
 | 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
@@ -438,19 +471,32 @@ SHOW PARTITIONS FROM my_table;
 
 See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
 full column list, including `hasParquetGenerated`, `isParquet`,
-`parquetFileSize`, `seqTxn`, and `isRemotelyServed`.
+`parquetFileSize`, `seqTxn`, `isRemotelyServed`, `deadRows`,
+`lastWriteTimestamp` and `pieceCount`; see
+[monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)
+for a compact projection of the new columns.
 
-`isRemotelyServed` is `true` when the partition's data lives in object storage and is fetched with range reads. See [cold storage](/docs/concepts/cold-storage/) (Enterprise).
+`isRemotelyServed` is `true` when the partition's data lives in object storage
+and is fetched with range reads. See
+[cold storage](/docs/concepts/cold-storage/) (Enterprise).
 
 :::note
 
-`seqTxn` and `isRemotelyServed` are appended at the end of the result set. Tools that bind `SHOW PARTITIONS` columns by position rather than by name must account for the two new trailing columns.
+`seqTxn`, `isRemotelyServed`, `deadRows`, `lastWriteTimestamp` and `pieceCount`
+are appended at the end of the result set, in that order. Tools that bind
+`SHOW PARTITIONS` columns by position rather than by name must account for the
+new trailing columns.
 
 :::
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 
-_Enterprise only._
+_Enterprise only._ `SHOW PERMISSIONS` lists the effective permissions of one
+user, group, or service account. The
+[`permissions()`](/docs/query/functions/access-control/#permissions) table
+function returns the same rows, and
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
+lists the permissions of every entity at once.
 
 ```questdb-sql
 SHOW PERMISSIONS;
@@ -541,15 +587,21 @@ requires `USER DETAILS`.
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       | enabled | memory_limit |
-| ---------- | ------- | ------------ |
-| client_app | true    | null         |
-| svc1_admin | true    | 268435456    |
+| name       | enabled | memory_limit | resource_group |
+| ---------- | ------- | ------------ | -------------- |
+| client_app | true    | null         | null           |
+| svc1_admin | true    | 268435456    | automation     |
+
+`memory_limit` is the account's own query memory limit in bytes (`268435456` is
+256 MiB) and `resource_group` its
+[resource group](/docs/query/sql/acl/alter-service-account-set-resource-group/) mapping,
+each `null` when not set.
 
 Filtering by a user or group instead lists the service accounts that principal
-can assume. The result has a `grant_option` column in place of `enabled`,
-showing whether the user or group may grant the assumption to others, and
-`memory_limit` reports each listed service account's own limit:
+can assume, without the `resource_group` column. The result has a `grant_option`
+column in place of `enabled`, showing whether the user or group may grant the
+assumption to others, and `memory_limit` reports each listed service account's
+own limit:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
@@ -609,10 +661,10 @@ _Enterprise only._ Requires `LIST USERS`.
 SHOW USERS;
 ```
 
-| name  | enabled | memory_limit |
-| ----- | ------- | ------------ |
-| admin | true    | null         |
-| john  | true    | 536870912    |
+| name  | enabled | memory_limit | resource_group |
+| ----- | ------- | ------------ | -------------- |
+| admin | true    | null         | null           |
+| john  | true    | 536870912    | reporting      |
 
 The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
 the user's own limit or, when it has none, the most restrictive of its groups'.
@@ -620,15 +672,19 @@ the user's own limit or, when it has none, the most restrictive of its groups'.
 (`cairo.query.memory.limit.bytes`) still applies, unlike the `memory_limit`
 column of [`query_activity`](/docs/query/functions/meta/#query_activity), which
 reports the effective limit and includes it. In `SHOW GROUPS` and
-`SHOW SERVICE ACCOUNTS` above it is instead the
-listed entity's own limit, since neither inherits one. See
-[memory limits](/docs/security/rbac/#memory-limits).
+`SHOW SERVICE ACCOUNTS` above it is instead the listed entity's own limit, since
+neither inherits one. See [memory limits](/docs/security/rbac/#memory-limits).
+
+`resource_group` is the user's direct
+[resource group](/docs/query/sql/acl/alter-user-set-resource-group/) mapping;
+a user mapped only through an ACL group shows `null` here.
 
 :::note
 
-`memory_limit` is appended as the last column of `SHOW USERS`, `SHOW GROUPS`,
-and `SHOW SERVICE ACCOUNTS`, including their filtered forms. Tools that bind
-these columns by position rather than by name must account for it. See
+`memory_limit` is appended after the original columns of `SHOW USERS`,
+`SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS`, including their filtered forms, and
+the unfiltered forms then append the resource group columns. Tools that bind
+these columns by position rather than by name must account for them. See
 [upgrading](/docs/security/rbac/#memory-limit-upgrade).
 
 :::

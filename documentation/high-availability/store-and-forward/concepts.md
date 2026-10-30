@@ -62,8 +62,9 @@ Two distinct counters track frame identity:
 - **FSN** (frame-sequence-number) — a monotonic counter assigned when a
   frame is appended to the substrate. FSN survives reconnects and (in SF
   mode) restarts. It is the substrate's permanent identifier for a frame.
-- **wireSeq** — the per-connection counter the server uses for
-  deduplication, reset to `0` on every successful WebSocket upgrade.
+- **wireSeq** — a per-connection counter used to correlate cumulative QWP
+  responses with sent frames. It resets to `0` on every successful WebSocket
+  upgrade.
 
 On every (re)connect the relationship is pinned:
 
@@ -82,9 +83,9 @@ Two consequences:
 - Frames **must** be sent in strict order. The wire format does not
   serialise `wireSeq` — the server assigns it implicitly from receive
   order. Reordering breaks the FSN mapping.
-- After a reconnect, the server sees the **same payloads** at new
-  `wireSeq` values. Server-side dedup keys off `messageSequence` inside
-  the payload, not `wireSeq`, so replay does not produce double-writes.
+- After a reconnect, the server sees the **same payloads** at new `wireSeq`
+  values. If the server committed a frame but its acknowledgement was lost,
+  replay writes those rows again.
 
 ## Trim: how unacked data is reclaimed
 
@@ -151,8 +152,10 @@ On every successful (re)connect:
 2. `wireSeq` resets to `0`.
 3. The read cursor rewinds to the first un-acked frame on disk (or in
    memory).
-4. Frames stream to the wire in FSN order. The server's dedup window
-   absorbs any frames that landed before the disconnect.
+4. Frames stream to the wire in FSN order. A frame that landed before the
+   disconnect but was not acknowledged is sent again and can duplicate rows;
+   use table-level `DEDUP UPSERT KEYS` with stable row identity when this must
+   be suppressed.
 5. New frames appended by the producer during replay are picked up
    automatically — the I/O loop watches a volatile `publishedFsn`
    cursor.
@@ -184,12 +187,16 @@ The exception message distinguishes the two scenarios:
 `close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
-C, C++ and Python. If the wait succeeds, all data is acked. If the timeout
-fires, a `WARN` is logged and:
+C, C++, Python, and Node.js. If the wait succeeds, all data is acked. If the
+timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
 - in **memory mode**, the un-acked tail is lost.
+
+The Node.js client reports the timeout differently: `close()` rejects with
+`QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
+data. Its pooled client logs a warning when a sender it closes times out.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
