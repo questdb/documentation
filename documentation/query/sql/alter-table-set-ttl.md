@@ -18,7 +18,8 @@ before attaching a storage policy. See
 [Storage Policy](/docs/concepts/storage-policy/) for the Enterprise
 replacement.
 
-System tables, such as `sys.view_audit`, accept a non-zero TTL: see
+System tables, such as `sys.view_audit`, accept a non-zero TTL. On
+`sys.view_audit`, only the built-in admin can set one: see
 [Retention](/docs/security/audited-views/#retention).
 
 :::

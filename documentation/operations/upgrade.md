@@ -101,6 +101,66 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
+### Upgrading to 4.1.1
+
+QuestDB Enterprise 4.1.1 reserves to the
+[built-in admin](/docs/security/rbac/#built-in-admin) the statements that remove
+rows from `sys.view_audit`, the audit trail of
+[audited views](/docs/security/audited-views/), or set it up to remove them. In
+4.1.0, a principal granted the permission a statement needs, on the table or
+`ON ALL TABLES`, could run it. After the upgrade, every other principal is
+refused them, whatever it holds, with
+`only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
+
+- `TRUNCATE TABLE`
+- `ALTER TABLE DROP PARTITION`, `SQUASH PARTITIONS`, and `DETACH PARTITION`
+- `ALTER TABLE SET TTL` and `SET PARAM`
+- `ALTER TABLE SET STORAGE POLICY`, with any policy, and
+  `ENABLE STORAGE POLICY`
+
+A storage policy already set on the trail keeps running, and `SELECT`,
+`DISABLE STORAGE POLICY`, and `DROP STORAGE POLICY` stay grantable. Before you
+upgrade, find the principals that can run these statements on the trail, and
+move the scripts and jobs that run them to the built-in admin, or replace them
+with a storage policy:
+
+```questdb-sql title="On 4.1.0: who can remove rows from the trail"
+SELECT entity_name, entity_type, permission, table_name
+FROM active_permissions()
+WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'DETACH PARTITION',
+    'SET TABLE PARAM', 'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
+  AND (table_name IS NULL OR table_name = 'sys.view_audit');
+```
+
+If the built-in admin is disabled,
+[`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
+no principal can run these statements after the upgrade, not even the
+administrators that replace the admin. A storage policy with a `DROP LOCAL`
+stage keeps pruning the trail without any principal, so set one before you
+upgrade, on the primary, as a principal that holds `SET STORAGE POLICY` on the
+trail. The policy replicates, and keeps pruning the trail of every node:
+
+```questdb-sql title="On 4.1.0: keep 90 days of trail on every node"
+ALTER TABLE 'sys.view_audit'
+    SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
+```
+
+A TTL on the trail blocks the policy: clear it first with
+`ALTER TABLE 'sys.view_audit' SET TTL 0 HOURS`. When upgrading from a release
+before 4.1.0, which has no trail yet, set
+[`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
+on every node instead, for example to `TO PARQUET 1d, DROP LOCAL 90d`: the
+server creates the trail with it on the first start. Its default,
+`TO PARQUET 1d`, never deletes a row.
+
+After the upgrade, a principal that holds `DISABLE STORAGE POLICY` or
+`REMOVE STORAGE POLICY` can still pause or remove the policy, but only the
+built-in admin can enable it again or set another. To do that, to remove rows
+by hand, or to repair the trail with `FORCE DROP PARTITION`, enable the admin:
+set `acl.admin.user.enabled=true`, with a strong `acl.admin.password`, and
+restart, since the setting is not reloadable. See
+[Tamper protection](/docs/security/audited-views/#protection).
+
 ### Upgrading to 4.1.0
 
 QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no

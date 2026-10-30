@@ -472,6 +472,12 @@ independently of the replicated access lists. It is the break-glass account
 when a `SWITCH ROLE` grant has not yet replicated to the node you need to
 promote.
 
+The built-in admin is also the only principal that can remove rows from the
+audit trail of [audited views](/docs/security/audited-views/), or set its
+storage policy. Before you disable the admin, give the trail a storage policy
+with a `DROP LOCAL` stage, which keeps pruning it without the admin: see
+[Retention](/docs/security/audited-views/#retention).
+
 ## Permission levels
 
 Permissions have different granularities determining where they can be applied:

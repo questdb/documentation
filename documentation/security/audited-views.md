@@ -344,15 +344,19 @@ syntax.
 
 ### Retention
 
+Only the [built-in admin](/docs/security/rbac/#built-in-admin) can remove rows
+from the trail, or set its storage policy or TTL, whatever other principals are
+granted: see [Tamper protection](#protection).
+
 The table is created with the storage policy that
 [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
 sets, `TO PARQUET 1d` by default, so older partitions of the trail move to
 Parquet. That default never deletes a row. The setting applies only when the
-server creates the table. After that, change the policy with
+server creates the table. After that, the built-in admin changes the policy with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/),
 for example to keep a fixed window of the trail:
 
-```questdb-sql title="Keep 90 days of trail on every node"
+```questdb-sql title="Built-in admin: keep 90 days of trail on every node"
 ALTER TABLE 'sys.view_audit'
     SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
 ```
@@ -367,6 +371,9 @@ ALTER TABLE 'sys.view_audit'
   system tables such as the trail, but while a TTL is set, `SET STORAGE POLICY`
   fails with `Cannot set storage policy, please, remove TTL settings`. Clear it
   first with `ALTER TABLE 'sys.view_audit' SET TTL 0 HOURS`.
+- A principal granted `DISABLE STORAGE POLICY` or `REMOVE STORAGE POLICY` can
+  pause or remove the policy, which stops the pruning, but only the built-in
+  admin can enable it again or set another.
 
 A policy can convert and drop local partitions, but cannot move the trail to
 object storage: `TO REMOTE` and `DROP REMOTE` are
@@ -374,11 +381,34 @@ object storage: `TO REMOTE` and `DROP REMOTE` are
 name, so in the remote tier the nodes would overwrite and delete each other's
 partitions.
 
-To remove older rows, drop partitions, or truncate the table with
-[`TRUNCATE TABLE`](/docs/query/sql/truncate/). Retention is the operator's to
-manage, and nothing records that these statements ran: see
-[Tamper protection](#protection) for the statements that remove rows, and
-[Permissions](#permissions) for who may run them.
+To remove older rows by hand, the built-in admin drops partitions, or truncates
+the table with [`TRUNCATE TABLE`](/docs/query/sql/truncate/). Nothing records
+that these statements ran.
+
+:::note
+
+With the built-in admin disabled,
+[`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
+no principal can set the trail's storage policy or remove its rows, not even
+the administrators that replace the admin. This is deliberate: the trail
+records their reads too. Settle retention before you disable the admin. A
+policy with a `DROP LOCAL` stage keeps pruning the trail without the admin,
+while the default, `TO PARQUET 1d`, never deletes a row. Set one:
+
+- Before the server first creates the table, as on a new deployment, set
+  [`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
+  on every node, for example to `TO PARQUET 1d, DROP LOCAL 90d`. After the
+  first start, check that the table carries the policy with
+  `SHOW CREATE TABLE 'sys.view_audit'`. The server can create the table
+  without one, for example when it rejects the policy, and logs why.
+- Once the table exists, the built-in admin sets the policy with
+  `ALTER TABLE SET STORAGE POLICY`, as above.
+
+To change the policy later, remove rows by hand, or repair the table with
+`FORCE DROP PARTITION`, enable the admin again, which takes a restart, since
+`acl.admin.user.enabled` is not reloadable.
+
+:::
 
 ### Tamper protection {#protection}
 
@@ -414,26 +444,38 @@ statement below fails with the error under it:
 
 `DROP ALL TABLES` skips system tables, so it leaves the trail in place.
 
-Removing rows is not refused. These statements are retention operations,
-governed only by the [permissions](#permissions) they need, as on any other
-table. Nothing records that they ran.
+Only the [built-in admin](/docs/security/rbac/#built-in-admin) can remove rows,
+or set the table up to remove them. Every other principal is refused these
+statements, whatever it holds, including `DATABASE ADMIN` and grants
+`ON ALL TABLES`. Each fails with
+`only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
 
 - [`TRUNCATE TABLE`](/docs/query/sql/truncate/)
 - [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
-  [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
+  [`SQUASH PARTITIONS`](/docs/query/sql/alter-table-squash-partitions/), which
+  needs the same `DROP PARTITION` permission
+- [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
 - [`SET TTL`](/docs/query/sql/alter-table-set-ttl/), which Enterprise accepts
-  on the trail: see [Retention](#retention)
-- A [storage policy](/docs/query/sql/alter-table-set-storage-policy/) with a
-  `DROP LOCAL` stage
+  on the trail, and [`SET PARAM`](/docs/query/sql/alter-table-set-param/),
+  which needs the same `SET TABLE PARAM` permission
+- [`SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/), with
+  any policy, and `ENABLE STORAGE POLICY`
 
-These remain available too: `SELECT`, other partition operations such as
-`CONVERT PARTITION TO PARQUET`, any other change to a storage policy that stays
-local, and a plain `ALTER TABLE RESUME WAL`, which recovers a suspended trail
-without losing a row.
+The built-in admin runs them as on any other table, unless it has assumed a
+service account. Nothing records that they ran. QuestDB Enterprise 4.1.0
+allowed them to any principal holding the permission they need, as on any other
+table: see the [upgrade notes](/docs/operations/upgrade/#upgrading-to-411).
+
+These remain available to any principal granted the permission they need:
+`SELECT`, `DISABLE STORAGE POLICY` and `DROP STORAGE POLICY`, other partition
+operations such as `CONVERT PARTITION TO PARQUET`, and a plain
+`ALTER TABLE RESUME WAL`, which recovers a suspended trail without losing a
+row.
 
 With access control turned off,
-[`acl.enabled=false`](/docs/configuration/iam/#aclenabled), writes to the trail
-and `SET TYPE` are not refused. With ILP over TCP authentication turned off,
+[`acl.enabled=false`](/docs/configuration/iam/#aclenabled), writes to the
+trail, `SET TYPE` and the statements that remove rows are not refused. With ILP
+over TCP authentication turned off,
 [`line.tcp.acl.enabled=false`](/docs/configuration/iam/#linetcpaclenabled),
 ILP over TCP writes are not refused: any ILP over TCP client can then add rows
 to the trail.
@@ -554,7 +596,7 @@ Lost rows show in the server log only. No metric reports them.
 | Change an audited view with `ALTER VIEW` or `CREATE OR REPLACE VIEW` | `ALTER VIEW` on the view and `AUDIT VIEW`, and `SELECT` on the tables the new body reads |
 | Read an audited view                                                | `SELECT` on the view, as for any [view](/docs/concepts/views/#definer-security-model-enterprise) |
 | Read the trail                                                      | `SELECT` on `sys.view_audit`                              |
-| Remove rows from the trail                                          | Any of `TRUNCATE TABLE`, `DROP PARTITION`, `DETACH PARTITION`, `SET TABLE PARAM` (for `SET TTL`) or `SET STORAGE POLICY` (for a `DROP LOCAL` stage), on `sys.view_audit` or `ON ALL TABLES` |
+| Remove rows from the trail, or set its storage policy or TTL        | None: only the [built-in admin](/docs/security/rbac/#built-in-admin) can, see [Tamper protection](#protection) |
 
 `AUDIT VIEW` is a database-level permission, included in `DATABASE ADMIN`. It
 guards every statement that binds a view to the trail, changes what it records,
@@ -590,11 +632,9 @@ reads, so its holder bypasses auditing and can read the whole trail, with every
 principal's `params`. Check existing grants for it, such as the analyst roles
 in [RBAC](/docs/security/rbac/#read-only-analyst).
 
-Grant `SELECT` on `sys.view_audit` to the people who review the trail, and the
-permissions that remove its rows only to the operators who manage its
-retention. A grant of those permissions `ON ALL TABLES` covers the trail too, so
-review existing grants as well. No principal can write rows to it, whatever it
-holds: see [Tamper protection](#protection).
+Grant `SELECT` on `sys.view_audit` to the people who review the trail. No
+principal can write rows to it, whatever it holds, and only the built-in admin
+can remove them: see [Tamper protection](#protection).
 
 ## Replication, backups, and read-only instances
 
