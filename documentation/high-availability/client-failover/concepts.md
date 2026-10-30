@@ -22,7 +22,7 @@ single hard-coded address must be reconfigured and restarted. A failover-aware
 client instead carries the full list of peers and walks that list automatically
 when the current connection breaks.
 
-This page explains the model. The user-facing knobs and worked examples live in
+This page explains the model. The user-facing knobs and examples live in
 the [Configuration](/docs/high-availability/client-failover/configuration/)
 page.
 
@@ -266,6 +266,6 @@ the failover model — split the workload into one connect string per credential
 ## Next steps
 
 - [Configuration](/docs/high-availability/client-failover/configuration/) —
-  the connect-string keys and worked examples for each context.
+  the connect-string keys and examples for each context.
 - [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/) —
   how the ingress failover loop interacts with the disk-backed substrate.
