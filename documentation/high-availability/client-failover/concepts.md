@@ -238,6 +238,28 @@ identically across the cluster, so a credential failure against one node is
 a credential failure against all of them. Retrying would spam every peer's
 audit log without recovering.
 
+The Java client relaxes this in two cases. With a token provider, a `401`
+first earns one retry of the same host with a new token. A Java sender that
+has connected before also treats a rejected credential like an outage: it
+keeps retrying with backoff, buffering rows, and reports each failed round to
+its error handler, so ingestion resumes once QuestDB accepts the credential
+again, such as after a token renewal. See
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+The Node.js client also treats a rejected credential like an outage, for a
+sender that has connected before and uses store-and-forward or was started
+with `async`: it keeps retrying with backoff, buffering rows, and reports each
+rejected attempt as an `auth-failed`
+[connection event](/docs/connect/clients/nodejs/#connection-events). So does
+a browser sender that authenticates with `sessionBootstrap` and was started
+with `initialConnectMode: "async"`. A browser cannot see why an upgrade
+failed, so a browser sender that authenticates with
+[`auth`](/docs/connect/clients/browser/#credentials-for-applications-on-another-origin)
+retries a rejected credential like an outage once it has connected, whatever
+its mode, and reports `endpoint-attempt-failed` instead. For the same reason,
+such a rejection does not end the endpoint walk: the browser client tries the
+other hosts, as it would for an unreachable one.
+
 If your deployment has per-host credentials, that is unsupported and outside
 the failover model — split the workload into one connect string per credential.
 

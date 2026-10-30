@@ -183,14 +183,14 @@ callers block up to `acquire_timeout_ms` then throw.
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
-| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_durability` | `memory` (also supports `periodic`; Node.js also `append`) |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
 | `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
-| `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python/Node.js) |
+| `connect_timeout` | unset (Node.js: `15000`) — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
 | `max_frame_rejections` | `4` |
 | `poison_min_escalation_window_millis` | `5000` |
@@ -234,6 +234,8 @@ surface — this matrix shows where each lives.
 | --- | :---: | :---: | :---: |
 | `addr` | ✅ | ✅ `address()/port()` | via conn string |
 | `username`/`password`/`token` | ✅ | ✅ | via conn string |
+| `token_provider`/`azure_*` (Java) | ✅ | via conn string | via conn string |
+| `HttpTokenProvider` (Java) | ❌ | ✅ `httpTokenProvider()` | ✅ `httpTokenProvider()` |
 | `tls_verify`/`tls_roots` | ✅ | ✅ | via conn string |
 | `auth_timeout_ms` | ✅ | ✅ | via conn string |
 | `initial_connect_retry` | ✅ | ✅ `initialConnectMode()` | via conn string |
@@ -283,7 +285,7 @@ here.
 | 2 | `reconnect_max_duration_millis` is named as if it governs reconnection, but a running sender never consults it — it bounds only the blocking initial connect. | Candidate (naming) |
 | 3 | `failover` sounds like it covers startup but only affects post-connect query `execute()`. Queries have no async/lazy initial connect at all. | Candidate |
 | 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`, or use `lazy_connect=true`. | Candidate |
-| 5 | A single endpoint returning `401`/`403` is treated as cluster-wide terminal and aborts the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. | Intended (documented), revisit |
+| 5 | A single endpoint returning `401`/`403` is treated as cluster-wide and ends the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. What follows depends on the phase; see [Authentication failures and token providers](#authentication-failures-and-token-providers). | Intended (documented), revisit |
 | 6 | Query `serverInfoTimeoutMs` has no config key, so a facade query client cannot tune it. | Candidate |
 | 7 | The simplest API (`fromConfig` + async) has the worst error visibility — terminal async failures surface only on later producer calls or at `close()`. | Candidate |
 | 8 | `SenderProgressHandler` has no builder setter on either surface; it must be installed post-construction via `QwpWebSocketSender.setProgressHandler`. | Candidate |
@@ -344,10 +346,16 @@ With `initial_connect_retry=async`:
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
-A sender in async mode does not give up because time passed. What ends it is a
-**terminal** condition — authentication rejection, a durable-ack capability
-mismatch, or the poison-frame detector — or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
+A sender in async mode does not give up because time passed. It ends only on
+a **terminal** condition: an authentication rejection or a durable-ack
+capability mismatch, the poison-frame detector, or the producer hitting
+`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
+`append()`. ⚠ The Java client treats an authentication rejection or a
+durable-ack capability mismatch as terminal only before the sender first
+connects, and retries them afterwards. A Node.js sender that uses
+store-and-forward or `initial_connect_retry=async` does the same once it has
+connected, as do some browser senders: see
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
 
@@ -380,6 +388,64 @@ and apply back-pressure to the producer rather than dropping data.
 
 :::
 
+⚠ In the Java client, a running sender also retries authentication failures.
+So does a Node.js sender that uses store-and-forward or
+`initial_connect_retry=async`, and a browser sender that authenticates with
+`sessionBootstrap` and was started with `initialConnectMode: "async"`, once it
+has connected. A browser sender that authenticates with `auth` cannot see why
+an upgrade failed, so once it has connected it retries a rejected credential
+like an outage, whatever its mode, and reports `endpoint-attempt-failed`
+rather than `auth-failed`. Other senders treat authentication failures as
+terminal. See
+[Authentication failures and token providers](#authentication-failures-and-token-providers).
+
+### Authentication failures and token providers
+
+A client sends its credential only on the WebSocket upgrade request, and never
+authenticates an established connection again. A client with a token provider,
+such as the [Java client](/docs/connect/clients/java/#token-providers), asks
+the provider for the credential at the start of every connect round: the
+initial connect, every reconnect and failover, every orphan-drain connect, and
+every query client connect. When the provider fails, the round ends without
+contacting any endpoint, as a **credential-unavailable** failure, which the
+provider classifies as retryable or permanent. An exception from a provider
+that the application supplies counts as permanent, unless it is a token
+failure marked as retryable.
+
+When an upgrade that presented a token from a provider receives `401`, without
+a Bearer `error` or with `error="invalid_token"`, the client tells the provider
+that the token was rejected, asks it for a token again, and, if the token
+changed, retries the same endpoint once, without backoff. A `403` never
+triggers this retry, and neither does a fixed credential. When the retry also
+fails, or the token did not change, the phase decides what happens:
+
+| Phase | Credential unavailable, retryable | Credential unavailable, permanent | `401` / `403` |
+| --- | --- | --- | --- |
+| Initial connect, `initial_connect_retry=off` | fail startup | fail startup | fail startup |
+| Initial connect, `on` / `sync` | retry within `reconnect_max_duration_millis` | fail startup | fail startup |
+| Initial connect, `async` | retry indefinitely | retry indefinitely | terminal, reported to the error handler |
+| Sender that has connected | retry indefinitely | retry indefinitely | retry indefinitely |
+| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the slot aside |
+| Orphan drain, fixed credential | n/a | n/a | set the slot aside |
+| Query | fail the query | fail the query | fail the query |
+
+*Retry indefinitely* means with capped exponential backoff for as long as the
+sender is open. No setting bounds it, because store-and-forward must not end a
+live producer. The client reports each failed round to the error handler as a
+retriable `SECURITY_ERROR`, and in its connection health, so an application
+that prefers a hard failure can close the sender itself. A query that fails
+names the failure class in its error, and the next query connects again.
+
+⚠ This is the behaviour of the Java client 1.3.11 and later. The browser
+client's `auth` option also accepts a function that supplies a credential
+before every connection attempt, and some Node.js and browser senders retry a
+rejected credential once they have connected, as described in
+[Reconnect and outage handling](#reconnect-and-outage-handling). A browser
+query session that authenticates with `auth` cannot see the status of a failed
+upgrade, so instead of failing the query it fails over as it would during an
+outage, until its failover limits run out. The other clients send fixed credentials only,
+and treat a `401` or `403` as terminal in every phase.
+
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
 | Per-endpoint result | Sender behavior |
@@ -389,11 +455,15 @@ and apply back-pressure to the producer rather than dropping data.
 | TLS session/certificate failure | transport error; try next endpoint |
 | HTTP upgrade timeout / non-auth transport error | try next endpoint |
 | `421` with `X-QuestDB-Role: REPLICA` | role reject; try next endpoint |
-| `401` / `403` auth failure | **terminal**; do not try later endpoints ⚠ |
+| `401` / `403` auth failure | stop the walk; do not try later endpoints ⚠. What follows depends on the phase: see [Authentication failures and token providers](#authentication-failures-and-token-providers) |
 | durable-ack requested but unsupported | terminal mismatch |
 | successful write upgrade | bind this endpoint |
 | all endpoints fail transport | throw / retry per initial/reconnect mode |
 | all endpoints role-reject as replicas | `QwpRoleMismatchException` |
+
+A browser cannot see the status of a failed upgrade, so the browser client
+handles a credential that QuestDB rejects from its `auth` option like an
+unreachable endpoint, and tries the next one.
 
 ### Query client initial connect
 
@@ -417,7 +487,7 @@ Query initial-connect endpoint matrix:
 | --- | --- |
 | DNS / TCP / TLS failure | record transport error; try next endpoint |
 | HTTP upgrade timeout | transport error; try next endpoint |
-| HTTP `401` / `403` | **terminal** `QwpAuthFailedException`; do not try later ⚠ |
+| HTTP `401` / `403` | Java first retries the same endpoint once after a `401`, with a new token from a token provider; otherwise **terminal** `QwpAuthFailedException`; do not try later ⚠ |
 | HTTP `421` + role header | role reject; try next endpoint |
 | upgrade ok but no `SERVER_INFO` before timeout | transport error; try next |
 | `SERVER_INFO` role ≠ `target` | role reject; try next endpoint |
@@ -439,7 +509,9 @@ With `failover=on`:
 - Bounded by `failover_max_attempts` (default `8`, incl. original) **and**
   `failover_max_duration_ms` (default `30000`; `0` disables the duration cap).
 - Backoff: `failover_backoff_initial_ms=50`, `failover_backoff_max_ms=1000`.
-- Auth failure during failover reconnect is terminal and reported to the handler.
+- Auth failure during failover reconnect fails the query and is reported to the
+  handler, after the same-endpoint retry with a new token that a `401` earns
+  with a token provider. The next query connects again.
 
 With `failover=off`, a transport failure is reported to the handler with no
 reconnect/replay.
@@ -465,6 +537,9 @@ reconnect/replay.
 | server down, reconnect duration set, no mode | `reconnect_max_duration_millis=...` | **synchronous** retry; build blocks ⚠ |
 | server down, async | `initial_connect_retry=async` | build returns; I/O thread retries |
 | server returns `401`/`403` | any mode | terminal auth failure; no endpoint continuation |
+| token provider cannot supply a token | `off` | build throws the provider's exception |
+| token provider cannot supply a token | `on` / `sync` | retryable failure: retried within `reconnect_max_duration_millis`; permanent failure: build throws |
+| token provider cannot supply a token | `async` | build returns; I/O thread retries |
 | server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
 | server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
@@ -555,5 +630,14 @@ source states the contract directly:
 > converts it into the durable-ack capability-gap budget. Neither bounds this
 > loop's steady-state reconnect.
 
-`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
-are terminal across all endpoints. Everything else is retried.
+Each connect attempt walks the endpoints in `addr`. A `QwpAuthFailedException`
+ends the walk at once, because every endpoint would reject the same
+credential. A `WebSocketUpgradeException`, a non-101 upgrade response without
+a role hint, does not: the walk tries the remaining endpoints, and raises it
+only when none of them accepts the connection. When another endpoint
+role-rejected the upgrade in the same walk, the walk raises a role mismatch
+instead, which the loop retries. Raised inside the loop, both exceptions are
+terminal for a sender that has not connected yet, and for an orphan drainer,
+which first rides out repeated `401` or `403` responses when its credential
+comes from a token provider. A sender that has connected retries them, like
+everything else, and reports each one to its error handler.

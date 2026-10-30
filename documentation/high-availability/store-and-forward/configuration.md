@@ -28,7 +28,7 @@ mode.
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
 | `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
-| `sf_durability` | enum | `memory` | `memory` (page-cache durable) and `periodic` (background checkpoint to stable storage) both ship. `periodic` requires `sf_dir`. `flush` and `append` parse but are rejected at build time. The .NET client accepts `memory` only. |
+| `sf_durability` | enum | `memory` | `memory` (page-cache durable) and `periodic` (background checkpoint to stable storage) both ship. `periodic` requires `sf_dir`. `flush` and `append` parse but are rejected at build time, except in the Node.js client, which accepts `append`, making every frame durable before its append completes, and rejects `flush` when parsing. The .NET client accepts `memory` only. |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
 | `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
@@ -52,7 +52,7 @@ and host-walk semantics are documented in
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
-| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++ and Python | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
+| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++, Python, and Node.js | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 
 Cross-reference:
 [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys).
@@ -106,8 +106,10 @@ The parser rejects:
 
 - Unknown keys (forward compatibility is via the spec, not silent
   acceptance).
-- `sf_durability` values other than `memory`, `flush`, `append`. `flush`
-  and `append` parse but are rejected at build time today.
+- `sf_durability` values other than `memory`, `periodic`, `flush`, and
+  `append`. `flush` and `append` parse but are rejected at build time today,
+  except that the Node.js client accepts `append` and rejects `flush` when
+  parsing.
 - `sender_id` containing path separators or empty.
 - `request_durable_ack=on` on non-WebSocket transports.
 

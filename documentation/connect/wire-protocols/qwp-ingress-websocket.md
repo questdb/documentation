@@ -31,8 +31,7 @@ clients, see [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-we
 If your language already has a QuestDB client, use it — the
 [language client guides](/docs/connect/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
-QWP to JavaScript, Rust, Ruby, .NET, or an embedded runtime that the existing
-clients don't cover).
+QWP to PHP or an embedded runtime that the existing clients don't cover).
 
 Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
 QWP trades a denser binary encoding for higher throughput and lower CPU on
@@ -147,6 +146,13 @@ Supported methods:
 
 A failed authentication results in a `401` or `403` HTTP response before the
 WebSocket connection is established. No QWP-level auth handshake exists.
+
+The credential is checked only on the upgrade request: QuestDB never
+authenticates an established connection again, so a connection stays open
+when its token expires. A client with an expiring token must present a valid
+one on its next connect, such as a reconnect or a failover. The
+[Java client](/docs/connect/clients/java/#token-providers) can request and
+renew tokens with a token provider for this.
 
 ## Client lifecycle
 
@@ -1167,8 +1173,20 @@ Key behaviors:
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
-- **Authentication errors are terminal** at any host (`401`/`403`). The
-  reconnect loop does not continue past them.
+- **Authentication errors end the endpoint walk** at any host (`401`/`403`):
+  the client does not try the other hosts. Startup fails. In most clients,
+  the reconnect loop does not continue past them either. A sender that has
+  connected keeps retrying instead in the Java client, in the Node.js client
+  when it uses store-and-forward or was started with `async`, and in the
+  browser client when it authenticates with `sessionBootstrap` and was started
+  with `async`. A browser cannot see the status of a failed upgrade, so a
+  credential sent with the browser client's `auth` option does not end the
+  walk when QuestDB rejects it: it looks like an unreachable host, and a
+  sender that has connected keeps retrying it whatever its mode. A Java client
+  with a token provider first retries the same host once after a `401`, with
+  a new token.
+  See
+  [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
 - **All other upgrade errors are transient** and feed into the reconnect loop,

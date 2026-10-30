@@ -10,8 +10,10 @@ A single connect string configures the QuestDB native client. The same
 string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
 multi-host failover, and the store-and-forward substrate. All language
 implementations share one option vocabulary, so the same connect string can
-configure both ingress and egress in any client. Where an implementation
-deviates, the affected key section and client page call it out.
+configure both ingress and egress in any client. The
+[browser client](/docs/connect/clients/browser/#options) is the exception: it
+takes its settings as an options object, not a connect string. Where an
+implementation deviates, the affected key section and client page call it out.
 
 One `ws::` / `wss::` connect string serves both the ingress sender and the
 egress query client. Each direction reads the keys relevant to it and
@@ -167,6 +169,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Enable TLS                                        | both      | `addr` with `wss` schema               | `tls_verify`, `tls_roots`, `tls_roots_password`                                             |
 | Basic-auth credentials                            | both      | `username`, `password`                 | `auth_timeout_ms`                                                                           |
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
+| Entra ID tokens that the client renews (Java)     | both      | `token_provider=azure`, `azure_resource` | `azure_credential`, `azure_client_id`                                                     |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
@@ -227,13 +230,49 @@ WebSocket upgrade request.
   and egress. Bounds the TCP connect phase for each endpoint, so a black-holed
   host in a multi-host `addr` no longer stalls the
   [endpoint walk](#failover-keys) until the OS connect timeout. Unset by
-  default.
+  default, except in the Node.js client, which defaults to `15000` and also
+  applies it to the upgrade unless `auth_timeout_ms` is set.
 
 **Mutual TLS (mTLS).** Not supported. The client validates the server's
 certificate against a trust store but cannot present a client certificate;
 the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
 `token=<token>` or `username=` / `password=` for client authentication.
+
+### Token providers {#token-providers}
+
+*Applies to: ingress and egress. Java client 1.3.11 or later only.*
+
+A fixed `token` stops working when it expires. A token provider requests
+bearer tokens from an identity provider instead, and renews them in the
+background before they expire, so every connection, reconnect, and failover
+presents a valid token:
+
+```
+wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
+```
+
+- `token_provider` selects the provider. `azure` requests Microsoft Entra ID
+  tokens through the Azure Identity library, and needs the
+  `questdb-client-azure` artifact. Requires the `wss` schema. Cannot be
+  combined with `token`, `username` / `password`, or a token provider that
+  the application passes in code.
+- `azure_resource` is required with `token_provider=azure`. It is the
+  Application ID URI of the QuestDB application in Entra ID, such as
+  `api://<application ID>`, or its application ID. The client requests tokens
+  for the scope `<azure_resource>/.default`.
+- `azure_credential` selects the Azure credential that requests the tokens:
+  `default`, `managed_identity`, `workload_identity`, or `environment`, a
+  service principal configured in environment variables. `default`, the
+  default, is `DefaultAzureCredential`, a discovery chain meant for
+  development. Name the credential in production.
+- `azure_client_id` is the client ID of a user-assigned managed identity or of
+  a workload identity. Cannot be combined with `azure_credential=environment`.
+
+These keys contain no secret, so they are safe to log. Clients built from
+equivalent connect strings share one provider in a process. See
+[Token providers](/docs/connect/clients/java/#token-providers) in the Java
+client reference.
 
 ## TLS {#tls}
 
@@ -255,6 +294,7 @@ Selecting the `wss` schema enables TLS.
   | Java | PEM (default, no password), JKS, PKCS#12 |
   | Rust, C, C++, Python | PEM (default), JKS, PKCS#12 |
   | .NET | PKCS#12 / PFX |
+  | Node.js | PEM only; `tls_roots_password` is rejected |
   | Go | none — OS trust store only, both keys rejected at parse time |
 
 - `tls_roots_password` — password for the `tls_roots` file. Required only for
@@ -277,8 +317,8 @@ against your own CA, supply `tls_roots` and leave `tls_verify` at its default.
 
 :::
 
-PEM is the passwordless default path on Java, Rust, C, C++ and Python, so a
-private CA needs no `keytool` import:
+PEM is the passwordless default path on Java, Rust, C, C++, Python, and
+Node.js, so a private CA needs no `keytool` import:
 
 ```text
 wss::addr=db.example.com:9000;tls_roots=/etc/ssl/ca.pem;
@@ -293,7 +333,8 @@ The Go client verifies against the operating-system trust store only and
 **rejects both keys at parse time**; to trust a private CA there, install it in
 the host trust store. On Rust, C, C++ and Python, `tls_roots_password` switches
 the file to a Java keystore and is QWP/WebSocket only: other transports keep
-PEM as the sole format. Check the relevant
+PEM as the sole format. The Node.js client accepts PEM only and rejects
+`tls_roots_password`. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
 specifics.
 
@@ -327,9 +368,10 @@ act independently: whichever threshold trips first sends the batch.
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Accepts
   [size suffixes](#size-suffixes). **The default differs by client**: Java
-  ships it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and Rust, C and
-  C++ reject the key outright. A Java application that assumes an 8 MiB byte
-  trigger is active will size batches expecting a flush that never fires.
+  and Node.js ship it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and
+  Rust, C and C++ reject the key outright. A Java application that assumes an
+  8 MiB byte trigger is active will size batches expecting a flush that never
+  fires.
   When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
   advertised `X-QWP-Max-Batch-Size` at handshake (one-way: the client
@@ -348,6 +390,15 @@ The Rust client currently does not implement auto-flushing. It accepts
 `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes`. Rust
 applications must call `flush()` explicitly; see the
 [Rust client page](/docs/connect/clients/rust/#sending-data-column-major).
+
+:::
+
+:::note Node.js support
+
+The Node.js client rejects `off` for `auto_flush_rows` and
+`auto_flush_interval`. Set either to `0` to disable that trigger.
+`auto_flush_bytes=off` is accepted. See the
+[Node.js client page](/docs/connect/clients/nodejs/#auto-flush).
 
 :::
 
@@ -380,6 +431,9 @@ case-insensitive and 1024-based, matching `-Xmx` conventions:
 | `m` or `mb`    | MiB (× 1024²)     | `4m`, `4mb`  |
 | `g` or `gb`    | GiB (× 1024³)     | `1g`, `10gb` |
 | `t` or `tb`    | TiB (× 1024⁴)     | `1t`         |
+
+The Node.js client accepts the single-letter suffixes only: `4m` works,
+`4mb` is rejected.
 
 ## Multi-host failover {#failover-keys}
 
@@ -501,6 +555,7 @@ equivalent — same architecture, no durability across restarts.
   |---|---|
   | Java (`QuestDB` facade) | `<sf_dir>/<sender_id>-<index>/` |
   | Rust, C, C++ (`QuestDb` / `questdb::pool` / `questdb_db`) | `<sf_dir>/<sender_id>-ingest-<index>/` |
+  | Node.js (`connectQwpNodeClient`) | `<sf_dir>/<sender_id>-<index>/` |
 
   The minted names belong to that pool's namespace, so pools sharing one
   `sf_dir` need distinct bases; the slot-in-use error covers both cases
@@ -508,14 +563,17 @@ equivalent — same architecture, no durability across restarts.
 - `sf_durability` — disk durability mode. `memory` (the default) and
   `periodic` both ship. `periodic` requires `sf_dir` and checkpoints published
   frames in the background at `sf_sync_interval_millis`. `flush` and `append`
-  are reserved: they parse but are rejected at `build()`.
+  are reserved: they parse but are rejected at `build()`, except in the Node.js
+  client, as described below.
 
   Reach for `periodic` when you must survive host loss. `memory` mode is
   process-crash durable but **not** host-crash durable, because the page cache
   is lost on power failure.
 
   The .NET client is the exception: it accepts only `memory` and rejects
-  anything else at parse time.
+  anything else at parse time. The Node.js client also accepts `append`,
+  which makes every frame durable before its append completes, rejects `flush`
+  at parse time, and requires `sf_dir` for every value.
 - `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
   checkpoints published frames to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a
@@ -547,7 +605,12 @@ exit, SIGKILL, host crash, or reboot — instantiate a new sender with the
    Windows). If the previous process is still alive and holds the lock,
    the new sender fails fast with `sf slot already in use`. The kernel
    releases the lock on process exit, even after SIGKILL, so a crashed
-   sender does not leave the slot stuck.
+   sender does not leave the slot stuck. The Node.js client locks the slot
+   with a `.lock.owner` directory instead, which a crash leaves behind. A
+   new sender takes it over only when it names a process on the same host
+   that no longer exists, so a restarted container can find the slot
+   locked: see
+   [Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
 2. Recovery reads the persisted ack watermark and replays every on-disk
    segment past it against the server. Replay runs on the I/O thread in
    parallel with the application's new `append()` calls — it does not
@@ -637,14 +700,25 @@ architecture is that a producer survives an arbitrarily long outage.
   milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
   (60 s) on Java and .NET, `5000` (5 s) on Rust, C, C++ and Python, which
-  share the same Rust core.
+  share the same Rust core, and `5000` on Node.js.
 
   This is the shutdown data-loss window. Setting it to `0` skips the drain
   entirely and drops un-ACKed batches on every clean shutdown.
 
-Auth failures during reconnect (authentication rejected, version mismatch,
-durable-ack mismatch, non-101 upgrade without a role hint) are immediately
-terminal — the loop does not retry them.
+In most clients, rejections of the upgrade request during reconnect
+(authentication rejected, version mismatch, durable-ack mismatch, non-101
+upgrade without a role hint) are immediately terminal: the loop does not
+retry them. The Java client treats a version mismatch like a transport
+failure, to ride out a rolling upgrade, and the other rejections as terminal
+only before the sender first connects. A Java sender that has connected keeps
+retrying all of them, and reports each failed attempt in its connection
+health. It also reports the rejections other than a version mismatch to its
+error handler. A Node.js sender that uses store-and-forward or
+`initial_connect_retry=async` also keeps retrying all of them once it has
+connected, and reports each failed attempt as a connection event. See
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
+and, for orphan drainers,
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 ### Egress failover {#egress-failover}
 
@@ -750,7 +824,7 @@ per-language names.
 
 *Applies to: the pooled facade (`QuestDB.connect`, `questdb::pool`,
 `QuestDb::connect`, `questdb.connect`, `qdb.NewQuestDB`,
-`QuestDBClient.Connect`).*
+`QuestDBClient.Connect`, `connectQwpNodeClient`).*
 
 Every client now leads with a pooled facade, so these keys are a first-contact
 concern. The `Sender` and query-client parsers accept and ignore them; the
@@ -770,7 +844,9 @@ explicit setter always wins over the string.
   forever. Default: `60000`.
 - `max_lifetime_ms` — maximum age of a connection; the housekeeper closes and
   reopens older ones once idle. `0` means no age limit. Default: `1800000`
-  (30 min).
+  (30 min). The Node.js client applies it only to idle connections above
+  `sender_pool_min` and `query_pool_min`, and closes them without opening
+  replacements.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
 - `lazy_connect` — when `on`, the pool defers opening its first connection
@@ -793,7 +869,7 @@ consumed by the application.
 
 Every client's parser accepts the six `on_*_error` keys below, but only
 clients that implement the policy layer act on them. **In the Java reference
-client they are currently accepted no-ops** — setting
+client and the Node.js client they are currently accepted no-ops** — setting
 `on_write_error=retriable_other` parses cleanly and changes nothing. .NET does
 implement them, via `SenderErrorPolicy` and `SenderErrorCategory`. The
 category table and precedence model below describe the target contract.
@@ -856,17 +932,20 @@ description and behaviour notes.
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | Java `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)                    |
+| `auto_flush_bytes`                      | size                          | Java, Node.js `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)           |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
+| `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
+| `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
 | `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
-| `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python `5000` | [Ingress reconnect](#reconnect-keys)        |
+| `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python, Node.js `5000` | [Ingress reconnect](#reconnect-keys) |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
 | `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
-| `connect_timeout`                       | int (ms, `> 0`)               | unset                         | [Authentication](#auth)                                       |
-| `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling)        |
+| `connect_timeout`                       | int (ms, `> 0`)               | unset (Node.js: `15000`)      | [Authentication](#auth)                                       |
+| `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java, Node.js) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling) |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
 | `error_inbox_capacity`                  | int (≥ 16)                    | `256`                         | [Error handling](#error-handling)                             |
@@ -909,15 +988,16 @@ description and behaviour notes.
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
-| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only) | [Store-and-forward](#sf-keys)                                |
+| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js: also `append`) | [Store-and-forward](#sf-keys)       |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
-| `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
+| `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only; Node.js: rejected) | [TLS](#tls)                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
+| `token_provider`                        | enum (`azure`)                | unset                         | [Token providers](#token-providers) (Java only)               |
 | `transaction`                           | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `user`                                  | string                        | unset                         | [Authentication](#auth) (alias of `username`)                 |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |

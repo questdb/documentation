@@ -59,7 +59,7 @@ The view creator automatically receives this permission with the `GRANT` option.
 
 | Error | Cause |
 | ----- | ----- |
-| `materialized view does not exist` | View doesn't exist and `IF EXISTS` not specified |
+| `materialized view does not exist` | View doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise), and `IF EXISTS` not specified |
 | `permission denied` | Missing `DROP MATERIALIZED VIEW` permission (Enterprise) |
 
 ## See also

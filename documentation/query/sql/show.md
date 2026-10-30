@@ -65,6 +65,12 @@ SHOW { COLUMNS FROM tableName
 - `SHOW USERS` lists all users with their enabled flag, memory limit and
   resource group (enterprise-only)
 
+In QuestDB Enterprise, `SHOW TABLES` and `SHOW CREATE DATABASE` cover only the
+objects you [can see](/docs/security/rbac/#object-visibility). The statements
+that name an object, such as `SHOW COLUMNS` or `SHOW CREATE TABLE`, fail with
+the missing-object error, for example `table does not exist [table=trades]`,
+for an object hidden from you.
+
 ## Examples
 
 ### SHOW COLUMNS
@@ -177,14 +183,17 @@ Filtering is applied per category, like `pg_dump -t`. Excluding a category that
 others depend on can leave dangling references, so a dump that omits a base
 table does not replay cleanly for the views built on it.
 
-:::note
+To select individual objects, such as the objects of a single tenant, wrap the
+statement in parentheses and filter the `ddl` column with `WHERE`. Each row
+starts with `CREATE`, so match the object name with a leading wildcard:
 
-Filtering the dump rows with a `WHERE` clause, for example
-`(SHOW CREATE DATABASE) WHERE ddl ILIKE 'fx_%'` to select the objects of a
-single tenant, is not supported yet. Row-level filtering is planned for a future
-QuestDB release.
+```questdb-sql title="Objects whose DDL mentions fx_" demo
+(SHOW CREATE DATABASE) WHERE ddl ILIKE '%fx_%';
+```
 
-:::
+The filtered rows keep dependency order. A pattern also matches views that read
+a matching table, so check that every object a filtered dump depends on is
+included before replaying it.
 
 #### Enterprise: access control
 
@@ -196,8 +205,14 @@ memberships, and permissions alongside the tables and views:
 - Memberships, as `ADD USER ... TO ...` and `ASSUME SERVICE ACCOUNT ... TO ...`.
 - Grants, as `GRANT <permissions> [ON ...] TO ... [WITH GRANT OPTION]`.
 
-`CREATE TABLE`, `CREATE VIEW`, and `CREATE MATERIALIZED VIEW` statements in an
-Enterprise dump also carry the `OWNED BY` clause identifying the owner.
+QuestDB stores no owner for an object, so the `GRANT` statements are what
+recreate its permissions. The `CREATE TABLE`, `CREATE VIEW`, and
+`CREATE MATERIALIZED VIEW` statements in an Enterprise dump also carry an
+`OWNED BY` clause, which names the principal that ran the dump, as in
+[`SHOW CREATE TABLE`](#enterprise-variant). Replaying the dump gives that
+principal all permissions on each of these objects, with the `GRANT` option, on
+top of the dumped grants. Edit or remove the clause before replaying if that
+principal should not hold them.
 
 Credentials are never dumped: the `CREATE USER` and `CREATE SERVICE ACCOUNT`
 statements carry no password or token, so set these after replaying the dump.
@@ -205,8 +220,11 @@ statements carry no password or token, so set these after replaying the dump.
 The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
 `PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
 or `USER DETAILS` permission, while the schema categories need no access control
-permission, so a user with only `SELECT` can still dump the structure. When
-access control is disabled the command degrades to a schema-only dump.
+permission, so a user with only `SELECT` can still dump the structure of the
+objects it can see. To dump the whole schema, run the statement as a principal
+that sees every object, such as the built-in admin or a user holding
+`DATABASE ADMIN`. When access control is disabled the command degrades to a
+schema-only dump.
 
 ### SHOW CREATE LIVE VIEW
 
@@ -221,8 +239,8 @@ SHOW CREATE LIVE VIEW trades_ma;
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
 `IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`,
-not necessarily the view's owner.
+output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`.
+See the [Enterprise variant](#enterprise-variant) of `SHOW CREATE TABLE`.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -320,10 +338,14 @@ policy is not shown in `SHOW CREATE TABLE`. See
 
 #### Enterprise variant
 
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause
-naming the user running `SHOW CREATE`, not necessarily the table's owner.
+In [QuestDB Enterprise](/enterprise/), `SHOW CREATE TABLE`, `SHOW CREATE VIEW`,
+`SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW` add an `OWNED BY`
+clause naming the user running `SHOW CREATE`. QuestDB stores no owner for an
+object, so the clause does not tell you who created it or who holds permissions
+on it. To see the permissions on an object, use
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
 
-For example,
+For example, run as `admin`:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -337,10 +359,10 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```
 
-This clause assigns permissions for the table to that user.
-
-If permissions should be assigned to a different user, please modify this clause
-appropriately.
+When the statement is replayed, the clause gives that user all permissions on
+the new table, with the `GRANT` option. To give them to a different user, group,
+or service account, change the clause before replaying it. See
+[OWNED BY](/docs/query/sql/create-table/#owned-by).
 
 ### SHOW CREATE VIEW
 
@@ -469,7 +491,12 @@ new trailing columns.
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 
-_Enterprise only._
+_Enterprise only._ `SHOW PERMISSIONS` lists the effective permissions of one
+user, group, or service account. The
+[`permissions()`](/docs/query/functions/access-control/#permissions) table
+function returns the same rows, and
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
+lists the permissions of every entity at once.
 
 ```questdb-sql
 SHOW PERMISSIONS;

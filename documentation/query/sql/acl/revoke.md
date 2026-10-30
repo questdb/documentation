@@ -243,3 +243,12 @@ REVOKE SELECT on products FROM admins;
 -- or
 REMOVE USER john FROM admins;
 ```
+
+### Revoke on a missing or hidden table
+
+`REVOKE` on a table that does not exist fails with
+`table does not exist [table=tableName]`, so a misspelled name is reported
+instead of revoking nothing. A column that does not exist fails with
+`column does not exist [table=tableName, column=columnName]`. A table the
+revoking principal [cannot see](/docs/security/rbac/#object-visibility) fails
+like a missing one, before its columns are checked.

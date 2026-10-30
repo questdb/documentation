@@ -79,6 +79,11 @@ module.exports = {
               label: "Node.js",
             },
             {
+              id: "connect/clients/browser",
+              type: "doc",
+              label: "Browser (JavaScript)",
+            },
+            {
               id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
@@ -87,6 +92,11 @@ module.exports = {
               id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
+            },
+            {
+              id: "connect/clients/ruby",
+              type: "doc",
+              label: "Ruby",
             },
             {
               id: "connect/clients/date-to-timestamp-conversion",
@@ -542,6 +552,7 @@ module.exports = {
           type: "category",
           label: "Functions",
           items: [
+            "query/functions/access-control",
             "query/functions/aggregation",
             "query/functions/array",
             "query/functions/binary",
@@ -781,6 +792,11 @@ module.exports = {
       label: "Security",
       type: "category",
       items: [
+        {
+          id: "security/governance",
+          type: "doc",
+          label: "Governance and auditing",
+        },
         {
           id: "security/rbac",
           type: "doc",
