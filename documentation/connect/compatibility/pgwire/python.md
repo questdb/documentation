@@ -500,7 +500,7 @@ adapter. It's a complete rewrite of psycopg2 with support for both synchronous a
 ### Installation
 
 ```bash
-pip install psycopg[binary]
+pip install "psycopg[binary]"
 ```
 
 :::tip
