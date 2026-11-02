@@ -79,6 +79,11 @@ module.exports = {
               label: "Node.js",
             },
             {
+              id: "connect/clients/browser",
+              type: "doc",
+              label: "Browser (JavaScript)",
+            },
+            {
               id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
@@ -786,6 +791,11 @@ module.exports = {
       label: "Security",
       type: "category",
       items: [
+        {
+          id: "security/governance",
+          type: "doc",
+          label: "Governance and auditing",
+        },
         {
           id: "security/rbac",
           type: "doc",

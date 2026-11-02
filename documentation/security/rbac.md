@@ -936,7 +936,7 @@ QuestDB Enterprise can limit the native memory tracked for a single query,
 overriding the server-wide query memory limit for a specific user, group, or
 service account. Use it to help prevent one tenant's runaway query from
 exhausting shared memory, or to grant a trusted principal more headroom than the
-default. Per-principal limits are available since QuestDB Enterprise 4.0.2; the
+default. Per-principal limits are available since QuestDB Enterprise 4.1.0; the
 server-wide [workload limits](/docs/configuration/cairo-engine/#memory-limits)
 they override are available since QuestDB 10.0.0.
 
