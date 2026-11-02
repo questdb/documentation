@@ -113,7 +113,7 @@ The parser rejects:
 - `sender_id` containing path separators or empty.
 - `request_durable_ack=on` on non-WebSocket transports.
 
-## Worked examples
+## Example configurations
 
 ### Single-node memory-mode producer
 
