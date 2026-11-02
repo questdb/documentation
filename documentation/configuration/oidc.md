@@ -152,7 +152,7 @@ When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2
 token should be sent in the password field, while the username field should
 contain the string `_sso`, or left empty if that is an option.
 
-### acl.oidc.pkce.enabled
+### acl.oidc.pkce.required
 
 - **Default**: `true`
 - **Reloadable**: no
