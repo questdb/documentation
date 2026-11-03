@@ -20,7 +20,7 @@ the database as it stood at an arbitrary instant, see
 
 | Node    | Recoverable | Unrecoverable                       |
 | ------- | ----------- | ----------------------------------- |
-| Primary | Restart     | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
+| Primary | Restart as primary only if no other node has been promoted since the failure | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
 | Replica | Restart     | Destroy and recreate                |
 
 ## Network partitions
@@ -81,7 +81,11 @@ instead; that path refuses rather than losing data.
    bounded to an earlier instant, use
    [point-in-time recovery](/docs/operations/point-in-time-recovery/) instead
 5. Start the replica (now the new primary)
-6. Create a new replica to replace the promoted one
+6. Create a new replica to replace the promoted one. If reusing the failed
+   primary's host, rebuild it in a fresh installation directory from a new
+   backup or snapshot of the current primary. Do not reuse its existing
+   database directory. See
+   [Rebuild the failed primary](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
 :::warning
 Data committed to the primary but not yet replicated will be lost. Use planned

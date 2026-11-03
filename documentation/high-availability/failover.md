@@ -111,9 +111,8 @@ writer pointed at a single address must be repointed.
 
 ## Promote a replica after a primary loss
 
-1. Make sure the failed primary is stopped and cannot restart as a primary. If
-   its disk survives, set `replication.role=replica` in its `server.conf`
-   before it is ever started again.
+1. Make sure the failed primary is stopped and cannot restart. Keep it stopped
+   until it has been [rebuilt as a new replica](#rebuild-the-failed-primary).
 2. On the replica:
 
    ```questdb-sql
@@ -130,9 +129,44 @@ store, and the in-place switch cannot recover them. When the loss is accepted
 and the replica cannot catch up, use the restart-based
 [emergency primary migration](/docs/high-availability/disaster-recovery/#emergency-primary-migration).
 
-Once the old primary is repaired, start it with `replication.role=replica`. It
-rejoins as a replica; any transactions it committed but never uploaded are
-superseded by the new primary's stream.
+### Rebuild the failed primary
+
+Because of a current recovery limitation, rebuild the failed primary as a new
+replica after an unplanned failover. If reusing its host, use a fresh
+installation directory and restore a new backup
+or snapshot of the current primary. See
+[Create a replica from a backup](/docs/operations/backup/#create-a-replica-from-a-backup)
+or the [replica setup procedure](/docs/high-availability/setup/#4-configure-replica-nodes).
+
+:::warning
+
+Do not restart the failed primary with `replication.role=replica` using its
+existing database directory. Changing the role does not safely discard
+transactions that it committed but never uploaded, and can cause silent data
+divergence from the new primary.
+
+:::
+
+### Advanced: why changing the role is not enough
+
+Replication uploads are asynchronous. A primary can commit and apply
+transactions 101 to 105 while the object store only contains transactions
+through 100. After failover, the new primary can reuse 101 to 105 for different
+data. The former primary can retain its original rows and skip the new
+primary's transactions when restarted as a replica.
+
+Matching transaction numbers or `data_id`, and the absence of warnings, do not
+prove that the nodes contain the same data. The former primary's disk does not
+preserve a per-table record of the last successfully published transactions.
+The current implementation also lacks a supported procedure to rewind an
+arbitrary committed tail.
+
+Improvements to divergence detection and recovery are expected in future
+releases. For now, rebuild the replica from the current primary.
+
+This restriction does not apply to a successfully completed planned switchover,
+which drains pending uploads before promotion, or to restarting the original
+primary as primary when no other node has been promoted since the failure.
 
 ## Choosing the timeout
 
@@ -204,10 +238,12 @@ committed transactions.
 
 :::warning
 
-Never restart a node in the `UNKNOWN` state with `replication.role=replica`.
-A replica boot performs no upload audit and completes the abandoned demote,
-discarding the backlog the refusal protected. Restart it as `primary`, which
-replays the pending uploads at boot.
+Never restart a node in the `UNKNOWN` state with `replication.role=replica`
+to bypass a failed demotion. Replica startup does not upload the pending
+transactions or safely discard them. If no other node has been promoted,
+restart it as `primary` to resume uploads. If another node has been promoted,
+keep the former primary stopped and
+[rebuild it as a new replica](#rebuild-the-failed-primary).
 
 :::
 
@@ -221,8 +257,10 @@ the role given by
 
 :::danger
 
-Set `replication.role` to the node's current role on both nodes as soon as a
-switch has settled, before either node can restart.
+After a successful runtime switch, set `replication.role` to the current role
+on each switched node before it can restart. If another node has been promoted
+after a primary loss, keep the failed node stopped until it has been
+[rebuilt as a new replica](#rebuild-the-failed-primary).
 
 A demoted node that restarts with `replication.role=primary` can come back as a
 second primary. While it ran as a replica it kept its object-store ownership
@@ -232,9 +270,9 @@ conflict is only detected later, as
 halts, which may be the legitimate primary.
 
 A promoted node that restarts with `replication.role=replica` silently demotes
-itself. Transactions it committed as primary but had not yet uploaded are
-superseded by the store, and if the other node is also a replica the cluster
-has no primary and reports no error.
+itself. Transactions committed locally but not yet uploaded are not safely
+superseded by the object store and can cause divergence if another primary
+takes over. If every node is a replica, the cluster has no primary.
 
 :::
 
@@ -264,7 +302,9 @@ but an assumed service account does not survive it.
 
 ## After the switch
 
-- Update `replication.role` on both nodes, see [Restarts](#restarts).
+- Update `replication.role` on each switched node, see [Restarts](#restarts).
+  If another node has been promoted after a primary loss, keep the failed node
+  stopped until it has been [rebuilt as a new replica](#rebuild-the-failed-primary).
 - Scheduled backups run on the primary only. The schedule pauses on the
   demoted node and resumes on the promoted one. A backup that was still running
   when the node was demoted is reported by the

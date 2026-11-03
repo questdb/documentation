@@ -64,12 +64,16 @@ setting.
 
 :::danger
 
-After a runtime switch, set `replication.role` to the new role on both nodes
-before either of them restarts. A demoted node that restarts with
+After a successful runtime switch, set `replication.role` to the new role on
+each switched node before it restarts. A demoted node that restarts with
 `replication.role=primary` can come back as a second primary on the same object
 store, and a promoted node that restarts with `replication.role=replica`
 silently demotes itself. See
 [Restarts](/docs/high-availability/failover/#restarts).
+
+Changing this setting is not a recovery procedure for a failed former primary
+after another node has been promoted. Keep the former primary stopped and
+[rebuild it as a new replica](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
 :::
 

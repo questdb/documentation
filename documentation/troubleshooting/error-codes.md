@@ -103,17 +103,18 @@ This error occurs when you start a primary instance and discover another instanc
 
 This typically happens after an emergency primary migration, usually due to a network partition that separated your database instances.
 
-Before proceeding, check your infrastructure to determine exactly how many primary instances are currently running.
+Before proceeding, check your infrastructure to determine which instance is
+the intended primary and stop the unintended primary. Retire the extra
+instance or rebuild it as a new replica from a fresh backup or snapshot of the
+current primary. Changing `replication.role` alone does not make its existing
+data safe to reuse after an unplanned failover. See
+[Rebuild the failed primary](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
-You have the following options:
-* Destroy the extra instance
-* Reconfigure it as `replication.role=replica` and restart it
-* Perform a planned primary migration and resume the primary role on this instance
-
-This error is also the expected outcome when a node that was demoted in place
-with [`SWITCH ROLE`](/docs/query/sql/switch-role/) is restarted while
-`server.conf` still says `replication.role=primary`. Set `replication.role` to
-the node's current role before any restart, see
+This error can also occur when a node that successfully completed a planned
+demotion with [`SWITCH ROLE`](/docs/query/sql/switch-role/) is restarted while
+`server.conf` still says `replication.role=primary`. If it has not committed any
+local writes since that demotion, restart it with `replication.role=replica`.
+Update the configuration before any restart, as described in
 [Restarts](/docs/high-availability/failover/#restarts).
 
 ### ER007
