@@ -593,11 +593,14 @@ more recent than the oldest available WAL data.
 
 :::note
 
-Catching up from the replication store is the purpose of this flow, so a
-`backup.restore.timestamp` in the `_backup_restore` file has no lasting effect
-here: whichever backup the replica starts from, it ends at the cluster's
-current state. To stop at an earlier instant instead, see
+For a new replica restored from a backup of the current primary,
+`backup.restore.timestamp` selects its starting snapshot. WAL replay then
+advances it to the cluster's current state; the timestamp does not stop
+replication at that point. To stop at an earlier instant instead, see
 [point-in-time recovery](/docs/operations/point-in-time-recovery/).
+
+After an unplanned failover, use a new backup of the current primary when
+[rebuilding the failed primary as a replica](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
 :::
 
