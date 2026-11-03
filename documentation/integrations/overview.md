@@ -80,7 +80,8 @@ Improve your interactions with QuestDB using these tools and interfaces:
 - [Airbyte](/docs/integrations/other/airbyte/): Sync data from a wide range of
   sources into QuestDB with an open-source ETL platform.
 - [adbcBridge](/docs/integrations/other/adbcbridge/): Read QuestDB into Apache
-  Arrow record batches through ADBC over the PostgreSQL ODBC driver.
+  Arrow through ADBC, natively over QWP on QuestDB 10 or through the PostgreSQL
+  ODBC driver on older servers.
 
 Is there an integration you'd like to see that's not listed? Let us know by
 opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).
