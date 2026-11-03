@@ -128,8 +128,8 @@ let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 `QuestDb::connect` parses the connect string and doesn't normally perform any
 blocking network I/O. The exception to that happens when store-and-forward
 durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the dirty slots at construction
-and start replaying them in the background.
+previously crashed client. The pool may reopen the sender directories that
+hold that data at construction and start replaying them in the background.
 
 The ingestion sender creates its local producer on first borrow and connects its
 delivery runner in the background, so it can queue data while the server is
@@ -713,14 +713,16 @@ If you disable default features, also enable `sync-reader-zstd`.
 ## Delivery and durability
 
 The ingestion sender pool always uses store-and-forward. Without `sf_dir`, the
-queue is in memory. With `sf_dir`, each borrowed sender uses a disk slot:
+queue is in memory. With `sf_dir`, each borrowed sender uses its own sender
+directory:
 
 ```text
 <sf_dir>/<sender_id>-ingest-<index>/
 ```
 
 Give each pool that shares an `sf_dir` a distinct `sender_id`. On restart, the
-pool reopens managed dirty slots and replays their unacknowledged frames.
+pool reopens its sender directories that still hold data and replays their
+unacknowledged rows.
 
 The default `sf_durability=memory` does not call `fsync`. It is page-cache
 durable, which protects against a client-process crash but does not guarantee
@@ -872,7 +874,7 @@ A borrow at the pool's cap waits up to `acquire_timeout_ms` for another thread
 to return a connection, then fails with `ErrorCode::InvalidApiCall`. Set
 `acquire_timeout_ms=0` to fail fast instead. In disk-backed store-and-forward
 mode, an ingestion borrow may first wait up to `close_flush_timeout_millis` for
-a closing slot to release its disk lock.
+a closing sender to release the lock on its sender directory.
 
 Keep borrows short. A borrow occupies its slot until `Drop`, even while the
 application is idle.

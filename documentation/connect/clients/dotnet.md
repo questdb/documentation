@@ -176,8 +176,8 @@ surface (bind parameters, DDL/DML, failover, compression).
 `Sender` is single-threaded and owns one connection. To send in parallel,
 create one sender per producer thread. If those senders share a
 [store-and-forward](#store-and-forward) directory, each must be configured
-with a distinct `sender_id` so they do not contend for the same on-disk
-slot — see [Store-and-forward](#store-and-forward).
+with a distinct `sender_id` so they do not contend for the same sender
+directory — see [Store-and-forward](#store-and-forward).
 
 :::
 
@@ -401,7 +401,7 @@ await Parallel.ForEachAsync(batches, async (batch, ct) =>
   decimal / extended columns), cast the borrowed `ISender` to
   `IQwpWebSocketSender` — pooled `ws` / `wss` senders implement it.
 - If the handle's ingest config sets `sf_dir`, each pooled sender owns a
-  distinct on-disk slot `<sender_id>-<index>`, so
+  distinct sender directory, `<sender_id>-<index>`, so
   [store-and-forward](#store-and-forward) works across the whole pool without
   extra configuration.
 
@@ -992,11 +992,11 @@ second, which limits what a host crash or power loss can lose.
 | Key | Default | Description |
 |---|---|---|
 | `sf_dir` | unset | Enables disk-backed SF when set. |
-| `sender_id` | `default` | Slot identity (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
+| `sender_id` | `default` | Name of the sender directory under `sf_dir` (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
 | `sf_max_segment_bytes` | 4 MiB | Per-segment size cap. |
-| `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
+| `sf_max_total_bytes` | 128 MiB (memory-only) / 10 GiB (disk) | Cap on total queued bytes. |
 | `sf_append_deadline_millis` | 30000 | Max time a flush blocks waiting for queue capacity. |
-| `drain_orphans` | `off` | If `on`, take over stale slots from a crashed sender. |
+| `drain_orphans` | `off` | If `on`, take over sender directories left by a crashed sender. |
 
 ## Durable acknowledgement
 
@@ -1057,13 +1057,13 @@ Row builders (`Table`, `Symbol`, `Column`, `NullableColumn`) never block —
 they only mutate the in-process encode buffer, which grows up to
 `max_buf_size` (default 100 MiB). Backpressure surfaces at flush time:
 
-- **In-memory mode (no `sf_dir`).** The in-flight publish window caps how
+- **Memory-only mode (no `sf_dir`).** The in-flight publish window caps how
   many unacknowledged frames can sit on the connection. On a standalone sender
   `SendAsync()` drains, so when the server is reachable but slow it waits for
   ACK-driven capacity before returning. When the server is unreachable, the
   drain waits up to `close_flush_timeout_millis` and then throws a timeout
   `IngressError`. Dispose does **not** drain, so anything unsent at that point
-  is dropped; in-memory mode does **not** survive a process exit either —
+  is dropped; memory-only mode does **not** survive a process exit either —
   unacked frames are lost.
 - **Store-and-forward mode (`sf_dir` set).** `SendAsync()` appends to the
   on-disk segment and returns quickly; the I/O loop drains it in the
@@ -1560,10 +1560,10 @@ WebSocket options:
 | `tls_verify` / `tls_roots` / `tls_roots_password` | `on` / — / — | TLS configuration (`wss` only). |
 | `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
 | `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
-| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and slot identity. |
+| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and the sender directory name under it. |
 | `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
 | `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
-| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
+| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' sender directories; max concurrent orphan drains. |
 | `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |
 | `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Sync initial-connect budget, plus the backoff the running loop uses while retrying indefinitely. |
 | `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |

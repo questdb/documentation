@@ -18,20 +18,20 @@ The keys below are the SF-specific subset.
 
 ## Storage keys
 
-These keys select between memory mode and SF mode and govern on-disk
-layout. The single switch is `sf_dir`: unset → memory mode, set → SF
+These keys select between memory-only mode and SF mode and govern on-disk
+layout. The single switch is `sf_dir`: unset → memory-only mode, set → SF
 mode.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
-| `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
+| `sf_dir` | path | unset | Parent directory for sender directories. When set, each sender keeps its data in its sender directory, `<sf_dir>/<sender_id>/`, and unacknowledged data survives process restarts. When unset, the client runs in memory-only mode. |
+| `sender_id` | string | `default` | Name of the sender directory under `sf_dir`. Two senders with the same `sender_id` and `sf_dir` collide on the directory's lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
-| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
+| `sf_max_total_bytes` | size | `128M` (memory-only) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
 | `sf_durability` | enum | `memory` | When the client forces store-and-forward data to stable storage: `memory` (doesn't force each write to disk), `periodic` (forces it every `sf_sync_interval_millis`; requires `sf_dir`), `append` (forces each flush's rows before the flush completes), `flush` (reserved). Not every client accepts every value; see your [client's page](/docs/connect/overview/#client-libraries). |
 | `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
-| `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
+| `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for other sender directories that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
 | `max_background_drainers` | int | `4` | Cap on concurrent orphan drainers. |
 
 Size values accept integer bytes or unit suffixes (`K`, `M`, `G`, `T`)
@@ -115,7 +115,7 @@ The parser rejects:
 
 ## Example configurations
 
-### Single-node memory-mode producer
+### Single-node memory-only producer
 
 ```java
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
@@ -126,7 +126,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
 }
 ```
 
-No `sf_dir`, so memory mode. The default `128 MiB` cap absorbs short
+No `sf_dir`, so memory-only mode. The default `128 MiB` cap absorbs short
 network blips. A sender crash loses the unacked tail.
 
 ### Single-node durable producer
@@ -153,8 +153,8 @@ try (Sender sender = Sender.fromConfig(
 }
 ```
 
-`wss::` for TLS, three-host failover, durable-ack opt-in. Slot lives at
-`/var/lib/qdb-sender/ingest-svc/`. The connect fails loudly if any peer
+`wss::` for TLS, three-host failover, durable-ack opt-in. The sender directory
+is `/var/lib/qdb-sender/ingest-svc/`. The connect fails loudly if any peer
 returns an upgrade without `X-QWP-Durable-Ack: enabled`.
 
 ### Multi-tenant host with orphan rescue
@@ -170,8 +170,8 @@ try (Sender sender = Sender.fromConfig(
 
 Each worker instance has a unique `sender_id`. When a worker crashes and
 a new instance comes up under a different `sender_id`, the new
-instance's foreground sender adopts the dead worker's slot in the
-background and drains it.
+instance's foreground sender adopts the dead worker's sender directory in
+the background and drains it.
 
 ### Long-outage tolerance for unattended ingest
 

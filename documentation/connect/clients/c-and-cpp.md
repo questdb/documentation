@@ -1378,8 +1378,8 @@ queue and returns before the server acks.
    directory layout. Strongly recommended for multi-host deployments: during
    failover, flushes keep landing on disk instead of filling RAM.
 5. **Backpressure is bounded blocking.** Two caps apply at once: 128 in-flight
-   unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
-   10 GiB disk mode). On hitting either, `flush` blocks up to
+   unacked frames, and `sf_max_total_bytes` (default 128 MiB in memory-only
+   mode, 10 GiB in disk mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
    buffer whose single payload exceeds the frame cap (see

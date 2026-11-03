@@ -18,14 +18,14 @@ returns as soon as data is published into the substrate. Acknowledgements
 arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
-no unacked data: the next sender on the slot recovers it from disk and
-replays it.
+no unacked data: the next sender that uses the same sender directory
+recovers it from disk and replays it.
 
 ## Two modes
 
 SF runs in either of two modes selected by the connect string:
 
-| Aspect | Memory mode | SF mode |
+| Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Trigger | `sf_dir` is **unset** | `sf_dir` is set |
 | Storage | malloc'd ring in process RAM | mmap'd files under `<sf_dir>/<sender_id>/` |
@@ -34,7 +34,7 @@ SF runs in either of two modes selected by the connect string:
 | Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
 | Tolerates transient network blips | Yes | Yes |
 | Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
-| Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
+| Recovers another sender's abandoned directory | n/a | Opt-in via `drain_orphans=on` |
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
@@ -92,7 +92,7 @@ Two consequences:
 The substrate holds frames until the server confirms it has received and
 processed them. Each confirmation advances the **acked FSN**, which
 allows the manager thread to unlink sealed segment files (in SF mode) or
-release ring memory (in memory mode) up to that watermark.
+release ring memory (in memory-only mode) up to that watermark.
 
 Two trim drivers exist:
 
@@ -191,8 +191,8 @@ C, C++, Python, and Node.js. If the wait succeeds, all data is acked. If the
 timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
-  next sender on the same slot;
-- in **memory mode**, the un-acked tail is lost.
+  next sender that uses the same sender directory;
+- in **memory-only mode**, the un-acked tail is lost.
 
 The Node.js client reports the timeout differently: `close()` rejects with
 `QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
@@ -200,16 +200,16 @@ data. Its pooled client logs a warning when a sender it closes times out.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
-Even in this branch, the slot lock is released and segments are unmapped
-cleanly, and a non-blocking safety-net check rethrows any latched
-terminal error that has not already been delivered through an async
+Even in this branch, the sender directory's lock is released and segments
+are unmapped cleanly, and a non-blocking safety-net check rethrows any
+latched terminal error that has not already been delivered through an async
 handler or a synchronous producer call.
 
 ## Crash recovery (SF mode)
 
-When the engine opens an SF-mode sender, it scans the slot directory:
+When the engine opens an SF-mode sender, it scans the sender directory:
 
-1. **Acquire the slot lock.** Two senders pointing at the same
+1. **Acquire the directory lock.** Two senders pointing at the same
    `<sf_dir>/<sender_id>/` will collide here and the second one fails to
    start, naming the holder's PID in the error message.
 2. **Validate every segment file.** Headers are checked, frames are walked
@@ -229,7 +229,7 @@ thread replays the un-acked tail and then drains forward.
 
 ### `.ack-watermark`
 
-An optional 16-byte file under the slot directory persists the cumulative
+An optional 16-byte file in the sender directory persists the cumulative
 durable-ack FSN across process restarts. Without it, recovery seeds the
 ack watermark from the lowest surviving segment's `baseSeq - 1` — which
 guarantees no data loss, but cannot distinguish which frames inside that
@@ -249,8 +249,8 @@ it. The reference client does.
 
 ### `.symbol-dict` {#symbol-dict}
 
-Each slot also persists its SYMBOL dictionary to a dot-prefixed side-file,
-`<sf_dir>/<sender_id>/.symbol-dict`.
+Each sender directory also holds the sender's SYMBOL dictionary, in a
+dot-prefixed side-file, `<sf_dir>/<sender_id>/.symbol-dict`.
 
 QWP sends each symbol string to the server **once per connection** and
 thereafter references it by a numeric id. A frame on disk therefore contains
@@ -259,7 +259,7 @@ replayed frames would reference ids the server has never seen and it would
 reject them with
 [`STATUS_DICTIONARY_GAP`](/docs/connect/wire-protocols/qwp-ingress-websocket/#status-codes).
 Persisting the dictionary alongside the frames is what makes a recovered or
-orphan-drained slot replayable on a fresh process.
+orphan-drained sender directory replayable on a fresh process.
 
 **Write-ahead ordering.** A new symbol is appended to `.symbol-dict` *before*
 the frame that references it is published. A crash can therefore leave
@@ -277,32 +277,34 @@ host loss; see
 **Torn tails are detected, not replayed.** The file is CRC-validated on open
 and any torn trailing entry is dropped. If the dictionary cannot be rebuilt —
 neither from the side-file's intact prefix nor from the surviving frames' own
-delta sections — the slot is **unreplayable**, and the client sets it aside
-rather than shipping frames whose ids nothing still backs. The reference client
-raises `UnreplayableSlotException`: `Sender.build()` sets the slot aside and
-starts the producer on a fresh one, and the background drainer marks it with a
-`.failed` sentinel so later orphan scans skip it. No data is silently
-discarded; the slot is preserved for inspection.
+delta sections — the sender directory is **unreplayable**, and the client sets
+it aside rather than shipping frames whose ids nothing still backs. The
+reference client raises `UnreplayableSlotException` (its API calls the sender
+directory a slot): `Sender.build()` sets the directory aside and starts the
+producer on a fresh one, and the background drainer marks it with a `.failed`
+sentinel so later orphan scans skip it. No data is silently discarded; the
+directory is preserved for inspection.
 
 ## Orphan adoption
 
 When the foreground sender's connect string sets `drain_orphans=on`, the
-engine scans `<sf_dir>/*` at startup for **sibling slot directories** —
+engine scans `<sf_dir>/*` at startup for **other sender directories** —
 other `sender_id`s under the same group root that contain unacked data
 and are not marked `.failed`. For each one, up to
 `max_background_drainers` at a time, a background drainer spawns,
-acquires the orphan slot's lock (skipping if another process holds it),
+acquires the orphan's lock (skipping if another process holds it),
 opens a separate WebSocket connection, runs the same recovery + replay
 flow, and exits when the orphan is fully drained.
 
 This is the rescue path for a sender that died without draining cleanly
 — a process crash, an OOM kill, a host reboot. The replacement process picks
-the orphan's slot lock and clears its disk footprint. Without
+the orphan's lock and clears its disk footprint. Without
 `drain_orphans=on` the dead sender's data persists on disk indefinitely
 until an operator intervenes.
 
 The orphan flow is opt-in because in a multi-tenant deployment with
-shared `sf_dir`, blindly draining unknown slots may be surprising.
+shared `sf_dir`, blindly draining unknown sender directories may be
+surprising.
 
 ## Error frames
 
@@ -329,10 +331,10 @@ indistinguishably from a healthy connection.
 ## Next steps
 
 - [When to use](/docs/high-availability/store-and-forward/when-to-use/) —
-  decision guide for memory vs SF mode, and when to opt into
+  decision guide for memory-only vs SF mode, and when to opt into
   durable-ack and orphan adoption.
 - [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/) —
-  slot directory layout, lock semantics, sizing, observability.
+  sender directory layout, lock semantics, sizing, observability.
 - [Configuration](/docs/high-availability/store-and-forward/configuration/) —
   connect-string key reference.
 - [Client failover concepts](/docs/high-availability/client-failover/concepts/) —

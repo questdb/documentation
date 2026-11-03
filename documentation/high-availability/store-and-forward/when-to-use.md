@@ -2,7 +2,7 @@
 title: When to use store-and-forward
 sidebar_label: When to use
 description:
-  Decision guide for choosing between memory mode and disk-backed
+  Decision guide for choosing between memory-only mode and disk-backed
   store-and-forward, when to opt into durable-ack trim, and when to enable
   orphan adoption.
 ---
@@ -15,17 +15,17 @@ decision guide.
 If you are new to SF, start with
 [Concepts](/docs/high-availability/store-and-forward/concepts/).
 
-## Memory mode vs SF mode
+## Memory-only mode vs SF mode
 
 The single switch that decides this is whether you set `sf_dir` in the
 connect string.
 
-### Memory mode — `sf_dir` unset
+### Memory-only mode — `sf_dir` unset
 
 Unacked frames live in a malloc'd ring in process memory. Default cap is
 `128 MiB`.
 
-**Choose memory mode when:**
+**Choose memory-only mode when:**
 
 - The producer process is short-lived or ephemeral (a CLI job, a CI
   worker, a serverless function).
@@ -36,7 +36,7 @@ Unacked frames live in a malloc'd ring in process memory. Default cap is
 - Your data volume comfortably fits in RAM during the longest outage you
   care about.
 
-### SF mode — `sf_dir=/path/to/slot-root`
+### SF mode — `sf_dir=/path/to/dir`
 
 Unacked frames are written to mmap'd files under
 `<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
@@ -61,7 +61,7 @@ string.
 
 ## Comparison at a glance
 
-| Aspect | Memory mode | SF mode |
+| Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Buffered data location | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
 | Default capacity | `128 MiB` | `10 GiB` |
@@ -121,7 +121,7 @@ GCS, or NFS).
 
 ## Orphan adoption: when to enable
 
-A sender that exits without draining its slot leaves unacked data on
+A sender that exits without draining its sender directory leaves unacked data on
 disk. If another process restarts under the same `sender_id` and same
 `sf_dir`, it picks up the orphan automatically as part of normal
 recovery. But if no process ever uses that `sender_id` again, the data
@@ -140,13 +140,13 @@ spawn background drainers to clear them.
   process instance), so dead instances leave permanent orphans that no
   natural restart will adopt.
 - You prefer "automatic eventual delivery" over "operator manually
-  reattaches the slot."
+  reattaches the sender directory."
 
 ### Leave it off when
 
 - Each `sender_id` is statically pinned to a specific process — there
   are no orphans by construction; a restart of the same process
-  recovers its own slot.
+  recovers its own sender directory.
 - You want explicit operator control over data movement in a shared
   `sf_dir`.
 - You run a single producer per host.
@@ -157,7 +157,7 @@ path but not the WebSocket.
 
 `drain_orphans=on` does not interfere with regular recovery: the
 foreground sender still recovers its own `sender_id` first, then
-drainers spawn for sibling slots.
+drainers spawn for other sender directories.
 
 ## Migrating from HTTP/TCP ILP
 
@@ -199,7 +199,7 @@ graph TD
     Q3{Is object-store durability required before ack?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 
-    Q1 -->|"No (ephemeral job)"| Memory[Memory mode — leave sf_dir unset]
+    Q1 -->|"No (ephemeral job)"| Memory[Memory-only mode — leave sf_dir unset]
     Q1 -->|"Yes (long-running service)"| Q2
     Q2 -->|No| Memory
     Q2 -->|Yes| SF[SF mode — set sf_dir]
@@ -217,4 +217,4 @@ graph TD
 - [Configuration](/docs/high-availability/store-and-forward/configuration/) —
   the connect-string keys.
 - [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/) —
-  slot layout, sizing, observability.
+  sender directory layout, sizing, observability.

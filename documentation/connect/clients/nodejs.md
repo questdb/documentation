@@ -1996,8 +1996,8 @@ Close every sender, session, and lease in a `finally` block:
 - **`Sender.close()` and `QwpSender.close()`** publish completed rows, then wait
   up to `close_flush_timeout_millis` (5 seconds) for QuestDB to acknowledge
   everything. If it does not, `close()` rejects with
-  `QwpSenderCloseTimeoutError`: in memory mode the unacknowledged data is lost,
-  and with store-and-forward it stays on disk for the next sender. If
+  `QwpSenderCloseTimeoutError`: in memory-only mode the unacknowledged data is
+  lost, and with store-and-forward it stays on disk for the next sender. If
   publishing the remaining rows fails first, for example because the replay
   queue is full, `close()` rejects with that error instead and logs the
   timeout. `0` skips the wait. An unfinished row is discarded with a warning,

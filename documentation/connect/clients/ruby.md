@@ -529,8 +529,9 @@ result.
 ## Delivery and durability
 
 Row senders always publish through a local store-and-forward queue. Without
-`sf_dir` the queue is in memory. With `sf_dir`, each lease uses a disk slot,
-and on restart the pool replays unacknowledged frames. Give each client that
+`sf_dir` the queue is in memory. With `sf_dir`, each lease uses its own sender
+directory, and on restart the pool replays unacknowledged rows. Give each
+client that
 shares an `sf_dir` a distinct `sender_id`. With the default
 `sf_durability=memory`, disk mode protects against a client process crash,
 but not against a host crash or power loss. Set `sf_durability=periodic` to

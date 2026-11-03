@@ -182,7 +182,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
-| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
+| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory-only mode) |
 | `sf_durability` | `memory` |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
@@ -309,13 +309,15 @@ here.
 
 `sf_dir=...` enables SF. There is no separate boolean enable flag.
 
-- The sender owns one slot: `<sf_dir>/<sender_id>/`. Default `sender_id` is
-  `default`.
+- The sender owns one sender directory: `<sf_dir>/<sender_id>/`. Default
+  `sender_id` is `default`.
 - Multiple independent senders sharing one `sf_dir` must use distinct
-  `sender_id` values, else the second fails because the slot lock is held.
-- In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
-  pooled senders never collide. The minted name is client-specific: Java uses
-  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
+  `sender_id` values, else the second fails because the first holds the
+  directory's lock.
+- In pooled `QuestDB` usage, the pool derives a directory name for each pooled
+  sender from the base so they never collide. The minted name is
+  client-specific: Java uses `<base>-0`, `<base>-1`, …; the Rust, C and C++
+  pool uses
   `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
   unacknowledged frames; acknowledged/truncated frames are not replayed.
@@ -369,13 +371,14 @@ the steady-state loop:
 
 1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
    which gives up and throws when the budget expires.
-2. The background drainer's **durable-ack capability-gap budget**, used when an
-   orphan slot repeatedly lands on a node that cannot serve durable acks.
+2. The background drainer's **durable-ack capability-gap budget**, used when
+   draining an orphan repeatedly lands on a node that cannot serve durable
+   acks.
 
 The practical consequence: what bounds your tolerance of a long outage is
 **buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
-available disk; in memory mode it is the same key against RAM. When the cap is
-reached, `append()` blocks and then throws after
+available disk; in memory-only mode it is the same key against RAM. When the
+cap is reached, `append()` blocks and then throws after
 `sf_append_deadline_millis` — that, not a timer, is the signal that an outage
 has outlasted your configuration.
 
@@ -425,8 +428,8 @@ fails, or the token did not change, the phase decides what happens:
 | Initial connect, `on` / `sync` | retry within `reconnect_max_duration_millis` | fail startup | fail startup |
 | Initial connect, `async` | retry indefinitely | retry indefinitely | terminal, reported to the error handler |
 | Sender that has connected | retry indefinitely | retry indefinitely | retry indefinitely |
-| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the slot aside |
-| Orphan drain, fixed credential | n/a | n/a | set the slot aside |
+| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the directory aside |
+| Orphan drain, fixed credential | n/a | n/a | set the directory aside |
 | Query | fail the query | fail the query | fail the query |
 
 *Retry indefinitely* means with capped exponential backoff for as long as the
@@ -607,15 +610,16 @@ avoid it.
 
 ### Pooled SF startup recovery nuance
 
-- Live/prewarmed sender slots recover their own unacked data via their
-  `CursorSendEngine`.
-- Non-live managed slots are scanned by the housekeeper startup recovery path,
-  so `build()` does not block on stranded slots.
-- Recovery of non-live stranded slots is best-effort and bounded: a build/drain
-  failure aborts that scan; data stays durable for a later attempt, but the
-  current process does not retry the aborted scan indefinitely.
-- For immediate background drain of all slots, keep enough `sender_pool_min`
-  slots warm or construct direct senders for the slots that must actively retry.
+- Live or prewarmed pooled senders recover the unacked data in their own sender
+  directories via their `CursorSendEngine`.
+- The pool's other sender directories are scanned by the housekeeper startup
+  recovery path, so `build()` does not block on stranded directories.
+- Recovery of those stranded directories is best-effort and bounded: a
+  build/drain failure aborts that scan; data stays durable for a later attempt,
+  but the current process does not retry the aborted scan indefinitely.
+- For immediate background drain of every sender directory, keep enough
+  senders warm with `sender_pool_min`, or construct direct senders for the
+  directories that must actively retry.
 
 ### Reconnect loop (`CursorWebSocketSendLoop`)
 

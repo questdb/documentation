@@ -309,7 +309,7 @@ Four consequences an implementer must handle:
 - **An OK on a deferred frame is not durability.** While deferred rows are
   uncommitted, the server withholds advancement of the cumulative OK
   watermark. Do not treat the ack as a commit.
-- **Deferred rows are rolled back on disconnect.** A store-and-forward slot
+- **Deferred rows are rolled back on disconnect.** A sender directory
   whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
   frame is an aborted group. The reference client detects and skips it during
   recovery.
@@ -1150,11 +1150,12 @@ differ only in where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
-  the next sender bound to the same slot.
-- **`sf_dir` unset** (memory mode): segments are allocated in process memory.
-  Unacknowledged data is lost if the sender process dies. The reconnect loop
-  still spans transient server outages such as rolling upgrades, but the RAM
-  buffer caps how much data can accumulate during the outage.
+  the next sender that uses the same sender directory.
+- **`sf_dir` unset** (memory-only mode): segments are allocated in process
+  memory. Unacknowledged data is lost if the sender process dies. The
+  reconnect loop still spans transient server outages such as rolling
+  upgrades, but the RAM buffer caps how much data can accumulate during the
+  outage.
 
 Connect-string keys that control ingress failover are documented in the
 [reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)

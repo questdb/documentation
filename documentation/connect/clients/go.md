@@ -316,7 +316,7 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
 | `WithLazyConnect(bool)` | `false` | Tolerate a down server at startup (see [below](#tolerating-a-down-server-at-startup)). |
 | `WithQuestDBErrorHandler(h)` | — | Ingest [`SenderErrorHandler`](#ingestion-errors) applied to every pooled sender. |
 | `WithQuestDBConnectionListener(l)` | — | [`SenderConnectionListener`](#connection-events) applied to every pooled sender. |
-| `WithQuestDBBackgroundDrainerListener(l)` | — | `QwpBackgroundDrainerListener` applied to every pooled sender's background drainers, including the pool's recovery of crash-stranded slots (see [Connection events](#connection-events)). |
+| `WithQuestDBBackgroundDrainerListener(l)` | — | `QwpBackgroundDrainerListener` applied to every pooled sender's background drainers, including the pool's recovery of sender directories stranded by a crash (see [Connection events](#connection-events)). |
 | `WithQuestDBLogger(l)` | `slog.Default()` | `*slog.Logger` for the client's diagnostics, used by both pools and every pooled sender and query session. |
 
 Unlike the Java facade, the Go `QuestDB` handle accepts the ingest error handler
@@ -530,7 +530,8 @@ error in this order:
 
 - `ErrCleanupFailed`: an internal failure left some resources held that can't be
   released safely. Calling `Close` again won't fix it. An affected
-  store-and-forward slot can stay locked until the process exits.
+  [sender directory](#store-and-forward) can stay locked until the process
+  exits.
 - `ErrCleanupPending`: the shutdown hasn't finished yet. Return any borrowed
   handles, then call `db.Close` again with a fresh context. If the error also
   matches `ErrSfCleanupPending`, store-and-forward cleanup is still running. If
@@ -561,14 +562,15 @@ channels or metrics clients, valid after `Close` returns.
 delivered.** With [store-and-forward](#store-and-forward), they stay on disk and
 are sent when the application starts again with the same `sf_dir` and
 `sender_id`. If you lower `sender_pool_max` between runs, also set
-`drain_orphans=on`. Otherwise the pool doesn't send the rows left in slots above
-the new maximum.
+`drain_orphans=on`. Otherwise the pool doesn't send the rows left in the
+[sender directories](#store-and-forward) of pooled senders above the new
+maximum.
 
 **`ErrPoolPoisoned` means one of the handle's pools can no longer lend** after an
 internal failure. The sender pool and the query pool fail independently. The
 error can come from a borrow, a handle's `Close`, or `db.Close`. Stop using the
-affected pool. If it is the sender pool, its store-and-forward slots can stay
-locked until the process restarts.
+affected pool. If it is the sender pool, its sender directories can stay locked
+until the process restarts.
 
 ## Data ingestion
 
@@ -684,8 +686,8 @@ Once the limit is reached, a row with a new symbol value fails with an error fro
 `At`/`AtNow`/`AtNano`. Rows that reuse values the sender has already written keep
 working. To start a new count, create a new sender: close a standalone sender
 and build another, or close the `QuestDB` handle and create a new one. With
-store-and-forward, a new sender on the same slot can start with the old
-sender's values already counted.
+store-and-forward, a new sender using the same sender directory can start with
+the old sender's values already counted.
 
 Use `SYMBOL` for values that repeat, such as tickers or venues. For values that
 are mostly unique, such as order IDs, use a `VARCHAR` column (`StringColumn`).
@@ -905,12 +907,14 @@ replayed after reconnection, surviving sender process restarts:
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 ```
 
-When multiple senders share the same `sf_dir`, each must have a distinct
-`sender_id`. Slots are exclusive: two senders with the same ID will collide.
-Allowed characters: `A-Za-z0-9_-`. When the `QuestDB` pool runs in
-store-and-forward mode, it assigns each pooled sender its own slot under the
-base `sender_id`, so slots never collide and crash-stranded slots are recovered
-automatically when the handle starts again (see
+Each sender keeps its store-and-forward data in its own **sender directory**,
+`<sf_dir>/<sender_id>/`. The API calls it a *slot*, as in
+`QuarantinedSlotPath()` and `SlotLockReleased()`. Only one sender can use a
+sender directory at a time, so senders that share an `sf_dir` need distinct
+`sender_id` values. Allowed characters: `A-Za-z0-9_-`. When the `QuestDB` pool
+runs in store-and-forward mode, it gives each pooled sender its own directory,
+`<sf_dir>/<sender_id>-<index>/`, so they never collide, and it recovers
+directories stranded by a crash when the handle starts again (see
 [Shutting down](#shutting-down) before lowering `sender_pool_max`).
 
 **`sf_dir` must be on a filesystem that can reserve disk space.** The client
@@ -953,8 +957,8 @@ the background, and when that segment is full, it waits until the whole segment
 is on disk before it starts the next one. The guarantees below follow from this.
 
 **No queued row is lost when your process crashes or is killed.** The next
-sender on the same slot sends those rows. Rows you were still building, not yet
-flushed, are lost.
+sender using the same sender directory sends those rows. Rows you were still
+building, not yet flushed, are lost.
 
 **An OS crash or power loss can lose rows from the end of the segment being
 written.** Every full segment file (`sf_max_segment_bytes`, 4 MiB by default)
@@ -966,20 +970,22 @@ Two platforms give weaker guarantees:
 
 - **macOS:** a power cut can lose more, because `fsync` on macOS doesn't flush
   the drive's own cache.
-- **Windows:** a host crash can keep some of a slot's latest file changes and
-  lose others. The client may then find the slot inconsistent and set it aside
-  at the next start; see [Quarantined slots](#quarantined-slots).
+- **Windows:** a host crash can keep some of a sender directory's latest file
+  changes and lose others. The client may then find the directory inconsistent
+  and set it aside at the next start; see
+  [Quarantined sender directories](#quarantined-sender-directories).
 
-#### Quarantined slots {#quarantined-slots}
+#### Quarantined sender directories {#quarantined-sender-directories}
 
-**If a slot's saved data is inconsistent at startup, the client sets the whole
-slot aside and starts with an empty one.** Ingestion continues, and the client
-never deletes or repairs the set-aside data. The unsent rows stay in
-`<sf_dir>/<slot>.unreplayable-<n>/`, where `<slot>` is the `sender_id` (for a
-pooled sender, `<sender_id>-<index>`). A `.failed` file inside it gives the
-reason, when the client could write one.
+**If a sender directory's saved data is inconsistent at startup, the client
+sets the whole directory aside and starts with an empty one.** Ingestion
+continues, and the client never deletes or repairs the set-aside data. The
+unsent rows stay in `<sf_dir>/<dir>.unreplayable-<n>/`, where `<dir>` is the
+`sender_id` (for a pooled sender, `<sender_id>-<index>`). A `.failed` file
+inside it gives the reason, when the client could write one.
 
-Check for set-aside data after you get a sender:
+Check for set-aside data after you get a sender. `QuarantinedSlotPath()`
+returns the path of the set-aside directory, or an empty string:
 
 ```go
 if qs, ok := sender.(qdb.QwpSender); ok {
@@ -991,27 +997,28 @@ if qs, ok := sender.(qdb.QwpSender); ok {
 
 With the `QuestDB` handle, check each borrowed sender, or list
 `<sf_dir>/*.unreplayable-*`. If the pool builds a sender that is never lent, a
-slot it set aside is reported only in the log.
+directory it set aside is reported only in the log.
 
 What to know about these directories:
 
 - **Cleaning them up is up to you.** The client never deletes them, and they
   don't count against `sf_max_total_bytes`. A crash loop can leave one per
   restart.
-- **Each slot can have at most 64.** `<n>` runs from 0 to 63. When all 64 names
-  are taken, the sender refuses to start until you move or remove some.
-- **Don't rename one back into a slot** to have it replayed. It is not a backup,
-  and its contents may be damaged.
+- **Each sender directory can have at most 64.** `<n>` runs from 0 to 63. When
+  all 64 names are taken, the sender refuses to start until you move or remove
+  some.
+- **Don't rename one back into a sender directory** to have it replayed. It is
+  not a backup, and its contents may be damaged.
 - **Background drainers skip them** (`drain_orphans=on`).
 
-You may also find these files in a live slot:
+You may also find these files in a live sender directory:
 
 - **Files with `.corrupt` in the name**, such as `*.sfa.corrupt` or
   `*.sfa.corrupt-1`: files the client couldn't read, renamed in place. They all
   count against `sf_max_total_bytes`, so if they fill it, producers get
   `ErrBackpressureTimeout`. Delete them to free the space.
-- **`.failed`**: a background drainer gave up on this slot and won't adopt it
-  again. See
+- **`.failed`**: a background drainer gave up on this directory and won't adopt
+  it again. See
   [`.failed`](/docs/high-availability/store-and-forward/operating-and-tuning/#failed)
   for what to do.
 
@@ -1435,7 +1442,8 @@ background drainers can call it at the same time.
 
 **The same policies apply to background drainers** (`drain_orphans=on`). When a
 drainer's rejection resolves to `PolicyTerminal`, the drainer gives up on that
-slot and marks it with a `.failed` file, so no drainer adopts it again. Drainer
+sender directory and marks it with a `.failed` file, so no drainer adopts it
+again. Drainer
 rejections are logged; they don't reach your error handler.
 
 After a `PolicyTerminal` rejection, the sender stops draining and the next
@@ -1707,8 +1715,8 @@ unacked data from crashed sibling senders. `qdb.WithBackgroundDrainerListener`
 (standalone) and `qdb.WithQuestDBBackgroundDrainerListener` (facade, applied to
 every pooled sender) surface drainer outcomes: durable-ack unavailability,
 persistent durable failure, and all-replica primary-unavailable windows. The
-facade listener also covers the pool's recovery of crash-stranded slots, even
-without `drain_orphans=on`.
+facade listener also covers the pool's recovery of sender directories stranded
+by a crash, even without `drain_orphans=on`.
 
 **Drainer listeners must be safe for concurrent use.** Several drainers can call
 them at the same time.
@@ -1795,9 +1803,9 @@ to `close_flush_timeout_millis` for the server to acknowledge them.
 context ends first, `Close` returns and the rest of the shutdown continues in the
 background.
 
-**Before reopening the same store-and-forward slot in the same process, wait
-until `SlotLockReleased()` returns `true`.** A `nil` from `Close` doesn't
-guarantee that the slot is free yet.
+**Before reopening the same sender directory in the same process, wait until
+`SlotLockReleased()` returns `true`.** A `nil` from `Close` doesn't guarantee
+that the directory is free yet.
 
 `qdb.WithInitialConnectMode` selects `InitialConnectOff` (default),
 `InitialConnectSync` (block the constructor while retrying), or
@@ -1862,7 +1870,7 @@ full list.
 | `auto_flush_interval`           | `100`    | Milliseconds before auto-flush       |
 | `auto_flush_bytes`              | `8388608`| Bytes before auto-flush (QWP 8 MiB; HTTP disabled) |
 | `sf_dir`                        | unset    | Store-and-forward directory          |
-| `sender_id`                     | `default`| Sender slot identity for SF          |
+| `sender_id`                     | `default`| Sender directory name for SF         |
 | `sf_max_total_bytes`            | `10 GiB` | Store-and-forward buffer cap per sender; requires `sf_dir` (fixed at 128 MiB without it). When full, producers [wait](#when-rows-cant-be-queued) |
 | `request_durable_ack`           | `off`    | Wait for durable object-storage upload ACK (Enterprise, QWP, replication primary) |
 | `durable_ack_keepalive_interval_millis` | `200` | Durable-ack keepalive ping pacing (`0` disables) |
@@ -1929,7 +1937,7 @@ func main() {
 		"wss::addr=db-primary:9000,db-replica:9000;"+ // Enterprise: multi-host
 			"token=YOUR_BEARER_TOKEN;"+               // Enterprise: token auth
 			"sf_dir=/var/lib/myapp/qdb-sf;"+          // durability across outages
-			"sender_id=ingest;"+                      // SF slot base
+			"sender_id=ingest;"+                      // SF sender directory prefix
 			"target=replica;",                        // queries prefer a replica
 		qdb.WithSenderPoolMax(8),
 		qdb.WithQueryPoolMax(8),

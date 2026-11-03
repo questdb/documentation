@@ -670,10 +670,10 @@ any other exception from `getToken()` as permanent.
 - **A query.** A query whose client has to connect, and cannot get a token or
   has its token rejected, fails with `QueryException`. The next query
   connects again.
-- **An orphan drainer.** With `drain_orphans=on`, a drainer that replays the
-  slot of another sender gives up when QuestDB keeps rejecting its
+- **An orphan drainer.** With `drain_orphans=on`, a drainer that replays
+  another sender's directory gives up when QuestDB keeps rejecting its
   credential: at once with a fixed credential, and after the rejections
-  persist for a while with a token provider. It then sets the slot aside,
+  persist for a while with a token provider. It then sets the directory aside,
   with its rows still on disk, and reports `DATA_LOSS`.
 
 ### HTTP basic auth
@@ -1009,17 +1009,17 @@ try (Sender sender = db.borrowSender()) {
 ```
 
 **Backpressure.** The engine's buffer is bounded by `sf_max_total_bytes`
-(default 128 MiB in memory mode, 10 GiB in store-and-forward mode). If a slow or
-unreachable server lets it fill, `flush()` blocks until the server acks rows and
-the engine frees space, up to `sf_append_deadline_millis` (default 30 s), then
-throws, keeping the buffered rows.
+(default 128 MiB in memory-only mode, 10 GiB in store-and-forward mode). If a
+slow or unreachable server lets it fill, `flush()` blocks until the server acks
+rows and the engine frees space, up to `sf_append_deadline_millis` (default
+30 s), then throws, keeping the buffered rows.
 
 **Closing.** On a sender you own, `close()` flushes buffered rows and then
 *drains*: it waits for the server to acknowledge everything published, up to
 `close_flush_timeout_millis` (default 60 s), before disconnecting. If the drain
 times out, `close()` throws `LineSenderException` with rows still unacknowledged
 — recoverable by reopening on the same `sf_dir` in store-and-forward mode, lost
-in memory mode. A **pooled** sender (from `db.borrowSender()`) behaves
+in memory-only mode. A **pooled** sender (from `db.borrowSender()`) behaves
 differently: its `close()` flushes and returns it to the pool without
 disconnecting or draining, and the drain runs only when `QuestDB.close()` closes
 the underlying connection. To
@@ -1043,13 +1043,14 @@ its own (see [Flushing](#flushing)). The `sf_dir` key changes one thing —
 **where the engine keeps unacknowledged rows** — and with it, what a crash can
 lose.
 
-**Memory mode** is the default (no `sf_dir`). Unacknowledged rows live in RAM.
-A running sender reconnects across transient server outages — rolling upgrades,
-brief network loss — retrying indefinitely with capped backoff, then replays the
-unacknowledged tail, so a server blip loses nothing. What bounds your outage
-tolerance is buffer capacity, not a timer: the RAM buffer is capped at 128 MiB
-(`sf_max_total_bytes`), and once it fills, `append()` applies backpressure to
-the producer. If the **sender process** dies, the RAM buffer dies with it.
+**Memory-only mode** is the default (no `sf_dir`). Unacknowledged rows live in
+RAM. A running sender reconnects across transient server outages — rolling
+upgrades, brief network loss — retrying indefinitely with capped backoff, then
+replays the unacknowledged tail, so a server blip loses nothing. What bounds
+your outage tolerance is buffer capacity, not a timer: the RAM buffer is capped
+at 128 MiB (`sf_max_total_bytes`), and once it fills, `append()` applies
+backpressure to the producer. If the **sender process** dies, the RAM buffer
+dies with it.
 
 **Store-and-forward mode** turns on when you set `sf_dir`. The engine backs its
 buffer with memory-mapped files under `sf_dir`, so unacknowledged rows survive a
@@ -1930,7 +1931,7 @@ Common WebSocket-specific options:
 | `auto_flush_interval` | `100` | Milliseconds before auto-flush. |
 | `auto_flush_bytes` | disabled | Bytes before auto-flush. |
 | `sf_dir` | unset | Store-and-forward directory. |
-| `sender_id` | `default` | Sender slot identity for SF. |
+| `sender_id` | `default` | Sender directory name for SF. |
 | `request_durable_ack` | `off` | Request durable upload ACK (Enterprise). |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget only. |
 | `failover` | `on` | Egress per-query reconnect switch. |
