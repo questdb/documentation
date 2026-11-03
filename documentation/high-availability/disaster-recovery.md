@@ -20,7 +20,7 @@ the database as it stood at an arbitrary instant, see
 
 | Node    | Recoverable | Unrecoverable                       |
 | ------- | ----------- | ----------------------------------- |
-| Primary | Restart as primary only if no other node has been promoted since the failure | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
+| Primary | Restart as primary only if no other node has been promoted since the failure; otherwise [rebuild it as a replica](/docs/high-availability/failover/#rebuild-the-failed-primary) | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
 | Replica | Restart     | Destroy and recreate                |
 
 ## Network partitions
@@ -84,7 +84,7 @@ instead; that path refuses rather than losing data.
 6. Create a new replica to replace the promoted one. If reusing the failed
    primary's host, rebuild it in a fresh installation directory from a new
    backup or snapshot of the current primary. Do not reuse its existing
-   database directory. See
+   installation directory. See
    [Rebuild the failed primary](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
 :::warning

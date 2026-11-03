@@ -78,16 +78,21 @@ A primary instance started which is not in sync with the configured object store
 
 Verify the `replication.object.store` configuration and ensure that the object store is not in use by another primary instance.
 
-Alternatively, you might have migrated the primary role to a different
-instance which has committed more transactions than the current instance.
+If this instance was the primary before an unplanned failover, do not use
+`_migrate_primary` in its existing installation directory. It may contain
+committed transactions that never reached the object store, even if the
+current primary has since advanced beyond its transaction numbers. Retire it
+or [rebuild it from the current primary](/docs/high-availability/failover/#rebuild-the-failed-primary).
+`_migrate_primary` downloads missing transactions; it does not repair
+divergent local data.
 
-If you are certain that the `replication.object.store` configuration is correct and that the object store is not in use by another primary instance, perform
-a primary migration.
-
-To do so, place an empty `_migrate_primary` file in your database installation directory, the parent of `conf` and `db` directories.
-
-This will update the primary instance to the latest state from the object
-store and have it take over as the new primary instance.
+For a replica that has remained on the current replication stream, verify
+that the configuration is correct and no other primary is running before
+performing a primary migration. Place an empty `_migrate_primary` file in its
+installation directory, the parent of `conf` and `db`, and start it with
+`replication.role=primary`. This downloads the latest state from the object
+store before taking over as primary. See
+[Emergency primary migration](/docs/high-availability/disaster-recovery/#emergency-primary-migration).
 
 An in-place promotion with
 [`SWITCH ROLE TO PRIMARY`](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss)
@@ -104,17 +109,29 @@ This error occurs when you start a primary instance and discover another instanc
 This typically happens after an emergency primary migration, usually due to a network partition that separated your database instances.
 
 Before proceeding, check your infrastructure to determine which instance is
-the intended primary and stop the unintended primary. Retire the extra
-instance or rebuild it as a new replica from a fresh backup or snapshot of the
-current primary. Changing `replication.role` alone does not make its existing
-data safe to reuse after an unplanned failover. See
+the intended primary. The node halted by ER006 may be the intended primary.
+Stop the unintended primary and prevent it from restarting automatically.
+
+If the intended primary was halted, restart it with `replication.role=primary`
+only after establishing that the unintended primary committed no competing
+writes and the intended primary retains the authoritative data. No promotion
+is needed. Startup can still be refused with [ER005](#er005), because even an idle
+unintended primary can advance the object-store ownership token. If either
+condition is uncertain, contact QuestDB support before resuming replication.
+
+Retire the extra instance or rebuild it as a new replica from a fresh backup
+or snapshot of the current primary. Changing `replication.role` alone does
+not make its existing data safe to reuse after an unplanned failover. See
 [Rebuild the failed primary](/docs/high-availability/failover/#rebuild-the-failed-primary).
 
 This error can also occur when a node that successfully completed a planned
 demotion with [`SWITCH ROLE`](/docs/query/sql/switch-role/) is restarted while
-`server.conf` still says `replication.role=primary`. If it has not committed any
-local writes since that demotion, restart it with `replication.role=replica`.
-Update the configuration before any restart, as described in
+`server.conf` still says `replication.role=primary`. Inspect its server logs
+from startup until it stopped for evidence of local writes, but the absence
+of write entries does not prove that no writes committed. Restart it with
+`replication.role=replica` only if you can establish that it committed no local
+writes since its successful demotion; otherwise rebuild it from the current
+primary. Update the configuration before any restart, as described in
 [Restarts](/docs/high-availability/failover/#restarts).
 
 ### ER007

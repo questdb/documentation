@@ -111,8 +111,10 @@ writer pointed at a single address must be repointed.
 
 ## Promote a replica after a primary loss
 
-1. Make sure the failed primary is stopped and cannot restart. Keep it stopped
-   until it has been [rebuilt as a new replica](#rebuild-the-failed-primary).
+1. Make sure the failed primary is stopped and cannot restart. For example,
+   disable its service unit or prevent its orchestrator from restarting it.
+   Keep it stopped until it has been
+   [rebuilt as a new replica](#rebuild-the-failed-primary).
 2. On the replica:
 
    ```questdb-sql
@@ -132,16 +134,47 @@ and the replica cannot catch up, use the restart-based
 ### Rebuild the failed primary
 
 Because of a current recovery limitation, rebuild the failed primary as a new
-replica after an unplanned failover. If reusing its host, use a fresh
-installation directory and restore a new backup
-or snapshot of the current primary. See
-[Create a replica from a backup](/docs/operations/backup/#create-a-replica-from-a-backup)
-or the [replica setup procedure](/docs/high-availability/setup/#4-configure-replica-nodes).
+replica after an unplanned failover:
+
+1. Keep the failed primary stopped. If reusing its host, prepare a fresh
+   installation directory, the parent of `conf` and `db`.
+2. On the **current primary**, ensure
+   [backups are configured](/docs/operations/backup/#configure) and run:
+
+   ```questdb-sql
+   BACKUP DATABASE;
+   ```
+
+   Record the returned timestamp. Use
+   [`backups()`](/docs/operations/backup/#monitor-and-abort) to wait for this
+   backup to complete successfully before continuing.
+3. On the current primary, read its backup instance name:
+
+   ```questdb-sql
+   SELECT backup_instance_name;
+   ```
+
+   Each instance has its own backup name. A newly promoted primary may not
+   have taken a backup yet; use the name from this node after step 2.
+4. Follow [Create a replica from a backup](/docs/operations/backup/#create-a-replica-from-a-backup)
+   in the fresh installation directory. In `_backup_restore`, set
+   `backup.instance.name` to the name from step 3 and
+   `backup.restore.timestamp` to the timestamp from step 2. Configure
+   `replication.role=replica` and the current primary's
+   `replication.object.store` before starting the replacement node.
+5. Start the replica and let it restore the backup and catch up through WAL
+   replay. Verify that no tables are suspended and the replica has caught up
+   before returning it to service.
+
+If using a filesystem snapshot instead, take a new snapshot of the current
+primary and follow the
+[replica setup procedure](/docs/high-availability/setup/#4-configure-replica-nodes)
+in a fresh installation directory.
 
 :::warning
 
 Do not restart the failed primary with `replication.role=replica` using its
-existing database directory. Changing the role does not safely discard
+existing installation directory. Changing the role does not safely discard
 transactions that it committed but never uploaded, and can cause silent data
 divergence from the new primary.
 
@@ -162,7 +195,8 @@ The current implementation also lacks a supported procedure to rewind an
 arbitrary committed tail.
 
 Improvements to divergence detection and recovery are expected in future
-releases. For now, rebuild the replica from the current primary.
+releases. For now, rebuild the former primary as a replica of the current
+primary.
 
 This restriction does not apply to a successfully completed planned switchover,
 which drains pending uploads before promotion, or to restarting the original
