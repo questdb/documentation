@@ -477,8 +477,9 @@ The `Close` signatures differ by object:
 - `db.Close(ctx)`: the context limits how long it waits; see
   [Shutting down](#shutting-down).
 - A borrowed sender's `Close(ctx)` ignores its context. Instead, it waits up to
-  the [append deadline](#when-rows-cant-be-queued) for each frame it queues, so
-  a large batch can take several times that long.
+  the [append deadline](#when-rows-cant-be-queued) for each
+  [batch](#flushing) it queues, so a large flush can take several times that
+  long.
 - A query session's `Close()` and a cursor's `Close()` take no context. Closing
   a session with an unread result waits up to `query_close_timeout_ms` (5 s by
   default) to finish reading it.
@@ -849,6 +850,8 @@ An app that disables auto-flush and never calls `Flush` loses everything it
 buffered.
 :::
 
+A flush sends its rows to the server as one batch, or as several if they don't
+fit in one. The protocol calls a batch a *frame*.
 `QwpSender.FlushAndGetSequence(ctx)` returns the published frame sequence number
 (FSN), and `AwaitAckedFsn(ctx, target)` blocks until the server has acknowledged
 up to a given FSN. Use the FSN to correlate a publish with any later
@@ -880,7 +883,7 @@ sender itself keeps working:
   disk problem is fixed.
 
 ```go
-// Each attempt waits up to the append deadline for each frame it queues.
+// Each attempt waits up to the append deadline for each batch it queues.
 for {
 	err := sender.Flush(ctx)
 	if !errors.Is(err, qdb.ErrBackpressureTimeout) {
@@ -923,21 +926,31 @@ the RAM buffer caps how much data can accumulate.
 
 <SfDedupWarning />
 
-**`sf_max_total_bytes` and `sf_append_deadline_millis` require `sf_dir`.** A
-sender without `sf_dir` always uses a 128 MiB buffer and a 30-second append deadline.
+**These store-and-forward keys require `sf_dir`:** `sender_id`,
+`sf_durability`, `sf_max_segment_bytes`, `sf_max_total_bytes`,
+`sf_append_deadline_millis`, `drain_orphans`, and `max_background_drainers`.
+A sender without `sf_dir` always uses a 128 MiB buffer and a 30-second append
+deadline. The client doesn't support `sf_sync_interval_millis`.
 When the buffer is full, producers wait; see
 [When rows can't be queued](#when-rows-cant-be-queued).
 
 Retriable rejections (write errors, internal errors, dictionary gaps, unknown
 statuses) recycle the connection and replay from the acknowledged watermark.
 Nothing is dropped and no producer action is needed. Terminal rejections
-(schema, parse, or security errors, and a frame the server keeps rejecting; see
+(schema, parse, or security errors, and a batch the server keeps rejecting; see
 [Ingestion errors](#ingestion-errors)) latch a terminal error: the next producer
 call returns it as a typed `*SenderError`, the sender will not drain further,
 and the unacknowledged bytes stay in the store-and-forward log. Close it and
 borrow a new one to continue.
 
 #### What survives a crash {#what-survives-a-crash}
+
+**The Go client accepts only `sf_durability=memory`, the default.** With
+`sf_dir` set, queued rows always go to segment files under `sf_dir`, and the
+value sets when the client forces them to disk. The client doesn't
+force each row to disk. It starts writing the segment being filled to disk in
+the background, and when that segment is full, it waits until the whole segment
+is on disk before it starts the next one. The guarantees below follow from this.
 
 **No queued row is lost when your process crashes or is killed.** The next
 sender on the same slot sends those rows. Rows you were still building, not yet
@@ -956,9 +969,6 @@ Two platforms give weaker guarantees:
 - **Windows:** a host crash can keep some of a slot's latest file changes and
   lose others. The client may then find the slot inconsistent and set it aside
   at the next start; see [Quarantined slots](#quarantined-slots).
-
-The Go client supports only `sf_durability=memory`, the default. It provides the
-guarantees above.
 
 #### Quarantined slots {#quarantined-slots}
 
@@ -1401,7 +1411,7 @@ status byte from a newer server degrades to retry, not to a dead sender). A
 retriable rejection recycles the connection and replays from the acknowledged
 watermark.
 
-**A frame the server keeps rejecting turns terminal after
+**A [batch](#flushing) the server keeps rejecting turns terminal after
 `max_frame_rejections` rejections in a row (default 4), but not before the
 rejections have lasted `reconnect_max_duration_millis` (default 5 minutes).**
 Until then, the sender keeps reconnecting and replaying it.
@@ -1564,7 +1574,7 @@ on a wall clock. Configure the backoff via the connect string:
 
 | Key                                | Default  | Description                          |
 | ---------------------------------- | -------- | ------------------------------------ |
-| `reconnect_max_duration_millis`    | `300000` | Budget for the **blocking sync initial connect** (`initial_connect_retry=sync`); also the minimum time a repeatedly rejected frame takes to turn terminal |
+| `reconnect_max_duration_millis`    | `300000` | Budget for the **blocking sync initial connect** (`initial_connect_retry=sync`); also the minimum time a repeatedly rejected batch takes to turn terminal |
 | `reconnect_initial_backoff_millis` | `100`    | First post-failure sleep             |
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
 | `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor up to `reconnect_max_duration_millis`; `async` returns immediately, buffers, and retries indefinitely |
@@ -1778,7 +1788,7 @@ progress.
 
 `Close` discards a row you started but didn't finish with `At`. It queues the
 remaining rows, waiting up to the
-[append deadline](#when-rows-cant-be-queued) for each frame, and then waits up
+[append deadline](#when-rows-cant-be-queued) for each batch, and then waits up
 to `close_flush_timeout_millis` for the server to acknowledge them.
 
 **The context limits how long `Close` waits, not the shutdown itself.** If the
@@ -1856,8 +1866,8 @@ full list.
 | `sf_max_total_bytes`            | `10 GiB` | Store-and-forward buffer cap per sender; requires `sf_dir` (fixed at 128 MiB without it). When full, producers [wait](#when-rows-cant-be-queued) |
 | `request_durable_ack`           | `off`    | Wait for durable object-storage upload ACK (Enterprise, QWP, replication primary) |
 | `durable_ack_keepalive_interval_millis` | `200` | Durable-ack keepalive ping pacing (`0` disables) |
-| `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget (running loop retries unbounded); also the minimum time a repeatedly rejected frame takes to turn terminal |
-| `max_frame_rejections`          | `4`      | Rejections in a row before a repeatedly rejected frame turns terminal (see [Ingestion errors](#ingestion-errors)) |
+| `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget (running loop retries unbounded); also the minimum time a repeatedly rejected batch takes to turn terminal |
+| `max_frame_rejections`          | `4`      | Rejections in a row before a repeatedly rejected batch turns terminal (see [Ingestion errors](#ingestion-errors)) |
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |

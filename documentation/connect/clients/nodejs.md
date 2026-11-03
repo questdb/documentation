@@ -1158,7 +1158,10 @@ ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
 `memory` durability survives a process crash but not a power loss or host
 crash. `periodic` can lose the last checkpoint interval on power loss.
 `append` makes each batch durable before `flush()` resolves, at the cost of
-throughput.
+throughput. `flush` is reserved, and the client rejects it.
+
+Without `sf_dir`, the client rejects `sf_durability`,
+`sf_sync_interval_millis`, `drain_orphans`, and `max_background_drainers`.
 
 When the journal is full, a flush waits up to `sf_append_deadline_millis` for
 acknowledgements to free space, then rejects with

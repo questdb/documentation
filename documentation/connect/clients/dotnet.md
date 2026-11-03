@@ -982,6 +982,11 @@ Without `sf_dir` the send queue lives in process memory and is lost if the
 process exits; the reconnect loop still spans transient outages, bounded by a
 RAM cap.
 
+**Durability.** The client accepts only `sf_durability=memory` and rejects
+other values when it parses the connect string. With `sf_dir`, it forces each
+full segment file to disk, and the segment being written at least once a
+second, which limits what a host crash or power loss can lose.
+
 <SfDedupWarning />
 
 | Key | Default | Description |

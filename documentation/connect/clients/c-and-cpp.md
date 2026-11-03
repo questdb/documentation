@@ -1628,6 +1628,13 @@ tune the queue in both memory and disk mode; `sender_id` has no effect
 without `sf_dir`. Full `sf_*` key semantics are in the
 [connect string reference](/docs/connect/clients/connect-string/#sf-keys).
 
+With the default `sf_durability=memory`, the disk queue protects against a
+client-process crash but not a host crash or power loss. Set
+`sf_durability=periodic` to survive host loss: the client also forces the
+queue files to disk every `sf_sync_interval_millis` (default `5000`). It
+requires `sf_dir`. `flush` and `append` are reserved: they parse but are
+rejected when the sender is created.
+
 ### Sizing the pool
 
 **A borrow at the cap waits for a return before it fails.** When

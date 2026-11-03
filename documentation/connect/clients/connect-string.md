@@ -523,115 +523,108 @@ for the full at-least-once / exactly-once model.
 
 *Applies to: ingress.*
 
-Store-and-forward (SF) is an opt-in durability substrate available on QWP /
-WebSocket. The client persists outgoing frames to disk before sending; the
-server's cumulative ACK trims acknowledged segments. If the connection drops
-or the client process restarts, the I/O thread silently reconnects and
-replays whatever is still on disk.
+Store-and-forward (SF) keeps rows the server hasn't acknowledged yet on disk,
+so they survive a lost connection and a client restart. It is available on
+QWP / WebSocket and is off by default. A flush sends its rows to the server as
+one batch, or as several if they don't fit in one. With SF, the client first
+writes each batch to a segment file on disk, and deletes a segment once the
+server has acknowledged every batch in it. If the connection drops, the client
+reconnects on its own and replays what is still on disk. After a process
+restart, a new sender with the same `sf_dir` and `sender_id` replays it; see
+[Sender restart and replay](#sender-restart-and-replay).
 
-To enable SF mode, set `sf_dir`. Without it, the client runs a memory-only
-equivalent — same architecture, no durability across restarts.
+To enable SF mode, set `sf_dir`. Without it, the client runs in memory-only
+mode: unacknowledged rows stay in RAM, so they survive a lost connection but
+not a process restart.
 
-:::note Go client
-
-The Go client accepts only `sf_durability=memory`, and every store-and-forward
-key except `sf_dir` requires `sf_dir`. See
-[What survives a crash](/docs/connect/clients/go/#what-survives-a-crash).
-
-:::
+Clients differ in which of these keys and values they accept, and in what
+they do with a key that has no effect without `sf_dir`. Your
+[client's page](/docs/connect/overview/#client-libraries) lists the
+differences.
 
 ### Storage
 
-- `sf_dir` — parent directory under which the slot lives. The slot path is
-  `<sf_dir>/<sender_id>/`. Required for SF mode; omit for memory-only mode.
-  Path handling:
+- `sf_dir` — parent directory for sender directories. Each sender keeps its
+  store-and-forward data in its own sender directory, `<sf_dir>/<sender_id>/`.
+  Required for SF mode; omit for memory-only mode. Path handling:
   - Taken verbatim. Absolute paths recommended for production; relative
     paths resolve against the process working directory.
   - The client does **not** expand shell-style syntax such as `~`.
   - The client creates the leaf directory if it is missing, but the parent
     must already exist — it does not create paths recursively.
-- `sender_id` — slot identity. The slot lives at `<sf_dir>/<sender_id>/`,
-  used verbatim as the directory name. Allowed characters: letters,
-  digits, `_`, `-`. No path separators, no `.`, no spaces. Two senders
-  sharing the same `sender_id` collide on the slot lock — the second one
-  fails fast. Default: `default`.
-  For pooled senders, `sender_id` is the slot **base** rather than a literal
-  directory: the pool mints one directory per slot, and the un-suffixed path
-  applies only to non-pooled senders. The minted name is client-specific:
+- `sender_id` — name of the sender directory, used verbatim. Allowed
+  characters: letters, digits, `_`, `-`. No path separators, no `.`, no
+  spaces. Only one sender can use a sender directory at a time: a second
+  sender with the same `sf_dir` and `sender_id` fails immediately with an
+  in-use error. Default: `default`.
+  For pooled senders, `sender_id` is a name prefix: the pool gives each pooled
+  sender its own directory, named after `sender_id`, and your client's page
+  gives the exact name. Pools that share an `sf_dir` need distinct
+  `sender_id` values.
+- `sf_durability` — when the client should force store-and-forward data to
+  stable storage. Not every client accepts every value; see your client's
+  page. Values:
 
-  | Client | Minted slot directory |
-  |---|---|
-  | Java (`QuestDB` facade) | `<sf_dir>/<sender_id>-<index>/` |
-  | Rust, C, C++ (`QuestDb` / `questdb::pool` / `questdb_db`) | `<sf_dir>/<sender_id>-ingest-<index>/` |
-  | Node.js (`connectQwpNodeClient`) | `<sf_dir>/<sender_id>-<index>/` |
-
-  The minted names belong to that pool's namespace, so pools sharing one
-  `sf_dir` need distinct bases; the slot-in-use error covers both cases
-  (another process or pool holds the slot).
-- `sf_durability` — disk durability mode. `memory` (the default) and
-  `periodic` both ship. `periodic` requires `sf_dir` and checkpoints published
-  frames in the background at `sf_sync_interval_millis`. `flush` and `append`
-  are reserved: they parse but are rejected at `build()`, except in the Node.js
-  client, as described below.
-
-  Reach for `periodic` when you must survive host loss. `memory` mode is
-  process-crash durable but **not** host-crash durable, because the page cache
-  is lost on power failure.
-
-  The .NET and Go clients accept only `memory` and reject anything else at
-  parse time. The Node.js client also accepts `append`, which makes every
-  frame durable before its append completes, rejects `flush` at parse time,
-  and requires `sf_dir` for every value.
-- `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
-  checkpoints published frames to stable storage. Default: `5000`. Requires
+  - `memory` (default) — the client writes queued rows to segment files under
+    `sf_dir` but doesn't force each write to disk. Queued rows survive a
+    process crash, but a host crash can lose rows that hadn't reached the disk
+    yet. Some clients force data to disk at certain points, which narrows that
+    loss; their pages give the details. `memory` doesn't mean memory-only
+    mode; for that, omit `sf_dir`.
+  - `periodic` — the client also forces the segment files to stable storage in
+    the background every `sf_sync_interval_millis`. Reach for it when you must
+    survive host loss. Requires `sf_dir`.
+  - `append` — the client forces each flush's rows to stable storage before
+    the flush completes.
+  - `flush` — reserved; clients reject it.
+- `sf_sync_interval_millis` — how often `sf_durability=periodic` forces the
+  segment files to stable storage. Default: `5000`. Requires
   `sf_durability=periodic`; rejected otherwise. The configured interval is a
   floor, since scheduler and storage latency add to it.
-- `sf_max_segment_bytes` — per-segment rotation threshold. Must be ≥ the largest
-  single flushed frame. Default: `4 MiB` (`4m`). Accepts
-  [size suffixes](#size-suffixes).
-- `sf_max_total_bytes` — hard cap on per-slot storage. When the slot
-  reaches the cap, `append()` blocks until ACKs trim space (see
-  `sf_append_deadline_millis`). Defaults: `10 GiB` (`10g`) in SF mode,
-  `128 MiB` (`128m`) in memory mode. Accepts size suffixes.
+- `sf_max_segment_bytes` — size of each segment file; the client starts a new
+  segment when the current one is full. Each batch must fit in one segment.
+  Default: `4 MiB` (`4m`). Accepts [size suffixes](#size-suffixes).
+- `sf_max_total_bytes` — cap on the unacknowledged data the client holds: on
+  disk in SF mode, in RAM in memory-only mode. When the cap is reached, a
+  flush, including an automatic flush during a row call, waits until server
+  acknowledgements free space; see `sf_append_deadline_millis`. Defaults:
+  `10 GiB` (`10g`) in SF mode, `128 MiB` (`128m`) in memory-only mode.
+  Accepts size suffixes.
 
 ### Sender restart and replay
 
-SF persists outgoing frames and the durable-ack watermark to disk under
-`<sf_dir>/<sender_id>/`.
+SF keeps unacknowledged rows in the sender directory, `<sf_dir>/<sender_id>/`,
+along with the ack watermark, which records how far the server has
+acknowledged them.
 
-**Sender creation triggers recovery.** When the application
-instantiates a new sender — `Sender.fromConfig(...)`, `Sender.fromEnv()`,
-or the builder — the client analyses the on-disk state under `sf_dir`
-before returning control. There is no background daemon; replay is part
-of the Sender lifecycle.
+**Sender creation triggers recovery.** When the application creates a
+sender, the client reads the on-disk state under `sf_dir` before returning
+the sender. No separate process is involved: recovery is part of creating
+the sender.
 
 To resume from the previous session's buffer after a restart — clean
-exit, SIGKILL, host crash, or reboot — instantiate a new sender with the
+exit, SIGKILL, host crash, or reboot — create a new sender with the
 **same** `sf_dir` and `sender_id`:
 
-1. The new sender acquires the slot's POSIX `flock` (`LockFileEx` on
-   Windows). If the previous process is still alive and holds the lock,
-   the new sender fails fast with `sf slot already in use`. The kernel
-   releases the lock on process exit, even after SIGKILL, so a crashed
-   sender does not leave the slot stuck. The Node.js client locks the slot
-   with a `.lock.owner` directory instead, which a crash leaves behind. A
-   new sender takes it over only when it names a process on the same host
-   that no longer exists, so a restarted container can find the slot
-   locked: see
-   [Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
+1. The new sender locks the sender directory. If the previous process is
+   still running, creating the new sender fails immediately with an in-use
+   error. Whether a crashed process leaves its lock behind depends on the
+   client; see
+   [Lock collisions in practice](/docs/high-availability/store-and-forward/operating-and-tuning/#lock-collisions-in-practice)
+   and your client's page.
 2. Recovery reads the persisted ack watermark and replays every on-disk
-   segment past it against the server. Replay runs on the I/O thread in
-   parallel with the application's new `append()` calls — it does not
-   block the application.
+   segment past it against the server. Replay runs in the background while
+   the application keeps adding rows; it doesn't block the application.
 
 If `sf_dir` is a relative path, ensure the process resolves it the same
 way after restart (typically: use an absolute path).
 
-For a *different* sender to pick up an **abandoned** slot — the original
-is never coming back — see [Orphan recovery](#orphan-recovery) below.
+For a *different* sender to pick up an **abandoned** sender directory — the
+original is never coming back — see [Orphan recovery](#orphan-recovery) below.
 
-**At-least-once delivery.** Replay can re-send frames the server already
-accepted but did not durable-acknowledge before the previous sender died.
+**At-least-once delivery.** Replay can re-send rows the server already
+accepted if their acknowledgement hadn't reached the previous sender before
+it stopped.
 To prevent duplicate rows in the target table, declare
 [DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` covering row
 identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
@@ -639,24 +632,26 @@ the full model and recipe.
 
 ### Backpressure
 
-- `sf_append_deadline_millis` — maximum time `append()` waits for trim to
-  free space when the slot hits the cap. If the deadline fires, the call
-  throws. Default: `30000` (30 s).
+- `sf_append_deadline_millis` — maximum time a flush waits for space when
+  `sf_max_total_bytes` is reached. If the deadline passes, the call fails with
+  an error. Default: `30000` (30 s).
 
 ### Orphan recovery
 
 When `drain_orphans=on`, the new sender scans `<sf_dir>/*` at startup for
-sibling slots that are unlocked and contain unacked data. The scan runs
-as part of Sender creation (alongside the same-slot recovery above). The
-sender locks each orphan slot, drains it on its own dedicated connection,
-and releases it — **multiple orphans drain in parallel**, up to
-`max_background_drainers` concurrent drains.
+other sender directories that are unlocked and still contain unacknowledged
+rows (orphans). The scan runs as part of creating the sender, alongside the
+recovery of its own directory above. The sender locks each orphan, sends its
+rows on a separate connection, and releases it. **Several orphans drain in
+parallel**, up to `max_background_drainers` at a time.
 
-- `drain_orphans` — `on` enables the orphan drainer pool. Default: `off`.
-- `max_background_drainers` — maximum concurrent drainers. Default: `4`.
+- `drain_orphans` — `on` sends the rows of orphans in the background.
+  Default: `off`.
+- `max_background_drainers` — maximum number of orphans drained at the same
+  time. Default: `4`.
 
-For delivery semantics, architecture, and tradeoffs (at-least-once
-guarantees, DEDUP requirements, segment-granular trim), see
+For delivery guarantees, DEDUP requirements, how disk space is freed, and
+other tradeoffs, see
 [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/).
 
 ## Reconnect and failover {#reconnect-keys}
