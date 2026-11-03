@@ -20,7 +20,7 @@ replacement.
 
 System tables, such as `sys.view_audit`, accept a non-zero TTL. On
 `sys.view_audit`, only the built-in admin can set one: see
-[Retention](/docs/security/audited-views/#retention).
+[Audited views retention](/docs/security/audited-views/#retention).
 
 :::
 
