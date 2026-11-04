@@ -1029,6 +1029,7 @@ module.exports = {
           collapsed: true,
           items: [
             "integrations/other/prometheus",
+            "integrations/other/drizzle",
             "integrations/other/sqlalchemy",
             "integrations/other/mindsdb",
             "integrations/other/cube",
