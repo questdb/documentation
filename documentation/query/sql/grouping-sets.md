@@ -367,6 +367,11 @@ contain the same columns, in any order or through an alias, so
 `GROUPING SETS ((symbol, side), (side, symbol))` is rejected too. `FILL(NONE)`
 accepts duplicate sets.
 
+`FILL(NULL)` and `FILL(value)` also support at most 31 rolled-up keys. A key is
+rolled up when at least one grouping set leaves it out, so `ROLLUP(a, b, c)`
+rolls up all three keys. A plain key before `ROLLUP` or `CUBE` in
+[composite syntax](#composite-syntax) is in every set and does not count.
+
 `GROUPING()` and `GROUPING_ID()` values are preserved in fill rows. They are not
 replaced by the fill value.
 
@@ -413,9 +418,11 @@ matters.
 
 - **Not supported with `LATEST ON`**. Rejected with an error.
 
-- **Not supported in correlated [LATERAL](/docs/query/sql/lateral-join/)
-  subqueries**. A `LATERAL` subquery that references the outer table cannot
-  use grouping sets. Uncorrelated `LATERAL` subqueries can.
+- **Not supported with `HORIZON JOIN`**. Rejected with an error.
+
+- **Not supported in correlated `LATERAL` subqueries**. A `LATERAL` subquery
+  that references the outer table cannot use grouping sets. Uncorrelated
+  `LATERAL` subqueries can.
 
 - **Not supported in materialized views**. A
   [materialized view](/docs/concepts/materialized-views/) query cannot use
@@ -429,8 +436,9 @@ matters.
 - **`SAMPLE BY` interval must be a constant**. A bind variable such as
   `SAMPLE BY $1 h` is rejected with grouping sets.
 
-- **`FILL(NULL)` and `FILL(value)` require distinct grouping sets** in
-  `SAMPLE BY`. See [FILL support](#fill-support).
+- **`FILL(NULL)` and `FILL(value)` require distinct grouping sets** and
+  support at most 31 rolled-up keys in `SAMPLE BY`. See
+  [FILL support](#fill-support).
 
 - **`SAMPLE BY ... FROM` requires a timestamp literal**. Functions,
   expressions, and bind variables in the `FROM` bound are not supported with
