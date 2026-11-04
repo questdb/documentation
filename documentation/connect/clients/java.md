@@ -1103,7 +1103,7 @@ relies on the OS page cache and the memory-mapped files rather than an explicit
 still in the page cache at an OS crash or power loss can be lost.
 
 Set `sf_durability=periodic` to survive host loss. It requires `sf_dir` and
-checkpoints published frames in the background every
+forces the queued data to disk in the background every
 `sf_sync_interval_millis` (default `5000`). `flush` and `append` are reserved:
 they parse but are rejected at `build()`.
 
@@ -1136,10 +1136,12 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 
 `flush()` returns once the batch is handed to the send engine, not once the
 server has acknowledged it. ACKs arrive asynchronously on the I/O loop. To
-bridge between publish and acknowledgement, every published frame is assigned a
-frame sequence number (FSN). `flushAndGetSequence()` returns
-the highest FSN the call published, and `awaitAckedFsn(targetFsn,
-timeoutMillis)` blocks until the server has acknowledged up to that FSN:
+bridge between publish and acknowledgement, the client numbers what it sends. A
+flush sends its rows to the server as one batch, or as several if they don't
+fit in one; the protocol calls a batch a *frame*. Every published batch gets a
+frame sequence number (FSN). `flushAndGetSequence()` returns the highest FSN
+the call published, and `awaitAckedFsn(targetFsn, timeoutMillis)` blocks until
+the server has acknowledged up to that FSN:
 
 ```java
 try (Sender sender = db.borrowSender()) {
@@ -1165,9 +1167,9 @@ FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
 rejected batches, so the value returned by `flushAndGetSequence()` is also
 the correlation key for async error reports.
 
-These methods are no-ops on transports that do not track frame sequence
-numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
-return `-1`, and `awaitAckedFsn()` returns immediately.
+These methods are no-ops on transports that do not track FSNs (HTTP, TCP,
+UDP): `flushAndGetSequence()` and `getAckedFsn()` return `-1`, and
+`awaitAckedFsn()` returns immediately.
 
 ## Querying with `Query` and `Completion`
 
@@ -1526,8 +1528,8 @@ sender of the pool, or with `errorHandler(...)` on the builder of a
 | Policy | `getAppliedPolicy()` | `RETRIABLE` (the client reconnects and replays the batch), `RETRIABLE_OTHER` (the same, on the next endpoint), `TERMINAL` (the next API call throws `LineSenderServerException`), or `ABANDONED` (with `DATA_LOSS` only: the rows can never be sent, and stay on disk) |
 | Server message | `getServerMessage()` | Human-readable error text from the server (may be null) |
 | Table name | `getTableName()` | The rejected table (null for multi-table batches) |
-| FSN range | `getFromFsn()` / `getToFsn()` | Frame sequence number span identifying the rejected batch |
-| Message sequence | `getMessageSequence()` | Server's per-frame sequence number (`-1` if not available) |
+| FSN range | `getFromFsn()` / `getToFsn()` | FSN span identifying the rejected batch |
+| Message sequence | `getMessageSequence()` | The server's sequence number for the rejected batch on this connection (`-1` if not available) |
 | Status byte | `getServerStatusByte()` | Raw QWP status code (`-1` if not available) |
 
 The error handler runs on a dedicated dispatcher thread, never on the I/O
@@ -1571,8 +1573,8 @@ Status codes:
 | `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                |
 
 Errors can arrive before any data (parse failure) or mid-stream (storage
-failure, server shutdown). When `onError` is called, no further frames
-arrive for that query.
+failure, server shutdown). When `onError` is called, no more data arrives
+for that query.
 
 `onError(long requestId, byte status, String message)` is a
 correlation-aware overload — the request id matches
@@ -1615,7 +1617,7 @@ What is and isn't carried on `onError`:
   client throws `QwpCredentialUnavailableException`, whose message starts
   with `credential-unavailable:`, and `db.borrowQuery()` wraps it in a
   `QueryException`.
-- **Malformed frames**: `QwpDecodeException` or WebSocket close with a
+- **Malformed server responses**: `QwpDecodeException` or WebSocket close with a
   terminal code.
 - **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
   roles that do not match the `target=` filter.

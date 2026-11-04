@@ -64,7 +64,7 @@ Opt in to object-store-durable trim. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
+| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. The client then frees acknowledged data only after `STATUS_DURABLE_ACK` messages. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -75,7 +75,7 @@ Opt in to object-store-durable trim. See
 | `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
 
 The per-category defaults are documented in
-[Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
+[Concepts § Error responses](/docs/high-availability/store-and-forward/concepts/#error-responses).
 `PROTOCOL_VIOLATION` and `UNKNOWN` are forced `HALT` and not user-overridable.
 
 ## Other relevant keys

@@ -302,8 +302,8 @@ if (!db) { /* read err, handle */ }
 
 ## Authentication and TLS
 
-Authentication happens during the WebSocket upgrade, before any binary frames
-are exchanged. All keys go in the connect string:
+Authentication happens during the WebSocket upgrade, before any data is
+exchanged. All keys go in the connect string:
 
 ```text
 wss::addr=db.example.com:9000;username=admin;password=quest;   # HTTP basic
@@ -464,18 +464,22 @@ buffer path; flushing is always explicit. Accumulate rows in the buffer on
 your own cadence (row count, byte size via `line_sender_buffer_size`, or a
 timer) and call `flush` yourself. A good starting cadence is about 1,000 rows or
 100 ms, whichever comes first: the auto-flush defaults of the other QWP
-clients. Flushing every row collapses throughput, and a single flush must
-stay under the frame cap: the smallest of `max_buf_size` (default 100 MiB),
-the batch size the server advertises, and the `sf_max_segment_bytes` segment
-payload capacity (just under 4 MiB by default). `line_sender_buffer_size`
-(C++ `buffer.size()`) is at least the size of the frame a flush encodes, so a
-buffer flushed before its size reaches the cap fits in one frame. A buffer
-over the cap fails with `batch_too_large`, publishes nothing, and keeps its
-rows. Null columns are
-written by **omission**: skip the column for that row. There is no `set_null`
-call.
+clients. Flushing every row collapses throughput.
 
 :::
+
+A flush sends rows to the server in batches. The protocol calls a batch a
+*frame* and numbers batches with frame sequence numbers (FSNs). A buffer is
+sent as one batch, so a single flush must stay under the batch size limit:
+the smallest of `max_buf_size` (default 100 MiB), the batch size the server
+advertises, and the `sf_max_segment_bytes` segment payload capacity (just
+under 4 MiB by default). `line_sender_buffer_size` (C++ `buffer.size()`) is at
+least the size of the batch a flush encodes, so a buffer flushed before its
+size reaches the limit fits in one batch. A buffer over the limit fails with
+`batch_too_large`, publishes nothing, and keeps its rows.
+
+Null columns are written by **omission**: skip the column for that row. There
+is no `set_null` call.
 
 :::note Buffer ACK tracking
 
@@ -491,7 +495,7 @@ To pick your own deadline, call `flush` and then `qwp_sender_wait` /
 argument) waits indefinitely; a non-zero value likewise fires only when
 acknowledgements stop arriving (see
 [Durability and backpressure](#durability-and-backpressure)). To track progress
-without blocking, use a flush that returns a frame sequence number (FSN) and
+without blocking, use a flush that returns an FSN and
 check how far the acknowledged FSN has advanced; see
 [FSN progress](#fsn-progress-non-blocking).
 
@@ -687,33 +691,34 @@ on_error:;
 
 ### Notes
 
-- **Reuse the chunk** across flushes: a flush clears it once the frame is
+- **Reuse the chunk** across flushes: a flush clears it once its rows are
   accepted into the local queue, while keeping its capacity. To reset a chunk
   you built but decided not to send, call `qwp_chunk_clear` (C++
   `chunk.clear()`).
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
-- **A chunk too large for one frame is split** across several, publishing each
-  on its own. The client targets about 2 MiB per frame — half of `sf_max_segment_bytes`
-  (default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. It
-  halves the row range until each frame fits, stopping at 8 rows: validity
-  bitmaps and boolean columns pack one bit per row, so a frame must start on a
-  byte boundary. An 8-row frame is checked against the full 4 MiB rather than
-  the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
-  string, binary, or array values — the flush fails instead of splitting.
+- **A chunk too large for one batch is split** across several, publishing each
+  on its own. The client targets about 2 MiB per batch — half of
+  `sf_max_segment_bytes` (default 4 MiB) — so a chunk encoding to more than
+  roughly 2 MiB splits. It halves the row range until each batch fits,
+  stopping at 8 rows: validity bitmaps and boolean columns pack one bit per
+  row, so a batch must start on a byte boundary. An 8-row batch is checked
+  against the full 4 MiB rather than the 2 MiB target; if 8 rows still exceed
+  4 MiB — which takes very large string, binary, or array values — the flush
+  fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code.** Check
   `line_sender_error_in_doubt` (C++: `e.in_doubt()`). This describes only the
-  failed operation's input. False means the queue
-  never took the frame and the chunk is intact: re-flush it. True means
-  delivery is uncertain, so `wait` for what the queue already holds, and resend
-  the chunk only where the table's dedup keys make duplicate rows harmless. A
-  chunk that split across frames needs extra care;
+  failed operation's input. False means the queue accepted nothing and the
+  chunk is intact: re-flush it. True means delivery is uncertain, so `wait`
+  for what the queue already holds, and resend the chunk only where the
+  table's dedup keys make duplicate rows harmless. A chunk that split into
+  several batches needs extra care;
   [Durability and backpressure](#durability-and-backpressure) has the full
   rules. (To poll progress without blocking, see
   [FSN progress](#fsn-progress-non-blocking).)
 - **A successful `flush` is local acceptance, not delivery.**
   `qwp_sender_flush_chunk` returning true means the local store-and-forward
-  queue took the frame; a background thread then delivers it and collects the
+  queue took the rows; a background thread then delivers them and collects the
   server's ack, which `qwp_sender_wait` (C++ `sender.wait()`) observes. For
   throughput, publish many chunks with `flush`, then `wait` once
   (`qwpws_ack_level_durable` waits for durable upload, Enterprise). See
@@ -1321,15 +1326,15 @@ for (;;)
 QWP/WebSocket ingestion is asynchronous: every flush **publishes** into a local
 queue and returns before the server acks.
 
-1. **`flush` = local acceptance.** Success means only that the frame is queued
+1. **`flush` = local acceptance.** Success means only that the rows are queued
    locally. A **background thread** does all the talking to QuestDB: it
-   delivers queued frames, receives acks, and reconnects and replays after a
+   delivers queued batches, receives acks, and reconnects and replays after a
    connection failure. It keeps running after you return the sender to the
-   pool, so queued frames still reach the server.
+   pool, so queued rows still reach the server.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
    - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
-     frames. `qwpws_ack_level_durable` additionally waits until they are
+     rows. `qwpws_ack_level_durable` additionally waits until they are
      uploaded to object storage, not just in the server's WAL (Enterprise
      with replication; see the protocol page's
      [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
@@ -1343,9 +1348,9 @@ queue and returns before the server acks.
      right after the ack can miss the newest rows. An empty read-back is
      not data loss.
    - **The timeout is a no-progress deadline.** It fires only if the server
-     stops acknowledging frames, not as a cap on total wait time. On timeout
-     the frames stay queued: call `wait` again, or poll progress without
-     blocking with [frame sequence numbers](#fsn-progress-non-blocking). Don't
+     stops acknowledging batches, not as a cap on total wait time. On timeout
+     the rows stay queued: call `wait` again, or poll progress without
+     blocking with [FSNs](#fsn-progress-non-blocking). Don't
      re-flush. `wait` takes its deadline per call (`0` = none);
      `flush_and_wait` uses the pool-wide `request_timeout` (default 30000 ms).
 3. **`in_doubt` decides whether to retry.** When a flush or wait fails, check
@@ -1354,38 +1359,38 @@ queue and returns before the server acks.
    typically reports `failover_retry`, and that code alone does not mean the
    input is safe to resend; likewise an emptied buffer does not mean the rows
    arrived, and a full one does not mean they didn't. `in_doubt == false` means
-   the flush failed before the queue took the frame: the rows never entered the
-   send path, so nothing can reach the server and the buffer or chunk is
+   the flush failed before the queue accepted anything: the rows never entered
+   the send path, so nothing can reach the server and the buffer or chunk is
    intact — re-flush it. True means the queue may already hold them: wait rather
    than re-flush, and replay the same rows only if the table's dedup keys make
    duplicates harmless.
-   - **A buffer is one frame, queued whole or not at all.** So an in-doubt
+   - **A buffer is one batch, queued whole or not at all.** So an in-doubt
      buffer failure can only be a failed ack wait, with every row already
      queued. Wait again and the queue delivers them.
-   - **A chunk may be split** into several frames (see
+   - **A chunk may be split** into several batches (see
      [Sending data: chunks](#sending-data-column-major)). A failure partway
-     through queues the earlier frames and never accepts the rest, so waiting
-     delivers only part of the batch. Getting the remainder means resending the
+     through queues the earlier batches and never accepts the rest, so waiting
+     delivers only part of the chunk. Getting the remainder means resending the
      chunk, which is safe only where dedup keys absorb the duplicated rows.
 4. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
-   crash loses unacked frames, and pool close drains best-effort within
+   crash loses unacked rows, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, each sender's
-   queue is a directory on disk, and frames **replay automatically** when a
+   queue is a directory on disk, and rows **replay automatically** when a
    pool restarts with the same `sender_id`: it finds the directories the
-   previous run left behind, and resends their unacknowledged frames in the
+   previous run left behind, and resends their unacknowledged rows in the
    background without you borrowing anything. Keep `sender_id` stable across
    restarts so replay finds them; see [Pool keys](#pool-keys) for the
    directory layout. Strongly recommended for multi-host deployments: during
    failover, flushes keep landing on disk instead of filling RAM.
 5. **Backpressure is bounded blocking.** Two caps apply at once: 128 in-flight
-   unacked frames, and `sf_max_total_bytes` (default 128 MiB in memory-only
+   unacked batches, and `sf_max_total_bytes` (default 128 MiB in memory-only
    mode, 10 GiB in disk mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
-   buffer whose single payload exceeds the frame cap (see
+   buffer whose single payload exceeds the batch size limit (see
    [Sending data: row buffers](#sending-data-row-major)) is rejected
    immediately with `batch_too_large` instead; an oversize chunk is split
-   across frames rather than rejected.
+   into several batches rather than rejected.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
@@ -1572,10 +1577,10 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | Error code | Meaning | Borrow state | What to do |
 | --- | --- | --- | --- |
 | `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
-| `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
+| `failover_retry` | Transient transport failure; delivery of queued rows may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved rows replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
-| `batch_too_large` | A buffer's frame, or a chunk frame that cannot be split further, exceeds the frame cap | Usable | A buffer published nothing and keeps its rows: flush fewer rows at a time, or raise the limit that binds (by default `sf_max_segment_bytes`). A chunk may have queued the frames before the oversized one, so check `in_doubt` before resending it. |
+| `batch_too_large` | A buffer, or a chunk batch that cannot be split further, exceeds the batch size limit | Usable | A buffer published nothing and keeps its rows: flush fewer rows at a time, or raise the limit that binds (by default `sf_max_segment_bytes`). A chunk may have queued the batches before the oversized one, so check `in_doubt` before resending it. |
 | `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool
@@ -1613,7 +1618,7 @@ Without `sf_dir` the queue is in memory and private to the borrow; setting
 pool gives each borrow its own directory, named
 `<sf_dir>/<sender_id>-ingest-<index>/`, where `index` is the lowest free number
 in `[0, sender_pool_max)`. Because those names are stable, a restarted pool
-re-adopts the directories and replays the unacked frames they hold.
+re-adopts the directories and replays the unacked rows they hold.
 
 `sender_id` (default `default`) is the **name prefix** for those directories,
 not a directory itself. Keep it stable across restarts so replay finds them,
@@ -1663,8 +1668,8 @@ path up to its own cap in live connections.
 
 Every QWP/WebSocket flush is asynchronous: it publishes into the local queue and
 returns before the server ACKs. Beyond the blocking `wait` barrier, the sender
-exposes **frame sequence numbers (FSNs)** for non-blocking progress tracking
-while the borrow is still held:
+exposes **FSNs**, the sequence numbers of published batches, for
+non-blocking progress tracking while the borrow is still held:
 
 - Publish with an FSN-returning flush: C
   `qwp_sender_flush_buffer_and_get_fsn` or
@@ -1677,7 +1682,7 @@ while the borrow is still held:
 - A successful flush of a non-empty buffer or chunk always yields an FSN. No
   value (C: `has_value == false` in the `line_sender_qwpws_fsn` out-param,
   C++: `std::nullopt`) means the buffer or chunk was empty, so there was no
-  frame to publish. Likewise `acked_fsn` has no value until the first frame on
+  batch to publish. Likewise `acked_fsn` has no value until the first batch on
   this borrow completes: keep polling, don't re-flush.
 
 An FSN is a watermark on one borrowed sender's own stream, meaningful only
@@ -1692,7 +1697,7 @@ Orderly shutdown is: **wait, return, close.**
    check FSN watermarks); pool close only drains best-effort within
    `close_flush_timeout_millis` (default 5000 ms; `0` disables the drain; see
    the [connect string reference](/docs/connect/clients/connect-string/)) on
-   an in-memory queue. With `sf_dir`, unacked frames survive on disk
+   an in-memory queue. With `sf_dir`, unacked rows survive on disk
    regardless and replay on the next run.
 2. Return or drop every borrow. In C++, scope exit does this.
 3. `questdb_db_close(db)` (C++: `pool` destructor). Accepts `NULL`. Unlike

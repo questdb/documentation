@@ -122,8 +122,8 @@ Two limits matter:
 
 This is the rotation threshold and the unit of trim. Segments that are
 smaller release disk faster but waste more space on the active tail;
-larger segments waste less on the active tail but hold acked frames in
-the same file as the still-unacked tail until every frame in the segment
+larger segments waste less on the active tail but hold acked batches in
+the same file as the still-unacked tail until every batch in the segment
 is acked.
 
 For most workloads `4 MiB` is fine. Raise it if you are appending very
@@ -144,7 +144,7 @@ rate:
 sf_max_total_bytes ≥ ingest_rate × max_tolerated_outage
 ```
 
-A 5-minute reconnect budget at 10 MB/s of compressed frames implies at
+A 5-minute reconnect budget at 10 MB/s of compressed data implies at
 least 3 GB. Add safety margin for trim latency — in particular,
 `request_durable_ack=on` extends time-to-trim by the WAL→object-store
 upload window.
@@ -177,14 +177,14 @@ When an SF-mode sender opens, it runs this sequence:
 1. Acquire `<sf_dir>/<sender_id>/.lock`. Fail loudly on contention.
 2. Scan every `*.sfa` file:
    - Validate magic, version, header.
-   - Walk frames forward verifying each CRC32C-Castagnoli.
-   - The first invalid frame becomes end-of-data; any non-zero bytes
+   - Walk the batches forward verifying each CRC32C-Castagnoli checksum.
+   - The first invalid batch becomes end-of-data; any non-zero bytes
      past that point are logged as a torn-tail count.
 3. Sort segments by `baseSeq` and verify no gaps. A gap is a fatal
    recovery error.
 4. Open `.ack-watermark` (if present) and read the cumulative
    durable-ack FSN. Reject a watermark that exceeds the on-disk
-   ceiling — it would seed `ackedFsn` past every un-acked frame and
+   ceiling — it would seed `ackedFsn` past every un-acked batch and
    silently drop the un-acked tail.
 5. Seed `ackedFsn = max(lowestBaseSeq - 1, watermark)`.
 6. Allocate the next segment generation as `max(existing-gen) + 1`.
@@ -200,8 +200,8 @@ fresh start: no segments, no replay.
 |---|---|---|
 | "Slot held by PID `<n>`" | Two processes claiming the same `sender_id`; the message calls the sender directory a slot. | Stop the duplicate. The lock releases on its exit. |
 | "Gap between segments" | Corruption — a segment was deleted out of band. | Restore from backup or accept data loss; the substrate refuses to start. |
-| "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's frames; rely on server deduplication. |
-| Torn tail count > 0 | The previous process crashed mid-frame-write. | Informational; the CRC + zero-fill design discards the partial frame. |
+| "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's batches; rely on server deduplication. |
+| Torn tail count > 0 | The previous process crashed while writing a batch. | Informational; the CRC + zero-fill design discards the partial batch. |
 
 ## Close and shutdown
 
@@ -268,7 +268,7 @@ A conformant client exposes at minimum:
 | `getTotalReconnectAttempts()` | How often the wire has broken across the sender's lifetime. |
 | `getTotalReconnectsSucceeded()` | How many of those recovered. |
 | `getTotalFramesReplayed()` | Volume re-sent after reconnects. A spike usually means a fresh outage; sustained growth means a flapping wire. |
-| `getTotalServerErrors()` | Count of error frames received (any category). |
+| `getTotalServerErrors()` | Count of error responses received (any category). |
 | `getDroppedErrorNotifications()` | Error-inbox overflow count. Non-zero means a busy error stream or a slow handler. |
 | `getTotalErrorNotificationsDelivered()` | Errors delivered to the user handler. |
 | `getTotalBackpressureStalls()` | Producer threads that hit `sf_max_total_bytes`. |

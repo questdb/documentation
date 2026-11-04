@@ -111,7 +111,7 @@ The steps are:
 3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
    and waits for the server ACK**. Auto-flush publishes full batches on its own,
    but the final partial batch is only guaranteed once you call `SendAsync()`.
-   An ACK means QuestDB committed the frame to the WAL, not that the rows are
+   An ACK means QuestDB committed the rows to the WAL, not that the rows are
    queryable yet: the WAL is applied to the table asynchronously. Rows are
    usually visible within milliseconds, but read-after-write logic should poll
    rather than assume.
@@ -184,7 +184,7 @@ directory — see [Store-and-forward](#store-and-forward).
 ## Authentication and TLS
 
 Authentication happens at the HTTP level during the WebSocket upgrade, before
-any binary frames are exchanged.
+any data is exchanged.
 
 ### Basic authentication
 
@@ -235,7 +235,7 @@ that purpose; left unset, it inherits `auth_timeout_ms`.
 ### Production example (TLS + token + multi-host)
 
 A realistic Enterprise deployment combines `wss`, token auth, multi-host
-failover, and a store-and-forward directory so unacked frames survive a
+failover, and a store-and-forward directory so unacked rows survive a
 sender restart:
 
 ```csharp
@@ -710,7 +710,7 @@ On QWP what `Send` waits for depends on the sender:
   server acknowledges it, bounded by `close_flush_timeout_millis` (throwing
   `IngressError` on timeout). A successful `SendAsync()` therefore means the
   rows are delivered.
-- A **pooled** sender (from `BorrowSender`) hands the frame to the send ring
+- A **pooled** sender (from `BorrowSender`) hands the rows to its send queue
   and returns immediately; the pooled connection ships it asynchronously and
   delivery is confirmed with `Flush()` / [`IQuestDBClient.Flush()`](#closing).
 
@@ -749,8 +749,9 @@ await sender.PingAsync();
 Console.WriteLine($"trades committed seqTxn: {sender.GetHighestAckedSeqTxn("trades")}");
 ```
 
-For frame-level tracking, every flush is assigned a frame sequence number
-(FSN):
+A flush sends rows to the server in batches; the protocol calls a batch a
+*frame*. To track batches, every published batch gets a frame sequence
+number (FSN):
 
 ```csharp
 long fsn = await sender.FlushAndGetSequenceAsync();
@@ -760,7 +761,7 @@ if (!acked) Console.Error.WriteLine("timed out waiting for server ACK");
 
 | Member | Returns |
 |---|---|
-| `FlushAndGetSequenceAsync()` | FSN of the highest frame published by this call. |
+| `FlushAndGetSequenceAsync()` | FSN of the last batch published by this call. |
 | `AckedFsn` | Highest FSN the server has acknowledged. |
 | `AwaitAckedFsnAsync(fsn, timeout)` | Block until `AckedFsn` reaches `fsn`. |
 | `GetHighestAckedSeqTxn(table)` | Highest committed `seqTxn` per table (`-1` if none). |
@@ -772,8 +773,8 @@ The server validates batches, and rejections are reported **out of band**:
 they arrive at the [error handler](#error-handler) on a background dispatcher
 rather than being thrown from the `Send` call that published the batch. (A
 standalone `Send` / `SendAsync` waits for the *ACK* of a successful batch, but
-a rejection produces an error frame, not an ACK — so it still surfaces through
-the handler, not the `Send` return.) This section covers how those
+a rejection produces an error message, not an ACK — so it still surfaces
+through the handler, not the `Send` return.) This section covers how those
 asynchronous errors are classified and handled.
 
 ### How errors surface
@@ -818,7 +819,7 @@ Each `SenderError` carries the following fields:
 | `AppliedPolicy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal; next API call throws `LineSenderServerException`). |
 | `ServerStatusByte` | Raw QWP status byte (e.g. `0x03` for `SchemaMismatch`). `-1` (`SenderError.NoStatusByte`) on `ProtocolViolation` and engine-internal terminal failures. |
 | `ServerMessage` | Human-readable server text (≤ 1024 UTF-8 bytes), or `null`. See [Message stability](#message-stability) and [PII safety](#message-pii). |
-| `MessageSequence` | Server's per-frame QWP wire sequence for the error frame. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
+| `MessageSequence` | The server's sequence number for the rejected batch on this connection. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
 | `FromFsn` / `ToFsn` | Inclusive client-side FSN span of the affected batch. Pair with `FlushAndGetSequenceAsync()` to identify the rejected rows. |
 | `TableName` | Rejected table; `null` for multi-table batches or when the server did not attribute the error. |
 | `DetectedAtUtc` | Wall-clock receipt time on the I/O thread; for ops timelines, not for correlation. |
@@ -828,9 +829,9 @@ Each `SenderError` carries the following fields:
 #### Message stability {#message-stability}
 
 `ServerMessage` is a human-readable diagnostic — **not a stable contract.**
-QWP error frames carry a server-supplied UTF-8 string capped at 1024 bytes by
-the wire spec; the text mirrors QuestDB's normal SQL error formatting and has
-historically been reworded across releases. The field may be empty. Use
+QWP error responses carry a server-supplied UTF-8 string capped at 1024 bytes
+by the wire spec; the text mirrors QuestDB's normal SQL error formatting and
+has historically been reworded across releases. The field may be empty. Use
 `Category` and `ServerStatusByte` for programmatic dispatch; never
 pattern-match on `ServerMessage`.
 
@@ -850,7 +851,7 @@ structural metadata.
 QWP does not surface a server-issued request or connection identifier. The
 closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
 plus the connection start time from your application logs — `MessageSequence`
-resets on reconnect, so it only disambiguates frames within a single
+resets on reconnect, so it only tells batches apart within a single
 connection. When filing a support ticket, include the connection start time
 and the `(MessageSequence, FromFsn, ToFsn)` triple.
 
@@ -912,9 +913,9 @@ or as listener events:
 - **Authentication failure** (`401` / `403` during the WebSocket upgrade) —
   terminal across all endpoints. The reconnect / failover loop stops
   immediately rather than replaying the same credential against every host.
-- **Malformed frames** — `QwpDecodeException` (egress) or `IngressError`
-  with a `ProtocolViolation` category (ingress); the WebSocket is closed
-  with a terminal code. The sender / query client transitions to a
+- **Malformed server responses** — `QwpDecodeException` (egress) or
+  `IngressError` with a `ProtocolViolation` category (ingress); the WebSocket
+  is closed with a terminal code. The sender / query client transitions to a
   non-recoverable state.
 - **Role mismatch** — `QwpRoleMismatchException` from `QueryClient.NewAsync`
   or the next `ExecuteReaderAsync` when no endpoint matches the configured
@@ -970,7 +971,7 @@ fell behind the dispatcher inbox.
 
 ## Store-and-forward
 
-With store-and-forward (SF) enabled, unacknowledged frames are persisted to
+With store-and-forward (SF) enabled, unacknowledged rows are persisted to
 disk and replayed after reconnection, surviving sender process restarts:
 
 ```csharp
@@ -1058,17 +1059,17 @@ they only mutate the in-process encode buffer, which grows up to
 `max_buf_size` (default 100 MiB). Backpressure surfaces at flush time:
 
 - **Memory-only mode (no `sf_dir`).** The in-flight publish window caps how
-  many unacknowledged frames can sit on the connection. On a standalone sender
+  many unacknowledged batches can sit on the connection. On a standalone sender
   `SendAsync()` drains, so when the server is reachable but slow it waits for
   ACK-driven capacity before returning. When the server is unreachable, the
   drain waits up to `close_flush_timeout_millis` and then throws a timeout
   `IngressError`. Dispose does **not** drain, so anything unsent at that point
   is dropped; memory-only mode does **not** survive a process exit either —
-  unacked frames are lost.
+  unacked rows are lost.
 - **Store-and-forward mode (`sf_dir` set).** `SendAsync()` appends to the
   on-disk segment and returns quickly; the I/O loop drains it in the
   background. If the disk queue is at its `sf_max_total_bytes` cap, the
-  append blocks waiting for the loop to trim acknowledged frames, bounded by
+  append blocks until acknowledgements free space, bounded by
   `sf_append_deadline_millis` (default 30 000 ms). If the deadline elapses
   the engine latches a terminal error and the next producer call surfaces it.
   No data is dropped while the publisher is parked.
@@ -1083,7 +1084,7 @@ payload.
 :::caution WebSocket / QWP does not support transactions
 
 The `Transaction` / `Commit` / `Rollback` API is **HTTP-only**. The QWP
-WebSocket sender rejects it — QWP frames are independently acknowledged batches.
+WebSocket sender rejects it — QWP acknowledges each batch independently.
 Use [store-and-forward](#store-and-forward) plus
 [DEDUP](/docs/concepts/deduplication/) keys for delivery guarantees on QWP.
 
@@ -1313,7 +1314,7 @@ There are two ways to cancel an in-flight query, and they differ in whether
 the connection survives:
 
 - **`reader.Cancel()`** (or `client.Cancel()`) — cooperative. Posts a QWP
-  `CANCEL` frame to the server; the stream then ends with a `ReadBatchAsync()`
+  `CANCEL` message to the server; the stream then ends with a `ReadBatchAsync()`
   that returns `false` and `reader.WasCancelled == true` (or, if the server
   raced to finish, a normal end with `WasCancelled == false`). The WebSocket
   stays open and the client is reusable for the next query. `Cancel()` is
@@ -1342,10 +1343,10 @@ Its `Status` (a `QwpStatusCode`) carries the QWP wire status byte and
 
 `QwpQueryException` can be thrown before the first batch (parse failure,
 schema mismatch on binds) or mid-stream (storage failure, server shutdown). It
-ends the query at a clean frame boundary, so the client stays usable — the next
-query on the same client starts fresh. A transport-level failure instead
-surfaces as a plain `IngressError` (or `OperationCanceledException` from a hard
-cancel), which **is** terminal — see Failover below.
+ends the query cleanly between result batches, so the client stays usable —
+the next query on the same client starts fresh. A transport-level failure
+instead surfaces as a plain `IngressError` (or `OperationCanceledException`
+from a hard cancel), which **is** terminal — see Failover below.
 
 ```csharp
 try
@@ -1500,7 +1501,7 @@ keys it honours:
 | Streaming | `compression`, `compression_level`, `max_batch_rows`, `initial_credit` |
 
 `initial_credit` (bytes; `0` = unbounded) caps how much data the server may
-emit before pausing for a `CREDIT` frame from the client — useful when a
+emit before pausing for a `CREDIT` message from the client — useful when a
 single result is much larger than the consumer's working set. The client
 auto-replenishes credit per consumed batch.
 
@@ -1539,7 +1540,7 @@ await using var sender = Sender.New("ws::addr=localhost:9000;");
 await sender.SendAsync();   // flush + await ACK; dispose alone would drop these rows
 ```
 
-With `sf_dir` set, frames that were already **sent** (handed to the on-disk
+With `sf_dir` set, rows that were already **sent** (handed to the on-disk
 ring) but not yet ACKed persist to disk and replay on the next run with the
 same `sf_dir` / `sender_id`. Rows that were only buffered — never sent — are
 not on disk and are lost regardless.
@@ -1663,7 +1664,7 @@ await sender.AwaitAckedFsnAsync(fsn, TimeSpan.FromSeconds(10));
 //   EndpointAttemptFailed db-primary:9000   — retries during outage
 //   FailedOver db-replica:9000              — replica took over
 //
-// With sf_dir set, unacked frames are persisted to disk during the
+// With sf_dir set, unacked rows are persisted to disk during the
 // outage and replayed once the new primary is reachable.
 
 

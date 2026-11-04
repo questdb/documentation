@@ -162,7 +162,7 @@ func main() {
 		panic(err)
 	}
 
-	// Query: the ACK above confirms QuestDB accepted the frame. The row becomes
+	// Query: the ACK above confirms QuestDB accepted the rows. The row becomes
 	// visible to queries only after the WAL is applied, which happens
 	// asynchronously. Poll for visibility, bounded by a deadline.
 	deadline := time.Now().Add(10 * time.Second)
@@ -219,7 +219,7 @@ real code:
   or a context error.** The rows are still buffered, so building them again
   sends them twice. Call `Flush` to retry. See
   [When rows can't be queued](#when-rows-cant-be-queued).
-- **Durability is not visibility.** An ACK means QuestDB committed the frame to
+- **Durability is not visibility.** An ACK means QuestDB committed the rows to
   the WAL. The row becomes queryable only once the WAL is applied to the table,
   which happens asynchronously, so a SELECT issued straight after the ACK can
   still return zero rows. `AwaitAckedFsn` cannot close that gap. For
@@ -1074,7 +1074,7 @@ walks the full endpoint list and binds a durable-advertising primary if one is
 reachable, failing terminally only when none do.
 
 `durable_ack_keepalive_interval_millis` (default 200 ms; `0` disables) paces a
-keepalive ping that prods an idle server into flushing pending durable-ack frames;
+keepalive ping that prods an idle server into sending pending durable acks;
 the standalone option form is `qdb.WithDurableAckKeepaliveInterval`. Leave it
 enabled under `request_durable_ack`: with the keepalive off, a quiescent final
 batch has nothing to elicit its `STATUS_DURABLE_ACK`, so `AwaitAckedFsn` can block
@@ -1326,7 +1326,7 @@ maps to `$1`. Setters include `BooleanBind`, `ByteBind`, `ShortBind`, `IntBind`,
 `Long256Bind`, `GeohashBind`, `DecimalBind` (and `Decimal64/128/256Bind`), plus a
 `Null...Bind` variant for each type. There is no symbol bind: use `VarcharBind`
 for symbol parameters. **Not bindable:** `BINARY` (no setter); `ARRAY` /
-`DOUBLE[]` / `LONG[]` (bind frames carry no array shape — pass a SQL array
+`DOUBLE[]` / `LONG[]` (binds carry no array shape — pass a SQL array
 literal in the statement instead); `IPv4` (bind it as `INT` with `IntBind`). A
 gap, a duplicate index, or any out-of-order call latches an error that surfaces
 from the first `Batches()` yield (for `Query`, which itself returns only a
@@ -1396,13 +1396,13 @@ Full `SenderError` field set, for logging, alerting, and support correlation:
 | `ServerMessage`    | `string`    | Human-readable server text. **≤ 1024 UTF-8 bytes**, English, may be empty. Safe to log; not a stable pattern-match key (switch on `Category` / `ServerStatusByte`). May echo table / column names — sanitise before forwarding to third-party error trackers. |
 | `TableName`        | `string`    | Rejected table; empty for unknown or multi-table batches.                                                                                                                             |
 | `FromFsn`,`ToFsn`  | `int64`     | Inclusive FSN span; join to `FlushAndGetSequence` to identify the rejected rows.                                                                                                       |
-| `MessageSequence`  | `int64`     | Server's per-frame wire sequence for the rejection frame. **Resets on reconnect** — only meaningful within one connection; round-trips verbatim against that connection's server-side logs. Not a standalone correlation key (see below). `NoMessageSequence` (`-1`) for protocol violations.                                       |
+| `MessageSequence`  | `int64`     | The server's sequence number for the rejected batch on this connection. **Resets on reconnect** — only meaningful within one connection; round-trips verbatim against that connection's server-side logs. Not a standalone correlation key (see below). `NoMessageSequence` (`-1`) for protocol violations.                                       |
 | `DetectedAt`       | `time.Time` | Client-side receipt time, for ops timelines (not for correlation).                                                                                                                     |
 
 The protocol does not surface a server-issued request or connection identifier.
 The closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
 plus the connection start time from your application logs — `MessageSequence`
-resets on reconnect, so it only disambiguates frames within a single connection.
+resets on reconnect, so it only tells batches apart within one connection.
 The ingest client identifies itself with an `X-QWP-Client-Id: go/<version>`
 header on the upgrade. When filing a support ticket, include the connection start time and the
 `(MessageSequence, FromFsn, ToFsn)` triple.
@@ -1592,7 +1592,7 @@ and ignores the `zone=` key, so a connect string shared with the query pool
 works unchanged. Reconnect is transparent to the producer; you do not change the
 ingestion loop for it.
 
-Reconnect and multi-host failover replay unacknowledged frames — whether or not
+Reconnect and multi-host failover replay unacknowledged rows — whether or not
 `sf_dir` is set — so the at-least-once rule applies to every failover connection,
 not just store-and-forward ones:
 
@@ -1972,7 +1972,7 @@ func main() {
 	defer query.Close()
 
 	// trades uses DEDUP because this deployment reconnects (multi-host + sf_dir):
-	// failover replays unacknowledged frames, and DEDUP stops that from
+	// failover replays unacknowledged rows, and DEDUP stops that from
 	// duplicating rows (see the failover DEDUP caution).
 	if _, err := query.Exec(ctx,
 		"CREATE TABLE IF NOT EXISTS trades "+

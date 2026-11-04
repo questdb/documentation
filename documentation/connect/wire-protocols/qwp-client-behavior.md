@@ -320,7 +320,7 @@ here.
   pool uses
   `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
-  unacknowledged frames; acknowledged/truncated frames are not replayed.
+  unacknowledged batches; acknowledged batches are not replayed.
 
 `flush()` semantics (QWP sender):
 
@@ -328,9 +328,10 @@ here.
 - In SF mode, data is persisted to mmap-backed segment files before `flush()`
   returns.
 - `flush()` does **not** wait for server ACKs unless backpressure requires
-  space. The I/O thread sends frames and trims ACKed frames asynchronously.
+  space. The I/O thread sends batches and deletes acknowledged ones
+  asynchronously.
 - `drain(timeoutMillis)` flushes and waits for the server to ACK all currently
-  published frames, up to the timeout.
+  published batches, up to the timeout.
 - `close()` flushes then waits up to `close_flush_timeout_millis` for ACKs,
   unless that timeout is `<= 0`.
 
@@ -339,24 +340,24 @@ here.
 With `initial_connect_retry=async`:
 
 - `build()` returns without a live socket; `wasEverConnected()` is `false`.
-- Producer calls and `flush()` can run before the server exists; frames
+- Producer calls and `flush()` can run before the server exists; rows
   accumulate in the cursor engine (and on disk with `sf_dir`).
 - The I/O thread retries in the background using the same loop used after wire
   failure, with capped exponential backoff and no wall-clock deadline.
-- When a server appears, buffered frames are sent/replayed and ACK-driven
-  trimming begins.
+- When a server appears, buffered rows are sent or replayed, and acknowledged
+  data starts being freed.
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
 A sender in async mode does not give up because time passed. It ends only on
-a **terminal** condition: an authentication rejection or a durable-ack
-capability mismatch, the poison-frame detector, or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
-`append()`. ⚠ The Java client treats an authentication rejection or a
-durable-ack capability mismatch as terminal only before the sender first
-connects, and retries them afterwards. A Node.js sender that uses
-store-and-forward or `initial_connect_retry=async` does the same once it has
-connected, as do some browser senders: see
+a **terminal** condition: an authentication rejection, a durable-ack capability
+mismatch, a batch the server keeps rejecting (`max_frame_rejections`), or the
+producer hitting `sf_max_total_bytes` and exhausting
+`sf_append_deadline_millis` on `append()`. ⚠ The Java client treats an
+authentication rejection or a durable-ack capability mismatch as terminal only
+before the sender first connects, and retries them afterwards. A Node.js
+sender that uses store-and-forward or `initial_connect_retry=async` does the
+same once it has connected, as do some browser senders: see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
@@ -472,7 +473,7 @@ unreachable endpoint, and tries the next one.
 
 `QwpQueryClient.connect()` is synchronous. Per endpoint it: opens TCP/TLS,
 performs the WebSocket upgrade to `/read/v1`, reads the initial `SERVER_INFO`
-frame, applies the `target=` role filter, and starts the egress I/O thread on
+message, applies the `target=` role filter, and starts the egress I/O thread on
 the first match. If no endpoint can be used, it throws. There is no async
 initial-connect mode for queries.
 
@@ -543,7 +544,7 @@ reconnect/replay.
 | token provider cannot supply a token | `off` | build throws the provider's exception |
 | token provider cannot supply a token | `on` / `sync` | retryable failure: retried within `reconnect_max_duration_millis`; permanent failure: build throws |
 | token provider cannot supply a token | `async` | build returns; I/O thread retries |
-| server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
+| server appears later, any delay | `initial_connect_retry=async` | buffered rows sent and ACKed — the retry loop has no deadline |
 | server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
 #### Read-replica startup (one bad endpoint, another replica works)

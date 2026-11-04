@@ -22,7 +22,7 @@ connect string.
 
 ### Memory-only mode — `sf_dir` unset
 
-Unacked frames live in a malloc'd ring in process memory. Default cap is
+Unacked rows live in a buffer in process memory. Default cap is
 `128 MiB`.
 
 **Choose memory-only mode when:**
@@ -38,7 +38,7 @@ Unacked frames live in a malloc'd ring in process memory. Default cap is
 
 ### SF mode — `sf_dir=/path/to/dir`
 
-Unacked frames are written to mmap'd files under
+Unacked rows are written to memory-mapped files under
 `<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
 
 **Choose SF mode when:**
@@ -73,16 +73,16 @@ string.
 
 ## Durable-ack: when to opt in
 
-By default the substrate trims unacked data on OK ack from the server.
-That means the substrate releases a frame once the server has acknowledged
-it into the WAL. The frame is durable on the **primary's** disk; whether
-it has been replicated to the object store or to replicas is a separate
-matter.
+By default the client frees a
+[batch](/docs/high-availability/store-and-forward/concepts/#batches) as soon
+as the server acknowledges it into the WAL. The batch is then durable on the
+**primary's** disk; whether it has been replicated to the object store or to
+replicas is a separate matter.
 
-When the connect string sets `request_durable_ack=on`, trim is held back
-until a separate `STATUS_DURABLE_ACK` frame confirms the data has been
-uploaded from the WAL to the **configured object store** (S3, Azure Blob,
-GCS, or NFS).
+When the connect string sets `request_durable_ack=on`, the client keeps the
+batch until a separate `STATUS_DURABLE_ACK` message confirms the data has
+been uploaded from the WAL to the **configured object store** (S3, Azure
+Blob, GCS, or NFS).
 
 ### Choose durable-ack when
 
@@ -109,10 +109,10 @@ GCS, or NFS).
   `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
   back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
   uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
+  connect **fails loudly**, by design. Silently waiting for acknowledgements
   that never arrive would let the SF disk fill up.
-- **Idle keepalive.** The OSS server only flushes pending durable-ack
-  frames during inbound recv events. The client sends a WebSocket PING
+- **Idle keepalive.** The OSS server only sends pending durable
+  acknowledgements during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
