@@ -2,7 +2,7 @@
 title: When to use store-and-forward
 sidebar_label: When to use
 description:
-  Decision guide for choosing between memory mode and disk-backed
+  Decision guide for choosing between memory-only mode and disk-backed
   store-and-forward, when to opt into durable-ack trim, and when to enable
   orphan adoption.
 ---
@@ -15,17 +15,17 @@ decision guide.
 If you are new to SF, start with
 [Concepts](/docs/high-availability/store-and-forward/concepts/).
 
-## Memory mode vs SF mode
+## Memory-only mode vs SF mode
 
 The single switch that decides this is whether you set `sf_dir` in the
 connect string.
 
-### Memory mode — `sf_dir` unset
+### Memory-only mode — `sf_dir` unset
 
-Unacked frames live in a malloc'd ring in process memory. Default cap is
+Unacked rows live in a buffer in process memory. Default cap is
 `128 MiB`.
 
-**Choose memory mode when:**
+**Choose memory-only mode when:**
 
 - The producer process is short-lived or ephemeral (a CLI job, a CI
   worker, a serverless function).
@@ -36,9 +36,9 @@ Unacked frames live in a malloc'd ring in process memory. Default cap is
 - Your data volume comfortably fits in RAM during the longest outage you
   care about.
 
-### SF mode — `sf_dir=/path/to/slot-root`
+### SF mode — `sf_dir=/path/to/dir`
 
-Unacked frames are written to mmap'd files under
+Unacked rows are written to memory-mapped files under
 `<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
 
 **Choose SF mode when:**
@@ -61,7 +61,7 @@ string.
 
 ## Comparison at a glance
 
-| Aspect | Memory mode | SF mode |
+| Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Buffered data location | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
 | Default capacity | `128 MiB` | `10 GiB` |
@@ -73,16 +73,16 @@ string.
 
 ## Durable-ack: when to opt in
 
-By default the substrate trims unacked data on OK ack from the server.
-That means the substrate releases a frame once the server has acknowledged
-it into the WAL. The frame is durable on the **primary's** disk; whether
-it has been replicated to the object store or to replicas is a separate
-matter.
+By default the client frees a
+[batch](/docs/high-availability/store-and-forward/concepts/#batches) as soon
+as the server acknowledges it into the WAL. The batch is then durable on the
+**primary's** disk; whether it has been replicated to the object store or to
+replicas is a separate matter.
 
-When the connect string sets `request_durable_ack=on`, trim is held back
-until a separate `STATUS_DURABLE_ACK` frame confirms the data has been
-uploaded from the WAL to the **configured object store** (S3, Azure Blob,
-GCS, or NFS).
+When the connect string sets `request_durable_ack=on`, the client keeps the
+batch until a separate `STATUS_DURABLE_ACK` message confirms the data has
+been uploaded from the WAL to the **configured object store** (S3, Azure
+Blob, GCS, or NFS).
 
 ### Choose durable-ack when
 
@@ -109,10 +109,10 @@ GCS, or NFS).
   `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
   back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
   uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
+  connect **fails loudly**, by design. Silently waiting for acknowledgements
   that never arrive would let the SF disk fill up.
-- **Idle keepalive.** The OSS server only flushes pending durable-ack
-  frames during inbound recv events. The client sends a WebSocket PING
+- **Idle keepalive.** The OSS server only sends pending durable
+  acknowledgements during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
@@ -121,7 +121,7 @@ GCS, or NFS).
 
 ## Orphan adoption: when to enable
 
-A sender that exits without draining its slot leaves unacked data on
+A sender that exits without draining its sender directory leaves unacked data on
 disk. If another process restarts under the same `sender_id` and same
 `sf_dir`, it picks up the orphan automatically as part of normal
 recovery. But if no process ever uses that `sender_id` again, the data
@@ -140,13 +140,13 @@ spawn background drainers to clear them.
   process instance), so dead instances leave permanent orphans that no
   natural restart will adopt.
 - You prefer "automatic eventual delivery" over "operator manually
-  reattaches the slot."
+  reattaches the sender directory."
 
 ### Leave it off when
 
 - Each `sender_id` is statically pinned to a specific process — there
   are no orphans by construction; a restart of the same process
-  recovers its own slot.
+  recovers its own sender directory.
 - You want explicit operator control over data movement in a shared
   `sf_dir`.
 - You run a single producer per host.
@@ -157,7 +157,7 @@ path but not the WebSocket.
 
 `drain_orphans=on` does not interfere with regular recovery: the
 foreground sender still recovers its own `sender_id` first, then
-drainers spawn for sibling slots.
+drainers spawn for other sender directories.
 
 ## Migrating from HTTP/TCP ILP
 
@@ -199,7 +199,7 @@ graph TD
     Q3{Is object-store durability required before ack?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 
-    Q1 -->|"No (ephemeral job)"| Memory[Memory mode — leave sf_dir unset]
+    Q1 -->|"No (ephemeral job)"| Memory[Memory-only mode — leave sf_dir unset]
     Q1 -->|"Yes (long-running service)"| Q2
     Q2 -->|No| Memory
     Q2 -->|Yes| SF[SF mode — set sf_dir]
@@ -217,4 +217,4 @@ graph TD
 - [Configuration](/docs/high-availability/store-and-forward/configuration/) —
   the connect-string keys.
 - [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/) —
-  slot layout, sizing, observability.
+  sender directory layout, sizing, observability.

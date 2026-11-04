@@ -4,13 +4,13 @@ sidebar_label: Concepts
 description:
   How the QuestDB store-and-forward client substrate decouples the producer
   from the wire, masks network outages and server restarts, and replays
-  unacknowledged frames against a fresh connection.
+  unacknowledged data against a fresh connection.
 ---
 
 Store-and-forward (SF) is the client-side substrate that sits between your
 application code and the QWP wire transport. It absorbs publishes into a
 local ring of fixed-size segments, drains them over a WebSocket connection
-on a dedicated I/O thread, and replays any unacknowledged frames after a
+on a dedicated I/O thread, and replays any unacknowledged data after a
 disconnect or restart.
 
 The goal is **producer-never-blocks-on-the-wire**. Your call to `flush()`
@@ -18,14 +18,14 @@ returns as soon as data is published into the substrate. Acknowledgements
 arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
-no unacked data: the next sender on the slot recovers it from disk and
-replays it.
+no unacked data: the next sender that uses the same sender directory
+recovers it from disk and replays it.
 
 ## Two modes
 
 SF runs in either of two modes selected by the connect string:
 
-| Aspect | Memory mode | SF mode |
+| Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Trigger | `sf_dir` is **unset** | `sf_dir` is set |
 | Storage | malloc'd ring in process RAM | mmap'd files under `<sf_dir>/<sender_id>/` |
@@ -34,36 +34,38 @@ SF runs in either of two modes selected by the connect string:
 | Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
 | Tolerates transient network blips | Yes | Yes |
 | Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
-| Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
+| Recovers another sender's abandoned directory | n/a | Opt-in via `drain_orphans=on` |
 
 Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
 where unacked data lives.
 
-## What "frame" means here
+## Batches
 
-A **frame** is one encoded QWP message — typically a batch of rows for one
-or more tables. The SF substrate treats frames as opaque payloads with two
-properties: a length, and a CRC32C checksum. The append protocol writes the
-payload first, the checksum last, and a partial write left behind by a
-crash is detected and discarded by the recovery scanner on next start.
+A **batch** is one encoded QWP message carrying rows for one or more
+tables. A flush sends its rows as one batch, or as several if they don't fit
+in one. The protocol, and some API names such as `getTotalFramesReplayed`,
+call a batch a *frame*. The SF substrate treats batches as opaque payloads
+with two properties: a length, and a CRC32C checksum. The append protocol
+writes the payload first, the checksum last, and a partial write left behind
+by a crash is detected and discarded by the recovery scanner on next start.
 
-Frames in SF mode are **self-sufficient**: every frame carries the full
+Batches in SF mode are **self-sufficient**: every batch carries the full
 schema for every table it touches and the full symbol-dictionary delta
-from id 0. That makes a frame replayable against any server connection,
+from id 0. That makes a batch replayable against any server connection,
 weeks or months later, even after a process restart that wiped all
 in-memory schema state. The cost is a small per-batch overhead which is
 accepted for correctness.
 
 ## The FSN model
 
-Two distinct counters track frame identity:
+Two distinct counters track batch identity:
 
-- **FSN** (frame-sequence-number) — a monotonic counter assigned when a
-  frame is appended to the substrate. FSN survives reconnects and (in SF
-  mode) restarts. It is the substrate's permanent identifier for a frame.
+- **FSN** (frame sequence number) — a monotonic counter assigned when a
+  batch is appended to the substrate. FSN survives reconnects and (in SF
+  mode) restarts. It is the substrate's permanent identifier for a batch.
 - **wireSeq** — a per-connection counter used to correlate cumulative QWP
-  responses with sent frames. It resets to `0` on every successful WebSocket
+  responses with sent batches. It resets to `0` on every successful WebSocket
   upgrade.
 
 On every (re)connect the relationship is pinned:
@@ -73,32 +75,32 @@ fsn = fsnAtZero + wireSeq
 ```
 
 where `fsnAtZero` is `ackedFsn + 1` (i.e. the next un-acked FSN). The
-client streams frames from disk to the wire in strict FSN order, one frame
+client streams batches from disk to the wire in strict FSN order, one batch
 per WebSocket binary message, incrementing `wireSeq`. The server echoes
-back the same `wireSeq` in its OK frames, and the client maps that back to
+back the same `wireSeq` in its OK responses, and the client maps that back to
 the original FSN to advance the trim watermark.
 
 Two consequences:
 
-- Frames **must** be sent in strict order. The wire format does not
+- Batches **must** be sent in strict order. The wire format does not
   serialise `wireSeq` — the server assigns it implicitly from receive
   order. Reordering breaks the FSN mapping.
 - After a reconnect, the server sees the **same payloads** at new `wireSeq`
-  values. If the server committed a frame but its acknowledgement was lost,
+  values. If the server committed a batch but its acknowledgement was lost,
   replay writes those rows again.
 
 ## Trim: how unacked data is reclaimed
 
-The substrate holds frames until the server confirms it has received and
+The substrate holds batches until the server confirms it has received and
 processed them. Each confirmation advances the **acked FSN**, which
 allows the manager thread to unlink sealed segment files (in SF mode) or
-release ring memory (in memory mode) up to that watermark.
+release ring memory (in memory-only mode) up to that watermark.
 
 Two trim drivers exist:
 
 ### Default — OK-driven trim
 
-Each successful batch produces an **OK frame** carrying the highest
+Each successful batch produces an **OK response** carrying the highest
 `wireSeq` it acknowledges and the per-table `seqTxn` watermarks that
 batch updated. On receipt:
 
@@ -113,21 +115,21 @@ is the durability bar you need.
 ### `request_durable_ack=on` — WAL-durable trim
 
 When the connect string sets `request_durable_ack=on`, trim is driven by
-a separate frame: `STATUS_DURABLE_ACK`. These carry per-table watermarks
+separate `STATUS_DURABLE_ACK` messages. These carry per-table watermarks
 for data the server has **already uploaded from the WAL to the configured
 object store** (S3, Azure Blob, GCS, or NFS).
 
-- OK frames still arrive on every batch, but they no longer advance the
+- OK responses still arrive for every batch, but they no longer advance the
   trim watermark. Instead, they are stashed alongside their per-table
   `seqTxn` values.
-- A `STATUS_DURABLE_ACK` frame names tables and their durable `seqTxn`
+- A `STATUS_DURABLE_ACK` message names tables and their durable `seqTxn`
   watermarks. The client matches the head of the OK queue against these
   watermarks; each fully-covered head entry pops, and `ackedFsn`
   advances to the highest covered wireSeq.
 - The client opt-in is mandatory — the connect fails loudly if the server
   does not echo `X-QWP-Durable-Ack: enabled` on the upgrade response.
   This avoids the silent failure mode where the producer waits forever
-  for ack frames that will never arrive.
+  for acknowledgements that will never arrive.
 
 Durable-ack mode is the right choice when "data is in the object store"
 is the durability bar, but it has two costs: a longer time-to-trim (so
@@ -150,17 +152,17 @@ On every successful (re)connect:
 
 1. `fsnAtZero = ackedFsn + 1`.
 2. `wireSeq` resets to `0`.
-3. The read cursor rewinds to the first un-acked frame on disk (or in
+3. The read cursor rewinds to the first un-acked batch on disk (or in
    memory).
-4. Frames stream to the wire in FSN order. A frame that landed before the
+4. Batches stream to the wire in FSN order. A batch that landed before the
    disconnect but was not acknowledged is sent again and can duplicate rows;
    use table-level `DEDUP UPSERT KEYS` with stable row identity when this must
    be suppressed.
-5. New frames appended by the producer during replay are picked up
+5. New batches appended by the producer during replay are picked up
    automatically — the I/O loop watches a volatile `publishedFsn`
    cursor.
 
-Frames sent before the disconnect and re-sent after a reconnect count
+Batches sent before the disconnect and re-sent after a reconnect count
 in the `getTotalFramesReplayed` observability counter.
 
 ## Backpressure
@@ -191,8 +193,8 @@ C, C++, Python, and Node.js. If the wait succeeds, all data is acked. If the
 timeout fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
-  next sender on the same slot;
-- in **memory mode**, the un-acked tail is lost.
+  next sender that uses the same sender directory;
+- in **memory-only mode**, the un-acked tail is lost.
 
 The Node.js client reports the timeout differently: `close()` rejects with
 `QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
@@ -200,20 +202,20 @@ data. Its pooled client logs a warning when a sender it closes times out.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
-Even in this branch, the slot lock is released and segments are unmapped
-cleanly, and a non-blocking safety-net check rethrows any latched
-terminal error that has not already been delivered through an async
+Even in this branch, the sender directory's lock is released and segments
+are unmapped cleanly, and a non-blocking safety-net check rethrows any
+latched terminal error that has not already been delivered through an async
 handler or a synchronous producer call.
 
 ## Crash recovery (SF mode)
 
-When the engine opens an SF-mode sender, it scans the slot directory:
+When the engine opens an SF-mode sender, it scans the sender directory:
 
-1. **Acquire the slot lock.** Two senders pointing at the same
+1. **Acquire the directory lock.** Two senders pointing at the same
    `<sf_dir>/<sender_id>/` will collide here and the second one fails to
    start, naming the holder's PID in the error message.
-2. **Validate every segment file.** Headers are checked, frames are walked
-   forward verifying each CRC. The first invalid or torn frame becomes
+2. **Validate every segment file.** Headers are checked, batches are walked
+   forward verifying each CRC. The first invalid or torn batch becomes
    the file's end-of-data; anything past it is discarded.
 3. **Reconcile gaps.** Segments are sorted by their `baseSeq` and adjacent
    pairs must satisfy `prev.baseSeq + prev.frameCount == curr.baseSeq`.
@@ -224,24 +226,24 @@ When the engine opens an SF-mode sender, it scans the slot directory:
 5. **Bump the connection generation** so the I/O loop, on first connect,
    replays from disk against a fresh wireSeq window.
 
-After recovery the producer publishes new frames as normal; the I/O
+After recovery the producer publishes new batches as normal; the I/O
 thread replays the un-acked tail and then drains forward.
 
 ### `.ack-watermark`
 
-An optional 16-byte file under the slot directory persists the cumulative
+An optional 16-byte file in the sender directory persists the cumulative
 durable-ack FSN across process restarts. Without it, recovery seeds the
 ack watermark from the lowest surviving segment's `baseSeq - 1` — which
-guarantees no data loss, but cannot distinguish which frames inside that
+guarantees no data loss, but cannot distinguish which batches inside that
 lowest segment the previous sender had already received durable acks
-for. Replay therefore re-sends every frame in that segment, producing
+for. Replay therefore re-sends every batch in that segment, producing
 row-level duplicates against a still-alive server unless deduplication is
 enabled on the target table. See
 [Delivery semantics](/docs/concepts/delivery-semantics/) for the
 at-least-once model and the DEDUP recipe.
 
 With `.ack-watermark`, recovery clamps the seed to the higher of the
-on-disk and watermarked values, so already-durable-acked frames inside
+on-disk and watermarked values, so already-durable-acked batches inside
 the lowest surviving segment are not re-replayed.
 
 The file is **optional** — a conformant client may choose not to maintain
@@ -249,62 +251,64 @@ it. The reference client does.
 
 ### `.symbol-dict` {#symbol-dict}
 
-Each slot also persists its SYMBOL dictionary to a dot-prefixed side-file,
-`<sf_dir>/<sender_id>/.symbol-dict`.
+Each sender directory also holds the sender's SYMBOL dictionary, in a
+dot-prefixed side-file, `<sf_dir>/<sender_id>/.symbol-dict`.
 
 QWP sends each symbol string to the server **once per connection** and
-thereafter references it by a numeric id. A frame on disk therefore contains
+thereafter references it by a numeric id. A batch on disk therefore contains
 ids, not strings. If the dictionary that assigned those ids were lost, the
-replayed frames would reference ids the server has never seen and it would
+replayed batches would reference ids the server has never seen and it would
 reject them with
 [`STATUS_DICTIONARY_GAP`](/docs/connect/wire-protocols/qwp-ingress-websocket/#status-codes).
-Persisting the dictionary alongside the frames is what makes a recovered or
-orphan-drained slot replayable on a fresh process.
+Persisting the dictionary alongside the batches is what makes a recovered or
+orphan-drained sender directory replayable on a fresh process.
 
 **Write-ahead ordering.** A new symbol is appended to `.symbol-dict` *before*
-the frame that references it is published. A crash can therefore leave
-dictionary entries with no referencing frame — harmless — but never a frame
+the batch that references it is published. A crash can therefore leave
+dictionary entries with no referencing batch — harmless — but never a batch
 whose ids are unknown.
 
 **Durability matches the rest of store-and-forward: no fsync.** Writes go to
 the page cache. A process crash (including `SIGKILL`) preserves both the
-dictionary and the frames, because the page cache survives. A **host** crash
+dictionary and the batches, because the page cache survives. A **host** crash
 or power loss can tear the dictionary tail, exactly as it can tear the segment
-frames themselves. Use `sf_durability=periodic` if you need checkpoints against
+batches themselves. Use `sf_durability=periodic` if you need checkpoints against
 host loss; see
 [Configuration](/docs/high-availability/store-and-forward/configuration/).
 
 **Torn tails are detected, not replayed.** The file is CRC-validated on open
 and any torn trailing entry is dropped. If the dictionary cannot be rebuilt —
-neither from the side-file's intact prefix nor from the surviving frames' own
-delta sections — the slot is **unreplayable**, and the client sets it aside
-rather than shipping frames whose ids nothing still backs. The reference client
-raises `UnreplayableSlotException`: `Sender.build()` sets the slot aside and
-starts the producer on a fresh one, and the background drainer marks it with a
-`.failed` sentinel so later orphan scans skip it. No data is silently
-discarded; the slot is preserved for inspection.
+neither from the side-file's intact prefix nor from the surviving batches' own
+delta sections — the sender directory is **unreplayable**, and the client sets
+it aside rather than shipping batches whose ids nothing still backs. The
+reference client raises `UnreplayableSlotException` (its API calls the sender
+directory a slot): `Sender.build()` sets the directory aside and starts the
+producer on a fresh one, and the background drainer marks it with a `.failed`
+sentinel so later orphan scans skip it. No data is silently discarded; the
+directory is preserved for inspection.
 
 ## Orphan adoption
 
 When the foreground sender's connect string sets `drain_orphans=on`, the
-engine scans `<sf_dir>/*` at startup for **sibling slot directories** —
+engine scans `<sf_dir>/*` at startup for **other sender directories** —
 other `sender_id`s under the same group root that contain unacked data
 and are not marked `.failed`. For each one, up to
 `max_background_drainers` at a time, a background drainer spawns,
-acquires the orphan slot's lock (skipping if another process holds it),
+acquires the orphan's lock (skipping if another process holds it),
 opens a separate WebSocket connection, runs the same recovery + replay
 flow, and exits when the orphan is fully drained.
 
 This is the rescue path for a sender that died without draining cleanly
 — a process crash, an OOM kill, a host reboot. The replacement process picks
-the orphan's slot lock and clears its disk footprint. Without
+the orphan's lock and clears its disk footprint. Without
 `drain_orphans=on` the dead sender's data persists on disk indefinitely
 until an operator intervenes.
 
 The orphan flow is opt-in because in a multi-tenant deployment with
-shared `sf_dir`, blindly draining unknown slots may be surprising.
+shared `sf_dir`, blindly draining unknown sender directories may be
+surprising.
 
-## Error frames
+## Error responses
 
 Not every server response is an OK. Server errors fall into six
 categories, each with a default policy:
@@ -313,7 +317,7 @@ categories, each with a default policy:
 |---|---|---|
 | `SCHEMA_MISMATCH` | `DROP_AND_CONTINUE` | The batch's schema doesn't match the server. Replay won't help — the substrate logs and advances trim past the rejected span. |
 | `WRITE_ERROR` | `DROP_AND_CONTINUE` | Per-batch write failure (e.g. table is not currently accepting writes). |
-| `PARSE_ERROR` | `HALT` | Almost certainly a client bug. The substrate preserves on-disk frames for postmortem. |
+| `PARSE_ERROR` | `HALT` | Almost certainly a client bug. The substrate preserves on-disk batches for postmortem. |
 | `INTERNAL_ERROR` | `HALT` | Catch-all server fault. |
 | `SECURITY_ERROR` | `HALT` | Cluster-wide auth / authorization failure. |
 | `PROTOCOL_VIOLATION` | `HALT` (forced) | Connection is gone after a terminal WebSocket close code; no choice. |
@@ -329,10 +333,10 @@ indistinguishably from a healthy connection.
 ## Next steps
 
 - [When to use](/docs/high-availability/store-and-forward/when-to-use/) —
-  decision guide for memory vs SF mode, and when to opt into
+  decision guide for memory-only vs SF mode, and when to opt into
   durable-ack and orphan adoption.
 - [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/) —
-  slot directory layout, lock semantics, sizing, observability.
+  sender directory layout, lock semantics, sizing, observability.
 - [Configuration](/docs/high-availability/store-and-forward/configuration/) —
   connect-string key reference.
 - [Client failover concepts](/docs/high-availability/client-failover/concepts/) —

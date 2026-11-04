@@ -18,21 +18,21 @@ The keys below are the SF-specific subset.
 
 ## Storage keys
 
-These keys select between memory mode and SF mode and govern on-disk
-layout. The single switch is `sf_dir`: unset → memory mode, set → SF
+These keys select between memory-only mode and SF mode and govern on-disk
+layout. The single switch is `sf_dir`: unset → memory-only mode, set → SF
 mode.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
-| `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
-| `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
-| `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
+| `sf_dir` | path | unset | Parent directory for sender directories. When set, each sender keeps its data in its sender directory, `<sf_dir>/<sender_id>/`, and unacknowledged data survives process restarts. When unset, the client runs in memory-only mode. |
+| `sender_id` | string | `default` | Name of the sender directory under `sf_dir`. Two senders with the same `sender_id` and `sf_dir` collide on the directory's lock. Must not contain path separators or be empty. |
+| `sf_max_segment_bytes` | size | `4M` | Size of each segment file; the client starts a new segment when the current one is full. Each batch must fit in one segment; a large flush is sent as several batches. |
+| `sf_max_total_bytes` | size | `128M` (memory-only) / `10G` (SF) | Cap on the unacknowledged data the client holds: on disk in SF mode, in RAM in memory-only mode. When it's reached, flushes wait for space; see `sf_append_deadline_millis`. |
 | `sf_durability` | enum | `memory` | When the client forces store-and-forward data to stable storage: `memory` (doesn't force each write to disk), `periodic` (forces it every `sf_sync_interval_millis`; requires `sf_dir`), `append` (forces each flush's rows before the flush completes), `flush` (reserved). Not every client accepts every value; see your [client's page](/docs/connect/overview/#client-libraries). |
-| `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
-| `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
-| `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
-| `max_background_drainers` | int | `4` | Cap on concurrent orphan drainers. |
+| `sf_sync_interval_millis` | int (ms) | `5000` | How often `sf_durability=periodic` forces the segment files to stable storage; rejected without `periodic`. The interval is a floor, since scheduler and storage latency add to it. |
+| `sf_append_deadline_millis` | int (ms) | `30000` | Maximum time a flush waits for space when `sf_max_total_bytes` is reached. If the deadline passes, the call fails with an error. |
+| `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and, in the background, send the rows of other sender directories that are unlocked and still hold unacknowledged rows (orphans). See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
+| `max_background_drainers` | int | `4` | Maximum number of orphans drained at the same time. |
 
 Size values accept integer bytes or unit suffixes (`K`, `M`, `G`, `T`)
 using binary multipliers.
@@ -64,7 +64,7 @@ Opt in to object-store-durable trim. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. Trim is then driven by `STATUS_DURABLE_ACK` frames only; OK frames no longer advance the trim watermark. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
+| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. The client then frees acknowledged data only after `STATUS_DURABLE_ACK` messages. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -75,7 +75,7 @@ Opt in to object-store-durable trim. See
 | `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
 
 The per-category defaults are documented in
-[Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
+[Concepts § Error responses](/docs/high-availability/store-and-forward/concepts/#error-responses).
 `PROTOCOL_VIOLATION` and `UNKNOWN` are forced `HALT` and not user-overridable.
 
 ## Other relevant keys
@@ -115,7 +115,7 @@ The parser rejects:
 
 ## Example configurations
 
-### Single-node memory-mode producer
+### Single-node memory-only producer
 
 ```java
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
@@ -126,7 +126,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
 }
 ```
 
-No `sf_dir`, so memory mode. The default `128 MiB` cap absorbs short
+No `sf_dir`, so memory-only mode. The default `128 MiB` cap absorbs short
 network blips. A sender crash loses the unacked tail.
 
 ### Single-node durable producer
@@ -153,8 +153,8 @@ try (Sender sender = Sender.fromConfig(
 }
 ```
 
-`wss::` for TLS, three-host failover, durable-ack opt-in. Slot lives at
-`/var/lib/qdb-sender/ingest-svc/`. The connect fails loudly if any peer
+`wss::` for TLS, three-host failover, durable-ack opt-in. The sender directory
+is `/var/lib/qdb-sender/ingest-svc/`. The connect fails loudly if any peer
 returns an upgrade without `X-QWP-Durable-Ack: enabled`.
 
 ### Multi-tenant host with orphan rescue
@@ -170,8 +170,8 @@ try (Sender sender = Sender.fromConfig(
 
 Each worker instance has a unique `sender_id`. When a worker crashes and
 a new instance comes up under a different `sender_id`, the new
-instance's foreground sender adopts the dead worker's slot in the
-background and drains it.
+instance's foreground sender adopts the dead worker's sender directory in
+the background and drains it.
 
 ### Long-outage tolerance for unattended ingest
 

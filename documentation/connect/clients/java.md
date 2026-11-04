@@ -670,10 +670,10 @@ any other exception from `getToken()` as permanent.
 - **A query.** A query whose client has to connect, and cannot get a token or
   has its token rejected, fails with `QueryException`. The next query
   connects again.
-- **An orphan drainer.** With `drain_orphans=on`, a drainer that replays the
-  slot of another sender gives up when QuestDB keeps rejecting its
+- **An orphan drainer.** With `drain_orphans=on`, a drainer that replays
+  another sender's directory gives up when QuestDB keeps rejecting its
   credential: at once with a fixed credential, and after the rejections
-  persist for a while with a token provider. It then sets the slot aside,
+  persist for a while with a token provider. It then sets the directory aside,
   with its rows still on disk, and reports `DATA_LOSS`.
 
 ### HTTP basic auth
@@ -1009,17 +1009,17 @@ try (Sender sender = db.borrowSender()) {
 ```
 
 **Backpressure.** The engine's buffer is bounded by `sf_max_total_bytes`
-(default 128 MiB in memory mode, 10 GiB in store-and-forward mode). If a slow or
-unreachable server lets it fill, `flush()` blocks until the server acks rows and
-the engine frees space, up to `sf_append_deadline_millis` (default 30 s), then
-throws, keeping the buffered rows.
+(default 128 MiB in memory-only mode, 10 GiB in store-and-forward mode). If a
+slow or unreachable server lets it fill, `flush()` blocks until the server acks
+rows and the engine frees space, up to `sf_append_deadline_millis` (default
+30 s), then throws, keeping the buffered rows.
 
 **Closing.** On a sender you own, `close()` flushes buffered rows and then
 *drains*: it waits for the server to acknowledge everything published, up to
 `close_flush_timeout_millis` (default 60 s), before disconnecting. If the drain
 times out, `close()` throws `LineSenderException` with rows still unacknowledged
 — recoverable by reopening on the same `sf_dir` in store-and-forward mode, lost
-in memory mode. A **pooled** sender (from `db.borrowSender()`) behaves
+in memory-only mode. A **pooled** sender (from `db.borrowSender()`) behaves
 differently: its `close()` flushes and returns it to the pool without
 disconnecting or draining, and the drain runs only when `QuestDB.close()` closes
 the underlying connection. To
@@ -1043,13 +1043,14 @@ its own (see [Flushing](#flushing)). The `sf_dir` key changes one thing —
 **where the engine keeps unacknowledged rows** — and with it, what a crash can
 lose.
 
-**Memory mode** is the default (no `sf_dir`). Unacknowledged rows live in RAM.
-A running sender reconnects across transient server outages — rolling upgrades,
-brief network loss — retrying indefinitely with capped backoff, then replays the
-unacknowledged tail, so a server blip loses nothing. What bounds your outage
-tolerance is buffer capacity, not a timer: the RAM buffer is capped at 128 MiB
-(`sf_max_total_bytes`), and once it fills, `append()` applies backpressure to
-the producer. If the **sender process** dies, the RAM buffer dies with it.
+**Memory-only mode** is the default (no `sf_dir`). Unacknowledged rows live in
+RAM. A running sender reconnects across transient server outages — rolling
+upgrades, brief network loss — retrying indefinitely with capped backoff, then
+replays the unacknowledged tail, so a server blip loses nothing. What bounds
+your outage tolerance is buffer capacity, not a timer: the RAM buffer is capped
+at 128 MiB (`sf_max_total_bytes`), and once it fills, `append()` applies
+backpressure to the producer. If the **sender process** dies, the RAM buffer
+dies with it.
 
 **Store-and-forward mode** turns on when you set `sf_dir`. The engine backs its
 buffer with memory-mapped files under `sf_dir`, so unacknowledged rows survive a
@@ -1102,7 +1103,7 @@ relies on the OS page cache and the memory-mapped files rather than an explicit
 still in the page cache at an OS crash or power loss can be lost.
 
 Set `sf_durability=periodic` to survive host loss. It requires `sf_dir` and
-checkpoints published frames in the background every
+forces the queued data to disk in the background every
 `sf_sync_interval_millis` (default `5000`). `flush` and `append` are reserved:
 they parse but are rejected at `build()`.
 
@@ -1135,10 +1136,12 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 
 `flush()` returns once the batch is handed to the send engine, not once the
 server has acknowledged it. ACKs arrive asynchronously on the I/O loop. To
-bridge between publish and acknowledgement, every published frame is assigned a
-frame sequence number (FSN). `flushAndGetSequence()` returns
-the highest FSN the call published, and `awaitAckedFsn(targetFsn,
-timeoutMillis)` blocks until the server has acknowledged up to that FSN:
+bridge between publish and acknowledgement, the client numbers what it sends. A
+flush sends its rows to the server as one batch, or as several if they don't
+fit in one; the protocol calls a batch a *frame*. Every published batch gets a
+frame sequence number (FSN). `flushAndGetSequence()` returns the highest FSN
+the call published, and `awaitAckedFsn(targetFsn, timeoutMillis)` blocks until
+the server has acknowledged up to that FSN:
 
 ```java
 try (Sender sender = db.borrowSender()) {
@@ -1164,9 +1167,9 @@ FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
 rejected batches, so the value returned by `flushAndGetSequence()` is also
 the correlation key for async error reports.
 
-These methods are no-ops on transports that do not track frame sequence
-numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
-return `-1`, and `awaitAckedFsn()` returns immediately.
+These methods are no-ops on transports that do not track FSNs (HTTP, TCP,
+UDP): `flushAndGetSequence()` and `getAckedFsn()` return `-1`, and
+`awaitAckedFsn()` returns immediately.
 
 ## Querying with `Query` and `Completion`
 
@@ -1525,8 +1528,8 @@ sender of the pool, or with `errorHandler(...)` on the builder of a
 | Policy | `getAppliedPolicy()` | `RETRIABLE` (the client reconnects and replays the batch), `RETRIABLE_OTHER` (the same, on the next endpoint), `TERMINAL` (the next API call throws `LineSenderServerException`), or `ABANDONED` (with `DATA_LOSS` only: the rows can never be sent, and stay on disk) |
 | Server message | `getServerMessage()` | Human-readable error text from the server (may be null) |
 | Table name | `getTableName()` | The rejected table (null for multi-table batches) |
-| FSN range | `getFromFsn()` / `getToFsn()` | Frame sequence number span identifying the rejected batch |
-| Message sequence | `getMessageSequence()` | Server's per-frame sequence number (`-1` if not available) |
+| FSN range | `getFromFsn()` / `getToFsn()` | FSN span identifying the rejected batch |
+| Message sequence | `getMessageSequence()` | The server's sequence number for the rejected batch on this connection (`-1` if not available) |
 | Status byte | `getServerStatusByte()` | Raw QWP status code (`-1` if not available) |
 
 The error handler runs on a dedicated dispatcher thread, never on the I/O
@@ -1570,8 +1573,8 @@ Status codes:
 | `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                |
 
 Errors can arrive before any data (parse failure) or mid-stream (storage
-failure, server shutdown). When `onError` is called, no further frames
-arrive for that query.
+failure, server shutdown). When `onError` is called, no more data arrives
+for that query.
 
 `onError(long requestId, byte status, String message)` is a
 correlation-aware overload — the request id matches
@@ -1614,7 +1617,7 @@ What is and isn't carried on `onError`:
   client throws `QwpCredentialUnavailableException`, whose message starts
   with `credential-unavailable:`, and `db.borrowQuery()` wraps it in a
   `QueryException`.
-- **Malformed frames**: `QwpDecodeException` or WebSocket close with a
+- **Malformed server responses**: `QwpDecodeException` or WebSocket close with a
   terminal code.
 - **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
   roles that do not match the `target=` filter.
@@ -1930,7 +1933,7 @@ Common WebSocket-specific options:
 | `auto_flush_interval` | `100` | Milliseconds before auto-flush. |
 | `auto_flush_bytes` | disabled | Bytes before auto-flush. |
 | `sf_dir` | unset | Store-and-forward directory. |
-| `sender_id` | `default` | Sender slot identity for SF. |
+| `sender_id` | `default` | Sender directory name for SF. |
 | `request_durable_ack` | `off` | Request durable upload ACK (Enterprise). |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget only. |
 | `failover` | `on` | Egress per-query reconnect switch. |

@@ -224,8 +224,8 @@ WebSocket upgrade request.
   overhead of basic auth and is the recommended path for Enterprise
   deployments.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
-  Does not cover TLS handshake or post-upgrade frame reads, which use OS or
-  hard-coded defaults. Default: `15000` (15 s).
+  Does not cover the TLS handshake or reads after the WebSocket upgrade, which
+  use OS or hard-coded defaults. Default: `15000` (15 s).
 - `connect_timeout` — integer milliseconds, must be `> 0`. Applies to ingress
   and egress. Bounds the TCP connect phase for each endpoint, so a black-holed
   host in a multi-host `addr` no longer stalls the
@@ -510,7 +510,7 @@ Related: [Reconnect and failover](#reconnect-keys),
 :::warning Enable DEDUP on tables ingested through failover
 
 On unplanned failover — when the primary dies before issuing a durable
-ACK — the client replays unacknowledged frames against the new primary.
+ACK — the client replays unacknowledged rows against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
 replays can produce duplicate rows. Tables ingested through a multi-host
 failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
@@ -700,7 +700,7 @@ architecture is that a producer survives an arbitrarily long outage.
   behaviour on the first connect while still tuning the backoff, set
   `initial_connect_retry=off` explicitly; the explicit setting wins.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
-  milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
+  milliseconds waiting for buffered rows to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
   (60 s) on Java and .NET, `5000` (5 s) on Rust, C, C++ and Python, which
   share the same Rust core, and `5000` on Node.js.
@@ -754,21 +754,21 @@ Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 
 QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an
 object store or another file system — typically over the network. After
-durably shipping a WAL, the server emits a `STATUS_DURABLE_ACK` frame to
-the store-and-forward client; the client marks that frame's FSN as durable
-only after this acknowledgement arrives.
+durably shipping a WAL, the server sends the store-and-forward client a
+`STATUS_DURABLE_ACK` message; the client treats the acknowledged batches as
+durable only after this message arrives.
 
 The benefit: if the primary dies before shipping a WAL, the client still
-holds the corresponding frames in its SF buffer and replays them against
+holds the corresponding rows in its SF buffer and replays them against
 the new primary on failover — closing the data-loss window that a
 transport-level OK ACK alone cannot close.
 
-- `request_durable_ack` — when `on`, the client gates trim on
-  `STATUS_DURABLE_ACK` frames from the server, suppressing OK-driven trim.
-  Default: `off`.
+- `request_durable_ack` — when `on`, the client frees acknowledged data only
+  after `STATUS_DURABLE_ACK` messages from the server, not after ordinary OK
+  acknowledgements. Default: `off`.
 - `durable_ack_keepalive_interval_millis` — interval at which the client
-  emits keepalive PINGs while waiting for durable-ack frames. Required
-  because the server only flushes pending durable acks on inbound recv
+  emits keepalive PINGs while waiting for durable acknowledgements. Required
+  because the server only sends pending durable acks on inbound recv
   events. Default: `200` (ms). Set to `0` or a negative value to disable.
 
 See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
@@ -896,11 +896,12 @@ discards data. The client either replays a rejected batch — `retriable`
 recycles the connection and replays from the acknowledged watermark;
 `retriable_other` does the same but rotates to the next endpoint (the node
 cannot serve writes at all) — or halts loudly with the bytes preserved in
-the store-and-forward log (`terminal`). A frame that the server keeps
-rejecting with no ack progress escalates to a terminal via the
-poison-frame detector (`max_frame_rejections`, default `4`).
+the store-and-forward log (`terminal`). If the server keeps rejecting the same
+[batch](#sf-keys) with no ack progress, the sender records a terminal error
+after `max_frame_rejections` rejections (default `4`). The protocol calls a
+batch a *frame*, hence the key's name.
 
-- `on_server_error` — global default for server-reject status frames.
+- `on_server_error` — global default for server rejections.
   Accepts `auto` \| `terminal` \| `retriable` \| `retriable_other`.
   Default: `auto` (applies the built-in per-category defaults listed below).
 - `on_schema_error` — schema-validation errors. Default: `terminal`
@@ -910,10 +911,10 @@ poison-frame detector (`max_frame_rejections`, default `4`).
 - `on_security_error` — ACL denial on a writable node. Default: `terminal`.
 - `on_write_error` — transient write failures (disk pressure, suspended
   table). Default: `retriable`.
-- `max_frame_rejections` — poison-frame detector threshold: consecutive
-  server rejections (retriable NACK, or non-orderly close after a send) of
-  the same head-of-line frame, with no ack progress in between, before the
-  sender latches a terminal instead of replaying forever. Integer ≥ 1;
+- `max_frame_rejections` — number of consecutive server rejections
+  (retriable NACK, or non-orderly close after a send) of the oldest
+  unacknowledged batch, with no ack progress in between, before the sender
+  records a terminal error instead of replaying forever. Integer ≥ 1;
   default `4`.
 
 **Resolution precedence**, from highest to lowest (as documented on
@@ -1003,7 +1004,7 @@ description and behaviour notes.
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `server_info_timeout_ms`                | int (ms)                      | `5000` (Go only)              | [Query client keys](#egress-keys)                             |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
-| `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
+| `sf_dir`                                | path                          | unset (memory-only mode)      | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js: also `append`) | [Store-and-forward](#sf-keys)       |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |

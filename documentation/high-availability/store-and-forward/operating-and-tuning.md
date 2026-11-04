@@ -2,21 +2,21 @@
 title: Operating and tuning store-and-forward
 sidebar_label: Operating & tuning
 description:
-  Operational guidance for QuestDB store-and-forward producers — slot
+  Operational guidance for QuestDB store-and-forward producers — sender
   directory layout, locks, capacity sizing, recovery, backpressure,
   observability, and orphan adoption.
 ---
 
 This page is the operator-facing guide for SF in production: how to
-provision the slot directory, what to watch, and how to tune the limits.
+provision the sender directories, what to watch, and how to tune the limits.
 For the underlying model see
 [Concepts](/docs/high-availability/store-and-forward/concepts/); for the
-choice between memory mode and SF mode see
+choice between memory-only mode and SF mode see
 [When to use](/docs/high-availability/store-and-forward/when-to-use/).
 
-## Slot directory layout
+## Sender directory layout
 
-In SF mode every sender owns one **slot directory**:
+In SF mode every sender owns one **sender directory**:
 
 ```
 <sf_dir>/<sender_id>/
@@ -30,7 +30,7 @@ In SF mode every sender owns one **slot directory**:
 ```
 
 `<sf_dir>` is the **group root** — the directory you point the connect
-string at. `<sender_id>` is the slot subdirectory; it defaults to
+string at. `<sender_id>` is the sender directory's name; it defaults to
 `default` but should be set explicitly when more than one sender shares
 the host.
 
@@ -41,7 +41,7 @@ lifetime — POSIX clients use `flock` / `fcntl`, Windows uses
 `LockFileEx`. The lock is released automatically when the file descriptor
 closes, including on hard process exit (kernel cleanup).
 
-A second sender pointing at the same slot directory will fail to start
+A second sender pointing at the same sender directory will fail to start
 with an error that names the holder's PID, read from `.lock.pid`. The
 PID file is overwritten on every successful acquire; an absent or empty
 `.lock.pid` reports `holder=unknown` rather than failing the lookup.
@@ -53,27 +53,27 @@ The Node.js client writes the same `.lock` and `.lock.pid` files, but takes
 the lock with a `.lock.owner` directory beside them instead of `flock`. A
 crash leaves that directory behind, and a new sender takes it over only when
 it names a process on the same host that no longer exists. In a container, a
-restart often reuses the process ID or changes the host name, so the slot
-stays locked until you delete `.lock.owner`: see
-[Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
+restart often reuses the process ID or changes the host name, so the sender
+directory stays locked until you delete `.lock.owner`: see
+[Recovering a sender directory after a crash](/docs/connect/clients/nodejs/#recovering-a-sender-directory-after-a-crash).
 The two locks do not interoperate, so a Node.js and a Java process must never
-open one slot at the same time.
+open one sender directory at the same time.
 
 **Cross-platform interop:** a POSIX client and a Windows client must
-**not** share a slot on a network filesystem. Their lock primitives are
-incompatible.
+**not** share a sender directory on a network filesystem. Their lock
+primitives are incompatible.
 
 ### `.failed`
 
-Present iff a previous drainer attempt gave up on the slot — reconnect
-budget exhausted, terminal auth failure, or irrecoverable corruption.
-The file contents are a UTF-8 reason for human operators; the **presence**
-is the signal that the orphan scanner uses to exclude the slot from
-auto-drain on subsequent scans.
+Present iff a previous drainer attempt gave up on the sender directory —
+reconnect budget exhausted, terminal auth failure, or irrecoverable
+corruption. The file contents are a UTF-8 reason for human operators; the
+**presence** is the signal that the orphan scanner uses to exclude the
+directory from auto-drain on subsequent scans.
 
 **Operator action:** read the reason, fix the underlying cause (rotate
 credentials, restore the missing peer, etc.), then delete `.failed`. The
-next sender that scans `<sf_dir>` will pick the slot up again.
+next sender that scans `<sf_dir>` will pick the directory up again.
 
 ### Segment files
 
@@ -98,8 +98,8 @@ to a supported local filesystem.
 ## Lock collisions in practice
 
 Two `sender_id`s in the same `sf_dir` never collide — they are
-independent slots. The same `sender_id` started twice **will** collide,
-and the second start fails loudly.
+independent sender directories. The same `sender_id` started twice
+**will** collide, and the second start fails loudly.
 
 A common cause is a redeploy where the old process hasn't fully exited
 when the new one comes up. Solutions:
@@ -111,8 +111,8 @@ when the new one comes up. Solutions:
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.
 
-`drain_orphans=on` does **not** override the lock — a busy orphan slot
-is skipped, not stolen.
+`drain_orphans=on` does **not** override the lock — a busy orphan is
+skipped, not stolen.
 
 ## Sizing capacity
 
@@ -122,15 +122,15 @@ Two limits matter:
 
 This is the rotation threshold and the unit of trim. Segments that are
 smaller release disk faster but waste more space on the active tail;
-larger segments waste less on the active tail but hold acked frames in
-the same file as the still-unacked tail until every frame in the segment
+larger segments waste less on the active tail but hold acked batches in
+the same file as the still-unacked tail until every batch in the segment
 is acked.
 
 For most workloads `4 MiB` is fine. Raise it if you are appending very
 large batches and pre-allocation cost matters; lower it if you observe
 disk usage staying high under slow ack cadence.
 
-### `sf_max_total_bytes` — slot capacity (default `128 MiB` memory / `10 GiB` SF)
+### `sf_max_total_bytes` — capacity (default `128 MiB` memory-only / `10 GiB` SF)
 
 This is the **hard cap** on resident SF storage — sealed segments plus
 the active segment. When this fills, producer `appendBlocking` calls
@@ -144,12 +144,12 @@ rate:
 sf_max_total_bytes ≥ ingest_rate × max_tolerated_outage
 ```
 
-A 5-minute reconnect budget at 10 MB/s of compressed frames implies at
+A 5-minute reconnect budget at 10 MB/s of compressed data implies at
 least 3 GB. Add safety margin for trim latency — in particular,
 `request_durable_ack=on` extends time-to-trim by the WAL→object-store
 upload window.
 
-In memory mode the default `128 MiB` is deliberately small: it forces
+In memory-only mode the default `128 MiB` is deliberately small: it forces
 you to think about backpressure rather than letting an outage silently
 balloon process RSS.
 
@@ -177,14 +177,14 @@ When an SF-mode sender opens, it runs this sequence:
 1. Acquire `<sf_dir>/<sender_id>/.lock`. Fail loudly on contention.
 2. Scan every `*.sfa` file:
    - Validate magic, version, header.
-   - Walk frames forward verifying each CRC32C-Castagnoli.
-   - The first invalid frame becomes end-of-data; any non-zero bytes
+   - Walk the batches forward verifying each CRC32C-Castagnoli checksum.
+   - The first invalid batch becomes end-of-data; any non-zero bytes
      past that point are logged as a torn-tail count.
 3. Sort segments by `baseSeq` and verify no gaps. A gap is a fatal
    recovery error.
 4. Open `.ack-watermark` (if present) and read the cumulative
    durable-ack FSN. Reject a watermark that exceeds the on-disk
-   ceiling — it would seed `ackedFsn` past every un-acked frame and
+   ceiling — it would seed `ackedFsn` past every un-acked batch and
    silently drop the un-acked tail.
 5. Seed `ackedFsn = max(lowestBaseSeq - 1, watermark)`.
 6. Allocate the next segment generation as `max(existing-gen) + 1`.
@@ -198,10 +198,10 @@ fresh start: no segments, no replay.
 
 | Symptom | Likely cause | Operator action |
 |---|---|---|
-| "Slot held by PID `<n>`" | Two processes claiming the same `sender_id`. | Stop the duplicate. The lock releases on its exit. |
+| "Slot held by PID `<n>`" | Two processes claiming the same `sender_id`; the message calls the sender directory a slot. | Stop the duplicate. The lock releases on its exit. |
 | "Gap between segments" | Corruption — a segment was deleted out of band. | Restore from backup or accept data loss; the substrate refuses to start. |
-| "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's frames; rely on server deduplication. |
-| Torn tail count > 0 | The previous process crashed mid-frame-write. | Informational; the CRC + zero-fill design discards the partial frame. |
+| "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's batches; rely on server deduplication. |
+| Torn tail count > 0 | The previous process crashed while writing a batch. | Informational; the CRC + zero-fill design discards the partial batch. |
 
 ## Close and shutdown
 
@@ -209,8 +209,8 @@ fresh start: no segments, no replay.
 
 | Value | Behaviour |
 |---|---|
-| `5000` (default) | Block up to 5 s waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory). |
-| `0` or `-1` | Skip the drain wait. Pending data persists on disk (SF) for the next sender, or is lost (memory). |
+| `5000` (default) | Block up to 5 s waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory-only). |
+| `0` or `-1` | Skip the drain wait. Pending data persists on disk (SF) for the next sender, or is lost (memory-only). |
 | any other positive value | That timeout in milliseconds. |
 
 In every branch `close()`:
@@ -218,7 +218,7 @@ In every branch `close()`:
 - Performs a non-blocking safety-net check that rethrows any latched
   terminal error not already delivered through an async handler or a
   synchronous producer call.
-- Releases the slot lock and unmaps segment files.
+- Releases the sender directory's lock and unmaps segment files.
 
 The safety-net check is what makes "close-and-forget" callers safe: if
 the only API your code uses is `close()`, terminal errors still surface
@@ -244,8 +244,8 @@ and exits when the orphan's `ackedFsn ≥ publishedFsn`.
 - **Auth-terminal upgrade error.** Same.
 - **Irrecoverable corruption.** Same.
 
-`.failed` slots are excluded from auto-drain on subsequent scans —
-operator action is required to clear the sentinel.
+Sender directories with `.failed` are excluded from auto-drain on subsequent
+scans — operator action is required to clear the sentinel.
 
 ### Observing drainers
 
@@ -268,7 +268,7 @@ A conformant client exposes at minimum:
 | `getTotalReconnectAttempts()` | How often the wire has broken across the sender's lifetime. |
 | `getTotalReconnectsSucceeded()` | How many of those recovered. |
 | `getTotalFramesReplayed()` | Volume re-sent after reconnects. A spike usually means a fresh outage; sustained growth means a flapping wire. |
-| `getTotalServerErrors()` | Count of error frames received (any category). |
+| `getTotalServerErrors()` | Count of error responses received (any category). |
 | `getDroppedErrorNotifications()` | Error-inbox overflow count. Non-zero means a busy error stream or a slow handler. |
 | `getTotalErrorNotificationsDelivered()` | Errors delivered to the user handler. |
 | `getTotalBackpressureStalls()` | Producer threads that hit `sf_max_total_bytes`. |
@@ -309,7 +309,7 @@ When several senders share a host and a `sf_dir`:
 - Plan for the worst-case lock-collision recovery: a misconfigured
   fleet that all share `sender_id=default` will leave only one sender
   alive on each host. That is the design — fail loudly rather than
-  silently corrupt overlapping slots.
+  silently corrupt a shared sender directory.
 
 ## Next steps
 
