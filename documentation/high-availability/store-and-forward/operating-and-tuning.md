@@ -55,7 +55,7 @@ crash leaves that directory behind, and a new sender takes it over only when
 it names a process on the same host that no longer exists. In a container, a
 restart often reuses the process ID or changes the host name, so the sender
 directory stays locked until you delete `.lock.owner`: see
-[Recovering a journal after a crash](/docs/connect/clients/nodejs/#recovering-a-journal-after-a-crash).
+[Recovering a sender directory after a crash](/docs/connect/clients/nodejs/#recovering-a-sender-directory-after-a-crash).
 The two locks do not interoperate, so a Node.js and a Java process must never
 open one sender directory at the same time.
 
