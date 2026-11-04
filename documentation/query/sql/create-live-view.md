@@ -56,7 +56,7 @@ the query. When `OWNED BY` is used, wrap the query in parentheses.
 | `PARTITION BY` | Partitioning unit for the view's disk tier. Defaults to the base table's scheme |
 | `START FROM` | Inclusive event-time boundary: `NOW`, `BEGINNING`, or a timestamp literal. Required |
 | `query` | A window-function `SELECT` over a single WAL-backed base table |
-| `OWNED BY` | Assign ownership (Enterprise) |
+| `OWNED BY` | Gives the creator's permissions to another user, group, or service account (Enterprise) |
 
 ## Clauses
 
@@ -265,6 +265,15 @@ The view query is validated at creation time and must:
   `WHERE` predicates are supported.
 - Not use non-deterministic functions such as `now()`, `sysdate()`,
   `systimestamp()`, or `rnd_*()`.
+- Not use
+  [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions)
+  or `SHOW` statements, such as `tables()` in a `WHERE` sub-query, unless the
+  creator holds `SYSTEM ADMIN` (Enterprise). The same rules as for materialized
+  views apply.
+- Not use Enterprise administrative functions, which check the permissions of
+  the calling session: `active_grants()`, `active_permissions()`,
+  `backup_instance_name()`, `backup_status()`, `backups()`, `permissions()`,
+  `reload_tick_calendars()`, and `reload_tls()`.
 - Not read another live view.
 
 ## Examples
@@ -395,13 +404,15 @@ GRANT SELECT ON trades TO user1;
 ```
 
 When you create a live view you automatically receive all permissions on it,
-including `DROP LIVE VIEW`, with the `GRANT` option. With `OWNED BY`, the named
-owner receives these permissions instead.
+including `DROP LIVE VIEW`, with the `GRANT` option. With `OWNED BY`, the user,
+group, or service account named in the clause receives these permissions
+instead. QuestDB stores no owner for the view: afterwards they are ordinary
+grants that can be revoked like any other.
 
 ### OWNED BY clause
 
-Assign ownership to a user, group, or service account. The query must be wrapped
-in parentheses:
+Give the creator's permissions to a user, group, or service account. The query
+must be wrapped in parentheses:
 
 ```questdb-sql
 CREATE GROUP analysts;
@@ -418,7 +429,7 @@ OWNED BY analysts;
 ```
 
 The example works as written for the built-in admin, which can name any
-existing user, group, or service account as the owner. Any other creator can
+existing user, group, or service account in `OWNED BY`. Any other creator can
 name only themselves or a group they are a member of; naming another group fails
 with `<user> is not part of group <group>`. External users must specify
 `OWNED BY` and can name only one of their groups.
@@ -445,6 +456,7 @@ the query.
 | `live view requires a START FROM clause` | `START FROM` is missing |
 | `Access denied for <user> [CREATE LIVE VIEW]` | Missing `CREATE LIVE VIEW` permission (Enterprise) |
 | `Access denied for <user> [SELECT on <table>(<column>)]` | Missing `SELECT` on a base-table column the view reads (Enterprise) |
+| `catalogue function cannot be used in live view without SYSTEM ADMIN: <function>` | The query calls a [catalogue function](/docs/query/sql/create-mat-view/#catalogue-functions) and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
 | `OWNED BY clause is required for external users` | An external user created a view without `OWNED BY` (Enterprise) |
 
 ### Query shape errors
@@ -463,6 +475,7 @@ the query.
 | `wildcard column select is not allowed in live view queries` | The top-level projection contains `*` |
 | `live view select cannot filter on the designated timestamp yet` | The `WHERE` clause filters the designated timestamp |
 | `non-deterministic function cannot be used in live view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
+| `administrative function cannot be used in live view: <function>` | The query calls an Enterprise administrative function, such as `permissions()` or `reload_tls()` |
 
 ### Window errors
 

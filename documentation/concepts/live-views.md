@@ -406,9 +406,9 @@ replaying it:
 - If the view was created with a trailing `;`, the saved query keeps it inside
   `AS ( ... )` and replaying fails with `')' expected`. Remove that `;`.
 - On QuestDB Enterprise, the saved `OWNED BY` names the user running
-  `SHOW CREATE`, not necessarily the view's owner, and dropping the view
-  removes its grants. Set `OWNED BY` to the intended owner and grant
-  permissions on the new view again.
+  `SHOW CREATE`, and dropping the view removes its grants. Set `OWNED BY` to
+  the user or group that should receive the creator's permissions, and grant
+  the other permissions on the new view again.
 
 Dropping the invalid view removes its materialized rows, including rows whose
 source history is no longer retained by the base table.
@@ -529,6 +529,15 @@ in [Base table lifecycle](#base-table-lifecycle).
 - **Deterministic queries only.** Non-deterministic functions such as `now()`,
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.
+- **Restricted catalogue functions.** Functions and `SHOW` statements that list
+  objects, such as `tables()`, follow the
+  [materialized view rules](/docs/query/sql/create-mat-view/#catalogue-functions):
+  in QuestDB Enterprise, only a creator with `SYSTEM ADMIN` can use them.
+- **No administrative functions.** Enterprise functions that check the
+  caller's permissions, such as `permissions()` and `backup_instance_name()`,
+  are rejected, since a live view refreshes in the background. See
+  [query constraints](/docs/query/sql/create-live-view/#query-constraints) for
+  the full list.
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Base-table retention does not shrink the view, because `DROP PARTITION`,
   `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.

@@ -66,7 +66,7 @@ as `[name=trades_ma]`.
 | Error | Cause |
 | ----- | ----- |
 | `live view name expected` | The name refers to a table or view that is not a live view, even with `IF EXISTS` |
-| `live view does not exist` | The view does not exist and `IF EXISTS` was not specified |
+| `live view does not exist` | The view does not exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise), and `IF EXISTS` was not specified |
 | `Access denied for <user> [DROP LIVE VIEW on <view>]` | Missing `DROP LIVE VIEW` permission (Enterprise) |
 
 ## See also

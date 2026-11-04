@@ -103,7 +103,7 @@ Use `COMPILE VIEW` when you want to:
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist [view=name]` | View with specified name doesn't exist |
+| `view does not exist [view=name]` | View with specified name doesn't exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise) |
 | `table does not exist [table=name]` | View references a table that doesn't exist |
 | `Invalid column` | View references a column that doesn't exist |
 | `Access denied [COMPILE VIEW on view_name]` | User lacks permission (Enterprise) |

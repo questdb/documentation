@@ -186,7 +186,15 @@ GRANT ALL ON table2 TO user2 WITH GRANT OPTION;
 
 Permission grants can be specific and fine-tuned.
 
-List the full list of applied permissions with `all_permissions()`.
+To check the grants, query
+[`active_grants()`](/docs/query/functions/access-control/#active_grants),
+which lists the direct grants of every user, group, and service account. It is
+available since QuestDB Enterprise 4.1.0:
+
+```questdb-sql
+SELECT * FROM active_grants()
+WHERE entity_name IN ('readonly', 'user1', 'user2');
+```
 
 - For the full role-based access control docs, including group management, see
   the [RBAC operations guide](/docs/security/rbac/).
@@ -556,11 +564,11 @@ not affected: they continue to use `TTL` for retention in Enterprise.
 To move a legacy table from `TTL` to a storage policy:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts on a table, and it is required before a storage
-   policy can be attached:
+   value Enterprise accepts on a user table, and it is required before a
+   storage policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
-   ALTER TABLE trades SET TTL 0;
+   ALTER TABLE trades SET TTL 0 HOURS;
    ```
 
 2. **Attach a storage policy** that reproduces, and ideally extends, the

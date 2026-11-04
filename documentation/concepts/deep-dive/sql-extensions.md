@@ -216,7 +216,8 @@ because no extra aggregation pass is required.
 [`DECLARE`](/docs/query/sql/declare/) introduces query-scoped variables for
 both stand-alone queries and view definitions. Variables make repeated
 expressions (date ranges, symbol filters, thresholds) reusable without
-losing readability.
+losing readability. A variable can also hold a
+[value list](/docs/query/sql/declare/#value-lists) for an `IN` filter.
 
 ```questdb-sql demo title="DECLARE used in a query"
 DECLARE

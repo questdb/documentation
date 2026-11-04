@@ -44,12 +44,15 @@ For guidance on what metrics to monitor and alerting strategies, see
 ## Scraping Prometheus metrics from QuestDB
 
 QuestDB has a `/metrics` HTTP endpoint on port `9003` to expose Prometheus
-metrics. Before being able to query metrics, they must be enabled via the
-`metrics.enabled` key in server configuration:
+metrics. The endpoint must be enabled via the `metrics.enabled` key in server
+configuration:
 
 ```ini title="/path/to/server.conf"
 metrics.enabled=true
 ```
+
+With or without the endpoint, QuestDB keeps a history of these metrics in the
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics) table.
 
 When running QuestDB via Docker, port `9003` must be exposed and the metrics
 configuration can be enabled via the `QDB_METRICS_ENABLED` environment variable:

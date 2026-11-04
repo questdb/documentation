@@ -350,5 +350,8 @@ trades PIVOT (
 
 - [GROUP BY](/docs/query/sql/group-by/) - Row-based aggregation
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+- [HORIZON JOIN](/docs/query/sql/horizon-join/#results-without-aggregate-functions) -
+  Aggregate markouts in the HORIZON JOIN, then pivot offsets into columns with
+  `first()`
 - [Aggregation functions](/docs/query/functions/aggregation/) - Functions available in PIVOT
 - [WITH](/docs/query/sql/with/) - Using PIVOT with common table expressions
