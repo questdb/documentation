@@ -25,14 +25,17 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 ### Performance Considerations
 
 QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized
-for performance. Our recommendation is to use the `pg` client for most use cases as it's well-supported with QuestDB.
+for performance. Among the PGWire clients, we recommend `pg` for most use cases as it's well-supported with QuestDB.
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
-querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/connect/clients/nodejs/) for data
-ingestion using ILP.
+For both ingestion and queries, use QuestDB's first-party clients instead of
+PGWire. The official [Node.js client](/docs/connect/clients/nodejs/) ingests
+data and streams SQL query results over QWP, and the
+[browser client](/docs/connect/clients/browser/) does the same from web
+applications. Use PGWire for compatibility: with tools and libraries that
+already speak the PostgreSQL protocol, with existing code written for `pg` or
+`postgres`, or with QuestDB versions before 10.0, which do not support QWP.
 
 :::
 
@@ -780,9 +783,9 @@ latestByQuery()
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard JavaScript PostgreSQL clients for querying
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
-We recommend the `pg` client for querying.
-For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
-throughput.
+For both ingestion and queries, we recommend QuestDB's
+[Node.js client](/docs/connect/clients/nodejs/), which speaks QWP. When you
+need PGWire for compatibility, use the `pg` client.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
 `SAMPLE BY` and `LATEST ON` for efficient queries.

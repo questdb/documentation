@@ -491,7 +491,7 @@ kubectl annotate serviceaccount default \
 The manifest below connects QuestDB to your S3 bucket and starts one instance
 with a backup every five minutes.
 
-Keep the QuestDB ECR account ID unchanged. The tested image tag for v0.3.1 is
+Keep the QuestDB ECR account ID unchanged. The tested image tag for v0.4.0 is
 `4.0.1-enterprise`; change it only when QuestDB provides another one.
 
 ```sh

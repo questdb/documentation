@@ -112,6 +112,7 @@ LIMIT 6;
 
 ## See also
 
+- [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins) - Settings for parallel aggregations over `INNER`, `LEFT` and `RIGHT` joins
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions

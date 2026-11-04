@@ -3,8 +3,8 @@ title: Kubernetes Operator API reference
 description: Custom resources provided by the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.3.1 (6e6eb55a58d21a5f480eed6a9324b1cd8cdf6580).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.3.1 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.4.0 (ccf29ce8787cc899fb73de99d2bbd9b4b8c1735a).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.4.0 -->
 # API Reference
 
 Packages:
@@ -222,6 +222,15 @@ cluster that never had it IS allowed: turning on backup/replication later is a
 legitimate day-2 operation that strands nothing (see the spec-level rules).<br/>
           <br/>
             <i>Validations</i>:<ul><li>self == oldSelf: spec.objectStoreRef is immutable</li></ul>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#questdbclusterspecpodmetadata">podMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          podMetadata adds labels and annotations to every instance Pod (e.g. scrape
+annotations for a metrics agent). Operator-owned keys always win. Changing it
+rolls the Pods, including the primary.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -871,6 +880,42 @@ legitimate day-2 operation that strands nothing (see the spec-level rules).
 reference. Which kind is determined by the field: see its documentation.<br/>
         </td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.podMetadata
+<sup><sup>[↩ Parent](#questdbclusterspec)</sup></sup>
+
+
+
+podMetadata adds labels and annotations to every instance Pod (e.g. scrape
+annotations for a metrics agent). Operator-owned keys always win. Changing it
+rolls the Pods, including the primary.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -3064,8 +3109,10 @@ podDisruptionBudget tunes the operator-managed PodDisruptionBudget.
         <td><b>enabled</b></td>
         <td>boolean</td>
         <td>
-          enabled controls whether the operator maintains a PDB. Defaults to true.
-Set false to remove the PDB entirely (e.g. to permit unrestricted node drains).<br/>
+          enabled controls whether the operator maintains a PDB. When unset, a
+replicated cluster (instances &gt; 1) gets one and a single-instance cluster does
+not, unless minAvailable is set. Set false to remove the PDB entirely (e.g. to
+permit unrestricted node drains).<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3073,15 +3120,16 @@ Set false to remove the PDB entirely (e.g. to permit unrestricted node drains).<
         <td>integer</td>
         <td>
           minAvailable overrides the computed integer minAvailable. When unset:
-single instance =&gt; 1; replicated =&gt; instances-1.
+replicated =&gt; instances-1; single instance =&gt; 1 if the PDB is enabled.
 
 LIMITATION: instance Pods have no controller to reschedule them, so a PDB
 that leaves no disruption budget HARD-BLOCKS voluntary evictions (`kubectl
 drain` hangs) until a human deletes the Pod or the PDB. This happens whenever
-minAvailable &gt;= the number of currently-Ready instances — including the
-single-instance default (minAvailable=1 over one Pod). It is intentional
-protection for a database, NOT auto-clamped: set a lower minAvailable, scale
-out, or disable the PDB if you need drains to proceed unattended.<br/>
+minAvailable &gt;= the number of currently-Ready instances — which is why a
+single-instance cluster gets no PDB by default: a drain evicts its only Pod
+(a short outage) and the operator recreates it on another node. It is NOT
+auto-clamped: set a lower minAvailable, scale out, or disable the PDB if you
+need drains to proceed unattended.<br/>
           <br/>
             <i>Format</i>: int32<br/>
             <i>Minimum</i>: 0<br/>

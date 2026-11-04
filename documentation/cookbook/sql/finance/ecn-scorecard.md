@@ -190,18 +190,19 @@ An ECN with a mildly negative `vw_markout_5s_bps` but 80%+ `adverse_fill_ratio` 
 
 ## Pivoted ECN scorecard
 
-The sections above produce one row per ECN per horizon offset. Using `PIVOT`, you can reshape the results into a wide format — one row per symbol-ECN combination with fill count, average size, volume, and markout at each horizon as separate columns:
+The sections above produce one row per ECN per horizon offset. `PIVOT` reshapes the results into a wide format: one row per symbol-ECN combination, with fill count, average size, volume, and markout at each horizon as separate columns. The HORIZON JOIN computes the metrics per symbol, ECN and offset on the query workers in parallel, and `PIVOT` only moves the offsets into columns, with `first()` picking the single value for each offset:
 
 ```questdb-sql title="Pivoted ECN scorecard (buy side)" demo
 WITH markouts AS (
     SELECT
         t.symbol,
         t.ecn,
-        t.price,
-        t.quantity,
         h.offset,
-        m.best_bid,
-        m.best_ask
+        count() AS fills,
+        avg(t.quantity) AS avg_size,
+        sum(t.quantity) AS volume,
+        avg(((m.best_bid + m.best_ask) / 2 - t.price)
+            / t.price * 10000) AS markout_bps
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -210,10 +211,10 @@ WITH markouts AS (
 )
 SELECT * FROM markouts
 PIVOT (
-    count() AS fills,
-    avg(quantity) AS avg_size,
-    sum(quantity) AS volume,
-    avg(((best_bid + best_ask) / 2 - price) / price * 10000) AS markout_bps
+    first(fills) AS fills,
+    first(avg_size) AS avg_size,
+    first(volume) AS volume,
+    first(markout_bps) AS markout_bps
     FOR offset IN (0 AS at_fill, 5000000000 AS t_5s, 60000000000 AS t_1m)
     GROUP BY symbol, ecn
 )

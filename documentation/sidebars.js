@@ -79,6 +79,11 @@ module.exports = {
               label: "Node.js",
             },
             {
+              id: "connect/clients/browser",
+              type: "doc",
+              label: "Browser (JavaScript)",
+            },
+            {
               id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
@@ -87,6 +92,11 @@ module.exports = {
               id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
+            },
+            {
+              id: "connect/clients/ruby",
+              type: "doc",
+              label: "Ruby",
             },
             {
               id: "connect/clients/date-to-timestamp-conversion",
@@ -102,13 +112,14 @@ module.exports = {
         },
         {
           type: "category",
-          label: "Message Brokers",
+          label: "Connectors",
           collapsed: true,
           items: [
             "connect/message-brokers/kafka",
             "connect/message-brokers/telegraf",
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
+            "connect/connectors/databento",
           ],
         },
         {
@@ -288,12 +299,36 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
-                  id: "query/sql/acl/alter-group",
+                  type: "category",
+                  label: "ALTER GROUP",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-group-drop-external-alias", // DROP EXTERNAL ALIAS
+                    "query/sql/acl/alter-group-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-group-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-group-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-group-with-external-alias", // WITH EXTERNAL ALIAS
+                  ],
+                },
+                {
+                  id: "query/sql/acl/alter-resource-group",
                   type: "doc",
                 },
                 {
-                  id: "query/sql/acl/alter-service-account",
-                  type: "doc",
+                  type: "category",
+                  label: "ALTER SERVICE ACCOUNT",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-service-account-create-token", // CREATE TOKEN
+                    "query/sql/acl/alter-service-account-disable", // DISABLE
+                    "query/sql/acl/alter-service-account-drop-token", // DROP TOKEN
+                    "query/sql/acl/alter-service-account-enable", // ENABLE
+                    "query/sql/acl/alter-service-account-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-service-account-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-service-account-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-service-account-with-no-password", // WITH NO PASSWORD
+                    "query/sql/acl/alter-service-account-with-password", // WITH PASSWORD
+                  ],
                 },
                 {
                   type: "category",
@@ -335,6 +370,11 @@ module.exports = {
                 },
                 {
                   type: "category",
+                  label: "ALTER LIVE VIEW",
+                  items: ["query/sql/alter-live-view-resume-wal"],
+                },
+                {
+                  type: "category",
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
                     {
@@ -353,8 +393,20 @@ module.exports = {
                   ],
                 },
                 {
-                  id: "query/sql/acl/alter-user",
-                  type: "doc",
+                  type: "category",
+                  label: "ALTER USER",
+                  // Ordered by the label the sidebar renders, not the doc id
+                  items: [
+                    "query/sql/acl/alter-user-create-token", // CREATE TOKEN
+                    "query/sql/acl/alter-user-disable", // DISABLE
+                    "query/sql/acl/alter-user-drop-token", // DROP TOKEN
+                    "query/sql/acl/alter-user-enable", // ENABLE
+                    "query/sql/acl/alter-user-set-memory-limit", // SET MEMORY LIMIT
+                    "query/sql/acl/alter-user-set-resource-group", // SET RESOURCE GROUP
+                    "query/sql/acl/alter-user-unset-resource-group", // UNSET RESOURCE GROUP
+                    "query/sql/acl/alter-user-with-no-password", // WITH NO PASSWORD
+                    "query/sql/acl/alter-user-with-password", // WITH PASSWORD
+                  ],
                 },
                 "query/sql/alter-view",
               ],
@@ -375,6 +427,10 @@ module.exports = {
                 },
                 "query/sql/create-live-view",
                 "query/sql/create-mat-view",
+                {
+                  id: "query/sql/acl/create-resource-group",
+                  type: "doc",
+                },
                 {
                   id: "query/sql/acl/create-service-account",
                   type: "doc",
@@ -397,6 +453,10 @@ module.exports = {
                 },
                 "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
+                {
+                  id: "query/sql/acl/drop-resource-group",
+                  type: "doc",
+                },
                 {
                   id: "query/sql/acl/drop-service-account",
                   type: "doc",
@@ -492,6 +552,7 @@ module.exports = {
           type: "category",
           label: "Functions",
           items: [
+            "query/functions/access-control",
             "query/functions/aggregation",
             "query/functions/array",
             "query/functions/binary",
@@ -611,6 +672,7 @@ module.exports = {
             "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
+            "concepts/merge-append-partitions",
             {
               id: "concepts/parquet",
               type: "doc",
@@ -641,6 +703,11 @@ module.exports = {
               id: "concepts/cold-storage",
               type: "doc",
               label: "Cold Storage",
+            },
+            {
+              id: "concepts/resource-groups",
+              type: "doc",
+              label: "Resource Groups",
             },
             "concepts/write-ahead-log",
           ],
@@ -690,6 +757,7 @@ module.exports = {
           type: "doc",
           label: "Overview",
         },
+        "configuration/audited-views",
         "configuration/cairo-engine",
         "configuration/cold-storage",
         "configuration/copy-settings",
@@ -705,6 +773,11 @@ module.exports = {
         "configuration/postgres-wire-protocol",
         "configuration/qwp",
         "configuration/database-replication",
+        {
+          id: "configuration/resource-groups",
+          type: "doc",
+          label: "Resource groups",
+        },
         "configuration/shared-workers",
         "configuration/storage-policy",
         "configuration/telemetry",
@@ -721,6 +794,11 @@ module.exports = {
       type: "category",
       items: [
         {
+          id: "security/governance",
+          type: "doc",
+          label: "Governance and auditing",
+        },
+        {
           id: "security/rbac",
           type: "doc",
           label: "Role-Based Access Control (RBAC)",
@@ -729,6 +807,11 @@ module.exports = {
           id: "security/oidc",
           type: "doc",
           label: "OpenID Connect (OIDC)",
+        },
+        {
+          id: "security/audited-views",
+          type: "doc",
+          label: "Audited views",
         },
         {
           type: "doc",
@@ -795,6 +878,11 @@ module.exports = {
           id: "operations/cold-storage",
           type: "doc",
           label: "Cold storage",
+        },
+        {
+          id: "operations/resource-groups",
+          type: "doc",
+          label: "Resource groups",
         },
         "operations/logging-metrics",
         "operations/monitoring-alerting",
@@ -909,7 +997,7 @@ module.exports = {
           ],
         },
         {
-          // Message brokers live under Ingestion. This is a cross-reference to
+          // Connector guides live under Connect. This is a cross-reference to
           // the overview section that lists them. The fragment is deliberate:
           // Docusaurus decides sidebar activeness by comparing normalized
           // paths without stripping it, so this link never highlights and
@@ -945,10 +1033,10 @@ module.exports = {
             "integrations/other/prometheus",
             "integrations/other/sqlalchemy",
             "integrations/other/mindsdb",
-            "integrations/other/databento",
             "integrations/other/cube",
             "integrations/other/ignition",
             "integrations/other/airbyte",
+            "integrations/other/databento",
           ],
         },
       ],

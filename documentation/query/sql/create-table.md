@@ -27,7 +27,7 @@ The first two modes accept the same set of optional clauses:
   [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
 - [`WITH`](#with-table-parameter) - table parameters
 - [`IN VOLUME`](#table-target-volume) - target volume for storage
-- [`OWNED BY`](#owned-by) - Enterprise RBAC owner
+- [`OWNED BY`](#owned-by) - who receives the creator's permissions (Enterprise)
 
 ## Syntax
 
@@ -309,8 +309,8 @@ translated into a `STORAGE POLICY(DROP LOCAL ...)`. On an existing table,
 `ALTER TABLE SET TTL` with a non-zero value is rejected with `TTL is not
 supported on Enterprise tables; use a storage policy instead`. A table can still
 carry a TTL if it was created in QuestDB Open Source and later upgraded to
-Enterprise; clear that legacy TTL with `ALTER TABLE SET TTL 0` before setting a
-storage policy.
+Enterprise; clear that legacy TTL with `ALTER TABLE SET TTL 0 HOURS` before
+setting a storage policy.
 
 :::
 
@@ -825,6 +825,10 @@ When a user creates a new table, they automatically get all table level
 permissions with the `GRANT` option for that table. However, if the `OWNED BY`
 clause is used, the permissions instead go to the user, group, or service
 account named in that clause.
+
+QuestDB stores no owner for the table. `OWNED BY` only decides who receives
+these permissions when the table is created, and afterwards they are ordinary
+grants that can be revoked like any other.
 
 The `OWNED BY` clause cannot be omitted if the table is created by an external
 user, because permissions cannot be granted to them.

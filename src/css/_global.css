@@ -445,8 +445,9 @@ html[data-theme="dark"] .DocSearch {
   display: none;
 }
 
-/* Hide Docusaurus chevron for custom GitHub link */
-.custom-github-link::after {
+/* Hide Docusaurus chevron for the custom GitHub and Enterprise links */
+.custom-github-link::after,
+.navbar__enterprise-link::after {
   display: none !important;
 }
 

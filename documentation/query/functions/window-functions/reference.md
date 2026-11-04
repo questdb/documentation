@@ -1,15 +1,15 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, EMA, VWEMA, the SUBSAMPLE keep-flag functions lttb, m4, minmax, uniform, cadence, sdt, and more.
-keywords: [subsample, lttb, m4, minmax, uniform, cadence, sdt, downsampling, window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, min, max, ema, vwema, exponential moving average]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, percentile_cont, percentile_disc, EMA, VWEMA, the SUBSAMPLE keep-flag functions lttb, m4, minmax, uniform, cadence, sdt, and more.
+keywords: [subsample, lttb, m4, minmax, uniform, cadence, sdt, downsampling, window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, percentile_cont, percentile_disc, quantile_cont, quantile_disc, percentile, median, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
 
 ## Aggregate window functions
 
-These functions respect the frame clause and calculate values over the specified window frame.
+These functions respect the frame clause and calculate values over the specified window frame. The exception is [percentile_cont() / percentile_disc()](#percentile), which always use the whole partition.
 
 ### avg() / EMA / VWEMA {#avg}
 
@@ -121,7 +121,7 @@ WHERE timestamp IN '$today';
 - NULL values are skipped; the previous EMA value is preserved
 - The first non-NULL value initializes the EMA
 - Works with both `TIMESTAMP` and `TIMESTAMP_NS` precision
-- EMA ignores the frame clause and operates cumulatively from the first row
+- EMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 #### Volume-Weighted Exponential Moving Average (VWEMA)
@@ -180,7 +180,7 @@ WHERE timestamp IN '$today';
 :::note VWEMA behavior
 - Rows with NULL price, NULL volume, or zero volume are skipped
 - When timestamps are identical (Δt = 0), the row is skipped in time-weighted mode
-- VWEMA ignores the frame clause and operates cumulatively from the first row
+- VWEMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 ---
@@ -631,6 +631,76 @@ WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
 ```
 
 With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
+
+---
+
+### percentile_cont() / percentile_disc() {#percentile}
+
+Calculates the exact percentile of a whole partition and attaches it to every row of that partition. This lets you compare each row with its group's distribution without a self-join, for example to flag trades above the 99th percentile of size for their symbol. `quantile_cont()` and `quantile_disc()` are aliases.
+
+**Syntax:**
+```questdb-sql
+percentile_cont(value, percentile) OVER ([PARTITION BY columnName])
+percentile_disc(value, percentile) OVER ([PARTITION BY columnName])
+percentile_cont(value, ARRAY[p1, p2, ...]) OVER ([PARTITION BY columnName])
+percentile_disc(value, ARRAY[p1, p2, ...]) OVER ([PARTITION BY columnName])
+```
+
+**Arguments:**
+- `value`: Numeric column. NULL values are ignored
+- `percentile`: Constant `double` between 0.0 and 1.0, inclusive, or a one-dimensional `double[]` constant of such values
+
+**Return value:**
+- `percentile_cont()`: `double`, interpolated between the two input values closest to the requested position
+- `percentile_disc()`: an actual input value. `long` for integer input, `double` for floating-point input
+- `double[]` for either function when `percentile` is an array, with results in the order requested
+- `NULL` when the partition has no non-NULL values
+
+**Description:**
+
+These are the window forms of the [percentile_cont](/docs/query/functions/aggregation/#percentile_cont--quantile_cont) and [percentile_disc](/docs/query/functions/aggregation/#percentile_disc--quantile_disc) aggregate functions, and compute the same values. Every row in a partition gets the same result.
+
+**Behavior:**
+- Only whole-partition windows are supported. `ORDER BY` and frame clauses (`ROWS`, `RANGE`) inside `OVER` are rejected, including `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
+- `percentile` must be a constant. Bind variables are rejected
+- The function buffers every value of the partition, so memory use grows with partition size
+- Not supported in [live views](/docs/query/sql/create-live-view/)
+
+**Examples:**
+```questdb-sql title="Median quantity per symbol next to each trade" demo
+SELECT
+    timestamp,
+    symbol,
+    quantity,
+    percentile_cont(quantity, 0.5) OVER (PARTITION BY symbol) AS median_qty
+FROM fx_trades
+WHERE timestamp IN '$now-1h..$now';
+```
+
+```questdb-sql title="Trades at or above the 99th percentile of size for their symbol" demo
+SELECT timestamp, symbol, ecn, quantity, p99_qty
+FROM (
+    SELECT
+        timestamp,
+        symbol,
+        ecn,
+        quantity,
+        percentile_disc(quantity, 0.99) OVER (PARTITION BY symbol) AS p99_qty
+    FROM fx_trades
+    WHERE timestamp IN '$today'
+)
+WHERE quantity >= p99_qty;
+```
+
+```questdb-sql title="Interquartile range per symbol" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    percentile_cont(price, ARRAY[0.25, 0.75]) OVER (PARTITION BY symbol) AS iqr
+FROM fx_trades
+WHERE timestamp IN '$now-1h..$now';
+```
 
 ---
 

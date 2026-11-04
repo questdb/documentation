@@ -33,9 +33,9 @@ also be set for the user.
 
 `CREATE USER` cannot set a memory limit. To cap the native memory each of the
 user's queries may allocate, set a limit on the user with
-[`ALTER USER ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-user/#set-memory-limit),
+[`ALTER USER ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-user-set-memory-limit/),
 or on one of its groups with
-[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group/#set-memory-limit).
+[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group-set-memory-limit/).
 See [memory limits](/docs/security/rbac/#memory-limits) for how the two
 interact.
 
@@ -67,7 +67,7 @@ CREATE USER IF NOT EXISTS john WITH NO PASSWORD;
 ```
 
 If you want to update the user's password unconditionally, you can use the
-[ALTER USER](/docs/query/sql/acl/alter-user/#set-password) command.
+[ALTER USER](/docs/query/sql/acl/alter-user-with-password/) command.
 
 ## Examples
 

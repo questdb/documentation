@@ -60,6 +60,10 @@ Parquet partitions behave like native partitions for most operations:
   page for details.
 * TTL applies to Parquet partitions, so expired partitions are dropped as usual.
 
+The [background compaction sweep](/docs/concepts/merge-append-partitions/#compaction)
+also reclaims dead row-group space in idle local Parquet partitions of WAL
+tables, even when merge-append is disabled; the default idle timeout is one hour.
+
 Partitions can be converted automatically on a schedule (QuestDB Enterprise) or
 manually with `ALTER TABLE` (all editions).
 

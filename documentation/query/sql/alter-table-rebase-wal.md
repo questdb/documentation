@@ -45,6 +45,9 @@ table instead:
 - [Materialized views](/docs/concepts/materialized-views/) that depend on the
   table are fully refreshed, because their watermarks no longer map onto the
   reset sequencer.
+- [Live views](/docs/concepts/live-views/) on the table are invalidated. Drop
+  and recreate them as described in
+  [Base table lifecycle](/docs/concepts/live-views/#base-table-lifecycle).
 
 ## Requirements
 

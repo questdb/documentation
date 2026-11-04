@@ -38,6 +38,16 @@ table; `OUT OF MEMORY` means a WAL apply batch ran out of memory, by breaching
 its own [memory limit](/docs/configuration/cairo-engine/#memory-limits) or the
 process-wide one.
 
+:::note Materialized views and live views
+
+`ALTER TABLE ... RESUME WAL` does not work on views: it fails with
+`cannot modify materialized view` or `cannot modify live view`. For a suspended
+materialized view or live view, use
+[`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/query/sql/alter-mat-view-resume-wal/)
+or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/).
+
+:::
+
 ## Examples
 
 Using the [`wal_tables()`](/docs/query/functions/meta/#wal_tables) function

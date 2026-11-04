@@ -982,6 +982,11 @@ Without `sf_dir` the send queue lives in process memory and is lost if the
 process exits; the reconnect loop still spans transient outages, bounded by a
 RAM cap.
 
+**Durability.** The client accepts only `sf_durability=memory` and rejects
+other values when it parses the connect string. With `sf_dir`, it forces each
+full segment file to disk, and the segment being written at least once a
+second, which limits what a host crash or power loss can lose.
+
 <SfDedupWarning />
 
 | Key | Default | Description |
@@ -999,6 +1004,7 @@ RAM cap.
 
 Durable acknowledgement requires QuestDB Enterprise with primary replication.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 By default the server confirms a batch once it is committed to the local
@@ -1022,6 +1028,7 @@ Console.WriteLine($"trades durable seqTxn: {sender.GetHighestDurableSeqTxn("trad
 Multi-host failover is most useful with QuestDB Enterprise primary-replica
 replication.
 
+Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
 Supply a comma-separated address list (or repeat `addr=`). The client connects

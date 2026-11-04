@@ -318,3 +318,46 @@ a valid target.
 Confirm the source retention window before creating the immutable destination,
 then follow the same bounded watch, failure checks, and data validation as a
 normal restore.
+
+## Backups left by departed instances
+
+Each instance writes its backups under the backup root, in a prefix named after
+its backup instance name. A new name appears whenever an instance starts on a
+fresh volume — for example, a demoted primary that rejoins as a replica after a
+failover. Scaling down an instance that once took backups as primary also leaves
+its prefix behind.
+
+The engine's cleaner only prunes its own instance's prefix. Nothing prunes a
+departed instance's prefix — not the engine, and not the operator, which never
+touches the object store. These backup sets stay in the bucket until you remove
+them.
+
+Don't delete them blindly. A departed instance's set can still be useful:
+
+- right after a failover, new replicas seed from the old primary's latest backup
+  until the new primary completes its first backup;
+- it can be a restore or PITR point (`sourceInstanceName`).
+
+To clean up:
+
+1. Get the name of every running instance — on each pod run:
+
+   ```sql
+   SELECT backup_instance_name();
+   ```
+
+2. Get the current seed name:
+
+   ```sh
+   kubectl get questdbcluster <name> -n <namespace> \
+     -o jsonpath='{.status.replication.seed.backupInstanceName}{"\n"}'
+   ```
+
+3. List the prefixes under the backup root. A prefix is safe to delete only if
+   it matches none of the names above and you don't need it as a restore point.
+
+:::warning
+Bucket lifecycle rules that expire objects by age can't tell a departed prefix
+from a live instance's older backups — they can delete backups you still need.
+Scope such a rule to a specific departed prefix, or delete by hand.
+:::

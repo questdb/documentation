@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC) Integration
-description: Configure OpenID Connect (OIDC) integration with external Identity Providers for SSO authentication in QuestDB Enterprise Web Console.
+description: Set up OpenID Connect (OIDC) in QuestDB Enterprise for Web Console SSO, service authentication with Entra ID managed identities, token validation, and troubleshooting.
 ---
 
 import Screenshot from "@theme/Screenshot";
@@ -20,6 +20,19 @@ Microsoft Active Directory and Azure AD, for example, can be turned into an
 Identity Provider.
 
 Specific installation steps depend on the type of the provider.
+
+:::warning QuestDB Enterprise 4.1.0
+
+QuestDB Enterprise 4.1.0 checks tokens and HTTP sessions more strictly. With
+`acl.oidc.groups.encoded.in.token=true`, it rejects a token that has expired
+or whose issuer is not the expected one, and refuses to start with
+`acl.oidc.host` unless `acl.oidc.issuer` is set. A request whose token
+QuestDB rejects fails with `401 Unauthorized`, even with a valid session
+cookie. See
+[Authentication changes in 4.1.0](/docs/operations/upgrade/#authentication-changes-in-410)
+before you upgrade.
+
+:::
 
 ## Architecture overview
 
@@ -580,6 +593,14 @@ with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name="foo", at="ts")
 ```
 
+A token that a client requests itself expires, and the client keeps sending it
+unchanged. A client that runs longer than its token lives must switch to a new
+token before QuestDB stops accepting the old one, as described in
+[Sessions and token expiry](#sessions-and-token-expiry). The
+[Java client](/docs/connect/clients/java/#token-providers) can request and
+renew its tokens itself with a token provider. For Azure services, see
+[Managed identities and service principals](#managed-identities-and-service-principals).
+
 ## OIDC for the PGWire endpoint
 
 If the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
@@ -655,7 +676,7 @@ ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=qu
 ```
 
 See [`CREATE GROUP`](/docs/query/sql/acl/create-group/) and
-[`ALTER GROUP`](/docs/query/sql/acl/alter-group/) for the full syntax.
+[`ALTER GROUP`](/docs/query/sql/acl/alter-group-with-external-alias/) for the full syntax.
 
 External users cannot be given a query memory limit directly;
 `ALTER USER ... SET MEMORY LIMIT` is rejected for them. Set the limit on the
@@ -668,10 +689,9 @@ message.
 If we take the example used earlier, we will see that the message contains a
 claim called `groups`. This name is configurable in QuestDB.
 
-If the groups claim is missing or it is an empty list, the user cannot access
-the database.
-
-Although the user is authenticated, they have no permissions at all.
+If the groups claim is missing or holds no group, QuestDB rejects the login.
+To read the principal and the groups from different claims for different
+kinds of tokens, see [User and group claims](#user-and-group-claims).
 
 The user has to have at least the `HTTP` permission to be able to successfully
 login via the [Web Console](/docs/getting-started/web-console/overview/).
@@ -697,6 +717,10 @@ There may be a slight delay due to the User Info Cache.
 QuestDB will use the cached information until it becomes stale, and gets
 updated.
 
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB reads the groups from
+the token itself, so a change takes effect when the client presents a new
+token.
+
 :::
 
 The same stands for changes made to the user's status within the Identity
@@ -715,6 +739,291 @@ by QuestDB.
 They could be displayed in the [Web Console](/docs/getting-started/web-console/overview/), or appear in
 the logs, for example.
 
+## User and group claims
+
+QuestDB takes the principal of an external user from the claim that
+[`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) names, `sub`
+by default, and the groups of the user from the claim that
+[`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim) names.
+It reads both from the User Info response or, with
+`acl.oidc.groups.encoded.in.token=true`, from the token.
+
+The principal identifies the external user: `current_user()` returns it, the
+Web Console displays it, and the server log records it. QuestDB keeps the
+groups of the latest login of each principal, so users who share a principal
+share their permissions. Pick a claim whose value the Identity Provider gives
+to one user or service only, such as a username or an object ID, and avoid
+display names, such as the `name` claim.
+
+### Fallback claim lists
+
+In QuestDB Enterprise 4.1.0 and later, both settings accept a comma-separated
+list of claim names in priority order, so that one configuration accepts
+tokens of different shapes. With Microsoft Entra ID, for example, the ID
+tokens of users carry `preferred_username` and `groups`, while the app-only
+tokens of
+[managed identities and service principals](#managed-identities-and-service-principals)
+carry only `oid` and `roles`:
+
+```ini title="server.conf"
+# the ID tokens of users carry preferred_username, app-only tokens only oid
+acl.oidc.sub.claim=preferred_username,oid
+# app-only tokens carry roles, the ID tokens of users carry groups
+acl.oidc.groups.claim=roles,groups
+```
+
+QuestDB picks the claims as follows:
+
+- **The list order decides.** QuestDB takes the first claim on the list that
+  carries a value, wherever the claims appear in the token or the User Info
+  response.
+- **Missing, `null`, and empty claims fall through.** A claim that is missing,
+  `null`, or an empty string falls through to the next claim on the list, and
+  so does a groups claim that holds no group name, such as an empty array.
+  QuestDB skips `null` and empty group names, and reads the string `"null"` as
+  `null`.
+- **Groups are not combined.** QuestDB takes every group from one claim. With
+  `roles,groups`, a user whose token carries a `roles` claim gets only the
+  QuestDB groups that the roles map to.
+- **Claim shapes.** Use a string for the principal, and an array of strings
+  or a single string for the groups. QuestDB also accepts numbers and
+  booleans as their text values. Unsupported containers, such as an array in
+  a principal claim or an object in a listed claim, fail the login even when
+  a claim earlier on the list carries a value.
+- **Only top-level claims count.** QuestDB ignores nested claims, and the
+  claims that the lists do not name, whatever their shape.
+
+When none of the listed claims carries a value, QuestDB rejects the login, as
+described in
+[Missing principal or groups claims](#missing-principal-or-groups-claims).
+
+:::warning Replicated clusters
+
+Versions before 4.1.0 read the whole value of each setting as one claim name,
+and reject every OIDC login when it holds a list. Upgrade every node of a
+replicated cluster before you set a list.
+
+:::
+
+### Startup validation
+
+With OIDC enabled, QuestDB refuses to start when either setting is empty,
+when a setting lists a claim twice, or when both settings list the same claim.
+An empty `acl.oidc.sub.claim` does not fall back to the default `sub`. The
+error names the setting and the claim:
+
+```text
+required property is not set: acl.oidc.groups.claim
+claim is listed more than once in acl.oidc.sub.claim [claim=oid]
+claim cannot be listed in both acl.oidc.sub.claim and acl.oidc.groups.claim [claim=roles]
+```
+
+QuestDB trims the spaces around claim names, and skips empty entries.
+
+## Token validation
+
+With `acl.oidc.groups.encoded.in.token=true`, QuestDB validates tokens itself,
+instead of asking the User Info endpoint of the provider. This applies to
+every JWT that QuestDB accepts in this mode: the ID tokens of Web Console
+users, and the tokens of other clients, such as the app-only access tokens of
+Microsoft Entra ID. QuestDB Enterprise 4.1.0 and later accept a token only
+when:
+
+- its signature matches a signing key from the JWKS endpoint of the provider;
+- it carries the `sub`, `aud`, and `exp` claims, and the `iss` claim unless
+  issuer validation is disabled;
+- it has not expired, with 60 seconds of allowed clock skew;
+- its `iss` claim is a single string that equals the
+  [expected issuer](#the-expected-issuer);
+- its `aud` claim contains
+  [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience), the client
+  ID by default;
+- its `sub` claim is not empty, whatever `acl.oidc.sub.claim` names.
+
+QuestDB caches the result for
+[`acl.oidc.cache.ttl`](/docs/configuration/oidc/#acloidccachettl), 30 seconds
+by default, so a token can stay accepted for that long after it expires, on
+top of the clock skew. In User Info mode, the default, QuestDB checks none of
+this itself: the User Info endpoint of the provider accepts or rejects the
+token.
+
+### The expected issuer
+
+The expected issuer is the `issuer` field of the discovery document at
+[`acl.oidc.configuration.url`](/docs/configuration/oidc/#acloidcconfigurationurl).
+QuestDB does not derive it from the URL. To pin it, set
+[`acl.oidc.issuer`](/docs/configuration/oidc/#acloidcissuer), which takes
+precedence over the discovery document. QuestDB compares the issuer exactly
+and case-sensitively, including the path and any trailing slash.
+
+Set `acl.oidc.issuer` in these cases:
+
+- QuestDB uses `acl.oidc.host` and the endpoint settings instead of a
+  discovery document. In token mode, QuestDB refuses to start without an
+  expected issuer.
+- The discovery document names a template instead of an issuer, as the
+  multi-tenant endpoints of Microsoft Entra ID do. Set the issuer of your
+  tenant, never a template or a wildcard.
+
+The check stops QuestDB from accepting the tokens of another tenant, when a
+provider signs the tokens of several tenants with the same keys. Earlier
+versions don't check the `iss` claim, so they accept a token of any issuer
+that a trusted key signs for the expected audience.
+
+With Microsoft Entra ID, the issuer depends on the version of the token:
+`https://login.microsoftonline.com/<tenant ID>/v2.0` for v2.0 tokens, which the
+v2.0 discovery document names, and `https://sts.windows.net/<tenant ID>/` for
+v1.0 tokens. With the v2.0 discovery document, Web Console users sign in
+through the v2.0 endpoints, so their ID tokens are v2.0 tokens. The access
+tokens that services request are v1.0 tokens, unless the QuestDB application
+asks for v2.0 tokens, as described in
+[Managed identities and service principals](#managed-identities-and-service-principals).
+
+For a provider whose tokens carry no `iss` claim, disable the check with
+[`acl.oidc.issuer.validation.enabled=false`](/docs/configuration/oidc/#acloidcissuervalidationenabled).
+QuestDB then accepts the tokens of any issuer that the provider signs for the
+expected audience, and logs an advisory at startup.
+
+## Sessions and token expiry
+
+QuestDB checks a token when a request or a new connection presents it. An
+established connection, such as a QWP or PGWire connection, stays open after
+its token expires. Every new connection and reconnect presents a token again,
+so a client that runs longer than its tokens live must present new ones, as
+the [Java client does with a token provider](/docs/connect/clients/java/#token-providers).
+
+The Web Console opens an HTTP session when the user logs in, identified by the
+`qdb_session` cookie, and also sends its token with every request. In QuestDB
+Enterprise 4.1.0 and later, a request that carries both the cookie and a token
+is authenticated with the token. When QuestDB rejects the token, the request
+fails with `401 Unauthorized`, and the session ends. Earlier versions serve
+such a request from the session, so an expired or rejected token keeps working
+for as long as the cookie does.
+
+QuestDB also rejects a token that it cannot check, because the Identity
+Provider is unreachable or answers with an error, once `acl.oidc.cache.ttl`
+has passed since the provider last checked it. In User Info mode, this affects
+every token. In token mode, QuestDB keeps the signing keys that it has
+downloaded, so it affects only a token signed with a key that QuestDB has not
+downloaded yet. An outage of the provider can therefore stop the queries of
+Web Console users, or log them out, as described below. A WebSocket
+connection that a browser opened with the session cookie stays open when the
+session ends.
+
+For how sessions treat passwords and REST tokens, see
+[HTTP sessions](/docs/security/rbac/#http-sessions).
+
+### Web Console token renewal
+
+The Web Console sends a token with every request: the access token in User
+Info mode, or the ID token with `acl.oidc.groups.encoded.in.token=true`. It
+renews its tokens with the refresh token that the provider issued at login.
+Without a refresh token, the user is logged out once QuestDB stops accepting
+the token of the login. Some providers, such as Microsoft Entra ID, issue a
+refresh token only for the `offline_access` scope, which
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) must then include.
+
+In QuestDB Enterprise 4.1.0 and later, the Web Console renews its tokens as
+follows:
+
+- **When.** Before a request, when the token expires within 30 seconds. The
+  Web Console reads the expiry of an ID token from its `exp` claim, and the
+  expiry of an access token from the `expires_in` field of the token
+  response. The request waits up to 10 seconds for the new tokens.
+- **ID tokens are required.** With `acl.oidc.groups.encoded.in.token=true`,
+  every token response must include an ID token. Without one, the Web Console
+  logs the user out with **Missing ID token**. Configure the provider to
+  return an ID token for the refresh token grant, and include `openid` in
+  `acl.oidc.scope`.
+- **A rejected token.** When QuestDB answers `401 Unauthorized`, for example
+  because the clock of the browser is behind, the Web Console renews its
+  tokens and sends the request again, once. It logs the user out when QuestDB
+  rejects the new token too.
+- **A refused renewal.** When the provider refuses to renew the tokens, for
+  example because the user is disabled or the refresh token has expired, the
+  Web Console logs the user out, and the login page shows the reason that the
+  provider gives.
+- **A failed renewal.** When the provider does not answer within 10 seconds,
+  cannot be reached, or answers with `429` or a `5xx` status, the Web Console
+  keeps the user logged in, and shows a warning with a **Sign in again**
+  button. While the current token is valid, requests use it, and later
+  requests retry the renewal, with a delay that grows from 5 to 30 seconds
+  between attempts. Once the token has expired, the Web Console does not send
+  it: a query fails with
+  `Could not renew your SSO session; the request was not executed`. Run it
+  again after a short wait to retry the renewal, or sign in again.
+
+## Troubleshooting
+
+### Missing principal or groups claims
+
+When the user information carries none of the listed principal claims, or
+none of the listed groups claims, QuestDB rejects the login: HTTP clients
+receive `401 Unauthorized`, and PGWire clients `invalid username/password`.
+The server log shows both lists and the user information that QuestDB
+received:
+
+```text
+Failed to find required claims [subClaims=[preferred_username,oid], groupsClaims=[roles,groups], userInfo={...}]
+```
+
+Compare the claims in `userInfo` with the lists. A provider leaves out the
+claims that no requested scope covers: Microsoft Entra ID, for example, sends
+`preferred_username` only for the `profile` scope. Versions before 4.1.0 log
+the two claim names instead:
+`Failed to find required claims [claims=sub,groups userInfo=...]`.
+
+### Token validation errors
+
+In token mode, QuestDB rejects a token that fails
+[token validation](#token-validation) the same way, and the server log gives
+the reason:
+
+```text
+Request failed [errorMsg=Failed to decode JWT token Error(InvalidIssuer)]
+Request failed [errorMsg=Failed to decode JWT token Error(MissingRequiredClaim("iss"))]
+Request failed [errorMsg=Failed to decode JWT token Error(InvalidAudience)]
+Request failed [errorMsg=Failed to decode JWT token Error(ExpiredSignature)]
+Request failed [errorMsg=Failed to decode JWT token Error(MissingRequiredClaim("exp"))]
+```
+
+- `InvalidIssuer`: the `iss` claim is not the expected issuer. Compare the
+  `iss` claim of a token with `acl.oidc.issuer`, or with the `issuer` field of
+  the discovery document. With Microsoft Entra ID, this usually means a v1.0
+  access token, or a token of another tenant.
+- `MissingRequiredClaim("iss")`: the token carries no `iss` claim. See
+  [The expected issuer](#the-expected-issuer).
+- `InvalidAudience`: the `aud` claim does not contain `acl.oidc.audience`.
+  The token was requested for another application or, with Microsoft Entra
+  ID, it is a v1.0 access token.
+- `ExpiredSignature`: the token has expired. The client must present a new
+  token. For the Web Console, check that it receives a refresh token, as
+  described in [Web Console token renewal](#web-console-token-renewal).
+
+### Web Console sign-in errors
+
+When the Web Console cannot complete a sign-in, the login page shows the
+reason. QuestDB logs nothing, because the browser exchanges the authorization
+code at the token endpoint of the provider directly:
+
+- `The identity provider did not respond within 10 seconds`: the token
+  endpoint did not answer in time.
+- `Could not reach the identity provider to complete the sign-in`: the browser
+  could not call the token endpoint. Usually, the provider does not allow the
+  origin of the Web Console, such as `https://questdb.example.com:9000`, in its
+  CORS settings.
+- `The identity provider returned an invalid token response`, or
+  `The identity provider returned an unexpected response (HTTP <status>)`:
+  the token endpoint answered with something other than a token response,
+  such as the error page of a proxy.
+- **Missing ID token**: with `acl.oidc.groups.encoded.in.token=true`, the
+  provider returned no ID token. Include `openid` in `acl.oidc.scope`.
+- Other messages usually come from the provider, such as the error for a
+  redirect URI that the provider does not accept.
+
+The network tab of the developer tools of the browser shows the request to
+the token endpoint and the response of the provider.
+
 ## Configuration options
 
 For all OIDC-related configuration options of QuestDB, see
@@ -724,7 +1033,9 @@ For all OIDC-related configuration options of QuestDB, see
 
 ## Active Directory
 
-The following sections are guides for setting up single sign-on (SSO) with various OAuth2 providers.
+The following sections are guides for setting up single sign-on (SSO) with
+various OAuth2 providers, and for authenticating Azure services with
+Microsoft Entra ID.
 
 ### PingFederate
 
@@ -1077,6 +1388,10 @@ If all has been wired up well, then login will succeed.
 This document sets up SSO authentication for the [QuestDB Web Console](/docs/getting-started/web-console/overview/) in
 [Microsoft EntraID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id), formerly known as Azure AD.
 
+Azure services that authenticate without a user, as a managed identity or a
+service principal, build on this setup, as described in
+[Microsoft Entra ID managed identities and service principals](#managed-identities-and-service-principals).
+
 
 :::tip
 
@@ -1260,8 +1575,8 @@ The below should be set in QuestDB's `server.conf`:
 # enable OIDC
 acl.oidc.enabled=true
 
-# the claim contains the username or user id
-acl.oidc.sub.claim=name
+# the claim contains the user's sign-in name, which needs the profile scope
+acl.oidc.sub.claim=preferred_username
 
 # the claim contains the user's group memberships
 acl.oidc.groups.claim=groups
@@ -1337,6 +1652,141 @@ GRANT SELECT ON table1, table2 to groupName;
 To test, head to the Web Console and login.
 
 If all has been wired up well, then login will succeed, and the user
-will have the access granted to them.
+will have the access granted to them. If the login fails, the login page or
+the server log gives the reason, as described in
+[Troubleshooting](#troubleshooting).
+
+### Microsoft Entra ID managed identities and service principals {#managed-identities-and-service-principals}
+
+Azure services, such as an ingestion job on a virtual machine or in Azure
+Kubernetes Service, can authenticate to QuestDB without a user. They request
+an app-only access token from Entra ID, as a managed identity or a service
+principal. An app-only token carries no `preferred_username` and no `groups`
+claim: it carries the object ID of the service in `oid`, and the app roles
+assigned to the service in `roles`. QuestDB Enterprise 4.1.0 and later accept
+these tokens next to the ID tokens of users, with
+[fallback claim lists](#fallback-claim-lists).
+
+This setup builds on the QuestDB application and the
+[QuestDB configuration](#questdb-configuration) of the
+[Microsoft Entra ID guide](#microsoft-entraid) above. QuestDB reads the
+principal and the roles of a service from its token, and validates the token
+itself, so OIDC must run in token mode, with
+`acl.oidc.groups.encoded.in.token=true`, as described in
+[Token validation](#token-validation).
+
+First, configure the QuestDB application in Entra ID:
+
+1. Under _Expose an API_, set the _Application ID URI_, such as
+   `api://8de84b90-1ea5-4e41-9e84-dba860aa01a6`. Services request their
+   tokens for this URI.
+2. Under _App roles_, create a role for each kind of access, such as a role
+   with the value `QuestDB.Ingest`, and set its _Allowed member types_ to
+   _Applications_. Users then never carry the role, so their tokens keep
+   their groups, which `roles,groups` would otherwise replace.
+3. In the _Manifest_, set `requestedAccessTokenVersion` to `2`, called
+   `accessTokenAcceptedVersion` in the legacy manifest. The access tokens of
+   services then carry the application ID in their `aud` claim, and the v2.0
+   issuer, which QuestDB expects, as described in
+   [The expected issuer](#the-expected-issuer).
+
+Then assign the role to the service. For a service principal, add the role
+under _API permissions_ of its own app registration, as an application
+permission of the QuestDB application, and grant admin consent. A managed
+identity has no app registration: assign the role through Microsoft Graph,
+for example with the Azure CLI, using the object IDs of the managed identity
+and of the enterprise application of QuestDB, and the ID of the app role:
+
+```bash title="Assign the QuestDB.Ingest role to a managed identity"
+MI="<managed identity object ID>"
+APP="<QuestDB enterprise application object ID>"
+ROLE="<app role ID>"
+az rest --method POST \
+  --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$MI/appRoleAssignments" \
+  --body "{\"principalId\": \"$MI\", \"resourceId\": \"$APP\", \"appRoleId\": \"$ROLE\"}"
+```
+
+In `server.conf`, keep the [QuestDB configuration](#questdb-configuration)
+of the Entra ID guide, and replace its two claim settings with fallback
+lists. These are the settings that the tokens of services depend on:
+
+```ini title="server.conf"
+acl.oidc.enabled=true
+# QuestDB validates the tokens itself, and reads the claims from them
+acl.oidc.groups.encoded.in.token=true
+# the v2.0 discovery document of the tenant names the expected issuer
+acl.oidc.configuration.url=https://login.microsoftonline.com/12345678-1234-1234-1234-123456789abc/v2.0/.well-known/openid-configuration
+# the application ID, also the expected audience of the tokens
+acl.oidc.client.id=8de84b90-1ea5-4e41-9e84-dba860aa01a6
+# users have preferred_username, services only oid
+acl.oidc.sub.claim=preferred_username,oid
+# services have roles, users have groups
+acl.oidc.groups.claim=roles,groups
+```
+
+Keep the settings that only the Web Console uses, such as
+`acl.oidc.redirect.uri` and `acl.oidc.scope`, as they are.
+
+The principal of a service is then its object ID, which `current_user()`
+returns. Map each app role to a QuestDB group, and grant the group the
+permissions that the service needs. QWP over WebSocket, which the clients
+use for ingestion, requires the `HTTP` endpoint permission:
+
+```questdb-sql title="Allow the services with the QuestDB.Ingest role to ingest into fx_trades"
+CREATE GROUP fxIngest WITH EXTERNAL ALIAS 'QuestDB.Ingest';
+GRANT HTTP TO fxIngest;
+GRANT INSERT ON fx_trades TO fxIngest;
+```
+
+Ingestion cannot create a table or add a column for an external user, so
+create the table, with every column that the service writes, in advance, as a
+database user such as the built-in admin:
+
+```questdb-sql title="Create the table that the service ingests into"
+CREATE TABLE fx_trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    side SYMBOL,
+    price DOUBLE,
+    quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+The [Java client](/docs/connect/clients/java/#microsoft-entra-id) requests the
+token of the service and renews it by itself, with `token_provider=azure` and
+the `questdb-client-azure` artifact. The token provider requires the `wss`
+schema, so QuestDB must serve HTTP over
+[TLS](/docs/security/tls/#enabling-tls-for-http-server-rest-api):
+
+```java title="Ingest into fx_trades as the managed identity of the host"
+import java.time.Instant;
+
+import io.questdb.client.QuestDB;
+import io.questdb.client.Sender;
+
+try (QuestDB db = QuestDB.connect(
+        "wss::addr=questdb.example.com:9000;"
+        + "token_provider=azure;"
+        + "azure_resource=api://8de84b90-1ea5-4e41-9e84-dba860aa01a6;"
+        + "azure_credential=managed_identity;")) {
+    try (Sender sender = db.borrowSender()) {
+        sender.table("fx_trades")
+              .symbol("symbol", "EURUSD")
+              .symbol("side", "buy")
+              .doubleColumn("price", 1.0842)
+              .doubleColumn("quantity", 100000.0)
+              .at(Instant.now());
+    }
+}
+```
+
+Other clients take a fixed token: request it with the Azure Identity library
+for the scope `api://<application ID>/.default`, and create a new client with
+a new token before the old one expires.
+
+QuestDB reads the roles from the token, so a role that you assign to or remove
+from a service takes effect when the service presents a new token. Azure
+caches the tokens of managed identities for around 24 hours. To cut off a
+service at once, revoke the permissions of its QuestDB group.
 
 <br />

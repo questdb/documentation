@@ -29,9 +29,8 @@ inform your own unique choices.
 [5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)\
 [6. Query data, PostgreSQL query](#6-query-data-postgresql-query)\
 [7. Setup replication](#7-setup-replication)\
-[8. Enable compression](#8-enable-compression)\
-[9. Configure a storage policy](#9-configure-a-storage-policy)\
-[10. Double-check kernel limits](#10-double-check-kernel-limits)\
+[8. Compress and tier data with storage policies](#8-compress-and-tier-data-with-storage-policies)\
+[9. Double-check kernel limits](#9-double-check-kernel-limits)\
 [Next steps](#next-steps)\
 [FAQ](#faq)
 
@@ -46,7 +45,6 @@ The following are required prior to following this guide:
   - Buying through Azure? QuestDB Enterprise is also available via
     [Azure Marketplace](/docs/deployment/azure/#buy-through-azure-marketplace).
 - Use of a [supported file system](/docs/getting-started/capacity-planning/#supported-filesystems)
-  - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
 ## Installation guide
 
@@ -188,7 +186,15 @@ GRANT ALL ON table2 TO user2 WITH GRANT OPTION;
 
 Permission grants can be specific and fine-tuned.
 
-List the full list of applied permissions with `all_permissions()`.
+To check the grants, query
+[`active_grants()`](/docs/query/functions/access-control/#active_grants),
+which lists the direct grants of every user, group, and service account. It is
+available since QuestDB Enterprise 4.1.0:
+
+```questdb-sql
+SELECT * FROM active_grants()
+WHERE entity_name IN ('readonly', 'user1', 'user2');
+```
 
 - For the full role-based access control docs, including group management, see
   the [RBAC operations guide](/docs/security/rbac/).
@@ -439,50 +445,112 @@ Full instructions can be found within the
    snapshot provides a starting point for the instance, which will soon catch up
    with the primary node.
 
-## 8. Enable compression
+## 8. Compress and tier data with storage policies
 
-Compression requires the
-[Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page).
+[Storage policies](/docs/concepts/storage-policy/) automate what happens to
+partitions as they age. They are not only for moving data to cold storage: the
+`TO PARQUET` stage is also how QuestDB Enterprise compresses data on local
+volumes. It converts partitions to
+[Parquet](/docs/concepts/parquet/#data-compression), compressed with `lz4_raw`
+by default, and removes the native files. Converted partitions stay on local
+disk, remain fully queryable, and still accept late writes.
 
-We'll assume Ubuntu, and demonstrate the basics CLI commands which you'd apply
-in something like an AWS EC2 to enable ZFS:
+A policy has up to four stages, each with its own delay:
 
-```bash title="Ubuntu - Install ZFS"
-sudo apt update
-sudo apt install zfsutils-linux
+- `TO PARQUET` converts the partition to compressed Parquet on local disk.
+- `TO REMOTE` uploads a Parquet copy of the partition to object storage.
+- `DROP LOCAL` removes the local copy. With `TO REMOTE` set, queries switch to
+  the remote copy. Without it, the data is deleted.
+- `DROP REMOTE` deletes the remote copy.
+
+Storage policies replace plain TTL in Enterprise, where `ALTER TABLE SET TTL`
+with a non-zero value is rejected.
+
+:::note ZFS compression
+File-system compression with ZFS is no longer the recommended way to compress
+QuestDB data. It works outside the database, while Parquet compression is
+managed by QuestDB per partition. If you already run on ZFS, see
+[ZFS compression](/docs/deployment/compression-zfs/).
+:::
+
+### Compress partitions on local disk
+
+A policy with only a `TO PARQUET` stage compresses older partitions and keeps
+all data on local disk. Attach it at table creation:
+
+```questdb-sql title="Web Console - Create a table with a storage policy"
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY
+  STORAGE POLICY(TO PARQUET 3d);
 ```
 
-To enable compression, create a ZPool with compression enabled:
+Or attach it to an existing table:
 
-```shell title="Ubuntu - Enable compression"
-zpool create -m legacy -o feature@lz4_compress=enabled autoexpand=on -O compression=lz4 -t volume1 questdb-pool sdf
+```questdb-sql title="Web Console - Set a storage policy on an existing table"
+ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 3 DAYS);
 ```
 
-The exact commands depend on which version of ZFS you are running. Use the
-[ZFS docs](https://openzfs.github.io/openzfs-docs/man/master/8/zpool-create.8.html)
-to customize your ZFS to meet your requirements.
+Set the `TO PARQUET` delay beyond the window in which late or out-of-order rows
+usually arrive. Rows that land on a Parquet partition cause QuestDB to rewrite
+it. To trade CPU for a higher compression ratio, change the codec, for example
+to `ZSTD`, as described in
+[Parquet data compression](/docs/concepts/parquet/#data-compression).
 
-If you are running QuestDB Enterprise in Kubernetes, QuestDB offers a
-[Container Storage Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md)
-(CSI) Driver to create ZFS volumes in your cluster.
+To also delete partitions after a retention window, add a `DROP LOCAL` stage,
+for example `STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)`.
 
-Please contact us for more information to see if your version and distribution
-of Kubernetes is supported.
+Check active policies via the `storage_policies` system view, and track
+conversion with `SHOW PARTITIONS`, where converted partitions have `isParquet`
+set to `true` and report their size in `parquetFileSize`:
 
-For more on storage and compression, see [Enable compression with ZFS](/docs/deployment/compression-zfs/).
+```questdb-sql title="Web Console - Check policies and conversion progress"
+SELECT * FROM storage_policies;
+SHOW PARTITIONS FROM trades;
+```
 
-## 9. Configure a storage policy
+### Tier partitions to object storage
 
-[Storage policies](/docs/concepts/storage-policy/) are the Enterprise primitive
-for automated partition retention. A policy converts older partitions to
-Parquet, drops the native binary files, and eventually drops the Parquet files
-too — on a schedule you define. This supersedes plain TTL in Enterprise, where
-`ALTER TABLE SET TTL` with a non-zero value is rejected.
+To keep historical partitions queryable without keeping them on local disk, add
+the `TO REMOTE` stage. It uploads a Parquet copy to S3, Google Cloud Storage,
+Azure Blob Storage, or a filesystem store, and `DROP LOCAL` then evicts the
+local copy while queries keep working:
+
+```questdb-sql title="Web Console - Tier partitions to object storage"
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS
+);
+```
+
+Tiering saves more storage on top of Parquet compression:
+
+- Object storage usually costs less than the block storage behind local
+  volumes.
+- The cluster keeps a single copy of each remote partition. The primary and
+  every replica read the same object instead of each holding its own copy.
+- History is no longer limited by the size of a single volume.
+
+`DROP LOCAL` makes a partition read-only, so set it beyond the longest window
+in which late rows or corrections can arrive. See
+[Immutability after DROP LOCAL](/docs/concepts/cold-storage/#immutability-after-drop-local).
+
+Tiering requires [cold storage](/docs/concepts/cold-storage/) to be enabled and
+an object store prefix to be configured first. See
+[Operating cold storage](/docs/operations/cold-storage/) for the setup
+procedure.
+
+For the full concept, including the stage model, timing, and replication
+behavior, see [Storage Policy](/docs/concepts/storage-policy/) and
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 ### Migrating from TTL when upgrading from OSS
 
 Tables that were created in OSS keep their existing `TTL` setting after you
-upgrade to Enterprise — no data is lost at upgrade time. On an existing table,
+upgrade to Enterprise, so no data is lost at upgrade time. On an existing table,
 `ALTER TABLE SET TTL` with a non-zero value is then rejected with:
 
 ```
@@ -496,14 +564,14 @@ not affected: they continue to use `TTL` for retention in Enterprise.
 To move a legacy table from `TTL` to a storage policy:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts on a table, and it is required before a storage
-   policy can be attached:
+   value Enterprise accepts on a user table, and it is required before a
+   storage policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
-   ALTER TABLE trades SET TTL 0;
+   ALTER TABLE trades SET TTL 0 HOURS;
    ```
 
-2. **Attach a storage policy** that reproduces — and ideally extends — the
+2. **Attach a storage policy** that reproduces, and ideally extends, the
    retention the TTL used to provide. A policy lets you keep data in Parquet
    after you would previously have dropped it, so `DROP LOCAL` is the stage
    that replaces the old TTL horizon:
@@ -517,61 +585,14 @@ To move a legacy table from `TTL` to a storage policy:
 
    If you want the policy to behave exactly like the old TTL (delete the
    partition outright after the same interval, with no Parquet conversion),
-   use a single-stage policy — for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
+   use a single-stage policy, for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
    to match `TTL 1 MONTH`.
 
 Do this for every table you want to keep managed automatically. Tables without
 a storage policy retain their data indefinitely once their legacy TTL has been
 cleared.
 
-### Creating new tables with a storage policy
-
-Attach a policy at table creation:
-
-```questdb-sql title="Web Console - Create a table with a storage policy"
-CREATE TABLE trades (
-    ts TIMESTAMP,
-    symbol SYMBOL,
-    price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
-```
-
-Or attach a policy to an existing table:
-
-```questdb-sql title="Web Console - Set a storage policy on an existing table"
-ALTER TABLE trades SET STORAGE POLICY(
-    TO PARQUET 3 DAYS,
-    DROP LOCAL 1 MONTH
-);
-```
-
-Check active policies via the `storage_policies` system view:
-
-```questdb-sql
-SELECT * FROM storage_policies;
-```
-
-For the full concept, including the stage model, timing, and replication
-behavior, see
-[Storage Policy](/docs/concepts/storage-policy/) and
-[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
-
-### Tiering partitions to object storage
-
-The policies above keep everything on local disk. To keep historical partitions queryable without keeping them on local disk, add the `TO REMOTE` stage. It uploads a Parquet copy to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store, and `DROP LOCAL` then evicts the local copy while queries keep working:
-
-```questdb-sql title="Web Console - Tier partitions to object storage"
-ALTER TABLE trades SET STORAGE POLICY(
-    TO PARQUET 7 DAYS,
-    TO REMOTE 14 DAYS,
-    DROP LOCAL 30 DAYS
-);
-```
-
-This requires [cold storage](/docs/concepts/cold-storage/) to be enabled and an object store prefix to be configured first. See [Operating cold storage](/docs/operations/cold-storage/) for the setup procedure.
-
-## 10. Double-check kernel limits
+## 9. Double-check kernel limits
 
 QuestDB works together with your server operating system to achieve maximum
 performance. Prior to putting your server under heavy loads, consider checking
@@ -660,11 +681,15 @@ correctly configured on both the primary and replica nodes. Check the logs for
 any errors related to replication and ensure there's network connectivity
 between all involved parties.
 
-**Q: Compression is enabled, but I'm not observing reduced storage usage. What
-could be the issue?**
+**Q: I set a storage policy with `TO PARQUET`, but I'm not observing reduced
+storage usage. What could be the issue?**
 
-A: Ensure that the ZFS filesystem is correctly configured with compression
-enabled. Note that the actual compression ratio achieved can vary significantly
-depending on the nature of your data. Some types of data may not compress well.
-Review the ZFS compression statistics to understand the compression level being
-achieved. If it seems out of expected range, please contact us.
+A: A partition converts only once its entire time range is older than the
+`TO PARQUET` delay, and the active partition never converts. Policies are
+checked every 5 minutes by default, so allow time for the first run. Use
+`SHOW PARTITIONS FROM tableName` to confirm which partitions have `isParquet`
+set to `true` and compare `parquetFileSize` with `diskSize`. The compression
+ratio varies with the nature of your data, and some data does not compress
+well. To trade CPU for a higher ratio, switch the codec to `ZSTD`, as described
+in [Parquet data compression](/docs/concepts/parquet/#data-compression). If the
+ratio still seems out of the expected range, please contact us.

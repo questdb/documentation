@@ -32,6 +32,13 @@ ALTER TABLE tableName SET TYPE [BYPASS] WAL;
 The command schedules the conversion of the specified table to WAL or non-WAL
 type. The actual conversion takes place on the next restart of the server.
 
+For a table that may hold
+[merge-append partitions](/docs/concepts/merge-append-partitions/), first set
+`cairo.o3.partition.merge.append.enabled=false`, restart, and run
+`ALTER TABLE trades SQUASH PARTITIONS`; only then issue
+`ALTER TABLE trades SET TYPE BYPASS WAL` and restart again.
+Skipping these steps is unsupported.
+
 If the command issued more than once before the restart, the last command
 overrides all previous ones.
 
