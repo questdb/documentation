@@ -255,7 +255,7 @@ In the results:
 
 ### GROUPING_ID(column1, column2, ...)
 
-Accepts one or more columns. Returns an integer bitmask combining the
+Accepts one to 31 columns. Returns an integer bitmask combining the
 `GROUPING()` values of all specified columns. Bit positions are assigned
 right-to-left: the rightmost argument occupies bit 0 (least significant bit).
 
@@ -393,9 +393,9 @@ fill value.
 QuestDB computes all grouping sets in a single scan of the input. When
 [parallel GROUP BY](/docs/configuration/cairo-engine/#cairosqlparallelgroupbyenabled)
 is enabled, the query runs on multiple worker threads, and `EXPLAIN` shows an
-`Async Group By` node with `groupingSets: true`. Queries with more than 31 key
-columns, or with many grouping sets relative to the number of query workers,
-run on a single thread.
+`Async Group By` node with `groupingSets: true`, or `Async JIT Group By` when
+the `WHERE` filter is JIT-compiled. Queries with many grouping sets relative to
+the number of query workers run on a single thread.
 
 Grouping sets aggregation is never vectorized. When you only need one level of
 aggregation, a plain `GROUP BY` over the same keys can be faster.
@@ -444,8 +444,9 @@ matters.
   expressions, and bind variables in the `FROM` bound are not supported with
   grouping sets.
 
-- **`GROUPING()` / `GROUPING_ID()` limited to 31 `GROUP BY` key columns**. The
-  bitmask is int-based.
+- **`GROUPING_ID()` accepts at most 31 arguments**, because its result is an
+  `INT` bitmask. `GROUPING()` and the number of `GROUP BY` keys have no such
+  limit.
 
 - **Maximum grouping sets per query**, controlled by the
   [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets)
