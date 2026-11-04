@@ -75,6 +75,10 @@ that case `COUNT(*)` returns `0` and `SUM()` returns `NULL`.
 You can specify any combination of column subsets. `ROLLUP` and `CUBE` are
 shorthand for common `GROUPING SETS` patterns.
 
+The list must contain at least one set, with no trailing comma.
+`GROUPING SETS ()` is a syntax error; for a grand total only, write
+`GROUPING SETS (())`.
+
 QuestDB does not remove duplicate grouping sets. Listing the same set twice,
 as in `GROUPING SETS ((symbol), (symbol))`, returns its rows twice.
 
@@ -195,6 +199,28 @@ For any of these, write out the sets you need with `GROUPING SETS`. For
 example, `GROUP BY symbol, GROUPING SETS ((side), ())` is written as
 `GROUP BY GROUPING SETS ((symbol, side), (symbol))`.
 
+## Expressions as keys
+
+`ROLLUP`, `CUBE`, and `GROUPING SETS` accept column references only. An
+expression written inside them, such as `ROLLUP(a + b)`, is rejected even when
+every set contains it. A `SELECT` alias of an expression is accepted only when
+every grouping set contains it. Plain keys before `ROLLUP` or `CUBE` in
+[composite syntax](#composite-syntax) can be expressions.
+
+To roll up an expression, compute it in a subquery and group by its output
+column:
+
+```questdb-sql title="Roll up an expression through a subquery" demo
+SELECT symbol, price_level, SUM(amount) AS total_amount
+FROM (
+    SELECT symbol, round(price, -2) AS price_level, amount
+    FROM trades
+    WHERE timestamp IN '$now-1h..$now'
+      AND symbol = 'BTC-USDT'
+)
+GROUP BY ROLLUP(symbol, price_level);
+```
+
 ## GROUPING() and GROUPING_ID() functions
 
 When columns are rolled up, they appear as `NULL` in the result. The data might
@@ -290,9 +316,25 @@ SAMPLE BY 1h GROUPING SETS ((symbol, side), (symbol))
 ORDER BY timestamp, symbol, side;
 ```
 
-`ALIGN TO FIRST OBSERVATION` is not supported with grouping sets. The `FROM`
-bound of `FROM ... TO` must be a timestamp literal; functions, expressions, and
-bind variables are not supported there.
+The input can be a table, or a subquery or CTE that keeps the designated
+timestamp:
+
+```questdb-sql title="ROLLUP over a CTE" demo
+WITH btc AS (
+    SELECT * FROM trades
+    WHERE timestamp IN '$now-1d..$now'
+      AND symbol = 'BTC-USDT'
+)
+SELECT timestamp, side, SUM(amount) AS total_amount
+FROM btc
+SAMPLE BY 1h ROLLUP(side)
+ORDER BY timestamp, side;
+```
+
+`ALIGN TO FIRST OBSERVATION` is not supported with grouping sets. The sample
+interval must be a constant, so `SAMPLE BY $1 h` is rejected. The `FROM` bound
+of `FROM ... TO` must be a timestamp literal; functions, expressions, and bind
+variables are not supported there.
 
 ### FILL support
 
@@ -317,6 +359,13 @@ Supported FILL modes:
 | `FILL(value)`  | Yes       |
 | `FILL(PREV)`   | No        |
 | `FILL(LINEAR)` | No        |
+
+`FILL(NULL)` and `FILL(value)` require distinct grouping sets. Queries that
+repeat a set, such as `GROUPING SETS ((symbol), (symbol))` or
+`ROLLUP(symbol, symbol)`, are rejected. Two sets count as duplicates when they
+contain the same columns, in any order or through an alias, so
+`GROUPING SETS ((symbol, side), (side, symbol))` is rejected too. `FILL(NONE)`
+accepts duplicate sets.
 
 `GROUPING()` and `GROUPING_ID()` values are preserved in fill rows. They are not
 replaced by the fill value.
@@ -351,11 +400,8 @@ matters.
 
 ## Limitations
 
-- **Expressions not allowed** in `ROLLUP`, `CUBE`, or `GROUPING SETS`. Only
-  column references are accepted, so `ROLLUP(a + b)` is rejected, and so is a
-  `SELECT` alias of an expression. Compute the expression in a subquery and
-  group by its output column instead. Plain columns in composite syntax
-  (`GROUP BY expr, ROLLUP(col)`) are not restricted.
+- **Expressions not allowed** in `ROLLUP`, `CUBE`, or `GROUPING SETS`. Compute
+  them in a subquery instead. See [Expressions as keys](#expressions-as-keys).
 
 - **No mixed qualified/unqualified references** to the same column.
   `ROLLUP(a, t.a)` is rejected. Use one form consistently.
@@ -367,6 +413,10 @@ matters.
 
 - **Not supported with `LATEST ON`**. Rejected with an error.
 
+- **Not supported in correlated [LATERAL](/docs/query/sql/lateral-join/)
+  subqueries**. A `LATERAL` subquery that references the outer table cannot
+  use grouping sets. Uncorrelated `LATERAL` subqueries can.
+
 - **Not supported in materialized views**. A
   [materialized view](/docs/concepts/materialized-views/) query cannot use
   `GROUPING SETS`, `ROLLUP`, or `CUBE`.
@@ -375,6 +425,12 @@ matters.
 
 - **`ALIGN TO FIRST OBSERVATION` not supported** with grouping sets in
   `SAMPLE BY`.
+
+- **`SAMPLE BY` interval must be a constant**. A bind variable such as
+  `SAMPLE BY $1 h` is rejected with grouping sets.
+
+- **`FILL(NULL)` and `FILL(value)` require distinct grouping sets** in
+  `SAMPLE BY`. See [FILL support](#fill-support).
 
 - **`SAMPLE BY ... FROM` requires a timestamp literal**. Functions,
   expressions, and bind variables in the `FROM` bound are not supported with

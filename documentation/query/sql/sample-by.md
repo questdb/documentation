@@ -25,7 +25,7 @@ SAMPLE BY [count]unit
 ### Key clauses
 
 - **`SAMPLE BY [count]unit`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`). The count is optional and defaults to `1`, so `h` means the same as `1h`
-- **`ROLLUP` / `CUBE` / `GROUPING SETS`**: Multi-level aggregation (see [GROUPING SETS](/docs/query/sql/grouping-sets/), [ROLLUP](/docs/query/sql/rollup/), [CUBE](/docs/query/sql/cube/)). Cannot be combined with `ALIGN TO FIRST OBSERVATION`, `FILL(PREV)`, `FILL(LINEAR)`, or a non-literal `FROM` bound. See [SAMPLE BY integration](/docs/query/sql/grouping-sets/#sample-by-integration)
+- **`ROLLUP` / `CUBE` / `GROUPING SETS`**: Multi-level aggregation (see [GROUPING SETS](/docs/query/sql/grouping-sets/), [ROLLUP](/docs/query/sql/rollup/), [CUBE](/docs/query/sql/cube/)). Cannot be combined with `ALIGN TO FIRST OBSERVATION`, `FILL(PREV)`, `FILL(LINEAR)`, a non-constant interval, or a non-literal `FROM` bound. See [SAMPLE BY integration](/docs/query/sql/grouping-sets/#sample-by-integration)
 - **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
 - **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
 - **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`
