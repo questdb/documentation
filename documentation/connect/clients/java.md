@@ -1084,18 +1084,19 @@ ws::addr=db:9000;sf_dir=/shared/qdb-sf;sender_id=ingest-a;drain_orphans=on;
 ws::addr=db:9000;sf_dir=/shared/qdb-sf;sender_id=ingest-b;drain_orphans=on;
 ```
 
-**Directories and recovery.** Within an `sf_dir`, each pooled sender owns
-`<sender_id>-<index>` (`ingest-a-0`, `ingest-a-1`, …), held by an exclusive OS
-lock for its lifetime — two running senders never share a directory, and one
-becomes adoptable only after its owner releases the lock by exiting or crashing,
-so a live sender's rows are never drained from under it. On restart a pool
-recovers its own directories automatically; `drain_orphans=on` extends that to
-abandoned siblings under the same root, replaying their rows over fresh
-connections (up to `max_background_drainers` at a time, default 4) and skipping
-any directory an earlier drain flagged `.failed`. Two instances that share an
-`sf_dir` with the same `sender_id` collide, and the second to start fails fast
-with `sf slot already in use`. Allowed `sender_id` characters: letters, digits,
-`_`, `-`.
+**Directories and recovery.** Within an `sf_dir`, each pooled sender owns a
+sender directory, `<sender_id>-<index>` (`ingest-a-0`, `ingest-a-1`, …), held
+by an exclusive OS lock for its lifetime — two running senders never share a
+directory, and one becomes adoptable only after its owner releases the lock by
+exiting or crashing, so a live sender's rows are never drained from under it.
+On restart a pool recovers its own directories automatically;
+`drain_orphans=on` extends that to abandoned siblings under the same root,
+replaying their rows over fresh connections (up to `max_background_drainers`
+at a time, default 4) and skipping any directory an earlier drain flagged
+`.failed`. Two instances that share an `sf_dir` with the same `sender_id`
+collide, and the second to start fails fast with `sf slot already in use`; the
+message calls the sender directory a slot. Allowed `sender_id` characters:
+letters, digits, `_`, `-`.
 
 **Durability.** Store-and-forward defaults to `sf_durability=memory`, which
 relies on the OS page cache and the memory-mapped files rather than an explicit

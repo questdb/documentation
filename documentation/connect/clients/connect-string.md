@@ -526,9 +526,10 @@ for the full at-least-once / exactly-once model.
 Store-and-forward (SF) keeps rows the server hasn't acknowledged yet on disk,
 so they survive a lost connection and a client restart. It is available on
 QWP / WebSocket and is off by default. A flush sends its rows to the server as
-one batch, or as several if they don't fit in one. With SF, the client first
-writes each batch to a segment file on disk, and deletes a segment once the
-server has acknowledged every batch in it. If the connection drops, the client
+one batch. A flush too large for one batch is split into several or rejected,
+depending on the client and the API. With SF, the client first writes each
+batch to a segment file on disk, and deletes a segment once the server has
+acknowledged every batch in it. If the connection drops, the client
 reconnects on its own and replays what is still on disk. After a process
 restart, a new sender with the same `sf_dir` and `sender_id` replays it; see
 [Sender restart and replay](#sender-restart-and-replay).

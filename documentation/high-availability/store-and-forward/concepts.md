@@ -43,12 +43,14 @@ where unacked data lives.
 ## Batches
 
 A **batch** is one encoded QWP message carrying rows for one or more
-tables. A flush sends its rows as one batch, or as several if they don't fit
-in one. The protocol, and some API names such as `getTotalFramesReplayed`,
-call a batch a *frame*. The SF substrate treats batches as opaque payloads
-with two properties: a length, and a CRC32C checksum. The append protocol
-writes the payload first, the checksum last, and a partial write left behind
-by a crash is detected and discarded by the recovery scanner on next start.
+tables. A flush sends its rows as one batch. A flush too large for one batch
+is split into several or rejected, depending on the client and the API; see
+your [client's page](/docs/connect/overview/#client-libraries). The protocol,
+and some API names such as `getTotalFramesReplayed`, call a batch a *frame*.
+The SF substrate treats batches as opaque payloads with two properties: a
+length, and a CRC32C checksum. The append protocol writes the payload first,
+the checksum last, and a partial write left behind by a crash is detected and
+discarded by the recovery scanner on next start.
 
 Batches in SF mode are **self-sufficient**: every batch carries the full
 schema for every table it touches and the full symbol-dictionary delta

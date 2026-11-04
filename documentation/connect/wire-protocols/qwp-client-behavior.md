@@ -309,6 +309,10 @@ here.
 
 `sf_dir=...` enables SF. There is no separate boolean enable flag.
 
+A flush sends rows to the server in batches. A batch is one QWP message; the
+protocol specs call it a *frame*, hence names such as `max_frame_rejections`.
+See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
+
 - The sender owns one sender directory: `<sf_dir>/<sender_id>/`. Default
   `sender_id` is `default`.
 - Multiple independent senders sharing one `sf_dir` must use distinct
