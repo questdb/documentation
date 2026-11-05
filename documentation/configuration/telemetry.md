@@ -3,17 +3,22 @@ title: Telemetry
 description: Configuration settings for telemetry in QuestDB.
 ---
 
-QuestDB collects usage telemetry that helps us improve the product. Telemetry
-does not include the data stored in your tables, and metrics such as database
-size and table count are sent as ranges rather than exact values. See our
-[Privacy Notice](https://questdb.com/privacy-notice/) for details.
+The QuestDB Web Console sends usage telemetry to QuestDB. We use it to improve
+the product, to understand which organizations use QuestDB and, for QuestDB
+Enterprise, to check license compliance. Telemetry does not include the data
+stored in your tables, and database size and table count are sent as ranges
+rather than exact values. See our
+[Privacy Notice](https://questdb.com/privacy-notice/#product-telemetry) for
+details.
 
 ## telemetry.enabled
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Enable or disable usage metrics collection.
+Enable or disable usage telemetry. When disabled, the Web Console stops sending
+usage telemetry and the
+[Metrics View](/docs/getting-started/web-console/metrics-view/) is unavailable.
 
 ## telemetry.hide.tables
 
