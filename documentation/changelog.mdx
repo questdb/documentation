@@ -10,6 +10,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## November 2026
 
+### New
+
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
+
 ### Updated
 
 - [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
