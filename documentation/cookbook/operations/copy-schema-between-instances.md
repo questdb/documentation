@@ -7,7 +7,8 @@ description:
 ---
 
 Recreate the structure of one QuestDB instance on another: tables, views,
-materialized views, and, on QuestDB Enterprise, the access control layer.
+materialized views, and live views, with the option to copy access control on
+QuestDB Enterprise.
 
 ## Problem
 
@@ -15,16 +16,16 @@ You want to copy the schema from one QuestDB instance to another.
 
 ## Solution
 
-[`SHOW CREATE DATABASE`](/docs/query/sql/show/#show-create-database) returns a
-data-free dump of the whole database, with one round-trippable DDL statement per
-row:
+[`SHOW CREATE DATABASE INCLUDE (SCHEMA)`](/docs/query/sql/show/#show-create-database)
+returns a data-free schema dump, with one replayable DDL statement per row. The
+explicit category keeps this recipe schema-only on both editions:
 
 ```questdb-sql title="Dump the database schema" demo
-SHOW CREATE DATABASE;
+SHOW CREATE DATABASE INCLUDE (SCHEMA);
 ```
 
-Statements come back in dependency order, so replaying them top to bottom on an
-empty instance recreates the database.
+Statements come back in dependency order. Replay them top to bottom on an empty
+instance to recreate the schema.
 
 On QuestDB Enterprise, the dump contains only the objects the caller
 [can see](/docs/security/rbac/#object-visibility). To copy the whole schema,
@@ -38,7 +39,7 @@ result set as JSON, with the statements under `.dataset[][0]`:
 
 ```shell
 curl -s -G "https://demo.questdb.io/api/v1/sql/execute" \
-  --data-urlencode "query=SHOW CREATE DATABASE"
+  --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)"
 ```
 
 From there you can either save the statements to a file or apply them straight
@@ -48,7 +49,7 @@ to the target instance.
 
 ```shell
 curl -s -G "https://demo.questdb.io/api/v1/sql/execute" \
-  --data-urlencode "query=SHOW CREATE DATABASE" \
+  --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)" \
 | jq -r '.dataset[][0] | sub(";?$";";") + "\n"' > schema.sql
 ```
 
@@ -63,7 +64,7 @@ Send each statement to the target's `/execute` endpoint as you read it:
 
 ```shell
 curl -s -G "https://demo.questdb.io/api/v1/sql/execute" \
-  --data-urlencode "query=SHOW CREATE DATABASE" \
+  --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)" \
 | jq --raw-output0 '.dataset[][0]' \
 | xargs -0 -n1 sh -c \
     'curl -sG "http://localhost:9000/api/v1/sql/execute" \
@@ -104,7 +105,7 @@ export QDB_TOKEN="your-rest-api-token"
 
 curl -s -G "https://source:9000/api/v1/sql/execute" \
   -H "Authorization: Bearer $QDB_TOKEN" \
-  --data-urlencode "query=SHOW CREATE DATABASE"
+  --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)"
 ```
 
 ## Enterprise: schema without permissions
@@ -121,19 +122,29 @@ curl -s -G "https://source:9000/api/v1/sql/execute" \
   -H "Authorization: Bearer $QDB_TOKEN" \
   --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)"
 
-# Permissions only, no tables or views
+# Identities, memberships, and grants; no schema
 curl -s -G "https://source:9000/api/v1/sql/execute" \
   -H "Authorization: Bearer $QDB_TOKEN" \
   --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (ACL)"
 ```
 
-The ACL categories each require the matching `LIST` or `USER DETAILS`
-permission, while the schema categories need none, so a user with only `SELECT`
-can still dump the structure of the objects they can see.
+Every selection that includes an ACL category, including plain
+`SHOW CREATE DATABASE`, requires both `LIST USERS` and `USER DETAILS`. Missing
+either permission aborts the dump. `INCLUDE (SCHEMA)` requires neither, so a
+user with only `SELECT` can still dump the structure of the objects they can see.
+Active table storage policies are included in the schema.
 
-Passwords and tokens are never dumped, so `CREATE USER` and
-`CREATE SERVICE ACCOUNT` statements replay without credentials. Set those on the
-target after the replay.
+To copy access control too, use plain `SHOW CREATE DATABASE` in the commands
+above. It creates principals first, schema objects next, then memberships,
+service account assignments, and grants. Replay on an empty target as its
+built-in admin to avoid adding another principal's creator grants. Schema-only
+and per-object dumps contain neither grants nor `OWNED BY`.
+
+Before opening the target to users, set credentials and reapply memory limits,
+resource groups, and resource group mappings: none are dumped. Only the external
+alias shown by `SHOW GROUPS` is restored for each group. Avoid concurrent schema
+and ACL changes during the export; the dump is best-effort, not a consistent
+snapshot. See [Replay limits](/docs/query/sql/show/#replay-limits).
 
 ## Manual alternative: copy from the Web Console
 

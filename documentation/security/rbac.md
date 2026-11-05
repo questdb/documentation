@@ -930,6 +930,13 @@ even to read your own rows.
 
 :::
 
+To export identities, group memberships, service account assignments, and direct
+grants as replayable SQL, use
+[`SHOW CREATE DATABASE INCLUDE (ACL)`](/docs/query/sql/show/#enterprise-access-control).
+It requires both `LIST USERS` and `USER DETAILS`, as does plain
+`SHOW CREATE DATABASE`. For structure only, use `INCLUDE (SCHEMA)`, which
+requires neither permission and includes only visible objects.
+
 ## Memory limits {#memory-limits}
 
 QuestDB Enterprise can limit the native memory tracked for a single query,

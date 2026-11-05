@@ -418,9 +418,10 @@ they can read through `views()` and `SHOW CREATE VIEW`, still names the table.
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
 
-Access control functions such as `active_grants()` and `active_permissions()`
-are an exception: in a view, they check the permissions of the user who queries
-the view, not those of its definer. See
+Access control functions such as `active_grants()` and `active_permissions()`,
+and [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views) with any ACL
+category, are exceptions: in a view's query body, they check the permissions of
+the user who queries the view, not those of its definer. See
 [access control functions](/docs/query/functions/access-control/#limitations).
 
 ### Metadata functions in views (Enterprise) {#metadata-functions-in-views}
@@ -463,6 +464,34 @@ A view created before QuestDB Enterprise 4.1.0 has no record of the tables its
 table-name functions name, so it resolves them with the reader's own
 permissions until you run [`ALTER VIEW`](/docs/query/sql/alter-view/) or
 `CREATE OR REPLACE VIEW` on it.
+
+### Administrative operations in view metadata
+
+A view's `PIVOT IN` subquery runs while QuestDB derives the view's columns,
+including during background recompilation and startup. It cannot use
+administrative functions or administrative `SHOW` statements that need a
+calling session or have side effects. This restriction also applies to nested
+subqueries and operations reached through another view.
+
+With Enterprise access control enabled, `SHOW CREATE DATABASE` with any ACL
+category counts as an administrative statement. Use
+`SHOW CREATE DATABASE INCLUDE (SCHEMA)` if the subquery only needs schema
+metadata. Catalogue queries that do not require a calling session remain
+allowed. Administrative operations outside `PIVOT IN` in a regular view's
+query body still run with the reader's permission checks.
+
+:::warning Existing views
+
+Creating, altering, or replacing a view with a prohibited operation fails.
+Previously accepted views become invalid at their next compilation, including
+at startup. Inspect `view_status` and `invalidation_reason` in
+[`views()`](/docs/query/functions/meta/#views). Replace ACL dumps with
+`INCLUDE (SCHEMA)` where appropriate, or remove the administrative operation
+from the subquery, then update the definition with
+[`ALTER VIEW`](/docs/query/sql/alter-view/) and run
+[`COMPILE VIEW`](/docs/query/sql/compile-view/).
+
+:::
 
 ### No column-level permissions on views
 

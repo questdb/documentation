@@ -405,10 +405,12 @@ replaying it:
   `START FROM BEGINNING` to include all history still present in the base table.
 - If the view was created with a trailing `;`, the saved query keeps it inside
   `AS ( ... )` and replaying fails with `')' expected`. Remove that `;`.
-- On QuestDB Enterprise, the saved `OWNED BY` names the user running
-  `SHOW CREATE`, and dropping the view removes its grants. Set `OWNED BY` to
-  the user or group that should receive the creator's permissions, and grant
-  the other permissions on the new view again.
+- On QuestDB Enterprise, the saved DDL contains no `OWNED BY` or grants, and
+  dropping the view removes its grants. Save them first with
+  [`SHOW CREATE DATABASE INCLUDE (PERMISSIONS)`](/docs/query/sql/show/#enterprise-access-control)
+  or inspect them with `active_grants()`. On recreation, add `OWNED BY` if
+  another principal should receive the creator's permissions, and restore the
+  other grants on the new view.
 
 Dropping the invalid view removes its materialized rows, including rows whose
 source history is no longer retained by the base table.
@@ -533,11 +535,12 @@ in [Base table lifecycle](#base-table-lifecycle).
   objects, such as `tables()`, follow the
   [materialized view rules](/docs/query/sql/create-mat-view/#catalogue-functions):
   in QuestDB Enterprise, only a creator with `SYSTEM ADMIN` can use them.
-- **No administrative functions.** Enterprise functions that check the
-  caller's permissions, such as `permissions()` and `backup_instance_name()`,
-  are rejected, since a live view refreshes in the background. See
-  [query constraints](/docs/query/sql/create-live-view/#query-constraints) for
-  the full list.
+- **No administrative functions or ACL dumps.** Enterprise functions that
+  check the caller's permissions, such as `permissions()` and
+  `backup_instance_name()`, and `SHOW CREATE DATABASE` with any ACL category
+  are rejected, since a live view refreshes in the background. Use
+  `INCLUDE (SCHEMA)` for schema metadata under the catalogue rules above. See
+  [query constraints](/docs/query/sql/create-live-view/#query-constraints).
 - **No TTL on the view.** Live-view disk growth is unbounded in this version.
   Base-table retention does not shrink the view, because `DROP PARTITION`,
   `TRUNCATE`, and TTL eviction on the base table leave the view's rows in place.
