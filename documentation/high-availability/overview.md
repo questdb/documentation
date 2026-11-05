@@ -35,7 +35,9 @@ applications follow it. The rest of this page covers replication — see the
 
 - **High availability** - Replicas can take over if the primary fails
 - **Read scaling** - Distribute query load across multiple replicas
-- **Disaster recovery** - Restore from any point in time using stored WAL files
+- **Disaster recovery** -
+  [Recover to an arbitrary instant](/docs/operations/point-in-time-recovery/)
+  using stored WAL files
 - **Geographic distribution** - Place replicas closer to users in different regions
 - **Zero performance impact** - Replicas don't affect primary performance
 
@@ -99,6 +101,11 @@ cases.
 Tables without timestamps (typically used for reference/lookup data) are not
 replicated automatically and should be populated separately on each instance.
 
+The audit trail of [audited views](/docs/security/audited-views/),
+`sys.view_audit`, is a WAL table whose definition and storage policy replicate,
+but whose rows do not: each node records the reads it serves. See
+[Replication, backups, and read-only instances](/docs/security/audited-views/#replication-backups-and-read-only-instances).
+
 ## Storage policies in a replicated cluster
 
 [Storage policy](/docs/concepts/storage-policy/) definitions are stored in
@@ -132,6 +139,17 @@ The remote stages behave differently from the local ones. [Cold storage](/docs/c
 
 See [Operating cold storage](/docs/operations/cold-storage/) for the manager handoff procedure and its preconditions.
 
+## Resource groups in a replicated cluster
+
+[Resource group](/docs/concepts/resource-groups/) policies and their principal
+mappings live in a WAL-backed system catalog, so they replicate to every
+instance through the same pipeline as user data. Enforcement then runs locally
+on each instance, against the catalog snapshot that instance holds.
+
+What that means while a replica is behind, including why a lagging replica
+cannot be promoted, is covered in
+[Replication and catalog lag](/docs/concepts/resource-groups/#behaviour-under-failure-and-on-replicas).
+
 ## Bring Your Own Cloud (BYOC)
 
 QuestDB Enterprise can be self-managed or operated by QuestDB's team under the
@@ -148,6 +166,8 @@ by you.
   primary, and replica nodes.
 - [Failover and role switch](/docs/high-availability/failover/) — switch roles
   in place, promote a replica, and recover from a refused switch.
+- [Disaster recovery](/docs/high-availability/disaster-recovery/) — failure
+  scenarios and the migration procedures that recover from them.
 - [Client failover](/docs/high-availability/client-failover/concepts/) —
   configure your applications to follow a primary promotion automatically.
 - [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —

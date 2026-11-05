@@ -34,7 +34,7 @@ reliable and consistent restorations from your database backups.
 
 ### What happens during CHECKPOINT CREATE?
 
-When initiatied, `CHECKPOINT CREATE`:
+When initiated, `CHECKPOINT CREATE`:
 
 - Disables background jobs that housekeep stale files and data blocks
 - Takes snapshot of table transactions across the whole database (all tables)
@@ -49,7 +49,7 @@ When initiatied, `CHECKPOINT CREATE`:
 
 Once a checkpoint is created, QuestDB continues taking in writes. However, it
 will consume more disk space. How much more depends on the shape of the data
-that is being written. Data that is written via the append method will yeild
+that is being written. Data that is written via the append method will yield
 almost no additional disk space consumption other that of the data itself. In
 contrast, the copy-on-write method will make data copies, which are usually
 copies of non-recent table partitions. This will lead to an increase in disk
@@ -57,7 +57,7 @@ space consumption.
 
 **It is strongly recommended that you minimize the time database is in
 checkpoint mode and monitor the free disk space closely. The recommended way to
-achive this is to utilize file system SNAPSHOTS as described in
+achieve this is to utilize file system SNAPSHOTS as described in
 [our backup and restore guide](/docs/operations/backup/).**
 
 Also note that QuestDB can only enter checkpoint mode once. After that period of
@@ -73,14 +73,14 @@ After your snapshot is complete, checkpoint mode must be exited via the
 `CHECKPOINT RELEASE` SQL. Once executed, QuestDB will reinstate the usual
 housekeeping and reclaim disk space.
 
-The database restore is preformed semi-automatically on the database startup.
+The database restore is performed semi-automatically on the database startup.
 This is done deliberately to avoid the restore procedure running accidentally on
 the source database instance. The database will attempt a restore when empty an
 file, typically `/var/lib/questdb/_restore` is present.
 
 The restore procedure will use `/var/lib/questdb/.checkpoint` to adjust the
 database files and remove extra data copies. After the restore is successful the
-database is avaialble as normal with no extra intervantion required.
+database is available as normal with no extra intervention required.
 
 ## Checkpoint history (Enterprise)
 

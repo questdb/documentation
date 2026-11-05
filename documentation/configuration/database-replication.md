@@ -76,7 +76,7 @@ silently demotes itself. See
 `primary-catchup-uploads` is a one-shot maintenance value: the instance starts
 as a primary, uploads every pending transaction, and exits. It is used by the
 restart-based
-[planned primary migration](/docs/high-availability/setup/#planned-primary-migration).
+[planned primary migration](/docs/high-availability/disaster-recovery/#planned-primary-migration).
 
 ### replication.summary.interval
 

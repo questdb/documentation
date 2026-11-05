@@ -13,7 +13,9 @@ price feeds, computing moving averages, or aggregating sensor readings within
 time windows.
 
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) and shares
-many of its execution traits.
+many of its execution traits. To see how it compares with HORIZON JOIN and the
+other time-series joins, read
+[Which time-series join?](/blog/questdb-time-series-joins-guide/)
 
 :::note WINDOW JOIN vs Window Functions
 Despite the similar name, WINDOW JOIN and [window functions](/docs/query/functions/window-functions/overview/) serve different purposes:

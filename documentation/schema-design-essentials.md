@@ -49,28 +49,31 @@ See [Designated Timestamp](/docs/concepts/designated-timestamp/) for details.
 
 ## Partitioning
 
-Partitioning splits your table into time-based chunks. Choose based on your data volume:
+Partitioning splits your table into time-based chunks. Target 30-80 million
+rows per partition for tables with average-sized rows. Tables with many
+columns should aim for the lower end; tables with few columns can go higher.
+Choose the interval based on your data volume:
 
 | Data volume | Recommended partition |
 |-------------|----------------------|
-| < 100K rows/day | `MONTH` or `YEAR` |
-| 100K - 10M rows/day | `DAY` |
-| 10M - 100M rows/day | `HOUR` |
-| > 100M rows/day | `HOUR` (consider multiple tables) |
+| > 1 billion rows/day | `HOUR` |
+| 30-500 million rows/day | `DAY` |
+| 5-30 million rows/day | `WEEK` |
+| 1-5 million rows/day | `MONTH` |
+| < 1 million rows/day | `YEAR` |
 
 **Guidelines:**
-- Each partition should be a few hundred MB to a few GB
-- Too many small partitions = more file operations
-- Too few large partitions = slower queries and more memory usage
+- Too many small partitions = more filesystem operations and syscall overhead
+- Too few large partitions = more data rewritten when out-of-order rows arrive
 
 ```questdb-sql
 -- High-volume tick data
 CREATE TABLE trades (...)
-TIMESTAMP(ts) PARTITION BY HOUR;
+TIMESTAMP(ts) PARTITION BY DAY;
 
 -- Lower-volume end-of-day prices
 CREATE TABLE eod_prices (...)
-TIMESTAMP(ts) PARTITION BY MONTH;
+TIMESTAMP(ts) PARTITION BY YEAR;
 ```
 
 See [Partitions](/docs/concepts/partitions/) for details.
@@ -335,7 +338,7 @@ PARTITION BY YEAR;          -- Partitions will be huge
 
 -- Good: Match partition size to data volume
 CREATE TABLE trades (...)
-PARTITION BY HOUR;
+PARTITION BY DAY;
 ```
 
 ### Forgetting the designated timestamp

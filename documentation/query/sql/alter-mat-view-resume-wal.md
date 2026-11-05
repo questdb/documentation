@@ -86,11 +86,11 @@ ALTER MATERIALIZED VIEW trades_1h RESUME WAL FROM TRANSACTION 5;
 
 ## Permissions (Enterprise)
 
-Resuming WAL on a materialized view requires the `ALTER MATERIALIZED VIEW`
-permission on the specific view:
+Resuming WAL on a materialized view requires the `RESUME WAL` permission on the
+view:
 
-```questdb-sql title="Grant alter permission"
-GRANT ALTER MATERIALIZED VIEW ON trades_1h TO user1;
+```questdb-sql title="Grant resume permission"
+GRANT RESUME WAL ON trades_1h TO user1;
 ```
 
 ## Errors

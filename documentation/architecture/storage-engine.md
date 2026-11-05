@@ -44,6 +44,9 @@ appears consistent to all readers, even during ongoing write operations.
 Changes in the parallel WAL files are stored on local disk in columnar format by
 the TableWriter. The TableWriter also handles and resolves out-of-order data
 writes and enables deduplication. Column files use an append model.
+Opt-in [merge-append partitions](/docs/concepts/merge-append-partitions/) reduce
+the copying needed for backdated writes by keeping untouched pieces in place;
+compaction later reclaims the superseded rows.
 
 By default, the active (most recent) partition for each table is stored in
 QuestDB's native binary format for minimum query latency and to optimize writes

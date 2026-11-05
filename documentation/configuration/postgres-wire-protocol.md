@@ -31,6 +31,22 @@ Comma-separated list of CPU core indexes to pin worker threads to. Example:
 Number of dedicated worker threads for PostgreSQL wire protocol queries.
 When `0`, uses the shared worker pool.
 
+### pg.worker.fiber.enabled
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Runs the dedicated PostgreSQL worker pool in Fiber mode, where a query can
+suspend and release its worker instead of holding it until it finishes. Setting
+this to `false` puts the pool in legacy mode.
+
+This applies only when `pg.worker.count` is above `0`. With the default of `0`,
+PostgreSQL runs on the shared network pool and
+[`shared.network.worker.fiber.enabled`](/docs/configuration/shared-workers/#sharednetworkworkerfiberenabled)
+governs it instead. QuestDB Enterprise
+[resource groups](/docs/concepts/resource-groups/) require Fiber mode on
+whichever pool actually serves PostgreSQL.
+
 ### pg.daemon.pool
 
 - **Default**: `true`

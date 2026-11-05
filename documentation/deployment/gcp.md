@@ -16,7 +16,8 @@ import MinimumHardware from "../../src/components/DRY/_questdb_production_hardwa
 |-----------|-------------|-------|
 | Instance | `c3-standard-4` or `c3-highmem-8` | 4-8 vCPUs, 16-64 GiB RAM |
 | Storage | Hyperdisk Balanced data disk, 300+ GiB | 5000 IOPS / 300 MBps for production |
-| File system | `ext4` | Or `zfs` with `lz4` for on-disk compression |
+| File system | `ext4` | Compression is handled by Parquet, not the file system |
+| Compression | Storage policy with `TO PARQUET` | Add `TO REMOTE` to tier history to GCS (Enterprise) |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
 ---
@@ -76,16 +77,31 @@ cannot be used on `C3` machines smaller than `88 vCPUs`.
 
 **File system:**
 
-Format the data disk as `ext4`. If you need on-disk compression, use `zfs` with
-`lz4` instead, at a small performance cost. See
-[ZFS compression](/docs/deployment/compression-zfs/).
+Format the data disk as `ext4`. QuestDB compresses data itself, so the file
+system does not need to.
+
+**Compression and tiering:**
+
+QuestDB compresses data by storing older partitions as
+[Parquet](/docs/concepts/parquet/#data-compression), which uses `lz4_raw`
+compression by default and stays fully queryable. In QuestDB Enterprise, a
+[storage policy](/docs/concepts/storage-policy/) with a `TO PARQUET` stage
+converts partitions automatically as they age. In QuestDB open source, convert
+them manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
+
+For further savings in Enterprise, add a `TO REMOTE` stage so the policy also
+tiers Parquet partitions to Google Cloud Storage
+[cold storage](/docs/concepts/cold-storage/). GCS usually costs less than
+Hyperdisk, the cluster keeps a single copy that every instance reads instead of
+one copy per replica, and history can grow beyond the size of a single disk.
 
 **Unsupported storage:**
 
 - **Filestore** - Not supported as primary storage (NFS latency too high). Use
   for Enterprise replication only (see [Enterprise on GCP](#enterprise-on-gcp)).
 - **Google Cloud Storage** - Not supported as primary storage. Use for
-  Enterprise replication only.
+  Enterprise replication and cold storage only.
 
 ### Networking
 
@@ -282,8 +298,8 @@ gcloud compute ssh questdb-europe-west3 --zone europe-west3-a
 
 Run these commands on the VM over SSH. They assume the attached data disk uses
 the custom device name `questdb-data` and format it as `ext4`, which is the
-recommended default. If you need on-disk compression, format the data disk as
-`zfs` with `lz4` instead. See [ZFS compression](/docs/deployment/compression-zfs/).
+recommended default. To compress data, use Parquet rather than the file system,
+as described in [Compression and tiering](#storage).
 
 :::warning
 The `mkfs.ext4` command erases the target device. Run it only on a new blank

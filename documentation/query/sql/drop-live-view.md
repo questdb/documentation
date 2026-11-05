@@ -19,7 +19,7 @@ DROP LIVE VIEW [ IF EXISTS ] viewName
 | Parameter | Description |
 | --------- | ----------- |
 | `viewName` | Name of the live view to drop |
-| `IF EXISTS` | Suppress the error if the view does not exist |
+| `IF EXISTS` | Suppress the error if no table or view with this name exists |
 
 ## Examples
 
@@ -60,13 +60,17 @@ The view creator automatically receives this permission with the `GRANT` option.
 
 ## Errors
 
+Messages are shown by their stable prefix. The server may append details, such
+as `[name=trades_ma]`.
+
 | Error | Cause |
 | ----- | ----- |
-| `live view name expected` | The name refers to a table or view that is not a live view |
-| `live view does not exist` | The view does not exist and `IF EXISTS` was not specified |
-| `permission denied` | Missing `DROP LIVE VIEW` permission (Enterprise) |
+| `live view name expected` | The name refers to a table or view that is not a live view, even with `IF EXISTS` |
+| `live view does not exist` | The view does not exist, or is [hidden](/docs/security/rbac/#object-visibility) from the user (Enterprise), and `IF EXISTS` was not specified |
+| `Access denied for <user> [DROP LIVE VIEW on <view>]` | Missing `DROP LIVE VIEW` permission (Enterprise) |
 
 ## See also
 
 - [Live views concept](/docs/concepts/live-views/)
 - [CREATE LIVE VIEW](/docs/query/sql/create-live-view/)
+- [ALTER LIVE VIEW RESUME WAL](/docs/query/sql/alter-live-view-resume-wal/)

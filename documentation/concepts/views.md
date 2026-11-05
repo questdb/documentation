@@ -186,6 +186,32 @@ CREATE VIEW mixed_params AS (
 DECLARE @limit := 50 SELECT * FROM mixed_params
 ```
 
+### List parameters
+
+A parameter can hold a list of values for an `IN` filter. Each statement that
+reads the view can override it with a list of any length. In a prepared
+statement, a list of bind variables has the length its text gives it: `($1, $2)`
+always takes two values.
+
+To pass any number of values with one statement, bind one text array instead,
+`DECLARE @symbols := $1`. That works when the view uses the parameter as the
+whole `IN` list, as `symbol IN @symbols` does below. `AUDITED` parameters support
+literal lists and lists of scalar bind variables, such as `($1, $2)`, but cannot
+take the entire list as one text-array bind. See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
+
+```questdb-sql
+CREATE VIEW trades_for AS (
+  DECLARE OVERRIDABLE @symbols := ('BTC-USDT', 'ETH-USDT')
+  SELECT timestamp, symbol, price FROM trades WHERE symbol IN @symbols
+)
+
+-- A list of one needs the trailing comma
+DECLARE @symbols := ('SOL-USDT',) SELECT * FROM trades_for
+```
+
+See [value lists](/docs/query/sql/declare/#value-lists) for the rules.
+
 ## View hierarchies
 
 Views can reference other views, tables, and materialized views:
@@ -284,6 +310,10 @@ Views are automatically invalidated when their dependencies change:
 | `RENAME COLUMN` | View becomes invalid if column is referenced |
 | Column type change | View metadata is updated |
 
+Since QuestDB 10.1.0, `CREATE VIEW` and `ALTER VIEW` also record a table named
+by a table-name function in the definition, such as `table_columns('trades')`,
+as a dependency, so dropping that table invalidates the view.
+
 ### Automatic recovery
 
 Views are automatically revalidated when the invalidating condition is reversed:
@@ -352,7 +382,8 @@ Use a [live view](/docs/concepts/live-views/) instead when you need to
 incrementally maintain a row-per-input window computation, such as a moving
 average, running total, or ranking.
 
-The output of a live view is one row per base row.
+The output of a live view is one row per base row that passes the view's
+`WHERE` filter and `START FROM` boundary.
 
 ## Security with views
 
@@ -375,11 +406,63 @@ GRANT SELECT ON public_summary TO analyst_role;
 
 -- Analysts can query the view without access to sensitive_sales
 SELECT * FROM public_summary;  -- Works!
-SELECT * FROM sensitive_sales; -- Access denied!
+SELECT * FROM sensitive_sales; -- table does not exist
 ```
+
+Holding no permission on `sensitive_sales`, the analysts cannot
+[see it](/docs/security/rbac/#object-visibility) either: it is missing from
+`SHOW TABLES`, and querying it fails with
+`table does not exist [table=sensitive_sales]`. The view's definition, which
+they can read through `views()` and `SHOW CREATE VIEW`, still names the table.
 
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
+
+Access control functions such as `active_grants()` and `active_permissions()`
+are an exception: in a view, they check the permissions of the user who queries
+the view, not those of its definer. See
+[access control functions](/docs/query/functions/access-control/#limitations).
+
+### Metadata functions in views (Enterprise) {#metadata-functions-in-views}
+
+The table-name functions `table_columns()`, `table_partitions()`,
+`wal_transactions()`, and `table_cold_partitions()`, and the `SHOW COLUMNS`,
+`SHOW PARTITIONS`, and `SHOW CREATE` statements read an object's metadata. In a
+view's definition, they resolve the objects the definition names with the
+view's authority, like the tables the view reads. A view can therefore publish
+the metadata of a table its readers cannot see:
+
+```questdb-sql title="Publish partition statistics, not the table"
+CREATE VIEW risk_limits_partitions AS (
+  SELECT name, numRows, diskSize FROM table_partitions('risk_limits')
+);
+GRANT SELECT ON risk_limits_partitions TO desk_user;
+```
+
+`desk_user` can query `risk_limits_partitions`, while running
+`table_partitions('risk_limits')` directly fails with
+`table does not exist [table=risk_limits]`. A principal that can see the view
+but holds no `SELECT` on it gets `Access denied`.
+
+The view lends its authority only to the objects its definition names. An
+object a reader substitutes through an `OVERRIDABLE` variable resolves with the
+reader's own permissions:
+
+```questdb-sql title="A substituted table resolves as the reader"
+CREATE VIEW columns_of AS (
+  DECLARE OVERRIDABLE @t := 'risk_limits'
+  SELECT "column", type FROM table_columns(@t)
+);
+
+-- As a reader that holds no permission on positions,
+-- fails with: table does not exist [table=positions]
+DECLARE @t := 'positions' SELECT * FROM columns_of;
+```
+
+A view created before QuestDB Enterprise 4.1.0 has no record of the tables its
+table-name functions name, so it resolves them with the reader's own
+permissions until you run [`ALTER VIEW`](/docs/query/sql/alter-view/) or
+`CREATE OR REPLACE VIEW` on it.
 
 ### No column-level permissions on views
 
@@ -442,6 +525,27 @@ GRANT SELECT ON desk_a_trades TO desk_a_users;
 For more details on permissions, see
 [Role-Based Access Control (RBAC)](/docs/security/rbac/).
 
+### Audited views (Enterprise)
+
+A view created `WITH AUDIT` records each read of it in the `sys.view_audit`
+table: who read it, when, and the values its `AUDITED` parameters resolved to,
+including a caller's overrides and bind variables. Use it to keep a
+best-effort audit trail of access to sensitive data:
+
+```questdb-sql
+CREATE VIEW trades_by_symbol AS (
+  DECLARE
+    OVERRIDABLE AUDITED @symbols := ('BTC-USDT', 'ETH-USDT'),
+    AUDITED @since := dateadd('h', -1, now())
+  SELECT timestamp, symbol, side, price, amount
+  FROM trades
+  WHERE symbol IN @symbols AND timestamp >= @since
+) WITH AUDIT;
+```
+
+See [Audited views](/docs/security/audited-views/) for what a read records, the
+audit table, permissions, and limitations.
+
 ## Performance considerations
 
 ### Views don't cache results
@@ -496,3 +600,4 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [Materialized Views](/docs/concepts/materialized-views/): Incrementally maintained `SAMPLE BY` aggregates
   - [Live views](/docs/concepts/live-views/): Incrementally maintained row-per-input window-function results
   - [DECLARE](/docs/query/sql/declare/): Parameter declaration for views
+  - [Audited views](/docs/security/audited-views/): Keep an audit trail of reads of a view (Enterprise)

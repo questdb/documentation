@@ -52,6 +52,7 @@ const config = {
       "data-project-name": "QuestDB",
       "data-project-logo": "/docs/images/favicon.webp",
       "data-bot-protection-mechanism": "hcaptcha",
+      "data-user-analytics-cookie-enabled": "false",
       "data-modal-z-index": "9999",
       "data-modal-size": "533px",
 
@@ -190,6 +191,12 @@ const config = {
         {
           to: "https://questdb.com/enterprise/",
           label: "QuestDB Enterprise",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://questdb.com/enterprise/trial/",
+          label: "Free Enterprise trial",
           position: "left",
           className: "mobile-only",
         },

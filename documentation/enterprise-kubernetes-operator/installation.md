@@ -12,8 +12,8 @@ tested combinations:
 
 | Platform   | Kubernetes | QuestDB Enterprise |
 | ---------- | ---------- | ------------------ |
-| Amazon EKS | 1.31–1.36  | 4.0.0              |
-| Azure AKS  | 1.33–1.36  | 4.0.0              |
+| Amazon EKS | 1.31–1.36  | 4.0.1              |
+| Azure AKS  | 1.33–1.36  | 4.0.1              |
 
 Other Kubernetes distributions and versions are untested. Only the latest
 release receives fixes; obtain its `<operator-version>` and private registry
@@ -49,6 +49,45 @@ Follow the complete cloud checklist before installing:
 
 - [Amazon EKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/aws/)
 - [Azure AKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/azure/)
+
+## Operator permissions
+
+The chart binds the operator's ServiceAccount to the
+`questdb-operator-manager-role` ClusterRole with a ClusterRoleBinding, so its
+permissions apply in every namespace. There is no namespace-scoped install mode:
+one operator watches `QuestDBCluster` objects in all namespaces.
+
+The full list of rules is in the chart's `templates/rbac/role.yaml`.
+
+The chart also creates a namespaced Role in the operator's namespace for leader
+election (Leases, ConfigMaps, Events), and, when metrics are enabled, a
+ClusterRole to create TokenReviews and SubjectAccessReviews so it can check who
+is reading `/metrics`.
+
+### Secrets
+
+The operator reads Secrets you point it at: the admin password
+(`spec.auth.adminSecret`), object-store credentials, and PGWire TLS
+certificates. It creates and updates Secrets of its own: a generated admin
+password if you don't supply one, its own database login, the object-store
+connection strings handed to the pods, and the webhook certificate in
+self-signed mode.
+
+It watches Secrets in every namespace so that a renewed TLS certificate takes
+effect, but it keeps only their metadata (names and labels) in memory, never the
+contents. It reads contents directly from the Kubernetes API when it needs them.
+
+The role has no `delete` on Secrets, on purpose. The operator never deletes a
+Secret. The ones it creates for a cluster are owned by that `QuestDBCluster`,
+and Kubernetes removes them when you delete the cluster. The webhook certificate
+Secret in the operator's namespace is never removed by the operator.
+
+### Object store
+
+The operator never touches your object store and has no cloud permissions. It
+does not create or delete buckets, containers, or IAM roles, and never reads or
+writes your data there. The QuestDB pods do all object-store I/O, with the
+identity or credentials you configure.
 
 ## Canonical Helm install
 

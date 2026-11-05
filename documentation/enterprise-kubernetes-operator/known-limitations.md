@@ -16,15 +16,19 @@ operational planning.
 
 A one-instance cluster has no replica to promote. On an unreachable node, the
 operator does not create a second pod while the old writer might still run.
-Recovery waits for safe node/volume recovery or human action. Use store-backed
-replication before an incident; see
+Recovery waits for safe node/volume recovery or human action. Turn on your
+platform's node auto-repair so that an unhealthy node is replaced without
+waiting for a person; see
+[Node maintenance](/docs/enterprise-kubernetes-operator/operations/database/#node-maintenance-and-disruption-budgets).
+Use store-backed replication before an incident; see
 [Scale out](/docs/enterprise-kubernetes-operator/operations/database/#scale-out).
 
-### Singleton drain is blocked by default
+### Draining a singleton's node restarts the database
 
-The default PodDisruptionBudget has `minAvailable: 1`, so voluntary drain of the
-singleton waits indefinitely. Before maintenance, scale out, lower
-`minAvailable`, or disable the PDB after accepting downtime. See
+A one-instance cluster has no PodDisruptionBudget by default. A voluntary drain
+evicts the only pod, and the operator recreates it on another node in the same
+zone. Expect a short outage on every node drain or node upgrade. To avoid it,
+scale out before maintenance. See
 [Node maintenance](/docs/enterprise-kubernetes-operator/operations/database/#node-maintenance-and-disruption-budgets).
 
 ### Failover is never automatic
@@ -145,8 +149,8 @@ Gateway, or LoadBalancer. Do not mutate operator-owned Service types.
 
 | Platform   | Tested Kubernetes | Tested QuestDB Enterprise |
 | ---------- | ----------------- | ------------------------- |
-| Amazon EKS | 1.31–1.36         | 4.0.0                     |
-| Azure AKS  | 1.33–1.36         | 4.0.0                     |
+| Amazon EKS | 1.31–1.36         | 4.0.1                     |
+| Azure AKS  | 1.33–1.36         | 4.0.1                     |
 
 Other Kubernetes distributions, versions, CSI/fsGroup behavior, and QuestDB
 versions are untested. They are not blocked by admission.

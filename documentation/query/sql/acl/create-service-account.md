@@ -32,7 +32,7 @@ CREATE SERVICE ACCOUNT [IF NOT EXISTS] accountName [OWNED BY ownerName];
 
 `CREATE SERVICE ACCOUNT` cannot set a memory limit. To cap the native memory
 each of the service account's queries may allocate, use
-[`ALTER SERVICE ACCOUNT ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-service-account/#set-memory-limit)
+[`ALTER SERVICE ACCOUNT ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-service-account-set-memory-limit/)
 after creating it. Service accounts do not inherit group limits.
 
 The chosen name must be unique across all users (including the built-in admin),

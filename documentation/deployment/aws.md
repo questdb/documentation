@@ -14,7 +14,8 @@ import CodeBlock from "@theme/CodeBlock"
 |-----------|-------------|-------|
 | Instance | `m7i.xlarge` or `r7i.2xlarge` | 4-8 vCPUs, 16-64 GiB RAM |
 | Storage | `gp3`, 200+ GiB | 16000 IOPS / 1000 MBps |
-| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| File system | `ext4` or `xfs` | Compression is handled by Parquet, not the file system |
+| Compression | Storage policy with `TO PARQUET` | Add `TO REMOTE` to tier history to S3 (Enterprise) |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
 ---
@@ -75,13 +76,30 @@ before provisioning storage.
 
 **File system:**
 
-Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
-compression, `ext4` or `xfs` offer slightly better performance.
+Format the data disk as `ext4` or `xfs`. QuestDB compresses data itself, so the
+file system does not need to.
+
+**Compression and tiering:**
+
+QuestDB compresses data by storing older partitions as
+[Parquet](/docs/concepts/parquet/#data-compression), which uses `lz4_raw`
+compression by default and stays fully queryable. In QuestDB Enterprise, a
+[storage policy](/docs/concepts/storage-policy/) with a `TO PARQUET` stage
+converts partitions automatically as they age. In QuestDB open source, convert
+them manually with
+[`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
+
+For further savings in Enterprise, add a `TO REMOTE` stage so the policy also
+tiers Parquet partitions to S3 [cold storage](/docs/concepts/cold-storage/). S3
+usually costs less than EBS, the cluster keeps a single copy that every instance
+reads instead of one copy per replica, and history can grow beyond the size of
+a single volume.
 
 **Unsupported storage:**
 
 - **EFS** - Not supported. Network latency is too high for database workloads.
-- **S3** - Not supported as primary storage. Use for replication (Enterprise only).
+- **S3** - Not supported as primary storage. Use for replication and cold
+  storage (Enterprise only).
 
 ### Networking
 
