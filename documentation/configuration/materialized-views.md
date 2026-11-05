@@ -2,7 +2,8 @@
 title: Materialized views
 description:
   Materialized view configuration in QuestDB, covering refresh workers, parallel
-  SQL, and the retry limits that govern out-of-memory and busy refresh failures.
+  SQL, retry limits for out-of-memory and busy refresh failures, and EXPIRE ROWS
+  cleanup.
 ---
 
 These settings control materialized view SQL support, background refresh, and
@@ -82,6 +83,30 @@ Turns on the background job that frees disk for rows removed by an eligible
 [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. Turning the job off does not
 turn off read filtering, so expired rows stay hidden from query results either
 way.
+
+## cairo.mat.view.row.expiry.cleanup.max.cached.partitions
+
+- **Default**: `16384`
+- **Reloadable**: no
+
+How many partitions, across all materialized views, the
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) cleanup job remembers as checked
+and free of expired rows. On later runs the job skips a remembered partition
+until its contents change, instead of counting its rows again.
+
+Only a `WHEN` condition that decides each row from that row's own values uses
+this, such as `price < 2.0` or `timestamp < '2024-01-03'`. A comparison of the
+designated timestamp with a `TIMESTAMP` value, such as
+`timestamp < dateadd('d', -7, now())`, is decided from each partition's time
+range and never counts rows.
+
+Once the job remembers this many partitions, it keeps those and adds no more,
+so each run counts the rows of every other unchanged partition again. Raise the
+limit if your views hold more partitions under such a policy than this, at the
+cost of a little heap memory per partition. The job keeps this in memory only,
+so its first run after a restart counts every partition once. Set this to `0`
+to make every run count every partition. A negative value stops the server from
+starting.
 
 ## cairo.mat.view.row.expiry.cleanup.min.expired.fraction
 

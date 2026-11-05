@@ -353,7 +353,7 @@ single table and picks columns from it qualifies, with or without a filter:
 | `SELECT DISTINCT ...` | Rejected |
 | `... LATEST ON timestamp PARTITION BY symbol` | Rejected |
 | `JOIN`, `UNION` | Rejected |
-| `row_number() OVER (...)` and other window functions | Rejected |
+| `row_number() OVER (...)` and other window functions, also inside an expression such as `row_number() OVER (...) + 1` | Rejected |
 | `LIMIT` | Rejected |
 | `ORDER BY` a non-timestamp column | Rejected: the view loses its designated timestamp |
 

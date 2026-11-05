@@ -505,6 +505,13 @@ through it. Set the property to `0` to rewrite as soon as any row expires, or to
 still removed). This threshold does not delay a fixed rule, whose expired rows
 never change over time.
 
+A fixed rule that the job cannot decide from a partition's time range, such as
+`price < 2.0`, makes it count the expired rows in each partition. The job
+remembers partitions it found unchanged and free of expired rows, and skips them
+on later runs. It remembers up to
+[`cairo.mat.view.row.expiry.cleanup.max.cached.partitions`](/docs/configuration/materialized-views/#cairomatviewrowexpirycleanupmaxcachedpartitions)
+(default `16384`) partitions across all views, and forgets them on restart.
+
 The job runs on the `CLEANUP EVERY` schedule (default `1h`) and is best effort.
 Because the read filter is what queries rely on, cleanup running late or not at
 all only affects disk usage, never query results.
@@ -522,10 +529,9 @@ replicas delete the same rows when they apply them. A read-only replica does not
 run the job and does not need to. Turn the job off with
 `cairo.mat.view.row.expiry.cleanup.enabled=false` in `server.conf` (reads stay
 filtered; this only stops disk cleanup, it does not turn off `EXPIRE ROWS`
-itself). Cleanup settings are read at startup, so changing this property or the
-minimum expired fraction needs a restart. If a cleanup pass fails, it retries
-after one second, then doubles the gap for that view each time, up to a 10-minute
-cap.
+itself). Cleanup settings are read at startup, so changing any of them needs a
+restart. If a cleanup pass fails, it retries after one second, then doubles the
+gap for that view each time, up to a 10-minute cap.
 
 To watch cleanup happen, compare the number of rows per partition before and
 after a pass:

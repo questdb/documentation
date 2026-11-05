@@ -72,25 +72,53 @@ Where:
 | PERIOD requires SAMPLE BY | The `PERIOD` clause only works with `SAMPLE BY` queries |
 | EVERY minimum | Minimum timer interval is `1m` |
 
-### LIMIT restrictions and existing definitions
+### LIMIT and window function restrictions
 
-You cannot use `LIMIT` in any part of the query that reads the base table,
-including nested queries. This applies to both aggregating and passthrough views.
-Each refresh runs the query over the rows that just changed, so a `LIMIT 100`
-would cap each batch rather than the view as a whole. A `LIMIT` in a subquery over
-a *different* table is still allowed.
+Any part of the query that reads the base table, including nested queries,
+cannot use:
 
-:::note Upgrading existing definitions
+- `LIMIT`. A `LIMIT` in a subquery over a *different* table is still allowed.
+- A window function, wherever it appears in a column. This includes a window
+  function inside an operator, a cast, a function call, or a `CASE`, such as
+  `row_number() OVER (ORDER BY timestamp) + 1`.
 
-Materialized views that already contain such a `LIMIT` keep refreshing. But if you
-recreate one after upgrading from a version that allowed it, you have to remove or
-rework the limit first. The same applies when you replay
-`SHOW CREATE MATERIALIZED VIEW` output during a migration or restore.
+This applies to both aggregating and passthrough views. Each refresh runs the
+query over the rows that just changed, so a `LIMIT 100` would cap each batch
+rather than the view as a whole, and a `row_number()` would start over on each
+batch.
 
-If the limit was only there to cap how many rows your application receives, remove
-it from the view and instead use `ORDER BY ... LIMIT ...` when you query the view.
-Note that moving the limit changes which rows the view stores, so it does not
-behave exactly like the original.
+```questdb-sql title="Rejected: window function inside an expression"
+CREATE MATERIALIZED VIEW trades_numbered AS (
+  SELECT timestamp, symbol,
+    row_number() OVER (ORDER BY timestamp) + 1 AS rn
+  FROM trades
+);
+```
+
+```text title="Error"
+window function on base table is not supported for materialized views: trades
+```
+
+A `LIMIT` fails the same way, with
+`LIMIT on base table is not supported for materialized views: trades`.
+
+:::warning Breaking change for existing definitions
+
+Earlier QuestDB versions accepted both of these in the base-table query: a
+`LIMIT`, and a window function nested inside an expression. A window function
+that makes up a whole column was already rejected.
+
+Materialized views that already contain either one keep refreshing. But if you
+recreate one, you have to rework the query first. The same applies when you
+replay `SHOW CREATE MATERIALIZED VIEW` output during an upgrade, migration, or
+restore.
+
+- If the `LIMIT` was only there to cap how many rows your application receives,
+  remove it from the view and instead use `ORDER BY ... LIMIT ...` when you query
+  the view. Moving the limit changes which rows the view stores, so it does not
+  behave exactly like the original.
+- Move a window function out of the view and into the query you run against the
+  view, where it sees all of the view's rows.
 
 :::
 
