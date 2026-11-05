@@ -116,15 +116,21 @@ The default policy, `TO PARQUET 1d`, never deletes rows. It makes inactive daily
 partitions eligible for Parquet conversion when the reference time is at least
 one day after the partition's start, not its end. By default, the reference time
 is the earlier of the latest audit timestamp and the wall clock. Conversion runs
-asynchronously, and a quiet log may wait for later changes before a partition
-becomes eligible.
+asynchronously.
 
-Add `DROP LOCAL` to bound disk usage, at the cost of deleting older audit
-evidence:
+Add `DROP LOCAL` to delete older audit evidence automatically. It uses the same
+[partition-start rule](/docs/concepts/storage-policy/#ttl-evaluation) as
+conversion: with daily partitions, `DROP LOCAL 365d` can delete a row almost a
+day before it is 365 days old. For a minimum 365-day retention window based on
+`change_id`, include a one-day partition allowance:
 
-```ini title="server.conf: Keep one year of ACL changes"
-acl.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 365d
+```ini title="server.conf: 365-day minimum timestamp-based retention"
+acl.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 366d
 ```
+
+This is timestamp-based retention, not elapsed time since a change was recorded.
+A quiet log may retain partitions longer while its latest timestamp does not
+advance.
 
 - Only `TO PARQUET` and `DROP LOCAL` are supported. `TO REMOTE` and
   `DROP REMOTE` are rejected.

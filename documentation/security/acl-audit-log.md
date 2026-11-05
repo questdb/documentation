@@ -242,22 +242,30 @@ The default policy, `TO PARQUET 1d`, never deletes rows. It makes inactive daily
 partitions eligible for Parquet conversion when the reference time is at least
 one day after the partition's start, not its end. By default, the reference time
 is the earlier of the latest audit timestamp and the wall clock. Conversion runs
-asynchronously, and a quiet log may wait for later changes before a partition
-becomes eligible.
+asynchronously.
+
+`DROP LOCAL` uses the same
+[partition-start rule](/docs/concepts/storage-policy/#ttl-evaluation), not each
+row's age. With daily partitions, `DROP LOCAL 365d` can delete a row almost a day
+before it is 365 days old. For a minimum 365-day timestamp-based retention
+window, use `DROP LOCAL 366d` to include a one-day partition allowance. The
+window is based on `change_id`, not elapsed time since the change was recorded;
+see [Change IDs and recovery](#change-ids-and-recovery). A quiet log may retain
+partitions longer while its latest timestamp does not advance.
 
 Set [`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy) on
-every node before the log is first created if you need automatic retention:
+every node before the log is first created:
 
-```ini title="server.conf: Keep one year of ACL changes"
-acl.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 365d
+```ini title="server.conf: 365-day minimum timestamp-based retention"
+acl.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 366d
 ```
 
-The setting applies only at table creation. To change an existing log's policy,
-run this as the built-in admin on the primary:
+The setting applies only at table creation. To apply the same retention window
+to an existing log, run this as the built-in admin on the primary:
 
 ```questdb-sql title="Set retention on an existing ACL audit log"
 ALTER TABLE 'sys.acl_audit_log'
-SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 365d);
+SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 366d);
 ```
 
 Only `TO PARQUET` and `DROP LOCAL` stages are supported. `TO REMOTE` and
