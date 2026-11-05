@@ -18,7 +18,7 @@ This enables concurrent writes, crash recovery, and replication.
 | Capability | Description |
 |------------|-------------|
 | **Concurrent writes** | Multiple clients can write simultaneously without blocking |
-| **Crash recovery** | Committed data is never lost — replay from log after restart |
+| **Crash recovery** | After a restart, committed transactions are replayed from the log. Surviving a power loss needs a [commit mode](/docs/concepts/durability/) that flushes the log, such as `adaptive` |
 | **Replication** | WAL enables high availability and disaster recovery |
 | **Out-of-order handling** | Late-arriving data is merged efficiently. See [Out-of-order data](/docs/concepts/out-of-order-data/). |
 | **Deduplication** | Enables [DEDUP UPSERT KEYS](/docs/concepts/deduplication/) |
@@ -105,6 +105,12 @@ When data is written to a WAL table:
 This decouples the commit (fast) from storage application (background),
 enabling high write throughput.
 
+Whether an acknowledged transaction survives an operating system crash or a
+power loss depends on the commit mode. In the default `nosync` mode, nothing is
+flushed to the disk. In `adaptive` mode, each commit flushes its WAL files, and
+the table files are flushed at periodic save points. See
+[Durability and commit modes](/docs/concepts/durability/).
+
 WAL apply sorts and commits many WAL transactions together as one block;
 larger blocks reduce out-of-order merges but use more memory per block.
 [Adaptive blocks](/docs/configuration/wal/#adaptive-wal-apply-blocks) are enabled
@@ -147,6 +153,8 @@ See [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) for details.
 
 ## See also
 
+- [Durability and commit modes](/docs/concepts/durability/): what a commit
+  survives in each commit mode
 - [Replication](/docs/high-availability/overview/) — high availability and failover
 - [Deduplication](/docs/concepts/deduplication/) — requires WAL
 - [CREATE TABLE](/docs/query/sql/create-table/#write-ahead-log-wal-settings) — WAL syntax

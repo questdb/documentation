@@ -26,7 +26,9 @@ If this is your first time setting up QuestDB, see the
    migrate internal metadata. Once this happens, rolling back to the previous
    version may produce errors. Create a backup or snapshot before upgrading,
    especially for production instances. See
-   [Backup and restore](/docs/operations/backup/) for details.
+   [Backup and restore](/docs/operations/backup/) for details. Before you go
+   back to an earlier release, read
+   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 ## Upgrade steps
 

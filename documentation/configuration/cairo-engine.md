@@ -99,163 +99,83 @@ the same as for `query.timeout`.
 
 ## Commit and write behavior
 
-### cairo.commit.mode
-
-- **Default**: `nosync`
-- **Reloadable**: no
-
-Selects the instance-wide durability policy. It is not configurable per table.
-Changing it requires a restart.
-
-| Mode       | Commit behavior                                                                                                                              | Crash guarantee                                                                                                                                                                     | Typical use                                                                                                                               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `nosync`   | Does not explicitly flush table or WAL files.                                                                                                | A process crash usually leaves the OS page cache intact, but an OS crash or power loss can lose acknowledged writes.                                                                | Maximum throughput when the upstream source can replay data. This is the default.                                                         |
-| `async`    | Requests a flush after each commit but does not wait for it.                                                                                 | Reduces the dirty-data backlog but does not make an acknowledgement a durability boundary.                                                                                          | Workloads that want background writeback without synchronous commit latency.                                                              |
-| `sync`     | Flushes materialized table state and waits on every commit.                                                                                  | A returned commit is locally durable.                                                                                                                                               | Non-WAL tables, or workloads that require the materialized table itself to be durable at every commit and can accept the throughput cost. |
-| `adaptive` | Makes WAL data durable, batches sequencer flushes, applies WAL lazily, and periodically creates a durable epoch of materialized table state. | Ordinary commit acknowledgements have a bounded RPO: the group window plus the background flush-sweep scheduling delay. A QWP `local` durable acknowledgement is zero-loss. | WAL ingestion that needs local durability at substantially lower cost than `sync`.                                                        |
-
-`adaptive` separates the small, authoritative WAL from the larger materialized
-table:
-
-1. QuestDB flushes each writer's private WAL data and event records.
-2. It batches shared sequencer flushes for up to
-   [`cairo.adaptive.commit.group.window`](#cairoadaptivecommitgroupwindow).
-3. WAL apply treats the table files, indexes, `_txn`, and `_cv` as a rebuildable
-   cache.
-4. A durable epoch periodically flushes that cache. After an unclean shutdown,
-   QuestDB restores the last valid epoch and replays the durable WAL tail.
-
-The default 50 ms group window means a normal commit may return before its
-sequencer record reaches the device. Set the window to `0` if every returned
-commit must survive power loss; this gives zero-loss semantics with `sync`-class
-per-commit latency. Alternatively, a QWP sender can request the
-[`local` durable-ack tier](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-and retain its store-and-forward copy until QuestDB confirms the sequencer
-record is durable.
-
-:::warning WAL tables only
-
-The `adaptive` recovery guarantee applies to WAL tables. A non-WAL table has no
-WAL to replay, so its regular apply path has `nosync`-grade durability under
-`adaptive`. Use `sync` when non-WAL commits must be locally durable. Structural
-writes that cannot be reconstructed from WAL are flushed synchronously under
-`adaptive`.
-
-:::
-
-#### Choosing a mode
-
-- Keep `nosync` when throughput is the priority and producers can replay the
-  possible loss window.
-- Use `async` to encourage writeback without paying synchronous latency, not as
-  a durability guarantee.
-- Use `sync` for locally durable non-WAL writes or when every materialized-table
-  commit must be durable immediately.
-- Use `adaptive` for WAL ingestion with a bounded RPO. Set its group window to
-  `0`, or wait for QWP local durable acknowledgements, when the relevant
-  acknowledgement must be zero-loss.
-- Replication and local commit mode protect against different failures. Local
-  durability survives power loss; replicated QWP acknowledgements survive loss
-  of the server's disk or node.
-
-#### Migration and rollback
-
-Commit mode changes are supported across restarts. When a table first opens in
-`adaptive` mode, QuestDB records that its materialized state may be ahead of its
-last durable epoch. If the process crashes and you restart with another mode,
-QuestDB still performs the required adaptive recovery before reconciling the
-table to the new mode. Switching from `adaptive` to `nosync`, `async`, or `sync`
-is therefore safe on a version that supports adaptive recovery.
-
-A **binary rollback** to a QuestDB version that predates `adaptive` is a
-different operation. The new epoch and checksum sidecars are designed to be
-ignored by older binaries, but the in-process compatibility tests do not replace
-a real cross-version rollback matrix. In particular, a pre-adaptive binary
-cannot recover a data directory left by an unclean adaptive shutdown.
-
-Before a binary rollback, use the adaptive-capable version to recover from any
-unclean shutdown, restart it with a non-adaptive commit mode, allow every
-adaptive WAL table to open for writing and reconcile to that mode, then stop it
-cleanly and take a volume snapshot. Treat rollback to an older binary as
-unverified unless the release notes for both versions explicitly support that
-path.
+These settings decide when commits are flushed to the disk. For what each commit
+mode survives, how adaptive commit mode works, and how to choose, see
+[Durability and commit modes](/docs/concepts/durability/).
 
 ### cairo.adaptive.commit.group.window
 
 - **Default**: `50ms`
 - **Reloadable**: no
 
-Maximum batching window for flushing adaptive sequencer records. The RPO for an
-ordinary commit acknowledgement is bounded by this window plus the background
-flush-sweep scheduling delay. `0` flushes every sequencer commit before
-returning and gives zero-loss commit acknowledgements at higher latency.
-Negative values are treated as `0`.
-
-This setting does not affect other commit modes. Materialized-view refresh WAL
-continues to flush each commit synchronously.
-
-### cairo.adaptive.epoch.interval
-
-- **Default**: `60s`
-- **Reloadable**: no
-
-Minimum time between durable materialized-state epochs for an adaptive table.
-`0` takes an epoch after every WAL apply batch. A negative value disables both
-time- and row-triggered epochs, causes unbounded WAL retention, and makes
-recovery replay the WAL from its base; use that only for diagnostics or test
-isolation.
-
-### cairo.adaptive.epoch.max.rows
-
-- **Default**: `5000000`
-- **Reloadable**: no
-
-Takes a durable epoch after this many rows have been applied since the previous
-epoch, even if the interval has not elapsed. This bounds retained WAL and
-recovery replay under sustained ingestion. A value less than or equal to `0`
-disables the row trigger while leaving the time trigger active.
-
-### cairo.adaptive.epoch.flush.on.close
-
-- **Default**: `true`
-- **Reloadable**: no
-
-Makes a best-effort final durable epoch when an adaptive table writer closes
-cleanly, including idle eviction and graceful shutdown. A negative
-`cairo.adaptive.epoch.interval` disables epochs, including this close-time one.
-Disable this setting only if the extra close-time I/O is unacceptable; the next
-startup must then replay the tail since the previous epoch.
+How long commits share one flush of the sequencer log in adaptive commit mode.
+`0` flushes the log before every commit returns, so a power loss loses no
+acknowledged commit. With a larger window, a power loss can lose the commits
+acknowledged in the last window. A value without a unit is read as
+microseconds, and a negative value counts as `0`. Only adaptive mode uses it.
+See [Group-commit window](/docs/concepts/durability/#group-commit-window).
 
 ### cairo.adaptive.epoch.column.sync.batched
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Uses a batched filesystem flush for adaptive epoch columns where the platform
-supports it. QuestDB automatically disables this optimization on filesystems
-where it cannot provide the required guarantee. Set it to `false` to force
-per-file flushing.
+On Linux, an adaptive save point starts writing back all column files, waits
+for them, and ends with one `syncfs` call. `false` flushes the column files one
+by one, then calls the same `syncfs`. It has no effect on other platforms.
 
-### cairo.adaptive.recovery.roll.forward.enabled
-
-- **Default**: `true`
-- **Reloadable**: no
-
-Restores adaptive tables to their last valid durable epoch and replays the WAL
-tail during startup. This is a recovery kill switch, not a way to accept weaker
-recovery: when set to `false`, QuestDB refuses to start if an adaptive table
-requires roll-forward.
-
-### cairo.wal.commit.writeback.drain
+### cairo.adaptive.epoch.flush.on.close
 
 - **Default**: `true`
 - **Reloadable**: no
 
-Starts writeback across an adaptive WAL segment before taking the per-file
-durability barriers. On supported filesystems this lets files write back in
-parallel and reduces commit latency. It is only an optimization: QuestDB still
-flushes every file, and filesystems that do not support effective range
-writeback simply skip the drain.
+When a table writer closes cleanly in adaptive commit mode, at shutdown or when
+an idle writer is released, it takes a save point that covers the transactions
+since the previous one, so a clean restart has nothing to replay. With
+`false`, the close skips that save point, and the next start replays those
+transactions from the WAL.
+
+### cairo.adaptive.epoch.interval
+
+- **Default**: `60s`
+- **Reloadable**: no
+
+Time between save points of a table in adaptive commit mode. A shorter interval
+shortens the replay after a crash and removes WAL files sooner, at the cost of
+flushing the table files more often. `0` takes a save point after every WAL
+apply. A negative value turns off the periodic, row-count, and idle save
+points: the WAL is then never removed and the replay after a crash keeps
+growing, so do not use it in production. A value without a unit is read as
+milliseconds.
+
+### cairo.adaptive.epoch.max.rows
+
+- **Default**: `5000000`
+- **Reloadable**: no
+
+Number of applied rows after which a table in adaptive commit mode takes a save
+point before the interval has passed. It limits the WAL kept on the disk and the
+replay after a crash under heavy ingestion. `0` or a negative value turns this
+trigger off. It has no effect when `cairo.adaptive.epoch.interval` is negative.
+
+### cairo.commit.mode
+
+- **Default**: `nosync`
+- **Reloadable**: no
+
+When commits are flushed to the disk, for the whole instance:
+
+- `nosync`: no flush. The operating system writes the data to the disk later,
+  so an operating system crash or a power loss can lose recent commits.
+- `async`: each commit starts a flush and does not wait for it.
+- `sync`: each commit waits until its data is on the disk.
+- `adaptive`: each commit to a WAL table flushes its write-ahead log, and the
+  table files are flushed at periodic save points. A power loss can lose only
+  the commits acknowledged in the last group-commit window, and commits cost
+  much less than in `sync`. Non-WAL tables behave as in `nosync`.
+
+Any other value stops the start. See
+[Durability and commit modes](/docs/concepts/durability/).
 
 ### cairo.max.uncommitted.rows
 
@@ -264,6 +184,16 @@ writeback simply skip the drain.
 
 Maximum number of uncommitted rows per table. When pending rows reach this
 threshold, a commit is issued automatically.
+
+### cairo.wal.commit.writeback.drain
+
+- **Default**: `true`
+- **Reloadable**: no
+
+In adaptive commit mode, on Linux file systems that support it, a commit starts
+writing back every file of its WAL segment at once, and waits for them before it
+flushes each file, so the files are written in parallel. It changes only speed:
+every flush still runs.
 
 ### cairo.wal.enabled.default
 
