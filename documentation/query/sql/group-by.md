@@ -12,7 +12,9 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 ```questdb-sql
 SELECT column [, column ...], aggregation [, aggregation ...]
 FROM tableName
-[GROUP BY column [, column ...]];
+[GROUP BY { column [, column ...]
+          | [column [, ...],] { ROLLUP | CUBE } (column [, ...])
+          | GROUPING SETS ({ (column [, ...]) | () } [, ...]) }];
 ```
 
 :::note
@@ -112,6 +114,7 @@ LIMIT 6;
 
 ## See also
 
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute subtotals and grand totals in a single query
 - [Parallel GROUP BY over hash joins](/docs/configuration/cairo-engine/#parallel-group-by-over-hash-joins) - Settings for parallel aggregations over `INNER`, `LEFT` and `RIGHT` joins
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
