@@ -38,6 +38,18 @@ table; `OUT OF MEMORY` means a WAL apply batch ran out of memory, by breaching
 its own [memory limit](/docs/configuration/cairo-engine/#memory-limits) or the
 process-wide one.
 
+:::note Adaptive commit mode
+
+In [adaptive commit mode](/docs/concepts/durability/), `RESUME WAL` takes a
+save point when the table owes one, for example after a restart until the
+table's first write. While another operation holds the table's writer, it then
+fails with a `table busy` error: retry the statement. If the save point itself
+fails, it reports
+`could not take the durable epoch the table owes, the table stays suspended; retry RESUME WAL`
+with the reason: fix the cause and retry.
+
+:::
+
 :::note Materialized views and live views
 
 `ALTER TABLE ... RESUME WAL` does not work on views: it fails with
