@@ -102,13 +102,14 @@ window function on base table is not supported for materialized views: trades
 A `LIMIT` fails the same way, with
 `LIMIT on base table is not supported for materialized views: trades`.
 
-:::warning Breaking change for existing definitions
+:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0
 
-Earlier QuestDB versions accepted both of these in the base-table query: a
-`LIMIT`, and a window function nested inside an expression. A window function
-that makes up a whole column was already rejected.
+Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, the base-table query could
+contain a `LIMIT`, or a window function nested inside an expression. A window
+function that makes up a whole column was rejected in earlier versions too.
 
-Materialized views that already contain either one keep refreshing. But if you
+Materialized views that already contain either one keep refreshing after the
+upgrade. But if you
 recreate one, you have to rework the query first. The same applies when you
 replay `SHOW CREATE MATERIALIZED VIEW` output during an upgrade, migration, or
 restore.

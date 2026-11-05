@@ -17,14 +17,14 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
-  Breaking change: the part of a materialized view's query that reads its base
-  table (this includes a subquery on the base table) can no longer use `LIMIT`,
-  or a window function nested inside an expression, such as
-  `row_number() OVER (ORDER BY timestamp) + 1`. A window function that makes up
-  a whole column was already rejected. A `LIMIT` in a subquery over a
-  *different* table is still allowed.
+  Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
+  materialized view's query that reads its base table (this includes a subquery
+  on the base table) can no longer use `LIMIT`, or a window function nested
+  inside an expression, such as `row_number() OVER (ORDER BY timestamp) + 1`. A
+  window function that makes up a whole column was already rejected. A `LIMIT`
+  in a subquery over a *different* table is still allowed.
 
-  Views created before this change keep refreshing. The restriction only matters
+  Views created on an earlier version keep refreshing. The restriction only matters
   when you **recreate** such a view — most often when you run
   `SHOW CREATE MATERIALIZED VIEW` and replay its output during an upgrade,
   migration, or restore. That statement is now rejected until you rewrite the
