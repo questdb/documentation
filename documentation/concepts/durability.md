@@ -1,6 +1,6 @@
 ---
 title: Durability and commit modes
-sidebar_label: Durability
+sidebar_label: Durability and commit modes
 description:
   How QuestDB commit modes trade write speed for durability, and how adaptive
   commit mode keeps commits to WAL tables safe from power loss.
@@ -20,8 +20,8 @@ files, and the table files are flushed at periodic save points.
 
 :::note Availability
 
-Adaptive commit mode and the `local` durable acknowledgement are available in
-QuestDB releases after 10.1.0 and QuestDB Enterprise releases after 4.1.0.
+Adaptive commit mode and the `local` durable acknowledgement are available
+since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0.
 
 :::
 
@@ -69,10 +69,11 @@ table, and the table files as a copy that can be rebuilt from it.
    its last two save points, so the start falls back to the older one if the
    newer one is damaged.
 5. **Damage detection.** `_txn`, `_cv`, and the records of the version 2
-   sequencer log carry checksums. A file torn by a power loss is detected
-   instead of being read as data.
+   sequencer log carry checksums. A file that a power loss left half-written
+   is detected instead of being read as data.
 
-Configuration keys and log messages call a save point an *epoch*.
+Configuration keys, the `wal_tables()` columns, and some log messages call a
+save point an *epoch*.
 
 Because the start can fall back to the older save point, QuestDB keeps the files
 that save point still needs: the WAL written since it, and the partition,
@@ -117,6 +118,11 @@ trades commit latency against how much a power loss can take:
 Every commit still flushes its own WAL files before it gets a transaction
 number, so the sequencer log never names data that is not on the disk.
 
+```ini title="server.conf: acknowledge only commits that are on the disk"
+cairo.commit.mode=adaptive
+cairo.adaptive.commit.group.window=0
+```
+
 Only commits made through a writer that stays open share a flush: ILP over TCP,
 ILP over HTTP on a kept-alive connection, and QWP. Each SQL `INSERT` through the
 HTTP `/exec` endpoint or the embedded API, and each PostgreSQL wire protocol
@@ -140,11 +146,15 @@ connect string to the durability tiers you need:
 
 | Value | The server confirms a batch once | Server requirement |
 | --- | --- | --- |
-| `local` | its WAL is on the server's disk. It survives a power loss, not the loss of that disk. | `cairo.commit.mode=adaptive` |
+| `local` | its WAL is on the server's disk. It survives a power loss of the server, not the loss of that disk or a failover to another node. | `cairo.commit.mode=adaptive` |
 | `replicated` | it reached the replication object store. It survives the loss of the server. | QuestDB Enterprise primary with replication |
-| `local,replicated` | both, as two separate confirmations | QuestDB Enterprise primary with replication and `cairo.commit.mode=adaptive` |
-| `on` | as `replicated`. The original name, which QuestDB Enterprise 4.1.0 and earlier also accept. | QuestDB Enterprise primary with replication |
-| `off` (default) | no durable confirmation | none |
+| `local,replicated` | both. The sender keeps the batch until the replicated confirmation. | QuestDB Enterprise primary with replication and `cairo.commit.mode=adaptive` |
+| `on` | as `replicated`. The original name, and the only value QuestDB Enterprise 4.1.0 and earlier accept. | QuestDB Enterprise primary with replication |
+| `off` (default) | no durable confirmation; the sender releases the batch on the OK | none |
+
+```text title="Connect string: keep each batch until it is on the server's disk"
+ws::addr=localhost:9000;request_durable_ack=local;
+```
 
 The server grants every requested tier or none. When it cannot grant them all,
 the client fails the connection at once, so it never waits for confirmations
@@ -208,8 +218,8 @@ Enterprise, on the primary), on storage that honours flushes:
 - **Power losses before the switch.** A power loss during a `nosync` or
   `async` run loses what those modes lose, even if you switch to adaptive mode
   later.
-- **Damage other than torn writes.** The checksums detect writes torn by a
-  power loss, not every kind of corruption. For example, damage to an already
+- **Damage other than half-written files.** The checksums detect files that a
+  power loss left half-written, not every kind of corruption. For example, damage to an already
   written record of a version 1 sequencer log is not detected.
 - **Going back to an older release and returning.** See
   [Downgrade to an earlier release](#downgrade).
@@ -431,7 +441,7 @@ that backup instead.
 
 - **Configure every node.** The default is `nosync`, as in open source. Set
   `cairo.commit.mode=adaptive` on every node that can become primary.
-- **Replicas.** A replica takes no save points and runs at `nosync` grade,
+- **Replicas.** A replica takes no save points and behaves as in `nosync`,
   even when configured `adaptive`: the object store holds the durable copy.
   The mode takes effect when the node is promoted. After a power loss, a
   replica does not download again what it lost locally; if it does not

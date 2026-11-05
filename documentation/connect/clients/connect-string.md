@@ -754,11 +754,11 @@ if the server lost it.
 
 | Value | The server confirms a batch once | Server requirement |
 | --- | --- | --- |
-| `off` (default) | no durable confirmation; the sender releases the batch on the OK | none |
 | `local` | its WAL is on the server's disk. It survives a power loss of the server, not the loss of that disk or a failover to another node. | [`cairo.commit.mode=adaptive`](/docs/concepts/durability/) |
 | `replicated` | it reached the replication object store. It survives the loss of the server. | QuestDB Enterprise primary with replication |
 | `local,replicated` | both. The sender keeps the batch until the replicated confirmation. | QuestDB Enterprise primary with replication and `cairo.commit.mode=adaptive` |
 | `on` | as `replicated`. The original name, and the only value QuestDB Enterprise 4.1.0 and earlier accept. | QuestDB Enterprise primary with replication |
+| `off` (default) | no durable confirmation; the sender releases the batch on the OK | none |
 
 The server grants every requested tier or none. When it cannot, for example
 when a server that is not in adaptive mode is asked for `local`, the connection

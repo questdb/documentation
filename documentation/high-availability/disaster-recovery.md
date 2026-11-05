@@ -43,8 +43,8 @@ uploads transactions to the object store before they are flushed to its own
 disk. After a power loss or an operating system crash, its local transaction
 log of a table can end before the last transaction in the object store. New
 commits would then reuse transaction numbers that the replicas already hold
-with other content, so the primary refuses to start, and the log names the
-table (one line in the log, wrapped here):
+with other content, so since QuestDB Enterprise 4.2.0 the primary refuses to
+start, and the log names the table (one line in the log, wrapped here):
 
 ```text
 local sequencer log is behind the object store, refusing to start as primary

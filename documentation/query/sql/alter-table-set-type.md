@@ -39,8 +39,9 @@ For a table that may hold
 `ALTER TABLE trades SET TYPE BYPASS WAL` and restart again.
 Skipping these steps is unsupported.
 
-When a WAL table is converted to non-WAL, the restart first applies every
-transaction still waiting in the WAL and flushes the table, then converts it.
+Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, when a WAL table is
+converted to non-WAL, the restart first applies every transaction still
+waiting in the WAL and flushes the table, then converts it.
 If that cannot finish, because the table is suspended or a transaction fails
 to apply, the conversion is refused: the table stays a WAL table, keeps its WAL
 and the pending conversion, and the start logs a critical error (one line in

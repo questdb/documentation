@@ -173,8 +173,8 @@ The end-to-end shape of a QWP client session, before the encoding details:
    - `X-QWP-Version` — the version the connection runs on. Use it for the
      `version` byte in every outgoing message header. Reject the connection
      if it's outside the range your client supports.
-   - `X-QWP-Durable-Ack` — confirms durable-ack frames will follow, iff you
-     opted in. It must name exactly the requested tiers (`enabled` for
+   - `X-QWP-Durable-Ack` — confirms durable-ack frames will follow, only if
+     you opted in. It must name exactly the requested tiers (`enabled` for
      `true`). If you opted in and this header is absent or different, fail the
      connection (don't silently wait for acks the server will never send).
    - `X-QWP-Max-Batch-Size` (optional, older servers omit it) — server's
@@ -1093,10 +1093,10 @@ never goes backwards on one connection. A new connection reports the real
 numbers again.
 
 Reconnects discard connection-local durable-ack tracking. The new connection
-re-OKs replayed batches and the server re-emits cumulative durable watermarks,
-so clients must rebuild their trim state against the new connection's request
-ordering. There is no durable-failure status: a stalled flush or upload shows
-only as durable watermarks that stop advancing.
+acknowledges replayed batches again with OK frames, and the server re-emits
+cumulative durable watermarks, so clients must rebuild their trim state against
+the new connection's request ordering. There is no durable-failure status: a
+stalled flush or upload shows only as durable watermarks that stop advancing.
 
 ## Protocol limits
 

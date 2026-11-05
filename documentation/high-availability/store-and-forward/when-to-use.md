@@ -122,10 +122,11 @@ trim is held back until a separate durable-ack frame confirms more:
 - **Server support is required.** The client sends the requested tiers in
   `X-QWP-Request-Durable-Ack` on the upgrade (`true` for `on`). The server
   must confirm all of them in `X-QWP-Durable-Ack` (`enabled` for `on`). If
-  it does not — a server not in adaptive mode asked for `local`, an OSS
-  build asked for `replicated`, uninitialised primary, missing registry,
-  hitting a replica — the connect **fails loudly**, by design. Silently
-  waiting for ack frames that never arrive would let the SF disk fill up.
+  it does not, the connect **fails loudly**, by design: for example a server
+  not in adaptive mode asked for `local`, an OSS build asked for
+  `replicated`, an uninitialised primary, a missing registry, or a replica.
+  Silently waiting for ack frames that never arrive would let the SF disk
+  fill up.
 - **Idle keepalive.** The server only flushes pending durable-ack
   frames during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
@@ -185,6 +186,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | No data loss on a sender crash | No | No | Yes (SF mode) |
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
+| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive commit mode](/docs/concepts/durability/)) |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
 | Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
 
