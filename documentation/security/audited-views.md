@@ -464,7 +464,7 @@ statements, whatever it holds, including `DATABASE ADMIN` and grants
 The built-in admin runs them as on any other table, unless it has assumed a
 service account. Nothing records that they ran. QuestDB Enterprise 4.1.0
 allowed them to any principal holding the permission they need, as on any other
-table: see the [upgrade notes](/docs/operations/upgrade/#upgrading-to-411).
+table: see the [upgrade notes](/docs/operations/upgrade/#upgrading-to-420).
 
 These remain available to any principal granted the permission they need:
 `SELECT`, `DISABLE STORAGE POLICY` and `DROP STORAGE POLICY`, other partition

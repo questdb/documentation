@@ -101,9 +101,9 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
-### Upgrading to 4.1.1
+### Upgrading to 4.2.0
 
-QuestDB Enterprise 4.1.1 reserves to the
+QuestDB Enterprise 4.2.0 reserves to the
 [built-in admin](/docs/security/rbac/#built-in-admin) the statements that remove
 rows from `sys.view_audit`, the audit trail of
 [audited views](/docs/security/audited-views/), or set it up to remove them. In
