@@ -60,7 +60,7 @@ ORDER BY change_id DESC;
 
 | Column                | Type        | Description                                                                                                                                    |
 | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `change_id`           | `TIMESTAMP` | Microsecond timestamp identifying the change. Rows written by the same change to ACL and credential tables carry this value.                   |
+| `change_id`           | `TIMESTAMP` | Microsecond timestamp for correlating a change with its ACL and credential rows. Subject to [recovery limits](#change-ids-and-recovery).        |
 | `session_principal`   | `VARCHAR`   | Principal that authenticated the session. `NULL` when no principal is available.                                                               |
 | `effective_principal` | `VARCHAR`   | Principal whose permissions were used, such as an assumed service account. `NULL` when no principal is available.                              |
 | `is_external`         | `BOOLEAN`   | Whether the session principal is managed by an external identity provider, such as OIDC. Assuming a service account does not change this flag. |
@@ -143,6 +143,10 @@ WHERE p.name = 'risk_analyst'
 ORDER BY a.change_id DESC;
 ```
 
+Do not assume this join is one-to-one: a `change_id` can be reused in the
+[recovery case described below](#change-ids-and-recovery), so a permission row
+can match more than one audit entry.
+
 [Permission compaction](/docs/configuration/iam/#aclpermissionscompactionrowthreshold)
 preserves `change_id` when archiving rows to `sys.acl_permissions_history`.
 Query that table instead for archived grants and revokes. Rows written before
@@ -181,10 +185,20 @@ or restart the server.
 
 :::
 
-Change IDs increase even when the system clock moves backward. Audit, ACL, and
-credential timestamps can therefore be ahead of the wall clock until it catches
-up. Do not assume that an ID is an exact wall-clock event time, or that a query
-bounded by `$now` includes every recent change after a clock correction.
+### Change IDs and recovery
+
+While a node remains primary, newly allocated change IDs increase even when the
+system clock moves backward. Audit, ACL, and credential timestamps can therefore
+be ahead of the wall clock until it catches up. Do not assume that an ID is an
+exact wall-clock event time, or that a query bounded by `$now` includes every
+recent change after a clock correction.
+
+After a restart or promotion, QuestDB derives the next ID from timestamps in
+applied audit, ACL, and credential rows. A statement that committed its audit
+row but failed before writing any ACL or credential row can be missed if its
+audit row is still unapplied during recovery. If the clock is at or below that
+ID, a later change can reuse it. Do not use `change_id` alone as a globally
+unique event identifier, such as a unique key in an external archive.
 
 ## Protection and administration
 
@@ -224,9 +238,14 @@ does not enforce the system-managed table write protections.
 
 ## Retention
 
-The default policy, `TO PARQUET 1d`, converts daily partitions to Parquet one
-day after each partition ends and never deletes rows. Set
-[`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy) on
+The default policy, `TO PARQUET 1d`, never deletes rows. It makes inactive daily
+partitions eligible for Parquet conversion when the reference time is at least
+one day after the partition's start, not its end. By default, the reference time
+is the earlier of the latest audit timestamp and the wall clock. Conversion runs
+asynchronously, and a quiet log may wait for later changes before a partition
+becomes eligible.
+
+Set [`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy) on
 every node before the log is first created if you need automatic retention:
 
 ```ini title="server.conf: Keep one year of ACL changes"

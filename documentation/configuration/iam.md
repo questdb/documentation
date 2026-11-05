@@ -110,9 +110,17 @@ in QuestDB Enterprise 4.1.0 or earlier.
 
 [Storage policy](/docs/concepts/storage-policy/) used when the server creates
 `sys.acl_audit_log`. The value is a comma-separated list of stages, without
-surrounding parentheses. The default converts daily partitions to Parquet one
-day after each partition ends and never deletes rows. Add `DROP LOCAL` to bound
-disk usage, at the cost of deleting older audit evidence:
+surrounding parentheses.
+
+The default policy, `TO PARQUET 1d`, never deletes rows. It makes inactive daily
+partitions eligible for Parquet conversion when the reference time is at least
+one day after the partition's start, not its end. By default, the reference time
+is the earlier of the latest audit timestamp and the wall clock. Conversion runs
+asynchronously, and a quiet log may wait for later changes before a partition
+becomes eligible.
+
+Add `DROP LOCAL` to bound disk usage, at the cost of deleting older audit
+evidence:
 
 ```ini title="server.conf: Keep one year of ACL changes"
 acl.audit.storage.policy=TO PARQUET 1d, DROP LOCAL 365d
