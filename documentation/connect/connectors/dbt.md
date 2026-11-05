@@ -3,7 +3,8 @@ title: dbt connector
 sidebar_label: dbt
 description:
   Build, test, and document SQL models in QuestDB Enterprise with the dbt
-  connector. Configure connections, incremental models, and materialized views.
+  connector. Configure connections, views, tables, incremental models, and
+  materialized views.
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -68,7 +69,8 @@ cp profiles.example.yml profiles.yml
 
 Set `QDB_HOST`, `QDB_USERNAME`, and `DBT_ENV_SECRET_QDB_PASSWORD` in your shell
 or job environment. dbt masks variables whose names start with `DBT_ENV_SECRET_`
-in its logs. Match the port and TLS settings to your instance:
+in its logs. Edit `profiles.yml` to match your instance's port and TLS setting.
+This profile connects over TLS:
 
 ```yaml title="profiles.yml"
 questdb_trades:
@@ -78,6 +80,7 @@ questdb_trades:
       type: questdb
       host: "{{ env_var('QDB_HOST', 'localhost') }}"
       port: 9000
+      tls: true
       username: "{{ env_var('QDB_USERNAME') }}"
       password: "{{ env_var('DBT_ENV_SECRET_QDB_PASSWORD') }}"
       schema: trades_dev
@@ -85,8 +88,16 @@ questdb_trades:
       threads: 4
 ```
 
-Add `tls: true` for a TLS endpoint. The profile name, `questdb_trades`, matches
-`profile` in the example's `dbt_project.yml`.
+The profile name, `questdb_trades`, matches `profile` in the example's
+`dbt_project.yml`. Leave out `tls: true` if your instance does not have
+[TLS](/docs/security/tls/) enabled.
+
+For a development instance with a self-signed certificate, such as the
+[demo certificate](/docs/security/tls/#demo-certificates), also add
+`tls_verify: false`. It skips server certificate verification, which leaves the
+connection open to interception, so do not use it in production. For a
+certificate issued by a private CA, set `tls_ca` to the CA's PEM file instead.
+The two settings cannot be combined.
 
 :::warning Choose a separate namespace
 
@@ -106,9 +117,8 @@ dbt build --profiles-dir .
 ```
 
 `debug` checks the connection. `build` loads sample trades, builds the models,
-runs their tests, and takes a snapshot of instrument reference data. The project
-includes one-minute candles, latest prices, an incremental upsert, and a
-materialized view.
+runs their tests, and takes a snapshot of instrument reference data.
+[Materializations](#materializations) describes each model in the project.
 
 Query the candles in the QuestDB Web Console:
 
@@ -126,6 +136,323 @@ snapshots. To generate the project's catalog and lineage documentation:
 dbt docs generate --profiles-dir .
 dbt docs serve --profiles-dir .
 ```
+
+## Materializations
+
+A dbt model is a `SELECT` statement in a `.sql` file. Its materialization
+decides what dbt builds from the query in QuestDB: a view, a table, an
+incrementally updated table, or a materialized view. The trades example uses
+each of them:
+
+| Name                        | Materialization   | Reads from           | Demonstrates                                              |
+| --------------------------- | ----------------- | -------------------- | --------------------------------------------------------- |
+| `raw_trades`, `instruments` | Seed              | CSV files            | Sample data                                               |
+| `stg_trades`                | View              | `raw_trades`         | Renamed, cast, and derived columns                        |
+| `trades`                    | Table             | `stg_trades`         | Designated timestamp, partitions, `SYMBOL`, deduplication |
+| `ohlc_1m`                   | Table             | `trades`             | `SAMPLE BY` candles                                       |
+| `latest_price`              | View              | `trades`             | `LATEST ON`                                               |
+| `trades_incremental`        | Incremental       | `stg_trades`         | `upsert` of new rows                                      |
+| `ohlc_5m_mv`                | Materialized view | `trades_incremental` | Candles that QuestDB keeps current                        |
+| `instruments_snapshot`      | Snapshot          | `instruments`        | History of reference data changes                         |
+
+The project's `dbt_project.yml` sets a default materialization for each model
+folder. A model's `config()` block overrides it:
+
+```yaml title="dbt_project.yml"
+models:
+  questdb_trades:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+```
+
+Ephemeral models create nothing in QuestDB: dbt inlines them as common table
+expressions in the models that reference them.
+
+### Transform data with SQL
+
+A dbt project transforms data in steps. Each step is a model that selects from
+earlier models with `ref()`, or from ingested tables with `source()`. dbt
+resolves each reference to the upstream object's name, such as
+`trades_dev__stg_trades` in `prefix` mode, and builds models in dependency
+order.
+
+The example arranges its steps in two folders:
+
+- **`staging`** cleans the raw input. [`stg_trades`](#views) renames the seed's
+  timestamp column, casts text columns, and computes each trade's notional
+  value.
+- **`marts`** shapes the clean data for queries. [`trades`](#tables) stores it
+  with a designated timestamp and partitions, [`ohlc_1m`](#tables) aggregates it
+  into one-minute candles, and [`latest_price`](#views) keeps the latest price
+  for each symbol.
+
+A join combines models. This view, which is not part of the example project,
+adds each instrument's base and quote asset from the `instruments` seed to its
+trades:
+
+```sql title="models/marts/trades_enriched.sql"
+{{ config(materialized='view') }}
+
+SELECT
+    t.ts,
+    t.symbol,
+    t.side,
+    t.price,
+    t.amount,
+    t.notional,
+    i.base_asset,
+    i.quote_asset
+FROM {{ ref('trades') }} t
+JOIN {{ ref('instruments') }} i ON t.symbol = i.symbol
+```
+
+The join keys need no cast: `trades.symbol` is a `SYMBOL` column and the seed's
+`symbol` is `VARCHAR`, which QuestDB compares directly. For time-series data,
+[`ASOF JOIN`](/docs/query/sql/asof-join/) matches each row with the latest
+earlier or equal row of another table, such as the prevailing quote for each
+trade.
+
+### Views
+
+A `view` model runs `CREATE OR REPLACE VIEW`, which replaces the view in place
+on each run. A [view](/docs/concepts/views/) stores no data: QuestDB runs its
+query whenever it is read, so the result reflects the current input. The staging
+model renames the seed's timestamp column, casts text columns to `VARCHAR`, and
+derives each trade's notional value:
+
+```sql title="models/staging/stg_trades.sql"
+SELECT
+    trade_ts AS ts,
+    CAST(symbol AS VARCHAR) AS symbol,
+    CAST(side AS VARCHAR) AS side,
+    price,
+    amount,
+    price * amount AS notional,
+    CAST(venue AS VARCHAR) AS venue
+FROM {{ ref('raw_trades') }}
+```
+
+Models can use QuestDB SQL extensions. This view returns the latest trade for
+each symbol with [`LATEST ON`](/docs/query/sql/latest-on/):
+
+```sql title="models/marts/latest_price.sql"
+{{ config(materialized='view') }}
+
+SELECT ts, symbol, price
+FROM {{ ref('trades') }}
+LATEST ON ts PARTITION BY symbol
+```
+
+### Tables
+
+A `table` model stores the query result with `CREATE TABLE AS` and replaces the
+table on every run. The [model configuration](#model-configuration) sets the
+table's storage. The example's `trades` model creates a table with designated
+timestamp `ts`, daily partitions, three `SYMBOL` columns, and deduplication
+keys:
+
+```sql title="models/marts/trades.sql"
+{{
+    config(
+        materialized='table',
+        timestamp='ts',
+        partition_by='DAY',
+        wal=true,
+        symbols=['symbol', 'side', 'venue'],
+        dedup_upsert_keys=['ts', 'symbol', 'side'],
+    )
+}}
+
+SELECT ts, symbol, side, price, amount, notional, venue
+FROM {{ ref('stg_trades') }}
+```
+
+Aggregations work the same way. `ohlc_1m` computes one-minute candles with
+[`SAMPLE BY`](/docs/query/sql/sample-by/), and each run recomputes them from all
+trades:
+
+```sql title="models/marts/ohlc_1m.sql"
+{{
+    config(
+        materialized='table',
+        timestamp='ts',
+        partition_by='DAY',
+        wal=true,
+        symbols=['symbol'],
+    )
+}}
+
+SELECT
+    ts,
+    symbol,
+    first(price) AS open,
+    max(price) AS high,
+    min(price) AS low,
+    last(price) AS close,
+    sum(amount) AS volume,
+    count() AS trades
+FROM {{ ref('trades') }}
+SAMPLE BY 1m
+```
+
+### Incremental models
+
+An `incremental` model creates its table on the first run. Later runs insert the
+rows its query returns when `is_incremental()` is true, typically rows newer
+than those already stored. `{{ this }}` refers to the model's own table:
+
+```sql title="models/marts/trades_incremental.sql"
+{{
+    config(
+        materialized='incremental',
+        incremental_strategy='upsert',
+        timestamp='ts',
+        partition_by='DAY',
+        wal=true,
+        symbols=['symbol'],
+        dedup_upsert_keys=['ts', 'symbol', 'side'],
+    )
+}}
+
+SELECT ts, symbol, side, price, amount, notional
+FROM {{ ref('stg_trades') }}
+{% if is_incremental() %}
+WHERE ts >= (SELECT max(ts) FROM {{ this }})
+{% endif %}
+```
+
+`append`, the default strategy, inserts every selected row. `upsert` uses
+QuestDB [deduplication](/docs/concepts/deduplication/) to replace rows with
+matching `dedup_upsert_keys`. The keys must identify a record and include the
+designated timestamp; dbt's `unique_key` does not replace this setting.
+
+This model selects the rows at the last stored timestamp again, and its keys,
+`(ts, symbol, side)`, replace those rows instead of duplicating them. The keys
+suit the sample data. Choose keys and a lookback appropriate to your own data,
+especially when records can arrive late.
+
+`on_schema_change` supports `ignore`, `fail`, `append_new_columns`, and
+`sync_all_columns`. Changing the designated timestamp or deduplication keys may
+require `--full-refresh`, which rebuilds the table from the model query.
+
+### Materialized views
+
+A `materialized_view` model runs `CREATE MATERIALIZED VIEW`. QuestDB then keeps
+the [materialized view](/docs/concepts/materialized-views/) current as rows
+arrive in its base table, including between dbt runs. The query must aggregate
+with `SAMPLE BY` or a time-based `GROUP BY`. The example builds five-minute
+candles over the incremental table:
+
+```sql title="models/marts/ohlc_5m_mv.sql"
+{{ config(materialized='materialized_view', partition_by='DAY') }}
+
+SELECT
+    ts,
+    symbol,
+    first(price) AS open,
+    max(price) AS high,
+    min(price) AS low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM {{ ref('trades_incremental') }}
+SAMPLE BY 5m
+```
+
+Use an ingested or incremental table as the base. Rebuilding a `table` model or
+seed invalidates the materialized views that read it, so every run that rebuilds
+the base also recomputes those views from the whole base table.
+
+A materialized view model reads a single base table. QuestDB requires
+`WITH BASE` for a query that reads several tables, and the adapter has no
+setting for it, so such a model fails. A view in the query counts as the tables
+it reads.
+
+`refresh` sets the view's `REFRESH` clause and takes any
+[refresh strategy](/docs/query/sql/create-mat-view/#refresh-strategies) the
+server accepts. The default, `immediate`, refreshes the view after each commit
+to the base table. The next two models are not part of the example project but
+can be added to it. This one refreshes an hourly VWAP on a timer every 10
+minutes and keeps 30 days of it:
+
+```sql title="models/marts/vwap_1h_mv.sql"
+{{
+    config(
+        materialized='materialized_view',
+        refresh='every 10m',
+        partition_by='DAY',
+        ttl='30 DAYS',
+    )
+}}
+
+SELECT
+    ts,
+    symbol,
+    sum(notional) / sum(amount) AS vwap,
+    sum(amount) AS volume
+FROM {{ ref('trades_incremental') }}
+SAMPLE BY 1h
+```
+
+With a `period` clause, QuestDB refreshes each period once it completes. This
+model publishes each day's candles two hours after the UTC day ends, so trades
+that arrive up to two hours late are included:
+
+```sql title="models/marts/ohlc_1d_mv.sql"
+{{
+    config(
+        materialized='materialized_view',
+        refresh='period (length 1d delay 2h)',
+        partition_by='MONTH',
+    )
+}}
+
+SELECT
+    ts,
+    symbol,
+    first(price) AS open,
+    max(price) AS high,
+    min(price) AS low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM {{ ref('trades_incremental') }}
+SAMPLE BY 1d
+```
+
+With `refresh='manual'`, QuestDB refreshes the view only on request. Each dbt
+run refreshes it incrementally, so the view updates on your dbt schedule.
+
+dbt applies a changed `refresh` or `ttl` in place. A changed query or
+`partition_by` rebuilds the view. Before downstream models run, dbt waits up to
+10 minutes for a new view's first refresh, and for an `immediate` view without
+`period` to catch up with its base table.
+
+### Snapshots
+
+A snapshot records how the rows of a table change over time. The example tracks
+each instrument's tick size with the `check` strategy:
+
+```sql title="snapshots/instruments_snapshot.sql"
+{% snapshot instruments_snapshot %}
+{{ config(unique_key='symbol', strategy='check', check_cols=['tick_size']) }}
+
+SELECT symbol, base_asset, quote_asset, tick_size
+FROM {{ ref('instruments') }}
+{% endsnapshot %}
+```
+
+Snapshots support the `timestamp` and `check` strategies. The `timestamp`
+strategy requires `updated_at`; a `check` snapshot without it records the time
+of the run. By default, a snapshot uses a WAL table designated on
+`dbt_valid_from`, with deduplication keys `(dbt_valid_from, dbt_scd_id)`. Do not
+set the model's `timestamp` option on a snapshot.
+
+### Live views
+
+The adapter has no live view materialization, so dbt cannot create
+[live views](/docs/concepts/live-views/). Create them in QuestDB with
+[`CREATE LIVE VIEW`](/docs/query/sql/create-live-view/).
 
 ## Use existing tables
 
@@ -208,6 +535,7 @@ Configure these fields under the selected output in `profiles.yml`:
 | `username`, `password` | Unset               | Database credentials. Use environment variables for secrets.                     |
 | `token`                | Unset               | Token authentication, as an alternative to username and password.                |
 | `tls`                  | `false`             | Enable TLS.                                                                      |
+| `tls_verify`           | `true`              | `false` skips certificate checks, for development only; requires `tls: true`.    |
 | `tls_ca`               | Unset               | PEM certificate authority file for a private CA; requires `tls: true`.           |
 | `schema`               | `public`            | Logical namespace; used in table names only in `prefix` mode.                    |
 | `schema_mode`          | `flat`              | Use `prefix` to name objects `<schema>__<model>`.                                |
@@ -250,34 +578,6 @@ an event time. Seeds without a timestamp also receive `dbt_loaded_at`.
 
 `partition_by: NONE`, or `wal: false` without `partition_by`, creates an
 unpartitioned non-WAL table. Such a table does not replicate.
-
-### Incremental models
-
-`append`, the default strategy, inserts every selected row. `upsert` uses
-QuestDB [deduplication](/docs/concepts/deduplication/) to replace rows with
-matching `dedup_upsert_keys`. The keys must identify a record and include the
-designated timestamp; dbt's `unique_key` does not replace this setting.
-
-The bundled project's incremental model uses `(ts, symbol, side)` for its sample
-data and reprocesses rows at the last stored timestamp. Choose keys and a
-lookback appropriate to your own data, especially when records can arrive late.
-
-`on_schema_change` supports `ignore`, `fail`, `append_new_columns`, and
-`sync_all_columns`. Changing the designated timestamp or deduplication keys may
-require `--full-refresh`, which rebuilds the table from the model query.
-
-### Materialized views and snapshots
-
-A `materialized_view` model uses QuestDB's server-managed refresh. Use an
-ingested or incremental table as its base: rebuilding a `table` model or seed
-invalidates dependent materialized views and requires them to be rebuilt. The
-adapter updates supported refresh and TTL changes in place; changes to the query
-or partitioning require a rebuild.
-
-Snapshots support the `timestamp` and `check` strategies and require an
-`updated_at` value. By default, they use a WAL table designated on
-`dbt_valid_from`, with deduplication keys `(dbt_valid_from, dbt_scd_id)`. Do not
-set the model's `timestamp` option on a snapshot.
 
 ## Failures and limitations
 
