@@ -146,15 +146,19 @@ you are already familiar with TTL, this comparison is the fastest way in:
 In QuestDB Enterprise, use storage policies instead of TTL. On a regular table,
 `ALTER TABLE SET TTL` with a non-zero value is rejected, while
 `CREATE TABLE ... TTL` is accepted only for backward compatibility and is
-translated into a `STORAGE POLICY(DROP LOCAL ...)`:
+translated into a `STORAGE POLICY(DROP LOCAL ...)`.
 
-```questdb-sql
--- Instead of:
--- ALTER TABLE trades SET TTL 30 DAYS;
+For a daily-partitioned `trades` table, preserving the minimum 30-day
+timestamp-based retention window of `TTL 30 DAYS` requires a one-day
+[partition allowance](#ttl-evaluation):
 
--- Use:
-ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
+```questdb-sql title="Preserve 30-day retention with daily partitions"
+ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 31d);
 ```
+
+For other partition intervals or calendar-month/year durations, calculate the
+threshold from the [partition-start rule](#ttl-evaluation) rather than copying
+the old TTL value.
 
 :::note
 
