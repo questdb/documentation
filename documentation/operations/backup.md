@@ -542,6 +542,43 @@ the version that created the backup (e.g., 8.1.0 and 8.1.1 are compatible).
 
 Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
 
+#### Restoring access control tables
+
+A backup includes the [ACL audit log](/docs/security/acl-audit-log/),
+`sys.acl_audit_log`, if it exists on the source. Its rows replicate, unlike
+those of `sys.view_audit`, so a primary backup includes the replicated ACL
+change history.
+
+When a newer server restores a backup taken before the ACL audit log was
+introduced, startup leaves the restored ACL and credential tables unchanged:
+it neither adds their `change_id` columns nor creates the missing audit log.
+This allows further restore updates while the source still runs the older
+version. The log and columns arrive with the first restored backup taken
+after the source is upgraded.
+
+Do not run ACL-changing statements on a node that must keep accepting restore
+updates. Such a statement changes the restored tables, and the next update
+refuses those local changes. The first ACL change also creates the audit log
+if it is missing, but without its configured storage policy, to avoid changing
+the restored storage policy tables.
+
+For a standalone recovery that will receive no further restore updates, such
+as recovery into a new cluster:
+
+1. As the built-in admin, add `change_id TIMESTAMP` to each restored table
+   that lacks it. The server logs the affected tables and their exact
+   `ALTER TABLE ... ADD COLUMN change_id TIMESTAMP` statements at startup.
+   Restarting alone does not add these columns, because restore markers stay
+   on the tables.
+2. Once the audit log exists, check its policy with
+   `SHOW CREATE TABLE 'sys.acl_audit_log'`. If needed, apply the desired
+   [retention policy](/docs/security/acl-audit-log/#retention) as the built-in
+   admin. Changing `acl.audit.storage.policy` does not update an existing
+   table.
+
+Existing rows retain a `NULL` `change_id`; adding the column does not
+reconstruct historical audit entries.
+
 #### Restore failure recovery
 
 If restore fails, QuestDB creates artifacts to help diagnose and recover:

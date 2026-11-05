@@ -12,8 +12,8 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   RBAC provides fine-grained database permissions management.
 </EnterpriseNote>
 
-To create a new service account in the database, the `CREATE SERVICE ACCOUNT`
-keywords are used.
+`CREATE SERVICE ACCOUNT` creates an identity for an application or a set of
+permissions that users can assume without sharing credentials.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
@@ -36,43 +36,56 @@ each of the service account's queries may allocate, use
 after creating it. Service accounts do not inherit group limits.
 
 The chosen name must be unique across all users (including the built-in admin),
-groups and service accounts. If the name has already been reserved, the command
-fails and an error is raised, unless the `IF NOT EXISTS` clause is included in
-the statement.
+groups and service accounts. `IF NOT EXISTS` leaves an existing service account
+unchanged: it does not assign it to the caller or to the principal named in
+`OWNED BY`, change its credentials, or create an
+[ACL audit row](/docs/security/acl-audit-log/). A name held by a user or group
+still fails.
 
 Note that new service accounts can only access the database if the necessary
 [endpoint permissions](/docs/security/rbac/#endpoint-permissions) have been
 granted.
 
-The user creating the service account automatically receives the
-`ASSUME SERVICE ACCOUNT` permission with `GRANT` option, unless the `OWNED BY`
-clause is present, in which case the permission is granted to the user or
-group specified in the clause.
+When the statement creates a new account, the creating user automatically
+receives the `ASSUME SERVICE ACCOUNT` permission with `GRANT` option, unless the
+`OWNED BY` clause is present, in which case the permission is granted to the
+user or group specified in the clause. To assign an existing account, use
+[`GRANT ASSUME SERVICE ACCOUNT`](/docs/query/sql/acl/grant-assume-service-account/)
+explicitly.
 
-The `OWNED BY` clause cannot be omitted if the service account is created by
-an external user, because permissions cannot be granted to them.
+The owner must be eligible to hold a service account. For example, a service
+account cannot own another service account. Owner validation runs even with
+`IF NOT EXISTS`, before any changes are made.
+
+The `OWNED BY` clause cannot be omitted if the service account is created by an
+external user, because permissions cannot be granted to them.
 
 ## Examples
 
-```questdb-sql
-CREATE SERVICE ACCOUNT audit;
+```questdb-sql title="Create a service account without credentials"
+CREATE SERVICE ACCOUNT risk_report;
 
-CREATE SERVICE ACCOUNT IF NOT EXISTS audit;
+CREATE SERVICE ACCOUNT IF NOT EXISTS risk_report;
 ```
 
-```
+The second statement leaves the existing account unchanged.
+
+```questdb-sql title="Create an account owned by a group"
 CREATE GROUP analysts;
 CREATE SERVICE ACCOUNT dashboard OWNED BY analysts;
-
 ```
 
-It can be verified with:
-
-```questdb-sql
-SHOW SERVICE ACCOUNT audit;
+```questdb-sql title="Assign an existing account explicitly"
+GRANT ASSUME SERVICE ACCOUNT risk_report TO analysts WITH GRANT OPTION;
 ```
 
-that yields:
+Check the authentication methods:
+
+```questdb-sql title="Inspect the new account's authentication methods"
+SHOW SERVICE ACCOUNT risk_report;
+```
+
+The account has no credentials yet:
 
 | auth_type  | enabled |
 | ---------- | ------- |
