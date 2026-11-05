@@ -415,7 +415,8 @@ source history is no longer retained by the base table.
 
 Live views over [deduplicated](/docs/concepts/deduplication/) base tables are
 supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
-in the view, and later rows are recomputed. Such a view has no in-memory rows
+in the view, and later rows are recomputed. Under `SKIP`, a discarded duplicate
+never reaches the view. Such a view has no in-memory rows
 ahead of disk, so it trails the base table by up to one `FLUSH EVERY` cycle.
 
 ## Monitoring

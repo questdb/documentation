@@ -8,6 +8,23 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## November 2026
+
+### New
+
+- [UPSERT and SKIP modes](/docs/concepts/deduplication/#upsert-and-skip-modes) - The new `SKIP` deduplication mode keeps the first row written for a key and discards later duplicates, the counterpart of `UPSERT`, which keeps the latest. Covers which row wins within a commit and across connections, choosing a mode, switching modes with [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/), reading the mode from [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause), and how versions without `SKIP` handle such tables
+
+### Reference
+
+- [CREATE TABLE](/docs/query/sql/create-table/#deduplication) - `DEDUP { UPSERT | SKIP } KEYS` in the syntax of both creation forms; `CREATE TABLE LIKE` copies the keys and the mode
+- [Standard SQL equivalents](/docs/concepts/deep-dive/sql-extensions/#standard-sql-features-not-supported) - `INSERT ... ON CONFLICT DO NOTHING` maps to `DEDUP SKIP KEYS`
+- Corrected the PKCE setting name in the [OIDC configuration](/docs/configuration/oidc/#acloidcpkcerequired) reference to `acl.oidc.pkce.required`
+
+### Updated
+
+- [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) and [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - The table keeps its TTL, `FORMAT PARQUET`, per-column Parquet encoding, and deduplication keys and mode; a table converted to WAL keeps dropping partitions past its TTL
+- [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) - The example output matches what the server returns, without symbol capacities or a `WITH` clause
+
 ## October 2026
 
 ### Releases

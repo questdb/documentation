@@ -1164,7 +1164,7 @@ SELECT * FROM all_permissions();
 | CREATE TABLE              | Database                            | Create tables                           |
 | CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
-| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication                    |
+| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
 | DEDUP DISABLE             | Database &#124; Table               | Disable deduplication                   |
 | DETACH PARTITION          | Database &#124; Table               | Detach partitions                       |
 | DISABLE STORAGE POLICY    | Database &#124; Table               | Disable storage policies                |
