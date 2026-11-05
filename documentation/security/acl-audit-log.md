@@ -167,12 +167,17 @@ be written. The server logs the failure, and the affected rows have no
 
 With
 [`cairo.wal.apply.suspended.write.denied=true`](/docs/configuration/wal/#cairowalapplysuspendedwritedenied),
-listing `sys.acl_audit_log` in
+listing the directory name of `sys.acl_audit_log` in
 [`cairo.wal.apply.suspended.tables`](/docs/configuration/wal/#cairowalapplysuspendedtables)
 blocks ACL statements. It also blocks creating objects for owners other than the
 built-in admin, including tables created by ingestion, because these operations
-must grant permissions to the owner. Remove the audit table from the list to
-restore those operations.
+must grant permissions to the owner.
+
+Use the `directoryName` column of [`tables()`](/docs/query/functions/meta/#tables)
+to find the value, including its table-ID suffix. The SQL table name alone does
+not match this setting. To restore those operations, remove that directory-name
+entry and [reload the configuration](/docs/configuration/overview/#reloadable-settings)
+or restart the server.
 
 :::
 
