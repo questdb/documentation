@@ -103,6 +103,14 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 
 ### ACL audit log
 
+:::note Upcoming Enterprise feature
+
+This section describes an unreleased feature and its migrations. The ACL audit
+log is not available in QuestDB Enterprise 4.1.0 or earlier. These instructions
+apply when upgrading to a release that includes it.
+
+:::
+
 When upgrading from a version without the
 [ACL audit log](/docs/security/acl-audit-log/), the server creates
 `sys.acl_audit_log` and adds `change_id` columns to ACL and credential tables.
@@ -169,11 +177,20 @@ rebuild:
 
 ### Service account creation
 
+:::note Upcoming Enterprise behavior change
+
+The behavior described here is unreleased. It does not apply to QuestDB
+Enterprise 4.1.0 or earlier.
+
+:::
+
+In the upcoming release,
 [`CREATE SERVICE ACCOUNT IF NOT EXISTS`](/docs/query/sql/acl/create-service-account/)
-now leaves an existing account unchanged. Earlier versions assigned the
-existing account to the statement's owner with grant option; now ownership is
-assigned only when the statement creates the account. An invalid owner is
-rejected before any changes, even when the account already exists.
+leaves an existing account unchanged. In Enterprise 4.1.0 and earlier, the
+statement could assign the existing account to the statement's owner with grant
+option. With the new behavior, ownership is assigned only when the statement
+creates the account. An invalid owner is rejected before any changes, even when
+the account already exists.
 
 Update provisioning scripts that relied on `IF NOT EXISTS ... OWNED BY` to
 assign an existing account. Use

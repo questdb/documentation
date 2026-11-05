@@ -8,6 +8,22 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## November 2026
+
+### New
+
+- [ACL audit log](/docs/security/acl-audit-log/) - Documented the upcoming Enterprise audit log for access control changes, including principal attribution, read permissions, redaction, delivery guarantees, replication, and retention. The feature is not available in Enterprise 4.1.0 or earlier
+
+### Reference
+
+- [IAM configuration](/docs/configuration/iam/#aclauditstoragepolicy) - Documented the upcoming `acl.audit.storage.policy` setting, its creation-only behavior, supported stages, and built-in-admin requirements for changing an existing log's policy
+
+### Updated
+
+- [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/) - Documented the upcoming change that leaves an existing account unchanged under `IF NOT EXISTS`, with explicit assignment through `GRANT ASSUME SERVICE ACCOUNT` and [upgrade guidance](/docs/operations/upgrade/#service-account-creation). This behavior is not available in Enterprise 4.1.0 or earlier
+- [Backup and restore](/docs/operations/backup/#retrying-or-updating-a-restore) - Distinguished fresh restores from same-lineage retries and forward updates, with their procedures and restrictions, and documented [access control recovery](/docs/operations/backup/#restoring-access-control-tables) from backups taken before the upcoming ACL audit log
+- [Governance and auditing](/docs/security/governance/#audit-access-control-changes) - Added an ACL audit query covering ordinary grants and revokes as well as service-account assumption assignments and revocations
+
 ## October 2026
 
 ### Releases

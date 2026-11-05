@@ -514,8 +514,9 @@ get it back without someone re-granting it.
 
 ## Audit access control changes
 
-The [ACL audit log](/docs/security/acl-audit-log/) records who changes users,
-groups, service accounts, credentials, and permissions, including both the
+The [ACL audit log](/docs/security/acl-audit-log/) is an upcoming Enterprise
+feature, unavailable in Enterprise 4.1.0 or earlier. It records who changes
+users, groups, service accounts, credentials, and permissions, including both the
 session principal and any assumed service account. Query `sys.acl_audit_log`
 with `LIST USERS`, `USER DETAILS`, and `SELECT` on the table; `SELECT ON ALL
 TABLES` alone does not grant access. Only the built-in admin can change its
@@ -575,7 +576,7 @@ and `wait_wal_table()`, and WAL recovery statements such as
 [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/) reach them
 for principals that hold the permission the statement requires.
 
-The [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
+The upcoming [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
 `sys.acl_audit_log`, is a separate exception: it requires both `LIST USERS`
 and `USER DETAILS` in addition to ordinary table permissions. Without both,
 it looks missing even to a principal with a grant `ON ALL TABLES`. Unlike

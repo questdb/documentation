@@ -2,19 +2,20 @@
 title: ACL audit log
 sidebar_label: ACL audit log
 description:
-  Track changes to users, groups, service accounts, credentials, and permissions
-  in QuestDB Enterprise, with principal attribution and configurable retention.
+  Preview the upcoming ACL audit log in QuestDB Enterprise, with principal
+  attribution for access control changes and configurable retention.
 ---
 
-The ACL audit log records changes to access control in `sys.acl_audit_log`, so
-you can investigate who granted access, changed credentials, or modified a
-principal. Each row identifies the authenticated principal, the principal it
-acted as, and the statement that caused the change.
+The upcoming ACL audit log records changes to access control in
+`sys.acl_audit_log`, so you can investigate who granted access, changed
+credentials, or modified a principal. Each row identifies the authenticated
+principal, the principal it acted as, and the statement that caused the change.
 
-:::note
+:::note Upcoming Enterprise feature
 
-The ACL audit log is available in [QuestDB Enterprise](/enterprise/). For read
-auditing rather than access control changes, see
+This page describes an unreleased [QuestDB Enterprise](/enterprise/) feature.
+The ACL audit log and `acl.audit.storage.policy` are not available in Enterprise
+4.1.0 or earlier. For read auditing rather than access control changes, see
 [Audited views](/docs/security/audited-views/).
 
 :::

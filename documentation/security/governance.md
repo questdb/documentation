@@ -26,7 +26,7 @@ available in all editions.
 | What may they even see? | [Object visibility](/docs/security/rbac/#object-visibility) | QuestDB Enterprise 4.1.0+ |
 | How much may they consume? | [Resource groups](/docs/concepts/resource-groups/) and [per-principal memory limits](/docs/security/rbac/#memory-limits) | QuestDB Enterprise 4.1.0+ |
 | Who can do what, right now? | [Access control functions](/docs/query/functions/access-control/), [`SHOW CREATE DATABASE`](/docs/query/sql/show/#enterprise-access-control) | QuestDB Enterprise |
-| Who changed access? | [ACL audit log](/docs/security/acl-audit-log/) | QuestDB Enterprise |
+| Who changed access? | [ACL audit log](/docs/security/acl-audit-log/) | QuestDB Enterprise (upcoming) |
 | Who read this data? | [Audited views](/docs/security/audited-views/) | QuestDB Enterprise |
 | What queries ran recently? | [Query tracing](/docs/concepts/deep-dive/query-tracing/), [`query_activity()`](/docs/query/functions/meta/#query_activity) | All |
 | Where does this data come from? | [`SHOW CREATE`](/docs/query/sql/show/), [`views()`](/docs/query/functions/meta/#views), [`materialized_views()`](/docs/query/functions/meta/#materialized_views) | All |
@@ -142,7 +142,8 @@ can diff between two reviews.
 
 ## Audit access control changes
 
-The [ACL audit log](/docs/security/acl-audit-log/) records changes to users,
+The [ACL audit log](/docs/security/acl-audit-log/) is an upcoming Enterprise
+feature, unavailable in Enterprise 4.1.0 or earlier. It records changes to users,
 groups, service accounts, credentials, and permissions in `sys.acl_audit_log`.
 It identifies both the authenticated principal and any assumed service
 account, with passwords and REST token values redacted from statement text.
@@ -152,9 +153,17 @@ Unlike the view audit trail, its rows replicate.
 SELECT change_id, session_principal, effective_principal, statement_text
 FROM 'sys.acl_audit_log'
 WHERE change_id IN '$now-7d..$now'
-  AND statement_kind IN ('GRANT', 'REVOKE')
+  AND statement_kind IN (
+      'GRANT', 'REVOKE',
+      'GRANT ASSUME SERVICE ACCOUNT',
+      'REVOKE ASSUME SERVICE ACCOUNT'
+  )
 ORDER BY change_id DESC;
 ```
+
+The query includes both ordinary permission grants and revokes and assignments
+that let users or groups assume a service account. Other ways to change access,
+such as group membership changes, have different statement kinds.
 
 Reading it requires `LIST USERS`, `USER DETAILS`, and `SELECT` on the log.
 Ordinary ACL changes commit an audit row before writing the change; an audit
