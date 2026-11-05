@@ -22,7 +22,7 @@ single hard-coded address must be reconfigured and restarted. A failover-aware
 client instead carries the full list of peers and walks that list automatically
 when the current connection breaks.
 
-This page explains the model. The user-facing knobs and worked examples live in
+This page explains the model. The user-facing knobs and examples live in
 the [Configuration](/docs/high-availability/client-failover/configuration/)
 page.
 
@@ -211,6 +211,10 @@ receive failures, `404` / `426` / `503` on upgrade, version mismatches
 peers), and generic frame-decode errors. The client records `TransportError`
 and walks to the next host.
 
+The Go query client doesn't resubmit after a server response it can't read
+that may have ended the statement; see
+[Query failover](/docs/connect/clients/go/#query-failover).
+
 When a round exhausts with transient errors, the client sleeps for the
 backoff interval and starts the next round. On the ingress sender the rounds
 continue indefinitely; on the egress query client they are bounded by
@@ -266,6 +270,6 @@ the failover model — split the workload into one connect string per credential
 ## Next steps
 
 - [Configuration](/docs/high-availability/client-failover/configuration/) —
-  the connect-string keys and worked examples for each context.
+  the connect-string keys and examples for each context.
 - [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/) —
   how the ingress failover loop interacts with the disk-backed substrate.

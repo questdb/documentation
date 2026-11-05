@@ -79,7 +79,7 @@ the user-visible knobs are:
 | `failover_backoff_initial_ms` | int (ms) | `50` | Starting backoff sleep. Doubles up to the cap. |
 | `failover_backoff_max_ms` | int (ms) | `1000` | Cap on the exponential backoff. With full-jitter, the actual sleep lands in `[0, max)`. |
 
-## Worked examples
+## Example configurations
 
 ### Three-node Enterprise cluster, default failover
 
