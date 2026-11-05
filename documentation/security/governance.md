@@ -239,7 +239,7 @@ its lifecycle on a schedule: conversion to Parquet, upload to
 the local copy, and final deletion. This makes retention a property of the
 table, declared once, instead of a script that has to keep running:
 
-```questdb-sql title="Keep 90 days locally and three years in object storage"
+```questdb-sql title="Tier partitions using age-based thresholds"
 ALTER TABLE fx_trades SET STORAGE POLICY(
     TO PARQUET 7d,
     TO REMOTE 14d,
@@ -247,6 +247,12 @@ ALTER TABLE fx_trades SET STORAGE POLICY(
     DROP REMOTE 3Y
 );
 ```
+
+The delays are
+[partition-age thresholds](/docs/concepts/storage-policy/#ttl-evaluation),
+measured from each partition's start, not each row's timestamp or the upload
+time. For a minimum timestamp-based retention window, allow for the full
+partition interval when choosing the deletion thresholds.
 
 Once `DROP LOCAL` runs, a partition is
 [sealed](/docs/concepts/cold-storage/#immutability-after-drop-local): later

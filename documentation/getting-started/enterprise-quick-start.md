@@ -684,12 +684,15 @@ between all involved parties.
 **Q: I set a storage policy with `TO PARQUET`, but I'm not observing reduced
 storage usage. What could be the issue?**
 
-A: A partition converts only once its entire time range is older than the
-`TO PARQUET` delay, and the active partition never converts. Policies are
-checked every 5 minutes by default, so allow time for the first run. Use
-`SHOW PARTITIONS FROM tableName` to confirm which partitions have `isParquet`
-set to `true` and compare `parquetFileSize` with `diskSize`. The compression
-ratio varies with the nature of your data, and some data does not compress
-well. To trade CPU for a higher ratio, switch the codec to `ZSTD`, as described
+A: An inactive partition becomes eligible for conversion when the
+[reference time](/docs/concepts/storage-policy/#ttl-evaluation) is at least the
+`TO PARQUET` delay after the partition's start, not its end. By default, the
+reference time is the earlier of the latest table timestamp and the wall clock,
+so a quiet table can delay conversion. The active partition never converts.
+Policies are checked every 5 minutes by default, and eligible conversions run
+asynchronously. Use `SHOW PARTITIONS FROM tableName` to confirm which partitions
+have `isParquet` set to `true` and compare `parquetFileSize` with `diskSize`.
+The compression ratio varies with the nature of your data, and some data does
+not compress well. To trade CPU for a higher ratio, switch the codec to `ZSTD`, as described
 in [Parquet data compression](/docs/concepts/parquet/#data-compression). If the
 ratio still seems out of the expected range, please contact us.
