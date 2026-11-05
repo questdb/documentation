@@ -8,6 +8,12 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## November 2026
+
+### Updated
+
+- [S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores) - From QuestDB Enterprise 4.2.0, an S3-compatible store used for replication or [backups](/docs/operations/backup/#supported-storage-backends) must support or ignore `If-Match` and `If-None-Match` on `PutObject`. On a store that rejects them, a primary cannot start or be promoted, and every backup fails
+
 ## October 2026
 
 ### Releases
