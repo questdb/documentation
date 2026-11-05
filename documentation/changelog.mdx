@@ -8,6 +8,23 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## November 2026
+
+### New
+
+- [Durability and commit modes](/docs/concepts/durability/) - New page on what a commit survives in each commit mode, and on adaptive commit mode, which keeps commits to WAL tables safe from power loss without flushing every table file on each commit. Covers how it works, the group-commit window, durable acknowledgements, guarantees and limits, costs, changing the mode and downgrading, monitoring, and troubleshooting
+
+### Reference
+
+- Added the `adaptive` value of [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) and the [adaptive commit settings](/docs/configuration/cairo-engine/#commit-and-write-behavior) `cairo.adaptive.commit.group.window`, `cairo.adaptive.epoch.interval`, `cairo.adaptive.epoch.max.rows`, `cairo.adaptive.epoch.flush.on.close`, `cairo.adaptive.epoch.column.sync.batched`, and `cairo.wal.commit.writeback.drain`
+- [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) - `request_durable_ack` accepts the `local`, `replicated`, and `local,replicated` tiers in the Java, C, C++, and Rust clients, and the [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement) documents tier negotiation and `STATUS_LOCAL_DURABLE_ACK`
+- Added the `durableEpochSeqTxn`, `recoveryIncarnation`, `localDurableSeqTxn`, and `lastEpochTs` columns to [`wal_tables()`](/docs/query/functions/meta/#wal_tables) and three adaptive commit [metrics](/docs/integrations/other/prometheus/#wal-metrics), and corrected the names of `questdb_wal_apply_seq_txn` and `questdb_wal_apply_writer_txn`
+
+### Updated
+
+- [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) - A conversion to non-WAL applies the WAL first, and is refused while it cannot
+- [Disaster recovery](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss) - A QuestDB Enterprise primary refuses to start when its log of a table ends before the object store, and how to recover
+
 ## October 2026
 
 ### Releases
