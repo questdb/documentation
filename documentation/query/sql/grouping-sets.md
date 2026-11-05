@@ -79,6 +79,9 @@ The list must contain at least one set, with no trailing comma.
 `GROUPING SETS ()` is a syntax error; for a grand total only, write
 `GROUPING SETS (())`.
 
+Every set is written in parentheses, including one-column sets:
+`GROUPING SETS ((symbol), (side), ())`, not `GROUPING SETS (symbol, side, ())`.
+
 QuestDB does not remove duplicate grouping sets. Listing the same set twice,
 as in `GROUPING SETS ((symbol), (symbol))`, returns its rows twice.
 
@@ -408,6 +411,30 @@ the number of query workers run on a single thread.
 Grouping sets aggregation is never vectorized. When you only need one level of
 aggregation, a plain `GROUP BY` over the same keys can be faster.
 
+When each grouping set on its own would run as a vectorized `GROUP BY`,
+typically a single key with simple aggregates such as `sum()`, a `UNION ALL`
+of one plain `GROUP BY` per set can be several times faster with parallel
+execution. Run `EXPLAIN` on the plain `GROUP BY`: `vectorized: true` means it
+takes the faster path. With two or more keys the difference is much smaller.
+
+```questdb-sql title="ROLLUP(symbol)" demo
+SELECT symbol, SUM(amount) AS total_amount
+FROM trades
+WHERE timestamp IN '$now-1d..$now'
+GROUP BY ROLLUP(symbol);
+```
+
+```questdb-sql title="The same rows as UNION ALL" demo
+SELECT symbol, SUM(amount) AS total_amount
+FROM trades
+WHERE timestamp IN '$now-1d..$now'
+GROUP BY symbol
+UNION ALL
+SELECT NULL::SYMBOL, SUM(amount)
+FROM trades
+WHERE timestamp IN '$now-1d..$now';
+```
+
 Rows are not returned in any guaranteed order. Use `ORDER BY` when order
 matters.
 
@@ -418,6 +445,9 @@ matters.
 
 - **No mixed qualified/unqualified references** to the same column.
   `ROLLUP(a, t.a)` is rejected. Use one form consistently.
+
+- **Parentheses required around each set** in `GROUPING SETS`. Write
+  `(symbol)`, not `symbol`.
 
 - **One `ROLLUP` or `CUBE` per `GROUP BY`**, placed last.
   `GROUP BY ROLLUP(a), CUBE(b)` and `GROUP BY ROLLUP(a), b` are rejected, and
