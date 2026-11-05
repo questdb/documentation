@@ -325,6 +325,7 @@ Materialized view queries must:
 
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
+- Not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
 - Not read [catalogue functions](#catalogue-functions) through a regular view,
   and in QuestDB Enterprise call them only with `SYSTEM ADMIN`

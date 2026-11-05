@@ -13,6 +13,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### New
 
 - [ACL audit log](/docs/security/acl-audit-log/) - Documented the upcoming Enterprise audit log for access control changes, including principal attribution, read permissions, redaction, delivery guarantees, change-ID recovery limits, replication, and retention. The feature is not available in Enterprise 4.1.0 or earlier
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 
 ### Reference
 
