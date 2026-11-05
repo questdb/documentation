@@ -30,7 +30,8 @@ If this is your first time setting up QuestDB, see the
 
 ### Schema dumps and view definitions
 
-Check schema-export scripts and stored views for these compatibility changes:
+Before upgrading from an earlier release to QuestDB Enterprise 4.2.0 or later,
+check schema-export scripts and stored views for these compatibility changes:
 
 - With Enterprise access control enabled, plain `SHOW CREATE DATABASE` now
   requires both `LIST USERS` and `USER DETAILS`. Schema-only scripts should use

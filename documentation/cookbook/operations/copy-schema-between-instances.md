@@ -108,11 +108,12 @@ curl -s -G "https://source:9000/api/v1/sql/execute" \
   --data-urlencode "query=SHOW CREATE DATABASE INCLUDE (SCHEMA)"
 ```
 
-## Enterprise: schema without permissions
+## Enterprise: schema and access control {#enterprise-schema-without-permissions}
 
-In [QuestDB Enterprise](/enterprise/), the default dump also carries the access
-control layer: users, groups, service accounts, memberships, and grants. That is
-usually not what you want when seeding a development instance from production.
+In [QuestDB Enterprise](/enterprise/) 4.2.0 and later, the default dump also
+carries the access control layer: users, groups, service accounts, memberships,
+and grants. That is usually not what you want when seeding a development
+instance from production.
 
 Select what to copy with `INCLUDE`:
 

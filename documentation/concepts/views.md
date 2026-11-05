@@ -482,9 +482,10 @@ query body still run with the reader's permission checks.
 
 :::warning Existing views
 
-Creating, altering, or replacing a view with a prohibited operation fails.
-Previously accepted views become invalid at their next compilation, including
-at startup. Inspect `view_status` and `invalidation_reason` in
+Starting with QuestDB Enterprise 4.2.0, creating, altering, or replacing a view
+with a prohibited operation fails. Previously accepted views become invalid at
+their next compilation after upgrading, including at startup. Inspect
+`view_status` and `invalidation_reason` in
 [`views()`](/docs/query/functions/meta/#views). Replace ACL dumps with
 `INCLUDE (SCHEMA)` where appropriate, or remove the administrative operation
 from the subquery, then update the definition with

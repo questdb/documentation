@@ -351,14 +351,16 @@ metadata:
   `files()`, and `glob()`
 - `SHOW TABLES`, `SHOW COLUMNS`, `SHOW PARTITIONS`, `SHOW CREATE TABLE`,
   `SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, `SHOW CREATE LIVE VIEW`,
-  and schema-only `SHOW CREATE DATABASE`, such as
+  and schema-only
+  [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views), such as
   `SHOW CREATE DATABASE INCLUDE (SCHEMA)`
 
-With Enterprise access control enabled, a database dump that includes any ACL
-category is administrative, not just a catalogue query. Materialized and live
-views reject it for every principal, even one holding `SYSTEM ADMIN` or
-`DATABASE ADMIN`. This includes plain `SHOW CREATE DATABASE`, since its default
-is `INCLUDE ALL`. The check applies at creation and refresh.
+In QuestDB Enterprise 4.2.0 and later, with access control enabled, a database
+dump that includes any ACL category is administrative, not just a catalogue
+query. Materialized and live views reject it for every principal, even one
+holding `SYSTEM ADMIN` or `DATABASE ADMIN`. This includes plain
+`SHOW CREATE DATABASE`, since its default is `INCLUDE ALL`. The check applies at
+creation and refresh.
 
 A materialized view refreshes under a context that sees every object, and every
 reader of the view reads what the refresh stored. To keep a view from

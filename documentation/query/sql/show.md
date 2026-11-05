@@ -100,9 +100,10 @@ a comma-separated string.
 
 `SHOW CREATE DATABASE` returns a logical, data-free dump as replayable SQL:
 one statement per row for tables, views, materialized views, and live views.
-QuestDB Enterprise also includes users, groups, service accounts, memberships,
-and grants by default. Use it to copy a database's structure and access control
-to an empty instance. It is not a data backup; see [Replay limits](#replay-limits).
+In QuestDB Enterprise 4.2.0 and later, the dump also includes users, groups,
+service accounts, memberships, and grants by default. Use it to copy a database's
+structure and access control to an empty instance. It is not a data backup; see
+[Replay limits](#replay-limits).
 
 ```questdb-sql title="SHOW CREATE DATABASE syntax"
 SHOW CREATE DATABASE
@@ -205,10 +206,10 @@ it does not return a partial schema-only result.
 
 :::warning Breaking change
 
-Plain `SHOW CREATE DATABASE` now includes ACL output and requires both
-permissions. For callers that only need the visible schema, change it to
-`SHOW CREATE DATABASE INCLUDE (SCHEMA)` rather than granting administrative
-permissions.
+Starting with QuestDB Enterprise 4.2.0, plain `SHOW CREATE DATABASE` includes
+ACL output and requires both permissions. For callers that only need the visible
+schema, change it to `SHOW CREATE DATABASE INCLUDE (SCHEMA)` rather than granting
+administrative permissions.
 
 :::
 
@@ -292,7 +293,7 @@ while exporting for replay, and verify the target's grants afterwards with
 
 #### Use in views
 
-When Enterprise access control is enabled:
+In QuestDB Enterprise 4.2.0 and later, when access control is enabled:
 
 - A regular view may read an ACL dump in its query body. The dump checks the
   reader's `LIST USERS` and `USER DETAILS`, not the view definer's permissions.
@@ -417,11 +418,11 @@ policy is not shown in either dump. See
 
 #### Enterprise variant
 
-In [QuestDB Enterprise](/enterprise/), `SHOW CREATE TABLE`, `SHOW CREATE VIEW`,
-`SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW` return structure,
-not permissions. They no longer append an `OWNED BY` clause naming the caller.
-QuestDB stores no owner for an object; `OWNED BY` at creation only decides who
-receives the creator's permissions.
+In [QuestDB Enterprise](/enterprise/) 4.2.0 and later, `SHOW CREATE TABLE`,
+`SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW`
+return structure, not permissions. Unlike earlier releases, they do not append
+an `OWNED BY` clause naming the caller. QuestDB stores no owner for an object;
+`OWNED BY` at creation only decides who receives the creator's permissions.
 
 On replay without `OWNED BY`, the principal executing the `CREATE` receives the
 normal creator permissions, with the `GRANT` option. To give those permissions

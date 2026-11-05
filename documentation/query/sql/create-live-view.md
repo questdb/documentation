@@ -267,16 +267,18 @@ The view query is validated at creation time and must:
   `systimestamp()`, or `rnd_*()`.
 - Not use
   [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions)
-  or catalogue `SHOW` statements, such as schema-only `SHOW CREATE DATABASE`
-  in a `WHERE` subquery, unless the creator holds `SYSTEM ADMIN` (Enterprise).
-  The same rules as for materialized views apply.
+  or catalogue `SHOW` statements, such as schema-only
+  [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views) in a `WHERE`
+  subquery, unless the creator holds `SYSTEM ADMIN` (Enterprise). The same rules
+  as for materialized views apply.
 - Not use Enterprise administrative functions, which check the permissions of
   the calling session: `active_grants()`, `active_permissions()`,
   `backup_instance_name()`, `backup_status()`, `backups()`, `permissions()`,
   `reload_tick_calendars()`, and `reload_tls()`.
 - Not use `SHOW CREATE DATABASE` with any ACL category when access control is
-  enabled, even as an administrator. The default statement includes ACL output;
-  use `INCLUDE (SCHEMA)` under the catalogue rules above.
+  enabled (QuestDB Enterprise 4.2.0 and later), even as an administrator. The
+  default statement includes ACL output; use `INCLUDE (SCHEMA)` under the
+  catalogue rules above.
 - Not read another live view.
 
 ## Examples
