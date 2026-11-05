@@ -40,13 +40,14 @@ process-wide one.
 
 :::note Adaptive commit mode
 
-In [adaptive commit mode](/docs/concepts/durability/), `RESUME WAL` takes a
-save point when the table owes one, for example after a restart until the
-table's first write. While another operation holds the table's writer, it then
-fails with a `table busy` error: retry the statement. If the save point itself
-fails, it reports
+In [adaptive commit mode](/docs/concepts/durability/), `RESUME WAL` sometimes
+has to take a save point first, for example after a restart, before the table's
+first write. It then needs the table's writer: if another operation holds the
+writer, `RESUME WAL` fails with `table busy [reason=...]`, and you retry the
+statement. If the save point fails, `RESUME WAL` reports
 `could not take the durable epoch the table owes, the table stays suspended; retry RESUME WAL`
-with the reason: fix the cause and retry.
+with the reason: fix the cause and retry. See
+[other messages](/docs/concepts/durability/#other-messages).
 
 :::
 

@@ -1342,8 +1342,11 @@ queue and returns before the server acks.
      after 7.2.1; `on` is the only one QuestDB Enterprise 4.1.0 and earlier
      accept (see [Durable ACK](/docs/connect/clients/connect-string/#durable-ack)).
      If the server does not grant every requested tier, the connect fails with
-     `protocol_version_error`. A wait for a level the connect string did not
-     request fails `wait` or `flush_and_wait` up front with
+     `protocol_version_error` and the message
+     `WebSocket upgrade failed: server did not enable durable ACK [...]`. The
+     local durable level is accepted only with `request_durable_ack=local`, and
+     the durable level only with a set that includes `replicated` (or `on`).
+     Any other wait fails `wait` or `flush_and_wait` up front with
      `invalid_api_call`, leaving the buffer or chunk untouched.
    - **Ack is not visibility.** Rows become visible to queries after WAL
      apply, typically within milliseconds of the ack, so a query issued

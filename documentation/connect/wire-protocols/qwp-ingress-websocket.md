@@ -997,7 +997,7 @@ table that committed data in the acknowledged batch. `tableCount` is 0 when no
 | 11   | `0x0B` | LIMIT_EXCEEDED  | Egress-only. Query aborted because a server-side limit was hit: query timeout, memory cap, circuit breaker, or OOM. |
 | 12   | `0x0C` | NOT_WRITABLE    | **Reserved.** Node cannot accept writes (read-only replica, or a demoting primary). |
 | 13   | `0x0D` | DICTIONARY_GAP  | A delta symbol dictionary whose start id runs past the server's connection dictionary. |
-| 14   | `0x0E` | LOCAL_DURABLE_ACK | Batch WAL is on the server's disk                |
+| 14   | `0x0E` | LOCAL_DURABLE_ACK | Batch is on the server's disk (WAL and sequencer record) |
 
 The status namespace is shared between ingress and egress, which is why the two
 egress-only codes appear here.
@@ -1017,14 +1017,15 @@ Two of these carry classification instructions a client cannot infer:
 ### Durable acknowledgement
 
 A standard OK confirms that the batch was committed to the server's WAL and
-reports its per-table sequencer transaction. It does not mean that the
-transaction is on the disk. In the WebSocket upgrade request, a client can ask
+reports its per-table sequencer transaction. It does not by itself mean that the
+transaction is on the disk: that depends on the server's
+[commit mode](/docs/concepts/durability/#commit-modes). In the WebSocket upgrade request, a client can ask
 the server to also confirm when its transactions are durable, with the
 `X-QWP-Request-Durable-Ack` header:
 
 | Request value | Confirmation | Status code | The server confirms a transaction once |
 | --- | --- | --- | --- |
-| `local` | `local` | `LOCAL_DURABLE_ACK` (`0x0E`) | its WAL and sequencer record are on the server's disk. It survives a crash or power loss of the server, not the loss of its disk. |
+| `local` | `local` | `LOCAL_DURABLE_ACK` (`0x0E`) | its WAL and sequencer record are on the server's disk. It survives a crash or power loss of the server, not the loss of its disk or a failover to another node. |
 | `replicated` | `replicated` | `DURABLE_ACK` (`0x02`) | it reached the replication object store. It survives the loss of the server. |
 | `local,replicated` | `local,replicated` | both | both, as two separate streams of frames. |
 | `true` | `enabled` | `DURABLE_ACK` (`0x02`) | as `replicated`. The original request value. |
@@ -1036,12 +1037,12 @@ Which tiers a server grants:
 
 | Tier | Granted by |
 | --- | --- |
-| `local` | a server in [adaptive commit mode](/docs/concepts/durability/) |
+| `local` | a server in [adaptive commit mode](/docs/concepts/durability/) (on QuestDB Enterprise, the primary) |
 | `replicated`, `true` | a QuestDB Enterprise primary with replication |
 | `local,replicated` | a QuestDB Enterprise primary with replication, in adaptive commit mode |
 
-QuestDB 10.1.0, QuestDB Enterprise 4.1.0, and earlier releases understand only
-`true`.
+QuestDB Enterprise 4.1.0 and earlier understand only `true`. QuestDB 10.1.0
+and earlier grant no durable acknowledgement.
 
 The grant is **all or nothing**. The server either confirms the full requested
 set in `X-QWP-Durable-Ack` or omits the header; it never grants a weaker tier

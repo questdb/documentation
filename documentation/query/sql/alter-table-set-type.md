@@ -39,13 +39,19 @@ For a table that may hold
 `ALTER TABLE trades SET TYPE BYPASS WAL` and restart again.
 Skipping these steps is unsupported.
 
-Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, when a WAL table is
-converted to non-WAL, the restart first applies every transaction still
-waiting in the WAL and flushes the table, then converts it.
-If that cannot finish, because the table is suspended or a transaction fails
-to apply, the conversion is refused: the table stays a WAL table, keeps its WAL
-and the pending conversion, and the start logs a critical error (one line in
-the log, wrapped here):
+If the command is issued more than once before the restart, the last command
+overrides all previous ones.
+
+If the target type of the conversion is the same as the current type of the
+table, the conversion request is ignored.
+
+Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, a conversion to non-WAL
+loses no committed transaction: the restart first applies every transaction
+still waiting in the WAL and flushes the table, then converts it. If that
+cannot finish, because the table is suspended or a transaction fails to apply,
+the conversion is refused: the table stays a WAL table, keeps its WAL and the
+pending conversion, and the start logs a critical error (one line in the log,
+wrapped here):
 
 ```text
 could not apply the WAL before the conversion to non-WAL, the table stays a WAL
@@ -55,13 +61,11 @@ lastSeqTxn=..., suspended=...]
 
 Resume the table with
 [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/), let the
-WAL apply catch up, and restart: the next start tries the conversion again.
+WAL apply catch up, and restart: the next start tries the conversion again. If
+a flush fails during the conversion, QuestDB stops, in every commit mode.
 
-If the command issued more than once before the restart, the last command
-overrides all previous ones.
-
-If the target type of the conversion is the same as the current type of the
-table, the conversion request is ignored.
+A non-WAL table gets no power-loss protection from
+[adaptive commit mode](/docs/concepts/durability/): it behaves as in `nosync`.
 
 ## Examples
 

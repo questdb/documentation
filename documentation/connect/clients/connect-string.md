@@ -180,7 +180,8 @@ caveats), follow the section links from the [Key index](#key-index).
 | Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_segment_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
-| End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
+| Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive commit mode              |
+| Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
 | Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
 | Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
@@ -746,19 +747,24 @@ need the Java client after 1.3.11, or the C, C++, and Rust clients after
 7.2.1. Other clients accept `on` and `off`.*
 
 By default, a sender releases its copy of each batch once the server's OK
-response confirms the commit. An OK does not mean that the commit is on the
-disk. With
-`request_durable_ack`, the sender keeps each batch until the server confirms
-that it reached the requested durability, and sends it again after a reconnect
-if the server lost it.
+response confirms the commit. An OK does not by itself mean that the commit is
+on the disk: that depends on the server's
+[commit mode](/docs/concepts/durability/#commit-modes). With `request_durable_ack`, the
+sender keeps each batch until the server confirms that it reached the requested
+durability, and sends it again after a reconnect if the server lost it.
 
-| Value | The server confirms a batch once | Server requirement |
-| --- | --- | --- |
-| `local` | its WAL is on the server's disk. It survives a power loss of the server, not the loss of that disk or a failover to another node. | [`cairo.commit.mode=adaptive`](/docs/concepts/durability/) |
-| `replicated` | it reached the replication object store. It survives the loss of the server. | QuestDB Enterprise primary with replication |
-| `local,replicated` | both. The sender keeps the batch until the replicated confirmation. | QuestDB Enterprise primary with replication and `cairo.commit.mode=adaptive` |
-| `on` | as `replicated`. The original name, and the only value QuestDB Enterprise 4.1.0 and earlier accept. | QuestDB Enterprise primary with replication |
-| `off` (default) | no durable confirmation; the sender releases the batch on the OK | none |
+- `local`: the commit is on the server's disk. Needs a server in adaptive commit
+  mode.
+- `replicated`: the commit reached the replication object store. Needs a
+  QuestDB Enterprise primary with replication.
+- `local,replicated`: both. Needs a QuestDB Enterprise primary with replication
+  in adaptive commit mode.
+- `on`: the original name of `replicated`, and the only value QuestDB
+  Enterprise 4.1.0 and earlier accept.
+- `off` (default): no durable confirmation.
+
+What each tier protects against, and what the server needs, is in
+[Durable acknowledgements](/docs/concepts/durability/#durable-acknowledgements).
 
 The server grants every requested tier or none. When it cannot, for example
 when a server that is not in adaptive mode is asked for `local`, the connection

@@ -105,16 +105,17 @@ When data is written to a WAL table:
 This decouples the commit (fast) from storage application (background),
 enabling high write throughput.
 
-Whether an acknowledged transaction survives an operating system crash or a
-power loss depends on the commit mode. In the default `nosync` mode, nothing is
-flushed to the disk. In `adaptive` mode, each commit flushes its WAL files, and
-the table files are flushed at periodic save points. See
-[Durability and commit modes](/docs/concepts/durability/).
-
 WAL apply sorts and commits many WAL transactions together as one block;
 larger blocks reduce out-of-order merges but use more memory per block.
 [Adaptive blocks](/docs/configuration/wal/#adaptive-wal-apply-blocks) are enabled
 by default and grow within a memory budget.
+
+Whether an acknowledged transaction survives an operating system crash or a
+power loss depends on the commit mode. In the default `nosync` mode, nothing is
+flushed to the disk. In adaptive commit mode, which is unrelated to the adaptive
+apply blocks above, each commit flushes its WAL files, and the table files are
+flushed at periodic save points. See
+[Durability and commit modes](/docs/concepts/durability/).
 
 <Screenshot
   alt="Diagram showing the sequencer allocating txn numbers to events chronologically"
@@ -137,6 +138,9 @@ by default and grow within a memory budget.
 WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
+- [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode): when
+  commits are flushed to the disk; see
+  [Durability and commit modes](/docs/concepts/durability/)
 - Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
 - Adaptive WAL apply blocks: [starting size](/docs/configuration/wal/#cairowalapplyblocksize), [row cap](/docs/configuration/wal/#cairowalapplyblockmaxrows), and [memory budget](/docs/configuration/wal/#cairowalapplyblockmemorypercent).
 - `cairo.wal.apply.memory.limit.bytes` — cap on the native memory a WAL apply

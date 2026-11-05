@@ -38,13 +38,13 @@ migration flow.
 
 ### A primary refuses to start after a power loss
 
-In `nosync` and `async` [commit mode](/docs/concepts/durability/), a primary
+In `nosync` and `async` [commit mode](/docs/concepts/durability/#commit-modes), a primary
 uploads transactions to the object store before they are flushed to its own
 disk. After a power loss or an operating system crash, its local transaction
 log of a table can end before the last transaction in the object store. New
 commits would then reuse transaction numbers that the replicas already hold
 with other content, so since QuestDB Enterprise 4.2.0 the primary refuses to
-start, and the log names the table (one line in the log, wrapped here):
+start. The log line that names the table begins with (wrapped here):
 
 ```text
 local sequencer log is behind the object store, refusing to start as primary
@@ -60,10 +60,10 @@ To recover, do one of the following:
 - Add the table to
   [`replication.disabled.tables`](/docs/configuration/database-replication/#replicationdisabledtables)
   to stop replicating it. The table keeps its local state, without the
-  transactions that only the object store holds. Do not put it back into
-  replication afterwards, because its replicas hold a different history. To
-  replicate it again, rebase it with
-  [`ALTER TABLE ... REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/).
+  transactions that only the object store holds. Its replicas hold a
+  different history, so removing it from the list later does not resume its
+  replication: the primary holds its uploads. To replicate it again, rebase it
+  with [`ALTER TABLE ... REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/).
 
 In `sync` and `adaptive` mode, a primary uploads only transactions that are
 already on its disk. QuestDB Enterprise 4.1.0 and earlier started in this

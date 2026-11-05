@@ -76,7 +76,7 @@ string.
 By default the substrate trims unacked data on OK ack from the server.
 That means the substrate releases a frame once the server has acknowledged
 it into the WAL. Whether the frame is on the **primary's** disk at that point
-depends on the server's [commit mode](/docs/concepts/durability/): in the
+depends on the server's [commit mode](/docs/concepts/durability/#commit-modes): in the
 default `nosync` mode, a power loss of the server can still lose it. Whether
 it has been replicated to the object store or to replicas is a separate
 matter.
@@ -85,7 +85,7 @@ When the connect string sets
 [`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
 trim is held back until a separate durable-ack frame confirms more:
 
-- `local`: the server flushed the WAL to its own disk. The server must run in
+- `local`: the commit is on the server's own disk. The server must run in
   adaptive commit mode.
 - `replicated`, or its original name `on`: the WAL has been uploaded to the
   **configured object store** (S3, Azure Blob, GCS, or NFS). QuestDB
@@ -132,9 +132,10 @@ trim is held back until a separate durable-ack frame confirms more:
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
-  `ingest_rate × time_to_durability`: about one group-commit window for
-  `local`, the upload time for `replicated`. Size `sf_max_total_bytes`
-  accordingly.
+  `ingest_rate × time_to_durability`: for `local`, about one group-commit
+  window, plus up to one `durable_ack_keepalive_interval_millis` when the
+  producer is idle; for `replicated`, the upload time. Size
+  `sf_max_total_bytes` accordingly.
 
 ## Orphan adoption: when to enable
 
@@ -215,6 +216,7 @@ graph TD
     Q1{Will the producer outlive any single outage you care about?}
     Q2{A sender crash must not lose in-flight data?}
     Q3{Is object-store durability required before ack?}
+    Q3L{Must a server power loss not lose acknowledged data?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 
     Q1 -->|"No (ephemeral job)"| Memory[Memory mode — leave sf_dir unset]
@@ -223,7 +225,10 @@ graph TD
     Q2 -->|Yes| SF[SF mode — set sf_dir]
     SF --> Q3
     Q3 -->|Yes| Durable[Add request_durable_ack=on]
-    Q3 -->|No| Q4
+    Q3 -->|No| Q3L
+    Q3L -->|"Yes, server in adaptive commit mode"| Local[Add request_durable_ack=local]
+    Q3L -->|No| Q4
+    Local --> Q4
     Durable --> Q4
     Q4 -->|Yes| Orphans[Add drain_orphans=on]
     Q4 -->|No| Done[Configuration complete]

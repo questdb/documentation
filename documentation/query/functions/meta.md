@@ -1684,17 +1684,18 @@ Returns a `table` including the following information:
 - `durableEpochSeqTxn` - the sequencer transaction of the table's current save
   point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
   the WAL is replayed from here
-- `recoveryIncarnation` - how many times this process restored the table from
-  a save point at a start; stays `0` after a clean shutdown
-- `localDurableSeqTxn` - the highest sequencer transaction whose WAL is on the
-  disk, or `-1` until a flush establishes it. Advances in `adaptive` and `sync`
-  commit modes
+- `recoveryIncarnation` - how many times this process put the table's files
+  back to its save point at a start; stays `0` after a clean shutdown, and
+  often after a power loss, when the files are already at the save point
+- `localDurableSeqTxn` - the highest sequencer transaction that is on the disk,
+  with its WAL files and its sequencer record flushed. `-1` after a start until
+  the table's next commit; advances only in `adaptive` and `sync` commit modes
 - `lastEpochTs` - when this process last took a save point for the table, or
   `NULL` if it has not taken one since it started
 
 The last four columns describe [durability](/docs/concepts/durability/#monitor-adaptive-mode).
-`sequencerTxn - localDurableSeqTxn` counts the committed transactions that are
-not yet on the disk.
+For a table written since the start, `sequencerTxn - localDurableSeqTxn` counts
+the committed transactions that are not yet on the disk.
 
 **Examples:**
 
@@ -1716,7 +1717,8 @@ SELECT
   sequencerTxn - localDurableSeqTxn AS not_yet_on_disk,
   sequencerTxn - durableEpochSeqTxn AS replay_after_crash,
   lastEpochTs
-FROM wal_tables();
+FROM wal_tables()
+WHERE localDurableSeqTxn >= 0;
 ```
 
 ## writer_pool

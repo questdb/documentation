@@ -108,7 +108,8 @@ batch updated. On receipt:
    returned to the available pool.
 
 This is the default. It is sufficient when a committed batch is the bar you
-need; an OK does not mean that the commit is on the server's disk.
+need; an OK does not by itself mean that the commit is on the server's disk.
+That depends on the server's [commit mode](/docs/concepts/durability/#commit-modes).
 
 ### Durable-ack trim
 
@@ -116,8 +117,8 @@ When the connect string sets
 [`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
 trim is driven by separate durable-ack frames that carry per-table watermarks:
 
-- `local`: `STATUS_LOCAL_DURABLE_ACK` frames, for data the server has
-  **flushed to its own disk**. The server must run in
+- `local`: `STATUS_LOCAL_DURABLE_ACK` frames, for commits that are **on the
+  server's own disk** (WAL and sequencer record flushed). The server must run in
   [adaptive commit mode](/docs/concepts/durability/).
 - `replicated`, or its original name `on`: `STATUS_DURABLE_ACK` frames, for
   data the server has **already uploaded from the WAL to the configured object

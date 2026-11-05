@@ -11,6 +11,9 @@ QuestDB clients deliver data **at-least-once**: every row your application
 publishes is guaranteed to reach the server, but under failure it may arrive
 more than once. Storing each row exactly once is the application's
 responsibility, and QuestDB provides the mechanisms to make it routine.
+Delivery is separate from durability: whether a row the server acknowledged
+survives a power loss of the server depends on its
+[commit mode](/docs/concepts/durability/#commit-modes).
 
 This page explains where duplicates come from and how to suppress them.
 

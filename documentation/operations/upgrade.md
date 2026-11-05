@@ -26,8 +26,11 @@ If this is your first time setting up QuestDB, see the
    migrate internal metadata. Once this happens, rolling back to the previous
    version may produce errors. Create a backup or snapshot before upgrading,
    especially for production instances. See
-   [Backup and restore](/docs/operations/backup/) for details. Before you go
-   back to an earlier release, read
+   [Backup and restore](/docs/operations/backup/) for details.
+
+3. **Plan the way back.** After QuestDB 10.2.0 or QuestDB Enterprise 4.2.0 has
+   run on a database, going back to an earlier release, writing with it, and
+   then starting the later release again is not supported. To go back, follow
    [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 ## Upgrade steps
@@ -102,6 +105,20 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 3.3.x, need an explicit `GRANT SWITCH ROLE`. See
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
+
+### Upgrading to 4.2.0
+
+QuestDB Enterprise 4.2.0 adds
+[adaptive commit mode](/docs/concepts/durability/). The default stays `nosync`.
+Check the following before upgrading:
+
+- A replicating primary in `nosync` or `async` mode now refuses to start when,
+  after a power loss or an operating system crash, its log of a table ends
+  before the last transaction in the object store. Earlier releases started
+  and diverged from the replicas. See
+  [A primary refuses to start after a power loss](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss).
+- Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
+  [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 ### Upgrading to 4.1.0
 

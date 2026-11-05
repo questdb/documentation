@@ -1116,8 +1116,9 @@ borrow (see [Ingestion errors](#ingestion-errors)).
 ### Durable acknowledgement
 
 By default, the server's OK response confirms that a batch was committed to the
-[WAL](/docs/concepts/write-ahead-log/), not that it is on the disk. To keep each
-batch until the server confirms that it is durable, set `request_durable_ack`:
+[WAL](/docs/concepts/write-ahead-log/). Whether it is also on the disk depends on
+the server's [commit mode](/docs/concepts/durability/#commit-modes). To keep each batch until
+the server confirms that it is durable, set `request_durable_ack`:
 
 ```text
 # On the server's disk. The server needs cairo.commit.mode=adaptive.

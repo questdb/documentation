@@ -111,8 +111,9 @@ mode survives, how adaptive commit mode works, and how to choose, see
 How long commits share one flush of the sequencer log in adaptive commit mode.
 `0` flushes the log before every commit returns, so a power loss loses no
 acknowledged commit. With a larger window, a power loss can lose the commits
-acknowledged in the last window. A value without a unit is read as
-microseconds, and a negative value counts as `0`. Only adaptive mode uses it.
+acknowledged since the last flush, normally those of the last window; a stalled
+flush can make that longer. A value without a unit is read as microseconds, and
+a negative value counts as `0`. Only adaptive mode uses it.
 See [Group-commit window](/docs/concepts/durability/#group-commit-window).
 
 ### cairo.adaptive.epoch.column.sync.batched
@@ -123,6 +124,7 @@ See [Group-commit window](/docs/concepts/durability/#group-commit-window).
 On Linux, an adaptive save point starts writing back all column files, waits
 for them, and ends with one `syncfs` call. `false` flushes the column files one
 by one, then calls the same `syncfs`. It has no effect on other platforms.
+Keep the default unless you are diagnosing flush behaviour.
 
 ### cairo.adaptive.epoch.flush.on.close
 
@@ -132,8 +134,8 @@ by one, then calls the same `syncfs`. It has no effect on other platforms.
 When a table writer closes cleanly in adaptive commit mode, at shutdown or when
 an idle writer is released, it takes a save point that covers the transactions
 since the previous one, so a clean restart has nothing to replay. With
-`false`, the close skips that save point, and the next start replays those
-transactions from the WAL.
+`false`, or with a negative `cairo.adaptive.epoch.interval`, the close skips
+that save point, and the next start replays those transactions from the WAL.
 
 ### cairo.adaptive.epoch.interval
 
@@ -144,8 +146,9 @@ Time between save points of a table in adaptive commit mode. A shorter interval
 shortens the replay after a crash and removes WAL files sooner, at the cost of
 flushing the table files more often. `0` takes a save point after every WAL
 apply. A negative value turns off the periodic, row-count, and idle save
-points: the WAL is then never removed and the replay after a crash keeps
-growing, so do not use it in production. A value without a unit is read as
+points, and the save point at a clean writer close: the WAL is then never
+removed and the replay after a crash keeps growing, so do not use it in
+production. A value without a unit is read as
 milliseconds.
 
 ### cairo.adaptive.epoch.max.rows
@@ -170,9 +173,10 @@ When commits are flushed to the disk, for the whole instance:
 - `async`: each commit starts a flush and does not wait for it.
 - `sync`: each commit waits until its data is on the disk.
 - `adaptive`: each commit to a WAL table flushes its write-ahead log, and the
-  table files are flushed at periodic save points. A power loss can lose only
-  the commits acknowledged in the last group-commit window, and commits cost
-  much less than in `sync`. Non-WAL tables behave as in `nosync`.
+  table files are flushed at periodic save points. A power loss can lose the
+  commits acknowledged since the last flush of the sequencer log, normally
+  those of the last group-commit window, and commits cost much less than in
+  `sync`. Non-WAL tables behave as in `nosync`.
 
 Any other value stops the start. See
 [Durability and commit modes](/docs/concepts/durability/).
@@ -193,7 +197,8 @@ threshold, a commit is issued automatically.
 In adaptive commit mode, on Linux file systems that support it, a commit starts
 writing back every file of its WAL segment at once, and waits for them before it
 flushes each file, so the files are written in parallel. It changes only speed:
-every flush still runs.
+every flush still runs. Keep the default unless you are diagnosing flush
+behaviour.
 
 ### cairo.wal.enabled.default
 

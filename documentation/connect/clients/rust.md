@@ -751,9 +751,12 @@ QuestDB Enterprise and `request_durable_ack=on`, `replicated`, or
 `local,replicated`. The tier names `local`, `replicated`, and
 `local,replicated` need a client release after 7.2.1; `on` is the only one
 QuestDB Enterprise 4.1.0 and earlier accept (see
-[Durable ACK](/docs/connect/clients/connect-string/#durable-ack)). Waiting for a
-level the connect string did not request is rejected before the buffer or chunk
-is changed.
+[Durable ACK](/docs/connect/clients/connect-string/#durable-ack)). If the server
+does not grant every requested tier, the connect fails with
+`WebSocket upgrade failed: server did not enable durable ACK [...]`.
+`LocalDurable` is accepted only with `request_durable_ack=local`, and `Durable`
+only with a set that includes `replicated` (or `on`). Any other wait is rejected
+before the buffer or chunk is changed.
 
 A `wait` timeout is a no-progress timeout. The data remains queued and its
 background delivery continues. Retry `wait()` or keep observing `acked_fsn()`;

@@ -196,9 +196,9 @@ straightforward to set up alerting for upcoming expirations.
 | `questdb_wal_apply_rows_per_second` | gauge | Rate of rows applied per second during WAL apply. |
 | `questdb_wal_apply_seq_txn` | gauge | Sum of all committed transaction sequence numbers. Used with `questdb_wal_apply_writer_txn`. |
 | `questdb_wal_apply_writer_txn` | gauge | Sum of all applied transaction sequence numbers. With no pending WAL transactions, equals `questdb_wal_apply_seq_txn`. A steadily growing lag indicates QuestDB cannot keep up with writes. |
-| `questdb_wal_apply_local_durable_seq_txn` | gauge | Sum over all tables of the highest transaction sequence number whose WAL is on the disk. Advances in `adaptive` and `sync` [commit modes](/docs/concepts/durability/). |
+| `questdb_wal_apply_local_durable_seq_txn` | gauge | Sum over all tables of the highest transaction sequence number that is on the disk. Advances only in `adaptive` and `sync` [commit modes](/docs/concepts/durability/#monitor-adaptive-mode). Subtracted from `questdb_wal_apply_seq_txn`, it counts the committed transactions not yet on the disk; the difference reads high after a start until every table has been written. |
 | `questdb_wal_adaptive_epoch_advances_total` | counter | Save points taken in adaptive commit mode. |
-| `questdb_wal_adaptive_recovery_events_total` | counter | Tables restored from a save point at a start, for example after a crash. |
+| `questdb_wal_adaptive_recovery_events_total` | counter | Tables whose files a start put back to their save point, as after a killed process. After a power loss the files are often already at the save point, and the table is not counted. |
 
 :::note Renamed WAL metrics
 
