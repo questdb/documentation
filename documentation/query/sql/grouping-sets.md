@@ -298,7 +298,8 @@ ORDER BY timestamp, symbol;
 Each time bucket contains one row per symbol plus one grand total row (where
 `symbol` is `NULL`). The timestamp column is never rolled up. It is always
 present as the time bucket key. A bucket with no input rows produces no rows,
-including no grand total row, unless `FILL` is used.
+including no grand total row. `FILL` can add rows for such buckets, as
+described in [FILL support](#fill-support).
 
 In a regular `SAMPLE BY` query, every non-aggregated column in the `SELECT`
 list becomes a key. With grouping sets, this does not happen: every
@@ -340,6 +341,13 @@ variables are not supported there.
 
 `FILL` works with grouping sets. Missing time buckets are filled per key
 combination: each distinct (symbol, grouping level) pair gets its own fill row.
+
+`FILL` fills the key combinations that the input produced. One matching row is
+enough to fill its series, including the grand total, across the whole range.
+When no input rows match, there is nothing to fill and the query returns no
+rows, even with `FROM ... TO` and even for the grand total of `ROLLUP` or
+`CUBE`. Plain keyed `SAMPLE BY ... FILL` behaves the same way. This differs from
+`GROUP BY`, where the empty set `()` returns a grand total row on empty input.
 
 ```questdb-sql title="SAMPLE BY with FILL and ROLLUP" demo
 SELECT timestamp, symbol, SUM(amount) AS total_amount, AVG(price) AS avg_price
@@ -438,6 +446,10 @@ matters.
 
 - **`FILL(NULL)` and `FILL(value)` require distinct grouping sets** and
   support at most 31 rolled-up keys in `SAMPLE BY`. See
+  [FILL support](#fill-support).
+
+- **`SAMPLE BY ... FILL` returns no rows on empty input**, not even a grand
+  total, because there is no key combination to fill. See
   [FILL support](#fill-support).
 
 - **`SAMPLE BY ... FROM` requires a timestamp literal**. Functions,
