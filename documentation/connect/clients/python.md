@@ -870,8 +870,12 @@ Row senders always publish through a local store-and-forward queue. Without
 
 Give each handle that shares an `sf_dir` a distinct `sender_id`. On restart,
 the pool reopens managed dirty slots and replays their unacknowledged frames.
-Disk mode is page-cache durable: it protects against a client-process crash
-but not a host crash or power loss.
+With the default `sf_durability=memory`, disk mode protects against a
+client-process crash but not a host crash or power loss. Set
+`sf_durability=periodic` to survive host loss: the client also forces the
+queue files to disk every `sf_sync_interval_millis` (default `5000`). It
+requires `sf_dir`. `flush` and `append` are reserved: they parse but are
+rejected when the sender is created.
 
 | Need | Use |
 | --- | --- |
