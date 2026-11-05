@@ -12,7 +12,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
-- [ACL audit log](/docs/security/acl-audit-log/) - Documented the upcoming Enterprise audit log for access control changes, including principal attribution, read permissions, redaction, delivery guarantees, change-ID recovery limits, replication, and retention. The feature is not available in Enterprise 4.1.0 or earlier
+- [ACL audit log](/docs/security/acl-audit-log/) - Documented the upcoming Enterprise audit log for access control changes, including principal attribution, read permissions, redaction, delivery guarantees, WAL availability troubleshooting, change-ID recovery limits, replication, and retention. The feature is not available in Enterprise 4.1.0 or earlier
 - [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 
 ### Reference
@@ -24,7 +24,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/) - Documented the upcoming change that leaves an existing account unchanged under `IF NOT EXISTS`, with explicit assignment through `GRANT ASSUME SERVICE ACCOUNT` and [upgrade guidance](/docs/operations/upgrade/#service-account-creation). This behavior is not available in Enterprise 4.1.0 or earlier
 - [Backup and restore](/docs/operations/backup/#retrying-or-updating-a-restore) - Distinguished fresh restores from same-lineage retries and forward updates, with their procedures and restrictions, and documented [access control recovery](/docs/operations/backup/#restoring-access-control-tables) from backups taken before the upcoming ACL audit log
 - [Governance and auditing](/docs/security/governance/#audit-access-control-changes) - Added an ACL audit query covering ordinary grants and revokes as well as service-account assumption assignments and revocations
-- [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected stage eligibility to use partition starts rather than ends, aligned the audit configuration and Enterprise quick start, and clarified minimum timestamp-based retention and the governance example's partition-age thresholds
+- [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected partition-start eligibility across audit retention, TTL migration, Parquet conversion, and Enterprise quick-start guidance, with partition allowances for minimum timestamp-based retention and clearer governance example thresholds
 
 ## October 2026
 

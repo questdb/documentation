@@ -177,11 +177,13 @@ blocks ACL statements. It also blocks creating objects for owners other than the
 built-in admin, including tables created by ingestion, because these operations
 must grant permissions to the owner.
 
-Use the `directoryName` column of [`tables()`](/docs/query/functions/meta/#tables)
-to find the value, including its table-ID suffix. The SQL table name alone does
-not match this setting. To restore those operations, remove that directory-name
-entry and [reload the configuration](/docs/configuration/overview/#reloadable-settings)
-or restart the server.
+To restore those operations, remove the audit log's directory-name entry from
+`cairo.wal.apply.suspended.tables`, then
+[reload the configuration](/docs/configuration/overview/#reloadable-settings)
+or restart the server. The entry includes the table-ID suffix, for example
+`sys.acl_audit_log~42`; the SQL table name alone does not match. Use the existing
+configured entry rather than looking it up in `tables()`, which does not list
+this system table.
 
 :::
 

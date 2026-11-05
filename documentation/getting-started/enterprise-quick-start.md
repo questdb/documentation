@@ -561,7 +561,14 @@ TTL is not supported on Enterprise tables; use a storage policy instead
 translates it into a `STORAGE POLICY(DROP LOCAL ...)`.) Materialized views are
 not affected: they continue to use `TTL` for retention in Enterprise.
 
-To move a legacy table from `TTL` to a storage policy:
+Before clearing the TTL, choose the replacement policy. Storage policies measure
+age from the [partition's start](/docs/concepts/storage-policy/#ttl-evaluation),
+while table TTL measures from its end. Reusing the same duration can delete data
+up to one partition interval earlier.
+
+The following example migrates a daily-partitioned `trades` table with
+`TTL 30 DAYS`. It uses `DROP LOCAL 31 DAYS` to preserve a minimum 30-day window
+based on the designated timestamp:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
    value Enterprise accepts on a user table, and it is required before a
@@ -571,22 +578,20 @@ To move a legacy table from `TTL` to a storage policy:
    ALTER TABLE trades SET TTL 0 HOURS;
    ```
 
-2. **Attach a storage policy** that reproduces, and ideally extends, the
-   retention the TTL used to provide. A policy lets you keep data in Parquet
-   after you would previously have dropped it, so `DROP LOCAL` is the stage
-   that replaces the old TTL horizon:
+2. **Attach the replacement policy.** `TO PARQUET` compresses older partitions
+   without deleting their rows; `DROP LOCAL` provides retention:
 
-   ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
+   ```questdb-sql title="Preserve 30-day retention with daily partitions"
    ALTER TABLE trades SET STORAGE POLICY(
        TO PARQUET 3 DAYS,
-       DROP LOCAL 1 MONTH
+       DROP LOCAL 31 DAYS
    );
    ```
 
-   If you want the policy to behave exactly like the old TTL (delete the
-   partition outright after the same interval, with no Parquet conversion),
-   use a single-stage policy, for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
-   to match `TTL 1 MONTH`.
+   For retention without Parquet conversion, use
+   `STORAGE POLICY(DROP LOCAL 31 DAYS)` on this daily-partitioned table. For other
+   partition intervals or calendar-month/year durations, calculate the threshold
+   from the partition-start rule rather than copying the old TTL value.
 
 Do this for every table you want to keep managed automatically. Tables without
 a storage policy retain their data indefinitely once their legacy TTL has been
