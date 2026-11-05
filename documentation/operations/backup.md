@@ -60,8 +60,8 @@ From QuestDB Enterprise 4.2.0, an S3-compatible store must support or ignore
 Backups send these conditional requests when they write their index,
 `backup/<backup_instance_name>/index.msgpack`: `If-None-Match` to create it,
 `If-Match` to replace it. AWS S3, Azure Blob Storage, and Google Cloud Storage
-support them, and backups to a filesystem backend write the index without them.
-To check a store, see
+support conditional writes, and backups to a filesystem backend write the index
+without them. To check a store, see
 [S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores).
 
 :::
