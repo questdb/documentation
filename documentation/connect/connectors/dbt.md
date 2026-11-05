@@ -545,6 +545,24 @@ Configure these fields under the selected output in `profiles.yml`:
 | `wait_for_wal`         | `true`              | Wait for writes to be readable before downstream models run.                     |
 | `extra_conf`           | Unset               | Additional [QWP connect-string settings](/docs/connect/clients/connect-string/). |
 
+If you don't want to store your secrets in the YAML file, read them from
+environment variables with dbt's
+[`env_var()`](https://docs.getdbt.com/reference/dbt-jinja-functions/env_var)
+function. Start secret names with `DBT_ENV_SECRET_` so dbt masks them in its
+logs. For token authentication:
+
+```yaml title="profiles.yml"
+questdb_trades:
+  target: dev
+  outputs:
+    dev:
+      type: questdb
+      host: "{{ env_var('QDB_HOST', 'localhost') }}"
+      port: 9000
+      tls: true
+      token: "{{ env_var('DBT_ENV_SECRET_QDB_TOKEN') }}"
+```
+
 The adapter targets the primary by default. Its reader pool is sized to
 `threads + 1`. Keep `wait_for_wal` enabled for normal runs so dependent models
 see completed writes.
