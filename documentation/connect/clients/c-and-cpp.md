@@ -716,7 +716,8 @@ on_error:;
   queue took the frame; a background thread then delivers it and collects the
   server's ack, which `qwp_sender_wait` (C++ `sender.wait()`) observes. For
   throughput, publish many chunks with `flush`, then `wait` once
-  (`qwpws_ack_level_durable` waits for durable upload, Enterprise). See
+  (`qwpws_ack_level_local_durable` waits for the server's disk,
+  `qwpws_ack_level_durable` for replication storage on Enterprise). See
   [Durability and backpressure](#durability-and-backpressure).
 - **Return the borrow.** C: `questdb_db_return_sender` (recycle) or
   `questdb_db_drop_sender` (retire a possibly in-doubt sender); C++ does
@@ -1328,19 +1329,22 @@ queue and returns before the server acks.
    pool, so queued frames still reach the server.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
-   - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
-     frames. `qwpws_ack_level_local_durable` waits for local-disk durability
-     and requires `request_durable_ack=local`, WAL tables, and
-     `cairo.commit.mode=adaptive`.
-     `qwpws_ack_level_durable` waits for replicated/object-store durability
-     and requires `request_durable_ack=replicated` or the legacy alias `on`.
-     `local,replicated` is protocol-defined but current servers deny it (see
-     the protocol page's
-     [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-     section). An unavailable or partial grant fails the connect with
-     `protocol_version_error`; a level not selected by the connect string
-     fails `wait` or `flush_and_wait` up front with `invalid_api_call`, leaving
-     the buffer or chunk untouched.
+   - **Ack levels.** `qwpws_ack_level_ok` (C++ `qwpws_ack_level::ok`) means
+     the server accepted the frames.
+     `qwpws_ack_level_local_durable` (C++ `qwpws_ack_level::local_durable`)
+     waits until the server flushed them to its own disk. It needs
+     `request_durable_ack=local` and a server running
+     [`cairo.commit.mode=adaptive`](/docs/concepts/durability/).
+     `qwpws_ack_level_durable` (C++ `qwpws_ack_level::durable`) waits until
+     they reached replication storage. It needs QuestDB Enterprise and
+     `request_durable_ack=on`, `replicated`, or `local,replicated`. The tier
+     names `local`, `replicated`, and `local,replicated` need a client release
+     after 7.2.1; `on` is the only one QuestDB Enterprise 4.1.0 and earlier
+     accept (see [Durable ACK](/docs/connect/clients/connect-string/#durable-ack)).
+     If the server does not grant every requested tier, the connect fails with
+     `protocol_version_error`. A wait for a level the connect string did not
+     request fails `wait` or `flush_and_wait` up front with
+     `invalid_api_call`, leaving the buffer or chunk untouched.
    - **Ack is not visibility.** Rows become visible to queries after WAL
      apply, typically within milliseconds of the ack, so a query issued
      right after the ack can miss the newest rows. An empty read-back is

@@ -741,35 +741,48 @@ Requires QuestDB Enterprise (multi-host).
 
 ## Durable ACK {#durable-ack}
 
-*Applies to: ingress.*
+*Applies to: ingress. The values `local`, `replicated`, and `local,replicated`
+need the Java client after 1.3.11, or the C, C++, and Rust clients after
+7.2.1. Other clients accept `on` and `off`.*
 
-Durable acknowledgements let a store-and-forward sender retain each frame until
-QuestDB confirms the requested durability boundary:
+By default, a sender releases its copy of each batch once the server's OK
+response confirms the commit. An OK does not mean that the commit is on the
+disk. With
+`request_durable_ack`, the sender keeps each batch until the server confirms
+that it reached the requested durability, and sends it again after a reconnect
+if the server lost it.
 
-- `request_durable_ack=local` waits for `STATUS_LOCAL_DURABLE_ACK`. The WAL
-  transaction survives power loss on that server, but not loss of its disk.
-  This requires WAL tables and `cairo.commit.mode=adaptive`; a `nosync` server
-  can accept the handshake without producing local progress.
-- `request_durable_ack=replicated` waits for `STATUS_DURABLE_ACK` after the WAL
-  reaches the configured object store. This requires QuestDB Enterprise with
-  replication.
-- `request_durable_ack=local,replicated` requests both streams. It is
-  protocol-defined but not currently granted by servers. When supported, only
-  the stronger replicated stream may drive trim.
-- `request_durable_ack=on` is the legacy alias for `replicated`. It retains the
-  original `true` request and `enabled` confirmation on the wire.
-- `request_durable_ack=off` (the default) trims on ordinary OK responses.
+| Value | The server confirms a batch once | Server requirement |
+| --- | --- | --- |
+| `off` (default) | no durable confirmation; the sender releases the batch on the OK | none |
+| `local` | its WAL is on the server's disk. It survives a power loss of the server, not the loss of that disk or a failover to another node. | [`cairo.commit.mode=adaptive`](/docs/concepts/durability/) |
+| `replicated` | it reached the replication object store. It survives the loss of the server. | QuestDB Enterprise primary with replication |
+| `local,replicated` | both. The sender keeps the batch until the replicated confirmation. | QuestDB Enterprise primary with replication and `cairo.commit.mode=adaptive` |
+| `on` | as `replicated`. The original name, and the only value QuestDB Enterprise 4.1.0 and earlier accept. | QuestDB Enterprise primary with replication |
 
-A server grants the complete requested tier set or fails the connection; it
-never silently substitutes a weaker guarantee.
+The server grants every requested tier or none. When it cannot, for example
+when a server that is not in adaptive mode is asked for `local`, the connection
+fails at once with a durable-ack mismatch, instead of leaving the sender
+waiting for confirmations that never come. Durable acknowledgements work only
+on WebSocket transports.
 
-`durable_ack_keepalive_interval_millis` controls how often the client sends a
-WebSocket PING while durable work is pending. This is required because the
-server emits pending durable progress only while handling inbound traffic.
-Default: `200` ms. Set to `0` or a negative value to disable.
+:::note QuestDB Enterprise
 
-See the [QWP ingress WebSocket protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-for the wire-level contract.
+`replicated`, `local,replicated`, and `on` need QuestDB Enterprise with
+replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
+
+:::
+
+- `durable_ack_keepalive_interval_millis`: how often the sender sends a
+  WebSocket PING while confirmations are pending and it has nothing else to
+  send. The server sends confirmations only while it handles inbound traffic,
+  so the ping keeps them coming. Default: `200` (ms). Set to `0` or a negative
+  value to disable.
+
+See [Durability and commit modes](/docs/concepts/durability/#durable-acknowledgements)
+for what each tier protects, and the
+[QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+for the wire format.
 
 ## Query client keys {#egress-keys}
 

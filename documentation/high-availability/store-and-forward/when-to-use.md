@@ -75,17 +75,28 @@ string.
 
 By default the substrate trims unacked data on OK ack from the server.
 That means the substrate releases a frame once the server has acknowledged
-it into the WAL. The frame is durable on the **primary's** disk; whether
+it into the WAL. Whether the frame is on the **primary's** disk at that point
+depends on the server's [commit mode](/docs/concepts/durability/): in the
+default `nosync` mode, a power loss of the server can still lose it. Whether
 it has been replicated to the object store or to replicas is a separate
 matter.
 
-When the connect string sets `request_durable_ack=on`, trim is held back
-until a separate `STATUS_DURABLE_ACK` frame confirms the data has been
-uploaded from the WAL to the **configured object store** (S3, Azure Blob,
-GCS, or NFS).
+When the connect string sets
+[`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
+trim is held back until a separate durable-ack frame confirms more:
+
+- `local`: the server flushed the WAL to its own disk. The server must run in
+  adaptive commit mode.
+- `replicated`, or its original name `on`: the WAL has been uploaded to the
+  **configured object store** (S3, Azure Blob, GCS, or NFS). QuestDB
+  Enterprise only.
+- `local,replicated`: both. Trim waits for the object store.
 
 ### Choose durable-ack when
 
+- A power loss of the server must not lose in-flight data, and the server
+  runs in adaptive commit mode with a group-commit window above `0`
+  (`local`).
 - You require object-store durability before considering a write
   acknowledged — e.g. compliance requirements, end-to-end exactly-once
   pipelines with cross-region recovery.
@@ -97,27 +108,32 @@ GCS, or NFS).
 
 ### Stay on the default OK trim when
 
-- WAL-local durability on the primary is sufficient.
+- Losing the last commits in a power loss of the primary is acceptable, or
+  the primary already flushes every commit before it acknowledges it (`sync`
+  mode, or adaptive mode with a group-commit window of `0`).
 - You want minimum steady-state disk usage.
-- You are running OSS or a build that does not support durable-ack.
-  (The handshake fails loudly if you opt in but the server cannot
+- The server cannot provide the tier you need: QuestDB open source has no
+  `replicated` tier, and only a server in adaptive mode has the `local`
+  tier. (The handshake fails loudly if you opt in but the server cannot
   deliver — see below.)
 
 ### Caveats
 
-- **Server support is required.** The client sends
-  `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
-  back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
-  uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for ack frames
-  that never arrive would let the SF disk fill up.
-- **Idle keepalive.** The OSS server only flushes pending durable-ack
+- **Server support is required.** The client sends the requested tiers in
+  `X-QWP-Request-Durable-Ack` on the upgrade (`true` for `on`). The server
+  must confirm all of them in `X-QWP-Durable-Ack` (`enabled` for `on`). If
+  it does not — a server not in adaptive mode asked for `local`, an OSS
+  build asked for `replicated`, uninitialised primary, missing registry,
+  hitting a replica — the connect **fails loudly**, by design. Silently
+  waiting for ack frames that never arrive would let the SF disk fill up.
+- **Idle keepalive.** The server only flushes pending durable-ack
   frames during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
-  `ingest_rate × time_to_object_store_durability`. Size
-  `sf_max_total_bytes` accordingly.
+  `ingest_rate × time_to_durability`: about one group-commit window for
+  `local`, the upload time for `replicated`. Size `sf_max_total_bytes`
+  accordingly.
 
 ## Orphan adoption: when to enable
 

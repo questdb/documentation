@@ -452,11 +452,10 @@ db.flush_arrow_batch(
 ```
 
 Pass `Some(ColumnName)` instead of `None` to source the designated timestamp
-from an Arrow timestamp column. Passing `None` for the ACK level selects
-`LocalDurable` for `request_durable_ack=local`, `Durable` for `on`,
-`replicated`, or `local,replicated`, and `Ok` for `off`. Local durability also
-requires WAL tables with `cairo.commit.mode=adaptive`; current servers deny the
-combined request.
+from an Arrow timestamp column. Passing `None` for the ACK level waits for the
+level the connect string requests: `LocalDurable` for
+`request_durable_ack=local`, `Durable` for `on`, `replicated`, or
+`local,replicated`, and `Ok` otherwise.
 
 For Polars, configure ingestion with `PolarsIngestOptions`:
 
@@ -744,13 +743,17 @@ rejected at build time.
 | Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
 `AckLevel::Ok` means the server accepted all frames through the boundary.
-`AckLevel::LocalDurable` waits for the server's local disk and requires
-`request_durable_ack=local`, WAL tables, and `cairo.commit.mode=adaptive`.
-`AckLevel::Durable` waits for the replication/object-store boundary and requires
-`request_durable_ack=on` or `replicated`. `local,replicated` is accepted by the
-client but current servers deny the combined request. Requesting a level not
-selected by the connect string is rejected before the buffer or chunk is
-changed.
+`AckLevel::LocalDurable` waits until the server flushed them to its own disk. It
+needs `request_durable_ack=local` and a server running
+[`cairo.commit.mode=adaptive`](/docs/concepts/durability/).
+`AckLevel::Durable` waits until they reached replication storage. It needs
+QuestDB Enterprise and `request_durable_ack=on`, `replicated`, or
+`local,replicated`. The tier names `local`, `replicated`, and
+`local,replicated` need a client release after 7.2.1; `on` is the only one
+QuestDB Enterprise 4.1.0 and earlier accept (see
+[Durable ACK](/docs/connect/clients/connect-string/#durable-ack)). Waiting for a
+level the connect string did not request is rejected before the buffer or chunk
+is changed.
 
 A `wait` timeout is a no-progress timeout. The data remains queued and its
 background delivery continues. Retry `wait()` or keep observing `acked_fsn()`;
@@ -985,7 +988,8 @@ Closing drains store-and-forward queues on a best-effort basis for
 `close_flush_timeout_millis`, which defaults to five seconds. Before shutdown:
 
 - Call `wait(AckLevel::Ok, timeout)` when accepted delivery is required.
-- Call `wait(AckLevel::Durable, timeout)` when durable ACKs are configured and
+- Call `wait(AckLevel::LocalDurable, timeout)` or
+  `wait(AckLevel::Durable, timeout)` when durable ACKs are configured and
   required.
 - Configure `sf_dir` when undelivered frames must replay after a process
   restart.

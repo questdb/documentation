@@ -1115,23 +1115,39 @@ borrow (see [Ingestion errors](#ingestion-errors)).
 
 ### Durable acknowledgement
 
-By default, the server's OK response confirms a WAL commit but not a durable
-storage boundary. A store-and-forward sender can retain its copy until the
-requested tier is acknowledged:
+By default, the server's OK response confirms that a batch was committed to the
+[WAL](/docs/concepts/write-ahead-log/), not that it is on the disk. To keep each
+batch until the server confirms that it is durable, set `request_durable_ack`:
 
 ```text
-# Local disk durability; requires adaptive commit mode
+# On the server's disk. The server needs cairo.commit.mode=adaptive.
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=local;
 
-# Object-store durability; requires Enterprise replication
+# In the replication object store. The server needs QuestDB Enterprise.
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=replicated;
 ```
 
-`request_durable_ack=on` remains the legacy alias for `replicated`. The Java
-builder also accepts `requestDurableAck("local")`,
-`requestDurableAck("replicated")`, and `requestDurableAck("local,replicated")`.
-The combined tier is protocol-defined but current servers do not grant it. A
-server must grant the complete requested set or the connection fails.
+The values `local`, `replicated`, and `local,replicated` need a Java client
+release after 1.3.11. `on` is the original name of `replicated`, and the only
+value that QuestDB Enterprise 4.1.0 and earlier accept. With
+`local,replicated`, the sender keeps each batch until the replicated
+confirmation. The builder takes the same values, for example
+`requestDurableAck("local")`; `requestDurableAck(true)` is the same as `on`.
+
+The server grants every requested tier or none. When it cannot, the connection
+attempt fails with `WebSocket upgrade failed: server does not support durable
+ack [host=..., port=..., requested=..., echoed=...]`. See
+[Durable ACK](/docs/connect/clients/connect-string/#durable-ack) for what each
+tier needs on the server, and
+[Durability and commit modes](/docs/concepts/durability/) for what each tier
+protects.
+
+:::note QuestDB Enterprise
+
+`replicated`, `local,replicated`, and `on` need QuestDB Enterprise with primary
+replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
+
+:::
 
 ### Awaiting acknowledgements
 
@@ -1160,12 +1176,12 @@ Related accessors:
 | `getAckedFsn()` | Highest FSN the server has acknowledged. `-1` if no batch has been published yet. |
 | `awaitAckedFsn(fsn, timeoutMillis)` | Block until `getAckedFsn()` reaches `fsn`, or the timeout elapses. |
 
-When a durable tier is requested, `getAckedFsn()` advances only after the
-strongest requested tier covers the batch: local disk for `local`, or object
-storage for `replicated` and the combined request. The same FSN span is reported
-on `SenderError.getFromFsn()` / `getToFsn()` for rejected batches, so the value
-returned by `flushAndGetSequence()` is also the correlation key for async error
-reports.
+When durable acknowledgements are requested, `getAckedFsn()` advances only
+after the strongest requested tier covers the batch: the server's disk for
+`local`, the object store for `replicated`, `local,replicated`, and `on`. The
+same FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
+rejected batches, so the value returned by `flushAndGetSequence()` is also the
+correlation key for async error reports.
 
 These methods are no-ops on transports that do not track frame sequence
 numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
@@ -1934,7 +1950,7 @@ Common WebSocket-specific options:
 | `auto_flush_bytes` | disabled | Bytes before auto-flush. |
 | `sf_dir` | unset | Store-and-forward directory. |
 | `sender_id` | `default` | Sender slot identity for SF. |
-| `request_durable_ack` | `off` | Durable tier: `local`, `replicated`, `local,replicated`, legacy `on`, or `off`. |
+| `request_durable_ack` | `off` | Durable acknowledgement tier: `off`, `local`, `replicated`, `local,replicated`, or `on` (the original name of `replicated`). |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget only. |
 | `failover` | `on` | Egress per-query reconnect switch. |
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`, `auto`). |
