@@ -1212,6 +1212,7 @@ module.exports = {
                     "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
+                    "cookbook/sql/advanced/subtotals-and-grand-totals",
                     "cookbook/sql/advanced/unpivot-table",
                     "cookbook/sql/advanced/sankey-funnel",
                     "cookbook/sql/advanced/conditional-aggregates",
