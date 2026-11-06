@@ -23,7 +23,7 @@ for Flink.
 
 This section shows the steps to use the QuestDB Flink connector to ingest data
 from Flink into QuestDB. The connector uses the SQL interface to interact with
-Flink. The overall steps are the followings:
+Flink. The overall steps are the following:
 
 1. The connector creates a table in Flink backed by QuestDB.
 2. The connector inserts data into the table.

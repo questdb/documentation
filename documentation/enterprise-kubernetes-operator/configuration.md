@@ -207,7 +207,7 @@ Set a firm memory budget with equal request and limit. A CPU limit is optional:
 
 ```yaml
 spec:
-  image: registry.distribution.questdb.io/questdb:4.0.0-enterprise
+  image: registry.distribution.questdb.io/questdb:4.0.1-enterprise
   imagePullSecrets:
     - name: questdb-registry
   resources:
@@ -227,15 +227,32 @@ worker-node IAM can provide ambient ECR pull access; IRSA cannot.
 
 `spec.scheduling` supports node selectors, affinity, tolerations, topology
 spread, priority class, and an operator-managed PodDisruptionBudget (PDB).
-Without an override, pods get soft hostname anti-affinity, soft zone spread, and
-a PDB with `minAvailable: 1` for one instance or `instances-1` for HA.
+Without an override, pods get soft hostname anti-affinity and soft zone spread.
+A replicated cluster also gets a PDB with `minAvailable: instances-1`.
 
-The single-instance default intentionally blocks voluntary eviction. Before a
-node drain, scale out, lower `spec.scheduling.podDisruptionBudget.minAvailable`,
-or disable the PDB after accepting the availability risk. Follow the
+A one-instance cluster gets no PDB by default, because a budget over a single
+pod would block every node drain. A drain therefore restarts the database. Set
+`spec.scheduling.podDisruptionBudget.enabled: true` to block voluntary eviction
+instead. Follow the
 [node maintenance runbook](/docs/enterprise-kubernetes-operator/operations/database/#node-maintenance-and-disruption-budgets).
 Custom affinity or topology spread replaces the corresponding default rather
 than merging with it.
+
+## Pod labels and annotations
+
+`spec.podMetadata` adds labels and annotations to every instance Pod, for
+example so a metrics agent scrapes the `metrics` port (9003):
+
+```yaml
+spec:
+  podMetadata:
+    annotations:
+      k8s.grafana.com/scrape: "true"
+      k8s.grafana.com/metrics.portName: metrics
+```
+
+If you set a key the operator also sets, the operator's value is used. Changing
+`spec.podMetadata` rolls the Pods, including the primary.
 
 ## Wire protocols
 
@@ -422,7 +439,7 @@ operator-owned QWP keys as `spec.config`: both maps are merged into one
 ## Changes and immutable fields
 
 Changes to the image, image pull Secrets, resources, engine configuration,
-protocol fields, or pod scheduling can roll affected Pods. Ordinary rollouts are
+protocol fields, pod scheduling, or pod metadata can roll affected Pods. Ordinary rollouts are
 serialized: replicas roll in serial order before the primary, and at most one
 ordinary drift delete is attempted per instanceset reconcile. The controller may
 hold a rollout while topology, PVC usability, peer readiness, node health, or

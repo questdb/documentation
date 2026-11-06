@@ -119,9 +119,10 @@ feeds.
 
 ### WINDOW JOIN
 
-[`WINDOW JOIN`](/docs/query/sql/window-join/) joins each left row to every
-right row inside a time range defined relative to the left row's timestamp.
-Used for "all market data in the next 100 ms after a trade" style queries.
+[`WINDOW JOIN`](/docs/query/sql/window-join/) aggregates the right rows inside
+a time range defined relative to each left row's timestamp, returning one row
+per left row. Used for "average spread in the 100 ms after each trade" style
+queries.
 
 ### HORIZON JOIN
 
@@ -142,7 +143,9 @@ ORDER BY t.symbol, horizon_sec;
 ```
 
 For the full join inventory in one table, see
-[Supported joins](#supported-joins) below.
+[Supported joins](#supported-joins) below. For help choosing between the
+time-series joins, with a query for each that runs on the demo, read
+[Which time-series join?](/blog/questdb-time-series-joins-guide/)
 
 ## Query syntax conveniences
 
@@ -213,7 +216,8 @@ because no extra aggregation pass is required.
 [`DECLARE`](/docs/query/sql/declare/) introduces query-scoped variables for
 both stand-alone queries and view definitions. Variables make repeated
 expressions (date ranges, symbol filters, thresholds) reusable without
-losing readability.
+losing readability. A variable can also hold a
+[value list](/docs/query/sql/declare/#value-lists) for an `IN` filter.
 
 ```questdb-sql demo title="DECLARE used in a query"
 DECLARE
@@ -434,7 +438,7 @@ For the full inventory in one place:
 | [`ASOF JOIN`](/docs/query/sql/asof-join/) | Attach the latest preceding row from the right side. |
 | [`LT JOIN`](/docs/query/sql/join/#lt-join) | Strict-inequality variant of `ASOF`. |
 | [`SPLICE JOIN`](/docs/query/sql/join/#splice-join) | Interleave two streams, expose latest from each. |
-| [`WINDOW JOIN`](/docs/query/sql/window-join/) | Right rows inside a time window of the left row. |
+| [`WINDOW JOIN`](/docs/query/sql/window-join/) | Aggregate the right rows inside a time window around each left row. |
 | [`HORIZON JOIN`](/docs/query/sql/horizon-join/) | Right table evaluated at one or more time offsets per left row. |
 
 ## Pgwire-specific caveats

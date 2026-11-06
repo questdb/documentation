@@ -21,6 +21,8 @@ a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
 - **Role-based access control (RBAC)** with users, groups, permissions, and
   per-principal query memory limits
 - **Single Sign-On (SSO)** via OpenID Connect
+- **[Audited views](/docs/security/audited-views/)** that record who read a view,
+  when, and with which parameter values
 - **Database replication** for high availability
 - **[Storage policies](/docs/concepts/storage-policy/)** for automated partition
   lifecycle management (convert to Parquet, then drop on a schedule)
@@ -32,6 +34,9 @@ a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
 
 You should have received an email with download credentials for the Enterprise
 binaries. Download the version matching your operating system and architecture.
+
+No credentials yet? [Start a free 30-day trial](https://questdb.com/enterprise/trial/)
+and we'll email you a download link within one business day.
 
 :::tip
 Check the [release notes](https://questdb.com/release-notes/?ref=docs&type=enterprise)

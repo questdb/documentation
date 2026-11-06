@@ -38,15 +38,17 @@ OIDC or LDAP group to the new group in one statement, so members of the external
 group inherit its permissions on login. The group and the mapping are created
 atomically. `WITH EXTERNAL ALIAS` cannot be combined with `IF NOT EXISTS`. To
 map or unmap an existing group, use
-[`ALTER GROUP`](/docs/query/sql/acl/alter-group/). For the external group
-mapping flow, see the
+[`ALTER GROUP ... WITH EXTERNAL ALIAS`](/docs/query/sql/acl/alter-group-with-external-alias/)
+or
+[`DROP EXTERNAL ALIAS`](/docs/query/sql/acl/alter-group-drop-external-alias/).
+For the external group mapping flow, see the
 [OpenID Connect (OIDC) integration](/docs/security/oidc/#mapping-user-permissions)
 guide.
 
 `CREATE GROUP` cannot set a memory limit: a new group has none, and
 `SHOW GROUPS` reports `null` in its `memory_limit` column. To cap the native
 memory each query from the group's members may allocate, use
-[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group/#set-memory-limit)
+[`ALTER GROUP ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-group-set-memory-limit/)
 after creating the group.
 
 The chosen name must be unique across all users (including the built-in admin),
@@ -75,7 +77,11 @@ SHOW GROUPS;
 
 that yields:
 
-| name     | external_alias                          | memory_limit |
-| -------- | --------------------------------------- | ------------ |
-| admins   |                                         | null         |
-| analysts | CN=Analysts,OU=Users,DC=example,DC=com  | null         |
+| name     | external_alias                         | memory_limit | resource_group | resource_group_priority |
+| -------- | -------------------------------------- | ------------ | -------------- | ----------------------- |
+| admins   |                                        | null         | null           | null                    |
+| analysts | CN=Analysts,OU=Users,DC=example,DC=com | null         | null           | null                    |
+
+`resource_group` and `resource_group_priority` are `null` until the group is
+mapped with
+[`ALTER GROUP ... SET RESOURCE GROUP`](/docs/query/sql/acl/alter-group-set-resource-group/).

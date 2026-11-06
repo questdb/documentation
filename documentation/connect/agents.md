@@ -97,6 +97,11 @@ SELECT * FROM tables();
 
 Over REST, the same queries run as `GET /exec?query=SHOW%20TABLES`.
 
+On QuestDB Enterprise, these queries return only the objects the agent's user
+[can see](/docs/security/rbac/#object-visibility), and a hidden table fails
+with `table does not exist`. Grant the agent a permission on every table it
+should discover.
+
 See the [`SHOW` reference](/docs/query/sql/show/) and
 [`tables()`](/docs/query/functions/meta/) for the full surface.
 

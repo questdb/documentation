@@ -1,15 +1,15 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, EMA, VWEMA, and more.
-keywords: [window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, min, max, ema, vwema, exponential moving average]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, percentile_cont, percentile_disc, EMA, VWEMA, the SUBSAMPLE keep-flag functions lttb, m4, minmax, uniform, cadence, sdt, and more.
+keywords: [subsample, lttb, m4, minmax, uniform, cadence, sdt, downsampling, window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, percentile_cont, percentile_disc, quantile_cont, quantile_disc, percentile, median, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
 
 ## Aggregate window functions
 
-These functions respect the frame clause and calculate values over the specified window frame.
+These functions respect the frame clause and calculate values over the specified window frame. The exception is [percentile_cont() / percentile_disc()](#percentile), which always use the whole partition.
 
 ### avg() / EMA / VWEMA {#avg}
 
@@ -121,7 +121,7 @@ WHERE timestamp IN '$today';
 - NULL values are skipped; the previous EMA value is preserved
 - The first non-NULL value initializes the EMA
 - Works with both `TIMESTAMP` and `TIMESTAMP_NS` precision
-- EMA ignores the frame clause and operates cumulatively from the first row
+- EMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 #### Volume-Weighted Exponential Moving Average (VWEMA)
@@ -180,7 +180,7 @@ WHERE timestamp IN '$today';
 :::note VWEMA behavior
 - Rows with NULL price, NULL volume, or zero volume are skipped
 - When timestamps are identical (Δt = 0), the row is skipped in time-weighted mode
-- VWEMA ignores the frame clause and operates cumulatively from the first row
+- VWEMA rejects a frame clause (`avg() does not support framing; remove ROWS/RANGE clause`) and accumulates from the first row of the partition
 :::
 
 ---
@@ -631,6 +631,76 @@ WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
 ```
 
 With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
+
+---
+
+### percentile_cont() / percentile_disc() {#percentile}
+
+Calculates the exact percentile of a whole partition and attaches it to every row of that partition. This lets you compare each row with its group's distribution without a self-join, for example to flag trades above the 99th percentile of size for their symbol. `quantile_cont()` and `quantile_disc()` are aliases.
+
+**Syntax:**
+```questdb-sql
+percentile_cont(value, percentile) OVER ([PARTITION BY columnName])
+percentile_disc(value, percentile) OVER ([PARTITION BY columnName])
+percentile_cont(value, ARRAY[p1, p2, ...]) OVER ([PARTITION BY columnName])
+percentile_disc(value, ARRAY[p1, p2, ...]) OVER ([PARTITION BY columnName])
+```
+
+**Arguments:**
+- `value`: Numeric column. NULL values are ignored
+- `percentile`: Constant `double` between 0.0 and 1.0, inclusive, or a one-dimensional `double[]` constant of such values
+
+**Return value:**
+- `percentile_cont()`: `double`, interpolated between the two input values closest to the requested position
+- `percentile_disc()`: an actual input value. `long` for integer input, `double` for floating-point input
+- `double[]` for either function when `percentile` is an array, with results in the order requested
+- `NULL` when the partition has no non-NULL values
+
+**Description:**
+
+These are the window forms of the [percentile_cont](/docs/query/functions/aggregation/#percentile_cont--quantile_cont) and [percentile_disc](/docs/query/functions/aggregation/#percentile_disc--quantile_disc) aggregate functions, and compute the same values. Every row in a partition gets the same result.
+
+**Behavior:**
+- Only whole-partition windows are supported. `ORDER BY` and frame clauses (`ROWS`, `RANGE`) inside `OVER` are rejected, including `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
+- `percentile` must be a constant. Bind variables are rejected
+- The function buffers every value of the partition, so memory use grows with partition size
+- Not supported in [live views](/docs/query/sql/create-live-view/)
+
+**Examples:**
+```questdb-sql title="Median quantity per symbol next to each trade" demo
+SELECT
+    timestamp,
+    symbol,
+    quantity,
+    percentile_cont(quantity, 0.5) OVER (PARTITION BY symbol) AS median_qty
+FROM fx_trades
+WHERE timestamp IN '$now-1h..$now';
+```
+
+```questdb-sql title="Trades at or above the 99th percentile of size for their symbol" demo
+SELECT timestamp, symbol, ecn, quantity, p99_qty
+FROM (
+    SELECT
+        timestamp,
+        symbol,
+        ecn,
+        quantity,
+        percentile_disc(quantity, 0.99) OVER (PARTITION BY symbol) AS p99_qty
+    FROM fx_trades
+    WHERE timestamp IN '$today'
+)
+WHERE quantity >= p99_qty;
+```
+
+```questdb-sql title="Interquartile range per symbol" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    percentile_cont(price, ARRAY[0.25, 0.75]) OVER (PARTITION BY symbol) AS iqr
+FROM fx_trades
+WHERE timestamp IN '$now-1h..$now';
+```
 
 ---
 
@@ -1251,7 +1321,390 @@ This example:
 
 ---
 
-## Examples
+## SUBSAMPLE window functions
+
+These functions expose the [SUBSAMPLE](/docs/query/sql/subsample/)
+downsampling algorithms as window functions. They do not return the reduced
+row set. Each one returns a `boolean` keep flag for every input row: `true`
+means the row is selected, `false` means it is discarded. Filter on the flag
+in an outer query to get the selected rows:
+
+```questdb-sql title="Filter on the keep flag in an outer query" demo
+SELECT *
+FROM (
+    SELECT
+        timestamp,
+        price,
+        lttb(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+When the window uses the same ascending timestamp order as the clause form,
+the rows flagged `true` are the rows the clause form returns. See
+[window-function form](/docs/query/sql/subsample/#window-function-form) on
+the SUBSAMPLE page for when to prefer each interface, and the
+[algorithm sections](/docs/query/sql/subsample/#algorithms) for diagrams and
+method selection.
+
+**Common rules:**
+
+- Window functions are not allowed in a `WHERE` clause at the same query
+  level. Filter on the flag from a subquery or CTE
+- `ORDER BY` is required in the `OVER` clause
+- `m4()`, `minmax()`, `lttb()`, and `sdt()` require an ascending `ORDER BY`.
+  `uniform()` and `cadence()` select by position in whatever window order
+  they are given. Order by the designated timestamp, ascending, to match
+  the clause form
+- Explicit `ROWS` and `RANGE` framing is rejected
+- `PARTITION BY` is supported by `sdt()` only. The other five functions
+  reject it
+- `RESPECT NULLS` and `IGNORE NULLS` are supported by `sdt()` only
+- The value-based functions take the timestamp as an explicit first
+  argument. The value argument can be an expression, such as `price * 2`,
+  which the clause form does not accept
+- Targets, strides, and seeds accept an integer constant, a
+  [DECLARE](/docs/query/sql/declare/) variable, or a bind variable
+- The surrounding query controls the final output order. Add an outer
+  `ORDER BY` when you need a specific order
+- [`cairo.sql.subsample.max.rows`](/docs/configuration/cairo-engine/#cairosqlsubsamplemaxrows)
+  limits the input of every function except `sdt()`
+
+### cadence() {#cadence}
+
+Flags one row out of every `stride` rows, by position in the window order.
+
+**Syntax:**
+```questdb-sql
+cadence(stride [, seed]) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `stride`: Integer constant or bind variable, at least `1`. The step
+  distance between flagged rows, not an output count
+- `seed` (optional): Integer constant, bind variable, or `NULL`. An integer
+  gives a reproducible random starting offset in `[0, stride)`. `NULL` gives
+  a fresh random offset on every run. Without `seed` the offset is `0`
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- The number of flagged rows depends on the input size, approximately
+  `rowCount / stride`
+- When `stride` is greater than `1` and no larger than the input row count,
+  the first and last rows in window order are always flagged
+- `cadence(1)` flags every row
+- When `stride` exceeds the input row count, only the first row is flagged.
+  The last row is not pinned in this case
+- No value column is inspected, so `NULL` and non-finite values in other
+  columns have no effect on the selection
+- `ORDER BY` is required. `PARTITION BY` and `ROWS`/`RANGE` framing are
+  rejected
+
+**Example:**
+```questdb-sql title="Every 1000th trade" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        cadence(1000) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [cadence](/docs/query/sql/subsample/#cadence---every-nth-row) on the
+SUBSAMPLE page for the algorithm, the diagram, and the anti-aliasing use of
+`seed`.
+
+---
+
+### lttb() {#lttb}
+
+Flags the rows chosen by the Largest Triangle Three Buckets algorithm, which
+preserves the visual shape of a line chart.
+
+**Syntax:**
+```questdb-sql
+lttb(ts, value, target [, gapThreshold]) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to measure triangle areas
+- `target`: Integer constant or bind variable, at least `2`. The number of
+  rows to flag
+- `gapThreshold` (optional): String constant such as `'30s'`, `'5m'`, `'1h'`,
+  or `'1d'`, greater than zero. Supported units are `s`, `m`, `h`, and `d`.
+  Enables gap-aware mode
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Without `gapThreshold`, exactly `target` rows are flagged when at least
+  that many eligible rows exist. With fewer eligible rows, all of them are
+  flagged
+- With `gapThreshold`, the input is split wherever consecutive timestamps
+  are further apart than the threshold, and each segment is selected
+  independently. `target` becomes a goal: the number of flagged rows can be
+  below or above it
+- Gap-aware mode adds no `NULL` separator row and no segment identifier.
+  The result is still one flag per input row
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="500 representative points, with gaps over 1 hour kept apart" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        lttb(timestamp, price, 500, '1h')
+            OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [lttb](/docs/query/sql/subsample/#lttb---largest-triangle-three-buckets)
+and [gap-preserving LTTB](/docs/query/sql/subsample/#gap-preserving-lttb) on
+the SUBSAMPLE page for the algorithm, the diagrams, and the client-side
+rendering caveat for gaps.
+
+---
+
+### m4() {#m4}
+
+Flags the first, last, minimum, and maximum rows of each M4 time bucket.
+
+**Syntax:**
+```questdb-sql
+m4(ts, value, target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to find the minimum and
+  maximum rows
+- `target`: Integer constant or bind variable, at least `2`. The row budget:
+  the time range is divided into `target / 4` equal time buckets
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Up to `target` rows are flagged: up to 4 per time bucket
+- When several roles resolve to the same row, that row is flagged once, so
+  a bucket contributes between 1 and 4 rows
+- Empty time buckets contribute no rows
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="First, last, min, and max per time bucket" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        m4(timestamp, price, 1920) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [m4](/docs/query/sql/subsample/#m4---minmaxfirstlast-per-time-interval)
+on the SUBSAMPLE page for the algorithm, the diagram, and how to size
+`target` for a pixel width.
+
+---
+
+### minmax() {#minmax}
+
+Flags the minimum and maximum rows of each non-empty time bucket.
+
+**Syntax:**
+```questdb-sql
+minmax(ts, value, target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row. It must be the ascending `ORDER BY` column
+- `value`: Numeric column or expression used to find the minimum and
+  maximum rows
+- `target`: Integer constant or bind variable, at least `2`. The row budget:
+  the time range is divided into `target / 2` equal time buckets
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- Up to `target` rows are flagged: up to 2 per time bucket
+- When the minimum and the maximum resolve to the same row, that row is
+  flagged once
+- Empty time buckets contribute no rows
+- A row with a `NULL` or non-finite `value`, or a `NULL` timestamp, is not
+  eligible and is always flagged `false`. It still counts toward the input
+  row limit
+- The `ORDER BY` must be ascending and must order by the `ts` argument.
+  `PARTITION BY` and `ROWS`/`RANGE` framing are rejected
+
+**Example:**
+```questdb-sql title="Min/max envelope" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        minmax(timestamp, price, 500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+)
+WHERE keep;
+```
+
+See [minmax](/docs/query/sql/subsample/#minmax---minmax-per-time-interval)
+on the SUBSAMPLE page for the algorithm and the diagram.
+
+---
+
+### sdt() {#sdt}
+
+Flags the rows retained by Swinging Door Trending, an error-bounded
+compression method. The number of flagged rows is decided by the data, not
+requested.
+
+**Syntax:**
+```questdb-sql
+sdt(ts, value, compdev)
+    [RESPECT NULLS | IGNORE NULLS]
+    OVER ([PARTITION BY columns] ORDER BY ts)
+```
+
+**Arguments:**
+- `ts`: Timestamp of each row, used for the slope calculations
+- `value`: Numeric column or expression, compared as `double`
+- `compdev`: The compression deviation. A constant, finite, non-negative
+  tolerance in the units of `value`. A numeric literal, a constant
+  expression such as `abs(-0.5)`, and a `DECLARE` variable holding a
+  constant are accepted. Bind variables, row-dependent expressions,
+  negative values, `NULL`, `NaN`, and infinity are rejected
+
+**Return value:**
+- `boolean`. `true` for retained rows, `false` for the rest
+
+**Behavior:**
+- Within a run, linear interpolation between consecutive retained rows
+  differs from every original eligible row by no more than `2 * compdev`,
+  not `compdev`
+- With `RESPECT NULLS`, the default, a row with a `NULL` or non-finite
+  `value` is a run boundary. That row is flagged `true`, the last eligible
+  row before it is flagged `true`, and the next eligible row starts a new
+  run
+- With `IGNORE NULLS`, a row with a `NULL` or non-finite `value` is flagged
+  `false` and the current run continues across it
+- A timestamp that does not increase, including an equal timestamp, is also
+  a run boundary
+- A timestamp gap on its own is not a boundary
+- With `PARTITION BY`, every partition keeps its own anchor and corridor
+  state, so each series is compressed independently
+- The `ORDER BY` must be ascending. `ROWS`/`RANGE` framing is rejected
+- `sdt()` is not governed by `cairo.sql.subsample.max.rows`. It remains
+  subject to the query's normal memory limits
+
+**Example:**
+```questdb-sql title="Compress every symbol independently, within 2 pips" demo
+SELECT timestamp, symbol, price
+FROM (
+    SELECT
+        timestamp,
+        symbol,
+        price,
+        sdt(timestamp, price, 0.0001)
+            OVER (PARTITION BY symbol ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [sdt](/docs/query/sql/subsample/#sdt---swinging-door-trending) on the
+SUBSAMPLE page for the swinging-door mechanism, the animation, the
+[error guarantee](/docs/query/sql/subsample/#error-guarantee), and
+[timestamp-gap behavior](/docs/query/sql/subsample/#timestamp-gaps).
+
+---
+
+### uniform() {#uniform}
+
+Flags a target number of evenly spaced rows, by position in the window
+order. It does not inspect a value column.
+
+**Syntax:**
+```questdb-sql
+uniform(target) OVER (ORDER BY ts)
+```
+
+**Arguments:**
+- `target`: Integer constant or bind variable, at least `2`. The number of
+  rows to flag
+
+**Return value:**
+- `boolean`. `true` for selected rows, `false` for the rest
+
+**Behavior:**
+- When the input has more rows than `target`, exactly `target` rows are
+  flagged. Otherwise every row is flagged
+- The first and last rows in window order are always flagged. Interior
+  positions round half up, so the selection is deterministic
+- No value column is inspected, so `NULL` and non-finite values in other
+  columns have no effect on the selection
+- `ORDER BY` is required. `PARTITION BY` and `ROWS`/`RANGE` framing are
+  rejected
+
+**Example:**
+```questdb-sql title="500 evenly spaced trades" demo
+SELECT timestamp, price
+FROM (
+    SELECT
+        timestamp,
+        price,
+        uniform(500) OVER (ORDER BY timestamp) AS keep
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+WHERE keep;
+```
+
+See [uniform](/docs/query/sql/subsample/#uniform---evenly-spaced-rows) on
+the SUBSAMPLE page for the algorithm and the diagram.
+
+---
+
+## Window function examples {#examples}
+
+These examples combine the aggregate, ranking, and offset functions from the
+first three categories. Each
+[SUBSAMPLE window function](#subsample-window-functions) has its own example
+in its section.
 
 ### Moving average of best bid price
 
@@ -1326,5 +1779,6 @@ WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
 
 - The order of rows in the result set is not guaranteed to be consistent across query executions. Use an `ORDER BY` clause outside the `OVER` clause to ensure consistent ordering.
 - Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`) and offset functions (`lag`, `lead`) ignore frame specifications.
+- SUBSAMPLE window functions (`cadence`, `lttb`, `m4`, `minmax`, `sdt`, `uniform`) reject explicit `ROWS` and `RANGE` frame specifications instead of ignoring them.
 - For time-based calculations, consider using `RANGE` frames with timestamp columns.
 - Aggregate window functions (`avg`, `sum`, `ksum`, `count`, `min`, `max`) support numeric types: `short`, `int`, `long`, `float`, `double`. The `decimal` type is not supported.

@@ -4,13 +4,14 @@ sidebar_label: SQUASH PARTITIONS
 description: ALTER TABLE SQUASH PARTITIONS SQL keyword reference documentation.
 ---
 
-Merges partition parts back into the physical partition.
-
-This SQL keyword is designed to use for downgrading QuestDB to a version earlier
-than 7.2, when
-[partition split](/docs/concepts/partitions/#partition-splitting-and-squashing)
-is introduced. Squashing partition parts makes the database compatible with
-earlier QuestDB versions.
+Merges split folders into one partition and folds
+[merge-append partitions](/docs/concepts/merge-append-partitions/) back into
+the standard layout, reclaiming dead space even in partitions without splits.
+Before downgrading, follow the
+[safe downgrade procedure](/docs/concepts/merge-append-partitions/#downgrade-safely).
+For non-WAL conversion, follow the
+[merge-append disable procedure](/docs/concepts/merge-append-partitions/#enable-or-disable)
+to prevent new merge-append writes.
 
 ## Syntax
 

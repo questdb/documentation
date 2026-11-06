@@ -43,6 +43,8 @@ import Screenshot from "@theme/Screenshot"
 Each partition is a directory on disk named by its time interval. Inside, each
 column is stored as a separate file (`.d` for data, plus index files for
 [SYMBOL](/docs/concepts/symbol/) columns).
+[Merge-append partitions](/docs/concepts/merge-append-partitions/) also contain
+`_geometry.<n>` files describing pieces that share these column files.
 
 ## Choosing a partition interval
 
@@ -123,6 +125,9 @@ SHOW PARTITIONS FROM trades;
 | 0     | DAY         | 2026-01-15 | 2026-01-15T00:00:00Z | 2026-01-15T23:59:59Z | 1440000 | 68.0 MiB      |
 | 1     | DAY         | 2026-01-16 | 2026-01-16T00:00:00Z | 2026-01-16T12:30:00Z | 750000  | 35.2 MiB      |
 
+Both interfaces also expose `deadRows`, `lastWriteTimestamp` and `pieceCount`
+for [monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions).
+
 The `table_partitions()` function returns the same data and can be used in
 queries with `WHERE`, `JOIN`, or `UNION`:
 
@@ -181,10 +186,19 @@ Split partitions appear with timestamp suffixes in `SHOW PARTITIONS`:
 | 2026-01-15               | 1259999 |
 | 2026-01-15T205959-880001 | 60002   |
 
-QuestDB automatically squashes splits:
-- Non-active partitions: squashed at end of each commit
-- Active (latest) partition: squashed when splits exceed
-  `cairo.o3.last.partition.max.splits` (default: 20)
+For WAL tables, commit housekeeping folds cold adjacent folders toward
+`cairo.o3.partition.max.splits` (default: 20) for every partition, including
+older ones. This is a target, not a hard limit: hot folders can temporarily
+keep a partition above it. Non-active split partitions become eligible for
+background merging after every folder has been idle for
+`cairo.partition.compaction.squash.idle.timeout` (default: 30 minutes), subject
+to the [sweep's event-time and safety checks](/docs/concepts/merge-append-partitions/#compaction).
+
+For non-WAL tables, commit housekeeping uses `cairo.o3.partition.max.splits`
+for the latest partition and `cairo.o3.mid.partition.max.splits` (default: 1)
+for older partitions. Non-WAL tables are outside the background sweep.
+These policies apply even when
+[merge-append partitions](/docs/concepts/merge-append-partitions/) are disabled.
 
 To manually squash all splits:
 

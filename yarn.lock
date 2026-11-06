@@ -2504,10 +2504,10 @@
   resolved "https://registry.yarnpkg.com/@posthog/types/-/types-1.406.2.tgz#362ee2707ca6382bc48de815a4d0788b29c6a36f"
   integrity sha512-RNNoKD7+ZD2v5uzIDp1SOKK1CseZ+YgNPRYCoPlVKuu+wTB/Tb41JCprMjX9E24gPcsdDg8B47dsEsmO0nwEfw==
 
-"@questdb/sql-parser@0.1.16":
-  version "0.1.16"
-  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.16.tgz#bee1d13af2be07b84b4a3d4e92b8faf42a5d0049"
-  integrity sha512-HsrTjs5lC5bdC5AE1kttnI6RC4ibREfb8iPg2/+JUHZqgz1Qg3kcel8jPu7SrHocB3GP4HDuElAP7XEpE5Wb+g==
+"@questdb/sql-parser@0.1.21":
+  version "0.1.21"
+  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.21.tgz#d0046498f6074567c03fb58e9c3ab8cdfa9483af"
+  integrity sha512-KFmllz+er1iasHLytQgBxEY67GLrJGbocT3fGiCDFsYLSdX4h88NeYXo25y6ywCyAWOb7ZcWaB7Q4ritL2O0dA==
   dependencies:
     chevrotain "11.1.1"
 

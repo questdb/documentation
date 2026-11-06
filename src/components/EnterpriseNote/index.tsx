@@ -53,21 +53,35 @@ export function EnterpriseNote({ children, className }: EnterpriseNoteProps) {
         <span className="font-semibold text-[#a23154] dark:text-[#d9688b]">
           Enterprise
         </span>
-        <span className="mx-2">—</span>
+        <span className="mr-2">:</span>
         {children || 'This feature is available in QuestDB Enterprise.'}
       </div>
-      <Link
-        to="https://questdb.com/enterprise/"
-        className={clsx(
-          'flex-none text-xs font-medium flex items-center gap-0.5',
-          'text-zinc-500 hover:text-[#a23154]',
-          'dark:text-zinc-400 dark:hover:text-[#d9688b]',
-          'transition-colors'
-        )}
-      >
-        Learn more
-        <ArrowIcon className="h-4 w-4" />
-      </Link>
+      <div className="flex flex-none items-center gap-4">
+        <Link
+          to="https://questdb.com/enterprise/"
+          className={clsx(
+            'flex-none text-xs font-medium flex items-center gap-0.5',
+            'text-zinc-500 hover:text-[#a23154]',
+            'dark:text-zinc-400 dark:hover:text-[#d9688b]',
+            'transition-colors'
+          )}
+        >
+          Learn more
+          <ArrowIcon className="h-4 w-4" />
+        </Link>
+        <Link
+          to="https://questdb.com/enterprise/trial/"
+          className={clsx(
+            'flex-none text-xs font-medium flex items-center gap-0.5',
+            'text-zinc-500 hover:text-[#a23154]',
+            'dark:text-zinc-400 dark:hover:text-[#d9688b]',
+            'transition-colors'
+          )}
+        >
+          Free trial
+          <ArrowIcon className="h-4 w-4" />
+        </Link>
+      </div>
     </div>
   )
 }

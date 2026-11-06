@@ -18,17 +18,31 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ START timestamp ] [ TIME ZONE timezone ]
            [ PERIOD ( LENGTH length [ TIME ZONE tz ] [ DELAY delay ] ) ]
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
-AS [ ( ] query [ ) ]
-[ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
-      [ TTL n timeUnit ] ]
-[ OWNED BY ownerName ]
+AS
+{ query
+| ( query )
+  [ TIMESTAMP ( columnRef ) ]
+  [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+        [ TTL n timeUnit ] ]
+  [ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
+  [ OWNED BY ownerName ]
+}
 ```
 
+You can leave out the parentheses around `query` only when the query is the last
+thing in the statement. They are required if any clause comes after the query,
+such as `TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
+
 Where:
+
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
+- `query`: Either an aggregating query (with `SAMPLE BY` or a time-based
+  `GROUP BY`), or a
+  [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that
+  copies rows from a single table
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) ON col [PARTITION BY cols]`.
+  This policy is meant for passthrough views (see below).
 
 ## Parameters
 
@@ -39,22 +53,75 @@ Where:
 | `WITH BASE` | Specify base table (required for JOINs) |
 | `REFRESH` | Refresh strategy (default: `IMMEDIATE`) |
 | `DEFERRED` | Skip initial refresh on creation |
-| `query` | A `SAMPLE BY` or time-based `GROUP BY` query |
+| `query` | An aggregating (`SAMPLE BY` / time-based `GROUP BY`) or [passthrough](/docs/concepts/materialized-views/#passthrough-views) query |
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
-| `OWNED BY` | Assign ownership (Enterprise) |
+| `EXPIRE ROWS` | Row-level retention for passthrough views (see below) |
+| `OWNED BY` | Gives the creator's permissions to another user, group, or service account (Enterprise) |
 
 ## Rules and defaults
 
 | Rule | Description |
 | ---- | ----------- |
-| Query must aggregate | Requires `SAMPLE BY` or `GROUP BY` with designated timestamp |
+| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a [passthrough](/docs/concepts/materialized-views/#passthrough-views) query that copies rows one-for-one from a single table |
+| Passthrough columns fixed at creation | A passthrough view stores `SELECT *` expanded into the base table's current columns. A column added to the base table later does not reach the view; recreate the view to include it. See [Columns are fixed at creation](/docs/concepts/materialized-views/#columns-are-fixed-at-creation) |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
 | PERIOD requires SAMPLE BY | The `PERIOD` clause only works with `SAMPLE BY` queries |
 | EVERY minimum | Minimum timer interval is `1m` |
+
+### LIMIT and window function restrictions
+
+Any part of the query that reads the base table, including nested queries,
+cannot use:
+
+- `LIMIT`. A `LIMIT` in a subquery over a *different* table is still allowed.
+- A window function, wherever it appears in a column. This includes a window
+  function inside an operator, a cast, a function call, or a `CASE`, such as
+  `row_number() OVER (ORDER BY timestamp) + 1`.
+
+This applies to both aggregating and passthrough views. Each refresh runs the
+query over the rows that just changed, so a `LIMIT 100` would cap each batch
+rather than the view as a whole, and a `row_number()` would start over on each
+batch.
+
+```questdb-sql title="Rejected: window function inside an expression"
+CREATE MATERIALIZED VIEW trades_numbered AS (
+  SELECT timestamp, symbol,
+    row_number() OVER (ORDER BY timestamp) + 1 AS rn
+  FROM trades
+);
+```
+
+```text title="Error"
+window function on base table is not supported for materialized views: trades
+```
+
+A `LIMIT` fails the same way, with
+`LIMIT on base table is not supported for materialized views: trades`.
+
+:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0
+
+Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, the base-table query could
+contain a `LIMIT`, or a window function nested inside an expression. A window
+function that makes up a whole column was rejected in earlier versions too.
+
+Materialized views that already contain either one keep refreshing after the
+upgrade. But if you
+recreate one, you have to rework the query first. The same applies when you
+replay `SHOW CREATE MATERIALIZED VIEW` output during an upgrade, migration, or
+restore.
+
+- If the `LIMIT` was only there to cap how many rows your application receives,
+  remove it from the view and instead use `ORDER BY ... LIMIT ...` when you query
+  the view. Moving the limit changes which rows the view stores, so it does not
+  behave exactly like the original.
+- Move a window function out of the view and into the query you run against the
+  view, where it sees all of the view's rows.
+
+:::
 
 ## Valid clause combinations
 
@@ -69,10 +136,11 @@ Where:
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
-  timestamp TIMESTAMP,
   symbol SYMBOL,
+  side SYMBOL,
   price DOUBLE,
-  amount DOUBLE
+  amount DOUBLE,
+  timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -278,9 +346,72 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
 
-## Complete example
+## EXPIRE ROWS
 
-Putting it all together:
+Add a row-level retention policy with `EXPIRE ROWS`. Where `TTL` drops whole
+partitions by age, `EXPIRE ROWS` keeps a chosen set of rows: the latest per key,
+the top-N per group, or rows that match a condition. QuestDB keeps that set up to
+date as the view refreshes.
+
+`EXPIRE ROWS` is built for
+[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views):
+a query over a single table with no `SAMPLE BY` / `GROUP BY`, where each view row
+matches one base row. An aggregating view is allowed, but only with a warning in
+the log, because a later refresh can rebuild rows that were deleted. The query
+must not read another view that has a policy, whether as its base table or
+through a join:
+
+```questdb-sql title="Passthrough view that keeps the latest row per symbol"
+CREATE MATERIALIZED VIEW trades_latest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP LATEST ON timestamp PARTITION BY symbol;
+```
+
+A `WHEN` condition is for rules that depend on the **current time**, such as a
+rolling `timestamp < dateadd('d', -7, now())` window. The view's query cannot do
+this, because it is not allowed to call functions like `now()`. A rule that only
+looks at a row's own values belongs in the query's `WHERE` clause instead, which
+keeps those rows out of the view completely; see
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
+
+The clause goes after the query (and after `PARTITION BY` if present):
+
+```
+EXPIRE ROWS
+  { WHEN predicate
+  | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
+  | KEEP [ N ] ( HIGHEST | LOWEST ) ON col [ PARTITION BY col [, col ...] ] }
+  [ CLEANUP EVERY duration ]
+```
+
+A `WHEN` threshold that is a fixed value at definition time and comes out as
+`NULL` is rejected, because it would expire nothing. This covers the obvious
+`timestamp < CAST(NULL AS TIMESTAMP)` and also math that overflows onto the
+reserved `NULL` value, such as `timestamp < 2147483647 + 1`. See
+[A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
+
+For how expired rows are filtered and freed from disk, see
+[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works). Change or
+remove a policy with
+[`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
+
+A view can have both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the statement
+and first in effect: it removes rows from the view, and the `EXPIRE ROWS` policy
+then applies to what is left. See
+[Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
+
+See the [Expiring rows](/docs/concepts/expire-rows/) concept page for all modes,
+examples, and details (NULLs, ties, and when rows are deleted from disk).
+
+## Larger example
+
+Create a materialized view that:
+
+- Checks for updates every 15 minutes (`EVERY 15m`)
+- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
+- Aggregates from `trades` table (`WITH BASE trades`)
+- Stores hourly averages and volumes (`SAMPLE BY 1h`)
+- Keeps 30 days of data (`TTL 30 DAYS`)
 
 ```questdb-sql title="Fully specified materialized view"
 CREATE MATERIALIZED VIEW IF NOT EXISTS trades_hourly_stats
@@ -301,13 +432,6 @@ AS (
 PARTITION BY DAY TTL 30 DAYS;
 ```
 
-This creates a view that:
-- Checks for updates every 15 minutes (`EVERY 15m`)
-- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
-- Aggregates from `trades` table (`WITH BASE trades`)
-- Stores hourly averages and volumes (`SAMPLE BY 1h`)
-- Keeps 30 days of data (`TTL 30 DAYS`)
-
 ## Metadata
 
 Query view metadata with `materialized_views()`:
@@ -325,10 +449,53 @@ Materialized view queries must:
 
 - Use `SAMPLE BY` or `GROUP BY` with designated timestamp
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
+- Not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
+- Not read [catalogue functions](#catalogue-functions) through a regular view,
+  and in QuestDB Enterprise call them only with `SYSTEM ADMIN`
+- Not use Enterprise administrative functions, such as `permissions()` or
+  `backups()`
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.
+
+### Catalogue functions
+
+Catalogue functions and statements list database objects or read their
+metadata:
+
+- `tables()`, `all_tables()`, `views()`, `materialized_views()`,
+  `live_views()`, `wal_tables()`, and `table_storage()`
+- `table_columns()`, `table_partitions()`, `wal_transactions()`, and, in
+  QuestDB Enterprise, `table_cold_partitions()`
+- `information_schema.tables()`, `information_schema.columns()`,
+  `information_schema.questdb_columns()`, `pg_class()`, `pg_attribute()`, and
+  `pg_attrdef()`
+- `reader_pool()`, `writer_pool()`, `query_activity()`, `export_activity()`,
+  `files()`, and `glob()`
+- `SHOW TABLES`, `SHOW COLUMNS`, `SHOW PARTITIONS`, `SHOW CREATE TABLE`,
+  `SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, `SHOW CREATE LIVE VIEW`,
+  and `SHOW CREATE DATABASE`
+
+A materialized view refreshes under a context that sees every object, and every
+reader of the view reads what the refresh stored. To keep a view from
+publishing objects its readers cannot
+[see](/docs/security/rbac/#object-visibility), these functions and statements
+are restricted:
+
+- In the view's own query, `CREATE MATERIALIZED VIEW` accepts them only from
+  the built-in admin, unless it has assumed a service account, or from a
+  principal holding `SYSTEM ADMIN`, which `DATABASE ADMIN` includes. This check
+  applies to QuestDB Enterprise only.
+- Reached through a regular view that the query reads, they are rejected at
+  `CREATE` and at every refresh, for every principal, because anyone who can
+  alter that view could change what the refresh stores. A system view, such as
+  [`storage_policies`](/docs/query/functions/meta/#storage_policies), counts as
+  part of the view's own query.
+
+After an upgrade to QuestDB 10.1.0 or QuestDB Enterprise 4.1.0, a materialized
+view that reads such a function through a regular view is invalidated at its
+first refresh. One that calls it in its own query keeps refreshing.
 
 ## Permissions (Enterprise)
 
@@ -343,6 +510,11 @@ Creating and managing materialized views requires specific permissions.
 | `DROP MATERIALIZED VIEW` | Materialized view | Dropping the view |
 | `REFRESH MATERIALIZED VIEW` | Materialized view | Manually refreshing the view |
 
+A materialized view over an [audited view](/docs/security/audited-views/) is
+not audited: its refreshes and its reads record nothing. A principal who can
+read an audited view and create materialized views can copy its data out of the
+audit trail's reach, so grant `CREATE MATERIALIZED VIEW` with that in mind.
+
 ### Owner permissions
 
 When you create a materialized view, you automatically receive all permissions on
@@ -351,7 +523,10 @@ it (including `DROP MATERIALIZED VIEW` and `REFRESH MATERIALIZED VIEW`) with the
 
 ### OWNED BY clause
 
-Assign ownership to a user, group, or service account:
+The creator of a materialized view receives all permissions on it, with the
+`GRANT` option. `OWNED BY` gives these permissions to a user, group, or service
+account instead. QuestDB stores no owner for the view: afterwards they are
+ordinary grants that can be revoked like any other.
 
 ```questdb-sql
 CREATE GROUP analysts;
@@ -390,12 +565,17 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `materialized view already exists` | View exists and `IF NOT EXISTS` not specified |
 | `base table does not exist` | Referenced table doesn't exist |
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
+| `catalogue function from view <view> cannot be used in materialized view: <function>` | A regular view the query reads calls a [catalogue function](#catalogue-functions). A `SHOW` statement reports `catalogue statement from view` |
+| `catalogue function cannot be used in materialized view without SYSTEM ADMIN: <function>` | The query calls a catalogue function and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
+| `administrative function cannot be used in materialized view: <function>` | The query calls an Enterprise administrative function, such as `active_permissions()` or `backups()` |
 | `permission denied` | Missing required permission (Enterprise) |
 
 ## See also
 
 - [Materialized views concept](/docs/concepts/materialized-views/)
+- [Row expiry concept](/docs/concepts/expire-rows/)
 - [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
 - [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
 - [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)
+- [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/)

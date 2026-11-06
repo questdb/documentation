@@ -346,25 +346,26 @@ Learn more about the [QuestDB Node.js Client](/docs/connect/clients/nodejs/)
 
 The `Date` class stores only date information, while the `DateTime` class stores both date and time information.
 
-QuestDB does not have an official Ruby client, but you can send a POST request comprising the ILP messages. Within this messages, you can pass an epoch timestamp in nanoseconds as the designated timestamp, and pass epoch timestamps in microseconds for other timestamp columns. 
-
-Alternatively, you can use the [InfluxDB Ruby Client](https://github.com/influxdata/influxdb-client-ruby), which is compatible with QuestDB.
+The QuestDB Ruby client accepts a `Time` directly, or the exact integer wrappers `QuestDB::TimestampNanos` and `QuestDB::TimestampMicros`. Build the `Time` in UTC: `Date#to_time` uses the machine's local timezone.
 
 ```ruby
-require 'date'
+require "date"
+require "questdb"
 
-date_str = '2024-08-05'
-date_obj = Date.parse(date_str)
+date_obj = Date.parse("2024-08-05")
+time = Time.utc(date_obj.year, date_obj.month, date_obj.day)
 
-# Convert to DateTime for timestamp in microseconds
-datetime_obj = DateTime.parse(date_str)
-timestamp = (datetime_obj.to_time.to_i * 1_000_000) + (datetime_obj.to_time.usec)
-
-puts "Date: #{date_obj}"
-puts "Timestamp (microseconds): #{timestamp}"
+QuestDB.connect("ws::addr=localhost:9000;") do |client|
+  client.sender do |sender|
+    sender.row("events",
+               columns: { day_start: QuestDB::TimestampMicros.from_time(time) },
+               at: QuestDB::TimestampNanos.from_time(time))
+    sender.flush(wait: true)
+  end
+end
 ```
 
-Learn more about the [ILP text format](/docs/connect/compatibility/ilp/advanced-settings/).
+Learn more about the [QuestDB Ruby client](/docs/connect/clients/ruby/).
 
 
 ## Date to Timestamp in PHP

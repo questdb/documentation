@@ -218,14 +218,6 @@ available on `http://localhost:4000`:
 docker run -v "$(pwd):/var/lib/questdb/conf" -p 4000:4000 questdb/questdb
 ```
 
-:::note
-
-If you wish to use ZFS for your QuestDB deployment, with Docker, then you will need to enable ZFS on the host volume that Docker uses.
-
-Please see the [docker documentation](https://docs.docker.com/storage/storagedriver/zfs-driver/) for more information.
-
-:::
-
 ### Upgrade QuestDB version
 
 It is possible to upgrade your QuestDB instance on Docker when a volume is

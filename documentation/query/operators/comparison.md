@@ -24,6 +24,12 @@ SELECT 5 IN (1, 2, 7, 5, 8)
 | ------ |
 | true   |
 
+The list can also be a declared variable, `X IN @list`. See
+[value lists](/docs/query/sql/declare/#value-lists). To pass a list of any
+length in a prepared statement, bind one text array to a `SYMBOL`, `VARCHAR` or
+`STRING` value, as the whole list: `X IN $1`. See
+[lists of bind variables](/docs/query/sql/declare/#lists-of-bind-variables).
+
 ## `=` Equals
 
 `(value1) = (value2)` - returns true if the two values are the same.
