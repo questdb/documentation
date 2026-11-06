@@ -164,7 +164,10 @@ and QWP clients learn when their rows are on the disk from
 
 ## Durable acknowledgements {#durable-acknowledgements}
 
-A QWP client can ask the server to confirm when its rows are durable. Set
+A QWP client can ask the server to confirm when its rows are durable. Every
+row a QWP client writes goes to a WAL table, in every commit mode and with or
+without durable acknowledgements: the server rejects a batch for a non-WAL
+table with a schema mismatch error (`cannot insert into non-WAL table`). Set
 [`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack) in the
 connect string to the durability tiers you need:
 
@@ -180,9 +183,9 @@ connect string to the durability tiers you need:
 ws::addr=localhost:9000;request_durable_ack=local;
 ```
 
-QWP writes only to WAL tables: it refuses a non-WAL table. The server grants
-every requested tier or none. When it cannot grant them all, the client fails
-the connection at once, so it never waits for confirmations that will not come.
+The server grants every requested tier or none. When it cannot grant them all,
+the client fails the connection at once, so it never waits for confirmations
+that will not come.
 The Java client reports
 `WebSocket upgrade failed: server does not support durable ack [...]`; the C,
 C++, and Rust clients report

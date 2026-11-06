@@ -969,7 +969,8 @@ The per-table entries report the
 [sequencer transaction](/docs/query/functions/meta/#wal_tables) assigned to each
 table that committed data in the acknowledged batch. `tableCount` is 0 when no
 [WAL](/docs/concepts/write-ahead-log/) (Write-Ahead Log) tables committed
-(e.g., non-WAL tables or empty batches).
+(e.g., empty batches). QWP writes only to WAL tables: a batch for a non-WAL
+table gets a `SCHEMA_MISMATCH` error response.
 
 ### Error response
 
