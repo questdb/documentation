@@ -32,6 +32,20 @@ ALTER TABLE tableName SET TYPE [BYPASS] WAL;
 The command schedules the conversion of the specified table to WAL or non-WAL
 type. The actual conversion takes place on the next restart of the server.
 
+The conversion keeps the table's settings, including its
+[TTL](/docs/concepts/ttl/), `FORMAT PARQUET`, per-column Parquet encoding, and
+[deduplication](/docs/concepts/deduplication/) keys and mode. A table with a
+TTL keeps dropping partitions that are past the TTL after the conversion.
+
+:::note
+
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0
+dropped the TTL, `FORMAT PARQUET`, and per-column Parquet encoding of a table
+they converted to WAL. Check the TTL of a table before you convert it, because
+it stays in effect after the conversion.
+
+:::
+
 For a table that may hold
 [merge-append partitions](/docs/concepts/merge-append-partitions/), first set
 `cairo.o3.partition.merge.append.enabled=false`, restart, and run

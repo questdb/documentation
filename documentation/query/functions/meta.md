@@ -1028,8 +1028,9 @@ Returns a `table` with the following columns:
   column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
-- `upsertKey` - if this column is a part of UPSERT KEYS list for table
-  [deduplication](/docs/concepts/deduplication)
+- `upsertKey` - if this column is a key column for table
+  [deduplication](/docs/concepts/deduplication), in either the `UPSERT` or the
+  `SKIP` mode
 - `indexType` - the [index type](/docs/concepts/deep-dive/indexes/) (`POSTING`,
   `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
 - `indexInclude` - comma-separated names of columns included in a
@@ -1283,7 +1284,7 @@ Returns a `table` with the following columns:
 | `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
 | `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
 | `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`                | BOOLEAN | Whether deduplication is enabled                                   |
+| `dedup`                | BOOLEAN | Whether deduplication is enabled, in either mode. [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause) shows the mode |
 | `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
 | `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
 | `matView`              | BOOLEAN | Whether this is a materialized view                                |
@@ -1337,7 +1338,7 @@ highest.
 | Column                            | Type      | Description                                                   |
 | --------------------------------- | --------- | ------------------------------------------------------------- |
 | `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table              |
-| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication (since server start) |
+| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication in either mode (since server start). A duplicate counts even when it is identical to the stored row and `UPSERT` changes nothing |
 | `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)            |
 | `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)     |
 | `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)          |
