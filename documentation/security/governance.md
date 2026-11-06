@@ -160,7 +160,7 @@ ORDER BY ts DESC;
 ```
 
 No principal, the built-in admin included, can insert into, update, rename, or
-drop the audit table, see
+drop the audit table, and only the built-in admin can remove its rows, see
 [tamper protection](/docs/security/audited-views/#protection). Read the
 [delivery guarantees](/docs/security/audited-views/#delivery) and
 [limitations](/docs/security/audited-views/#limitations) before relying on the

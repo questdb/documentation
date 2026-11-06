@@ -24,6 +24,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Audited views](/docs/security/audited-views/#protection) - From QuestDB Enterprise 4.2.0, only the built-in admin can remove rows from `sys.view_audit`, or set its storage policy or TTL. `TRUNCATE TABLE`, partition drops and detaches, `SET TTL`, `SET PARAM`, `SET STORAGE POLICY`, and `ENABLE STORAGE POLICY` on the trail are refused to every other principal, whatever it holds. Documented how to keep the trail pruned with the built-in admin disabled, and the [upgrade steps](/docs/operations/upgrade/#upgrading-to-420)
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
   Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
   materialized view's query that reads its base table (this includes a subquery
