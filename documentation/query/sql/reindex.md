@@ -12,6 +12,10 @@ The operation can only be performed when there is no other reader and writer
 working on the table. During the operation, the table is locked and no read and
 write should be performed on the selected table.
 
+To rebuild indexes on Parquet partitions while the table stays online, use
+[`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/)
+instead.
+
 ## Syntax
 
 ```questdb-sql
