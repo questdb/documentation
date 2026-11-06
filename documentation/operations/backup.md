@@ -597,9 +597,23 @@ A backup includes the [ACL audit log](/docs/security/acl-audit-log/),
 those of `sys.view_audit`, so a primary backup includes the replicated ACL
 change history.
 
+The following internal ACL and credential tables use a `change_id TIMESTAMP`
+column to link their rows to audit entries:
+
+- `sys.acl_entities`
+- `sys.acl_external_groups`
+- `sys.acl_jwk_tokens`
+- `sys.acl_links`
+- `sys.acl_passwords`
+- `sys.acl_permissions`
+- `sys.acl_permissions_history`
+- `sys.acl_rest_tokens`
+
+Only these system tables need this column; do not add it to user-created tables.
+
 When a newer server restores a backup taken before the ACL audit log was
-introduced, startup leaves the restored ACL and credential tables unchanged:
-it neither adds their `change_id` columns nor creates the missing audit log.
+introduced, startup leaves these restored system tables unchanged: it neither
+adds their `change_id` columns nor creates the missing audit log.
 This allows [forward restore updates](#retrying-or-updating-a-restore) while the
 source still runs the older version. The log and columns arrive with the first
 restored backup taken after the source is upgraded.
@@ -613,9 +627,15 @@ the restored storage policy tables.
 For a standalone recovery that will receive no further restore updates, such
 as recovery into a new cluster:
 
-1. As the built-in admin, add `change_id TIMESTAMP` to each restored table
-   that lacks it. The server logs the affected tables and their exact
-   `ALTER TABLE ... ADD COLUMN change_id TIMESTAMP` statements at startup.
+1. As the built-in admin, run the `ALTER TABLE` statements in the startup log
+   to add `change_id TIMESTAMP` to the system tables listed above that lack
+   it. The log identifies each affected table and the exact statement to run.
+   For example, if it identifies `sys.acl_permissions`:
+
+   ```questdb-sql
+   ALTER TABLE 'sys.acl_permissions' ADD COLUMN change_id TIMESTAMP;
+   ```
+
    Restarting alone does not add these columns, because restore markers stay
    on the tables.
 2. Once the audit log exists, check its policy with
