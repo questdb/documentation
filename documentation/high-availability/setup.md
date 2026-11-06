@@ -58,6 +58,31 @@ replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};regi
 QuestDB will automatically use the instance's IAM role for authentication.
 :::
 
+### S3-compatible stores
+
+From QuestDB Enterprise 4.2.0, replication and backups need an S3-compatible
+store, such as MinIO, to support or ignore `If-Match` and `If-None-Match` on
+`PutObject`. The primary sends these conditional requests when it writes the
+replication index, `index.msgpack`: `If-None-Match` to create it in an empty
+location, `If-Match` to replace it. AWS S3, Azure Blob Storage, and Google Cloud
+Storage support conditional writes, and on an NFS (`fs`) store the primary
+writes the index without them. On an S3-compatible store that rejects them:
+
+- A primary cannot start: QuestDB exits during startup.
+- A replica cannot be promoted: `SWITCH ROLE TO PRIMARY` is accepted, then
+  fails while it runs and leaves the node in the `UNKNOWN` state, see
+  [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
+  Retrying fails the same way until the store stops rejecting the headers.
+- Every [backup](/docs/operations/backup/) to the store fails, because backups
+  write their own index the same way.
+
+No setting turns these requests off. Before you upgrade, check the store's
+documentation for conditional writes, or test the store: from a new instance on
+QuestDB Enterprise 4.2.0 or later,
+[run a first backup](/docs/operations/backup/#quick-start) to it. That backup
+creates its index and then replaces it, so if `backups()` reports
+`backup complete`, the store supports or ignores both headers.
+
 ### Azure Blob Storage
 
 Create a Storage Account following
