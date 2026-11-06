@@ -146,8 +146,10 @@ sf_max_total_bytes ≥ ingest_rate × max_tolerated_outage
 
 A 5-minute reconnect budget at 10 MB/s of compressed frames implies at
 least 3 GB. Add safety margin for trim latency — in particular,
-`request_durable_ack=on` extends time-to-trim by the WAL→object-store
-upload window.
+`request_durable_ack=on` or `replicated` extends time-to-trim by the
+WAL→object-store upload window, and `local` by about one group-commit
+window, plus up to one `durable_ack_keepalive_interval_millis` when the
+producer is idle.
 
 In memory mode the default `128 MiB` is deliberately small: it forces
 you to think about backpressure rather than letting an outage silently

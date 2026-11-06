@@ -107,33 +107,45 @@ batch updated. On receipt:
 3. Any segment whose last FSN is `≤ ackedFsn` is unlinked and its bytes
    returned to the available pool.
 
-This is the default and is sufficient when "data is in the server's WAL"
-is the durability bar you need.
+This is the default. It is sufficient when a committed batch is the bar you
+need; an OK does not by itself mean that the commit is on the server's disk.
+That depends on the server's [commit mode](/docs/concepts/durability/#commit-modes).
 
-### `request_durable_ack=on` — WAL-durable trim
+### Durable-ack trim
 
-When the connect string sets `request_durable_ack=on`, trim is driven by
-a separate frame: `STATUS_DURABLE_ACK`. These carry per-table watermarks
-for data the server has **already uploaded from the WAL to the configured
-object store** (S3, Azure Blob, GCS, or NFS).
+When the connect string sets
+[`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
+trim is driven by separate durable-ack frames that carry per-table watermarks:
+
+- `local`: `STATUS_LOCAL_DURABLE_ACK` frames, for commits that are **on the
+  server's own disk** (WAL and sequencer record flushed). The server must run in
+  [adaptive commit mode](/docs/concepts/durability/).
+- `replicated`, or its original name `on`: `STATUS_DURABLE_ACK` frames, for
+  data the server has **already uploaded from the WAL to the configured object
+  store** (S3, Azure Blob, GCS, or NFS). QuestDB Enterprise only.
+- `local,replicated`: `STATUS_DURABLE_ACK` frames drive trim. The
+  `STATUS_LOCAL_DURABLE_ACK` frames only report earlier progress.
+
+With any of these values:
 
 - OK frames still arrive on every batch, but they no longer advance the
   trim watermark. Instead, they are stashed alongside their per-table
   `seqTxn` values.
-- A `STATUS_DURABLE_ACK` frame names tables and their durable `seqTxn`
+- A durable-ack frame names tables and their durable `seqTxn`
   watermarks. The client matches the head of the OK queue against these
   watermarks; each fully-covered head entry pops, and `ackedFsn`
   advances to the highest covered wireSeq.
 - The client opt-in is mandatory — the connect fails loudly if the server
-  does not echo `X-QWP-Durable-Ack: enabled` on the upgrade response.
-  This avoids the silent failure mode where the producer waits forever
-  for ack frames that will never arrive.
+  does not confirm every requested tier in `X-QWP-Durable-Ack` on the
+  upgrade response. This avoids the silent failure mode where the producer
+  waits forever for ack frames that will never arrive.
 
-Durable-ack mode is the right choice when "data is in the object store"
-is the durability bar, but it has two costs: a longer time-to-trim (so
-larger steady-state disk usage in SF mode), and a small WebSocket PING
-sent every `durable_ack_keepalive_interval_millis` to nudge the server's
-flush path when the client is idle but has pending confirmations.
+Durable-ack mode is the right choice when the data must be on the server's
+disk or in the object store before the client lets go of it, but it has two
+costs: a longer time-to-trim (so larger steady-state disk usage in SF mode),
+and a small WebSocket PING sent every `durable_ack_keepalive_interval_millis`
+to nudge the server's flush path when the client is idle but has pending
+confirmations.
 
 See [When to use](/docs/high-availability/store-and-forward/when-to-use/)
 for the decision.

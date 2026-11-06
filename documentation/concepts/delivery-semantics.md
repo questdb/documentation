@@ -11,6 +11,9 @@ QuestDB clients deliver data **at-least-once**: every row your application
 publishes is guaranteed to reach the server, but under failure it may arrive
 more than once. Storing each row exactly once is the application's
 responsibility, and QuestDB provides the mechanisms to make it routine.
+Delivery is separate from durability: whether a row the server acknowledged
+survives a power loss of the server depends on its
+[commit mode](/docs/concepts/durability/#commit-modes).
 
 This page explains where duplicates come from and how to suppress them.
 
@@ -137,17 +140,20 @@ directly.
 The decision is per-table, not per-deployment: enable DEDUP on the tables
 that need exactly-once, leave it off on the tables that don't.
 
-## Related Enterprise features
+## Related features
 
 These features change *where* the replay window opens, but do not change
 the guarantee — at-least-once still applies, and DEDUP is still the
 mechanism that achieves exactly-once.
 
-- **Durable ACK**
-  ([`request_durable_ack=on`](/docs/connect/clients/connect-string#durable-ack))
-  — the server delays the per-batch acknowledgement until the WAL is
-  shipped to object storage. This narrows the replay window after primary
-  failover but does not eliminate it.
+- **Durable acknowledgement**
+  ([`request_durable_ack`](/docs/connect/clients/connect-string#durable-ack)):
+  the client keeps each batch until the server confirms that it is durable,
+  on the server's disk (`local`, which needs
+  [adaptive commit mode](/docs/concepts/durability/)) or in object storage
+  (`replicated`, QuestDB Enterprise). The client then replays a batch the
+  server lost in a power loss or a primary failover, but replay can still
+  produce duplicates.
 - **[Store-and-forward](/docs/high-availability/store-and-forward/concepts/)**
   — provides at-least-once across sender process restarts. Replay
   semantics from this page apply.
@@ -161,8 +167,10 @@ mechanism that achieves exactly-once.
   mechanism that makes exactly-once achievable.
 - [Designated timestamp](/docs/concepts/designated-timestamp/) — required
   for DEDUP and for explicit-timestamp publishing.
-- [Write-ahead log](/docs/concepts/write-ahead-log/) — when the server
-  considers a batch durable.
+- [Write-ahead log](/docs/concepts/write-ahead-log/) — how the server
+  commits a batch.
+- [Durability and commit modes](/docs/concepts/durability/): what an
+  acknowledged batch survives.
 - [Client failover concepts](/docs/high-availability/client-failover/concepts/)
   — the multi-host replay path in detail.
 - [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/)

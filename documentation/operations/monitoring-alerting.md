@@ -353,6 +353,26 @@ ORDER BY wal_pending_row_count DESC;
 See the [`tables()` reference](/docs/query/functions/meta/#tables) for the
 complete list of columns and additional example queries.
 
+### Detect adaptive commit problems
+
+In [adaptive commit mode](/docs/concepts/durability/), commits reach the disk
+within about one group-commit window, and a table that is being written takes a
+save point about once a minute.
+
+**Detection:**
+
+- The log line `could not advance adaptive durable epoch`: a table's save
+  points fail, so its WAL is never removed and the replay after a crash keeps
+  growing.
+- The server exits with code 55 after `fatal durability barrier failure`: a
+  flush failed, and the data it covered may not be on the disk.
+- A `not_yet_on_disk` value that keeps growing, from the query in
+  [Monitor adaptive mode](/docs/concepts/durability/#monitor-adaptive-mode):
+  the disk does not keep up with the flushes.
+
+**Resolution:** see
+[Troubleshooting](/docs/concepts/durability/#troubleshooting).
+
 ## Detect slow queries
 
 QuestDB maintains a table called `_query_trace`, which records each executed

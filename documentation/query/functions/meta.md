@@ -1724,6 +1724,21 @@ Returns a `table` including the following information:
 - `memoryPressure` - memory pressure level of the table writer: `0` for none,
   `1` when parallelism is reduced, `2` when the writer backs off between
   attempts (equivalent to `table_memory_pressure_level` in `tables()`)
+- `durableEpochSeqTxn` - the sequencer transaction of the table's current save
+  point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
+  the WAL is replayed from here
+- `recoveryIncarnation` - how many times this process put the table's files
+  back to its save point at a start; stays `0` after a clean shutdown, and
+  often after a power loss, when the files are already at the save point
+- `localDurableSeqTxn` - the highest sequencer transaction that is on the disk,
+  with its WAL files and its sequencer record flushed. `-1` after a start until
+  the table's next commit; advances only in `adaptive` and `sync` commit modes
+- `lastEpochTs` - when this process last took a save point for the table, or
+  `NULL` if it has not taken one since it started
+
+The last four columns describe [durability](/docs/concepts/durability/#monitor-adaptive-mode).
+For a table written since the start, `sequencerTxn - localDurableSeqTxn` counts
+the committed transactions that are not yet on the disk.
 
 **Examples:**
 
@@ -1736,6 +1751,18 @@ wal_tables();
 | sensor_wal  | false     | 2         | 1               | 4            |               |                                                                                                                             | 0              |
 | weather_wal | false     | 3         | 0               | 3            |               |                                                                                                                             | 0              |
 | test_wal    | true      | 7         | 1               | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 2              |
+
+The durability columns are omitted from the result above.
+
+```questdb-sql title="Check how much of each table is on the disk"
+SELECT
+  name,
+  sequencerTxn - localDurableSeqTxn AS not_yet_on_disk,
+  sequencerTxn - durableEpochSeqTxn AS replay_after_crash,
+  lastEpochTs
+FROM wal_tables()
+WHERE localDurableSeqTxn >= 0;
+```
 
 ## writer_pool
 

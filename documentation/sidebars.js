@@ -713,6 +713,7 @@ module.exports = {
               label: "Resource Groups",
             },
             "concepts/write-ahead-log",
+            "concepts/durability",
           ],
         },
         {
