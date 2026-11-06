@@ -212,7 +212,7 @@ Disabling removes the keys and the mode. Rows already stored are not changed.
 SHOW CREATE TABLE prices;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'prices' (
     ts TIMESTAMP,
     ticker SYMBOL,
@@ -233,8 +233,9 @@ Check which columns are keys. The column is named `upsertKey` in both modes:
 SELECT "column", upsertKey FROM table_columns('prices');
 ```
 
-Count the rows deduplication has removed since the server started. The count
-includes rows that `UPSERT` replaced and rows that `SKIP` discarded:
+Count the rows deduplication has removed since the server started. A duplicate
+counts in either mode, even when it is identical to the stored row and `UPSERT`
+changes nothing:
 
 ```questdb-sql
 SELECT table_name, wal_dedup_row_count_since_start
@@ -256,8 +257,9 @@ WHERE table_name = 'prices';
 
 :::caution
 
-QuestDB versions that predate the `SKIP` mode, including QuestDB Enterprise
-replicas that still run such a version, do not recognize it:
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0,
+including replicas that still run such a version, do not recognize the `SKIP`
+mode:
 
 - They deduplicate a `SKIP` table as `UPSERT`, without an error. After a
   downgrade, later duplicates replace the stored rows.

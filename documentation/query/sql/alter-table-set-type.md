@@ -39,9 +39,10 @@ TTL keeps dropping partitions that are past the TTL after the conversion.
 
 :::note
 
-Earlier versions dropped the TTL, `FORMAT PARQUET`, and per-column Parquet
-encoding of a table they converted to WAL. Check the TTL of a table before
-you convert it, because it stays in effect after the conversion.
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0
+dropped the TTL, `FORMAT PARQUET`, and per-column Parquet encoding of a table
+they converted to WAL. Check the TTL of a table before you convert it, because
+it stays in effect after the conversion.
 
 :::
 

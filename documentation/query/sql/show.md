@@ -323,7 +323,7 @@ the `SHOW CREATE TABLE` output:
 SHOW CREATE TABLE sensor_data;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'sensor_data' (
     ts TIMESTAMP,
     value DOUBLE
@@ -346,7 +346,7 @@ columns:
 SHOW CREATE TABLE quotes;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'quotes' (
     timestamp TIMESTAMP,
     symbol SYMBOL,
