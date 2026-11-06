@@ -1040,6 +1040,7 @@ module.exports = {
             "integrations/other/ignition",
             "integrations/other/airbyte",
             "integrations/other/databento",
+            "integrations/other/adbcbridge",
           ],
         },
       ],
