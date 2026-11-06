@@ -41,6 +41,17 @@ Maximum number of rows that may sit uncommitted in WAL writers across
 server-side bound on the batch-splitting mechanism described in the
 [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#flag_defer_commit).
 
+## WebSocket ingestion
+
+### qwp.min.idle.ms.before.writer.release
+
+- **Default**: `30000` (milliseconds)
+- **Reloadable**: no
+
+Controls how long an idle QWP WebSocket ingestion connection holds its
+table writers. Releasing them lets QuestDB free resources and purge obsolete
+WAL files while your client stays connected.
+
 ## Browser connections
 
 A browser sends an `Origin` header with every WebSocket upgrade. QuestDB

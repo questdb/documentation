@@ -13,6 +13,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### New
 
 - [dbt connector](/docs/connect/connectors/dbt/) - New page for the QuestDB Enterprise dbt adapter, which builds, tests, and documents SQL models over QWP. Covers installation from the release archive, a TLS profile for the bundled trades project, SQL transformations from staging to joined and aggregated models, views, tables, incremental upserts, materialized views with timer and period refresh, snapshots, reading ingested tables such as the Databento connector's as dbt sources, connection and model settings, and limitations
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 
 ## October 2026
 
