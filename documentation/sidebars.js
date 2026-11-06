@@ -1033,6 +1033,7 @@ module.exports = {
           items: [
             "integrations/other/prometheus",
             "integrations/other/sqlalchemy",
+            "integrations/other/drizzle",
             "integrations/other/mindsdb",
             "integrations/other/cube",
             "integrations/other/ignition",
