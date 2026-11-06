@@ -28,28 +28,6 @@ If this is your first time setting up QuestDB, see the
    especially for production instances. See
    [Backup and restore](/docs/operations/backup/) for details.
 
-### Schema dumps and view definitions
-
-Before upgrading from an earlier release to QuestDB Enterprise 4.2.0 or later,
-check schema-export scripts and stored views for these compatibility changes:
-
-- With Enterprise access control enabled, plain `SHOW CREATE DATABASE` now
-  requires both `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
-  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
-  [database dumps](/docs/query/sql/show/#enterprise-access-control).
-- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
-  Schema-only output does not restore grants. Use the ACL dump for permissions,
-  and review [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
-- With Enterprise access control enabled, materialized and live views reject
-  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
-  schema-metadata queries to
-  `INCLUDE (SCHEMA)` under the
-  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
-- A regular view's `PIVOT IN` subquery rejects administrative functions and
-  administrative `SHOW` statements. Existing definitions become invalid at
-  their next compilation, including startup. See
-  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
-
 ## Upgrade steps
 
 ### Docker
@@ -214,6 +192,29 @@ check how these changes affect your users and clients:
   `acl.oidc.sub.claim`, or with a claim listed in both settings: earlier
   versions started with them, then rejected every OIDC login. See
   [Startup validation](/docs/security/oidc/#startup-validation).
+
+### Upgrading to 4.2.0
+
+QuestDB Enterprise 4.2.0 changes `SHOW CREATE` output and restricts
+administrative operations in views. Check schema-export scripts and stored
+views for the following before upgrading:
+
+- With access control enabled, plain `SHOW CREATE DATABASE` now requires both
+  `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
+  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
+  [database dumps](/docs/query/sql/show/#enterprise-access-control).
+- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
+  Schema-only output does not restore grants. Use the ACL dump for permissions,
+  and review
+  [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
+- With access control enabled, materialized and live views reject
+  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
+  schema-metadata queries to `INCLUDE (SCHEMA)` under the
+  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
+- A regular view's `PIVOT IN` subquery rejects administrative functions and
+  administrative `SHOW` statements. Existing definitions become invalid at
+  their next compilation, including startup. See
+  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
 
 ### QuestDB Enterprise BYOC
 
