@@ -266,9 +266,10 @@ For exploratory analysis, dynamic subqueries are convenient. For production quer
 use a constant list or store keys in a small dimension table for better performance.
 :::
 
-In a stored view, an `IN` subquery cannot use administrative functions or
+In a stored view, a `PIVOT IN` subquery cannot use administrative functions or
 administrative `SHOW` statements, including Enterprise ACL dumps. This also
-applies through nested queries and other views. Schema-only
+applies to nested queries and other views read by that subquery, not to ordinary
+subqueries elsewhere in a regular view's query body. Schema-only
 `SHOW CREATE DATABASE INCLUDE (SCHEMA)` remains allowed in a regular view. See
 [administrative operations in view metadata](/docs/concepts/views/#administrative-operations-in-view-metadata)
 for restrictions and migration guidance.

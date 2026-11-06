@@ -197,8 +197,9 @@ CREATE VIEW with_timestamp AS (
 A `PIVOT IN` subquery in a view cannot use administrative functions or
 administrative `SHOW` statements, including Enterprise `SHOW CREATE DATABASE`
 with any ACL category. Use `INCLUDE (SCHEMA)` when only schema metadata is
-needed. The restriction also applies through nested queries and other views,
-and is checked when creating, replacing, altering, or recompiling a view. See
+needed. The restriction extends to nested queries and other views read by the
+`PIVOT IN` subquery, not to ordinary subqueries elsewhere in the view's query
+body. It is checked when creating, replacing, altering, or recompiling a view. See
 [administrative operations in view metadata](/docs/concepts/views/#administrative-operations-in-view-metadata)
 for existing-view migration guidance.
 

@@ -467,18 +467,26 @@ permissions until you run [`ALTER VIEW`](/docs/query/sql/alter-view/) or
 
 ### Administrative operations in view metadata
 
-A view's `PIVOT IN` subquery runs while QuestDB derives the view's columns,
-including during background recompilation and startup. It cannot use
-administrative functions or administrative `SHOW` statements that need a
-calling session or have side effects. This restriction also applies to nested
-subqueries and operations reached through another view.
+A regular view can use administrative functions and administrative `SHOW`
+statements in its query body, including ordinary subqueries. These operations
+check the permissions of the user who queries the view, not those of its definer.
+
+A [`PIVOT IN` subquery](/docs/query/sql/pivot/#dynamic-in-list-from-subquery) is a
+special case: its result values determine the output column names. QuestDB must
+execute it at compile time to derive the view's columns, not just when a user
+queries the view. This also happens during background recompilation and startup,
+when there is no calling session. The subquery therefore cannot use administrative
+operations that need a calling session or have side effects.
+
+This restriction extends to nested subqueries and other views read by the
+`PIVOT IN` subquery. It does not apply to ordinary subqueries elsewhere in the
+view's query body.
 
 With Enterprise access control enabled, `SHOW CREATE DATABASE` with any ACL
 category counts as an administrative statement. Use
 `SHOW CREATE DATABASE INCLUDE (SCHEMA)` if the subquery only needs schema
 metadata. Catalogue queries that do not require a calling session remain
-allowed. Administrative operations outside `PIVOT IN` in a regular view's
-query body still run with the reader's permission checks.
+allowed.
 
 :::warning Existing views
 
