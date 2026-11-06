@@ -13,6 +13,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### New
 
 - [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 
 ### Updated
 

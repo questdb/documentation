@@ -672,6 +672,8 @@ the results. Recreate affected [views](/docs/concepts/views/) with
   JOIN. Use `GROUP BY` with a time-bucketing expression instead, or apply
   `SAMPLE BY` in an outer query over a HORIZON JOIN
   [without aggregate functions](#row-order-and-designated-timestamp).
+- **No grouping sets**: `ROLLUP`, `CUBE`, and `GROUPING SETS` cannot be used in
+  the same query as HORIZON JOIN.
 - **WHERE filters left-hand table only**: The `WHERE` clause can only reference
   columns from the left-hand table. References to any right-hand table columns
   or horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.

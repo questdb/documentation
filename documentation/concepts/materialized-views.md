@@ -445,6 +445,7 @@ not summarise data; the rules below are for aggregating views.)
 - `FILL` clause
 - `FROM-TO` clause
 - `ALIGN TO FIRST OBSERVATION`
+- [`GROUPING SETS`, `ROLLUP`, and `CUBE`](/docs/query/sql/grouping-sets/)
 - Non-deterministic functions like `now()` or `rnd_uuid4()`
 
 Keep queries simple. Move complex transformations to queries that run on the
