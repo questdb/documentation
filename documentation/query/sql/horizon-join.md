@@ -689,7 +689,10 @@ the results. Recreate affected [views](/docs/concepts/views/) with
 - **Restricted right-hand side**: Each right-hand side must be a table with an
   optional filter, in one of the
   [forms in the grammar](#select-list-right-hand-side-and-on-condition), see
-  [Filter restrictions](#filter-restrictions).
+  [Filter restrictions](#filter-restrictions). A materialized view with an
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy qualifies only when the
+  policy compares the designated timestamp with a constant, `now()`, or
+  `dateadd()` over `now()`, such as `WHEN ts < dateadd('d', -30, now())`.
 - **Restricted left-hand side**: A table with an optional filter works best.
   Some other queries are supported, but don't run in parallel.
 - **RANGE constraints**: `STEP` must be positive; `FROM` must be less than or
