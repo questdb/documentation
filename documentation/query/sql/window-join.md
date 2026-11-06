@@ -118,7 +118,11 @@ static bounds when a fixed window size is sufficient.
 
 1. Both tables must have [designated timestamps](/docs/concepts/designated-timestamp/)
    and be partitioned
-2. The right table must be a direct table reference, not a subquery
+2. The right table must be a direct table reference, not a subquery. A
+   materialized view with an [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy
+   qualifies only when the policy compares the designated timestamp with a
+   constant, `now()`, or `dateadd()` over `now()`, such as
+   `WHEN ts < dateadd('d', -30, now())`
 3. Aggregate functions are required - you cannot select non-aggregated columns
    from the right table
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on

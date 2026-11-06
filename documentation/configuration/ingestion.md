@@ -164,6 +164,9 @@ Maximum size of any measurement.
 
 Minimum idle time in milliseconds before a table writer is released.
 
+For QWP WebSocket ingestion, see
+[`qwp.min.idle.ms.before.writer.release`](/docs/configuration/qwp/#qwpminidlemsbeforewriterrelease).
+
 ### line.tcp.msg.buffer.size
 
 - **Default**: `32768`
