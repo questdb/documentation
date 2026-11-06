@@ -487,15 +487,79 @@ another copy, restore the whole table from that backup instead.
 
 ### Other messages
 
-| Message | What to do |
-| --- | --- |
-| `could not advance adaptive durable epoch [table=..., error=...]` | A periodic save point failed. The table keeps its previous save point and its WAL. Fix the cause in the error; the next WAL apply tries again. |
-| `could not take the durable epoch the table owes, the table stays suspended; retry RESUME WAL [table=...]` | `RESUME WAL` could not take the save point the table needs. Fix the logged cause, then retry [`ALTER TABLE ... RESUME WAL`](/docs/query/sql/alter-table-resume-wal/). |
-| `could not complete durable epoch after <operation>; retry the operation or RESUME WAL [table=...]` | A `DETACH PARTITION` or a direct partition change could not take its save points. Its effect may be visible, but it is not complete. Fix the cause, then retry the operation or `RESUME WAL`. |
-| `durable epoch skipped after <operation>, a crash before the next one undoes it [table=...]` | The save point after an operation such as `ATTACH PARTITION` was skipped. The change is visible. Check that a later save point succeeds. |
-| `adaptive save point failed its checksums, trying the other generation [...]` or `removing adaptive save point that failed its content checks [...]` | The newer save point was damaged. The start used the older one and replayed the WAL kept for it, so no row is lost. Keep the log for a report. |
-| `adaptive epoch roll-forward restored durable cut [table=..., epochSeqTxn=...]` | The start put the table's files back to its save point after a crash. No action needed. |
-| `WebSocket upgrade failed: server does not support durable ack [...]` (Java) or `WebSocket upgrade failed: server did not enable durable ACK [...]` (C, C++, Rust) | The server cannot grant every requested tier, most often `local` from a server that is not in adaptive mode. See [Durable acknowledgements](#durable-acknowledgements) for what each tier needs. |
+Each message below is one line, wrapped here. All come from the server log,
+except the two in the last block, which the client reports.
+
+**A periodic save point failed.**
+
+```text
+could not advance adaptive durable epoch [table=..., error=...]
+```
+
+The table keeps its previous save point and its WAL. Fix the cause in the error;
+the next WAL apply tries again.
+
+**`RESUME WAL` could not take a save point.**
+
+```text
+could not take the durable epoch the table owes, the table stays suspended;
+retry RESUME WAL [table=...]
+```
+
+Fix the logged cause, then retry
+[`ALTER TABLE ... RESUME WAL`](/docs/query/sql/alter-table-resume-wal/).
+
+**A partition change is not complete.**
+
+```text
+could not complete durable epoch after <operation>; retry the operation or
+RESUME WAL [table=...]
+```
+
+A `DETACH PARTITION` or a direct partition change could not take its save
+points. Its effect may be visible, but it is not complete. Fix the cause, then
+retry the operation or `RESUME WAL`.
+
+**A save point after an operation was skipped.**
+
+```text
+durable epoch skipped after <operation>, a crash before the next one undoes it
+[table=...]
+```
+
+The save point after an operation such as `ATTACH PARTITION` was skipped. The
+change is visible. Check that a later save point succeeds.
+
+**The newer save point was damaged.**
+
+```text
+adaptive save point failed its checksums, trying the other generation [...]
+removing adaptive save point that failed its content checks [...]
+```
+
+Either line means that the start used the older save point and replayed the WAL
+kept for it, so no row is lost. Keep the log for a report.
+
+**The start restored a table.**
+
+```text
+adaptive epoch roll-forward restored durable cut [table=..., epochSeqTxn=...]
+```
+
+The start put the table's files back to its save point after a crash. No
+action needed.
+
+**A QWP client cannot get durable acknowledgements.**
+
+```text
+WebSocket upgrade failed: server does not support durable ack [...]
+WebSocket upgrade failed: server did not enable durable ACK [...]
+```
+
+The first line is the Java client's error, the second the C, C++, and Rust
+clients' error. The server cannot grant every requested tier, most often
+`local` from a server that is not in adaptive mode. See
+[Durable acknowledgements](#durable-acknowledgements) for what each tier needs.
 
 ## QuestDB Enterprise
 
