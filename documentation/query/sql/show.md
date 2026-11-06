@@ -39,8 +39,8 @@ SHOW { COLUMNS FROM tableName
 
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
-- `SHOW CREATE DATABASE` returns DDL statements that recreate every object in
-  the database, one per row, ordered so dependencies come first.
+- `SHOW CREATE DATABASE` returns statements to recreate the schema and, on
+  Enterprise, access control, one per row in replay order.
 - `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
   view.
 - `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
@@ -65,11 +65,13 @@ SHOW { COLUMNS FROM tableName
 - `SHOW USERS` lists all users with their enabled flag, memory limit and
   resource group (enterprise-only)
 
-In QuestDB Enterprise, `SHOW TABLES` and `SHOW CREATE DATABASE` cover only the
-objects you [can see](/docs/security/rbac/#object-visibility). The statements
-that name an object, such as `SHOW COLUMNS` or `SHOW CREATE TABLE`, fail with
-the missing-object error, for example `table does not exist [table=trades]`,
-for an object hidden from you.
+In QuestDB Enterprise, `SHOW TABLES` and the schema portion of
+`SHOW CREATE DATABASE` cover only the objects you
+[can see](/docs/security/rbac/#object-visibility). Dumping any access control
+category also requires [administrative permissions](#enterprise-access-control).
+Statements that name an object, such as `SHOW COLUMNS` or `SHOW CREATE TABLE`,
+fail with the missing-object error, for example
+`table does not exist [table=trades]`, for an object hidden from you.
 
 ## Examples
 
@@ -96,10 +98,12 @@ a comma-separated string.
 
 ### SHOW CREATE DATABASE
 
-`SHOW CREATE DATABASE` returns a logical, data-free dump of the whole database:
-one round-trippable DDL statement per row for every user object, much like
-`pg_dump --schema-only`. Replaying the statements from top to bottom on an empty
-instance recreates the database. No table data and no credentials are included.
+`SHOW CREATE DATABASE` returns a logical, data-free dump as replayable SQL:
+one statement per row for tables, views, materialized views, and live views.
+In QuestDB Enterprise 4.2.0 and later, the dump also includes users, groups,
+service accounts, memberships, and grants by default. Use it to copy a database's
+structure and access control to an empty instance. It is not a data backup; see
+[Replay limits](#replay-limits).
 
 ```questdb-sql title="SHOW CREATE DATABASE syntax"
 SHOW CREATE DATABASE
@@ -109,36 +113,29 @@ SHOW CREATE DATABASE
 An optional `INCLUDE` or `EXCLUDE` clause selects which object categories to
 dump. Each `category` is one of:
 
-- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`, `LIVE_VIEWS`.
-- **Access control** (Enterprise only): `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`,
-  `PERMISSIONS`.
-- **Umbrellas**: `SCHEMA` (all schema objects), `ACL` (all access control
-  objects), `ALL` (`SCHEMA` plus `ACL`).
+- **Schema objects**: `LIVE_VIEWS`, `MATERIALIZED_VIEWS`, `TABLES`, `VIEWS`.
+- **Access control** (Enterprise only): `GROUPS`, `PERMISSIONS`,
+  `SERVICE_ACCOUNTS`, `USERS`.
+- **Umbrellas**: `ACL` (all access control categories), `ALL` (`SCHEMA` plus
+  `ACL`), `SCHEMA` (all schema objects).
 
 `INCLUDE`/`EXCLUDE` accept either `ALL` or a parenthesised list, so
 `INCLUDE ALL`, `EXCLUDE (MATERIALIZED_VIEWS)`, and `INCLUDE (TABLES, VIEWS)` are
-all valid. Called without a clause, the statement dumps the whole database:
+all valid. With no clause, the statement defaults to `INCLUDE ALL`:
 
-```questdb-sql title="Dump the database schema" demo
+```questdb-sql title="Dump schema and access control"
 SHOW CREATE DATABASE;
 ```
 
+In QuestDB open source, `ALL` and `SCHEMA` produce the same output. On
+Enterprise, select `SCHEMA` explicitly to omit access control:
+
+```questdb-sql title="Dump only the database schema" demo
+SHOW CREATE DATABASE INCLUDE (SCHEMA);
+```
+
 The result set has a single `ddl` column with one self-contained statement per
-row. Run against a database holding the [demo](https://demo.questdb.io) tables
-and materialized views, it returns one row per object:
-
-| ddl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CREATE TABLE 'market_data' ( timestamp TIMESTAMP, symbol SYMBOL, bids DOUBLE[][], asks DOUBLE[][], best_bid DOUBLE, best_ask DOUBLE ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS ( SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s ) PARTITION BY DAY;                                                                                                                                                                                                                                                                                                                                                                                                            |
-| CREATE MATERIALIZED VIEW 'bbo_1m' WITH BASE 'bbo_1s' REFRESH EVERY 1m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1s SAMPLE BY 1m ) PARTITION BY DAY;                                                                                                                                                                                                                                                                                                                                                                                          |
-| CREATE MATERIALIZED VIEW 'bbo_1h' WITH BASE 'bbo_1m' REFRESH EVERY 10m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1m SAMPLE BY 1h ) PARTITION BY MONTH;                                                                                                                                                                                                                                                                                                                                                                                       |
-| CREATE MATERIALIZED VIEW 'bbo_1d' WITH BASE 'bbo_1h' REFRESH EVERY 1h DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1h SAMPLE BY 1d ) PARTITION BY YEAR;                                                                                                                                                                                                                                                                                                                                                                                         |
-| ...                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| CREATE TABLE 'trips' ( cab_type SYMBOL, vendor_id SYMBOL, pickup_datetime TIMESTAMP, dropoff_datetime TIMESTAMP, rate_code_id SYMBOL, pickup_latitude DOUBLE, pickup_longitude DOUBLE, dropoff_latitude DOUBLE, dropoff_longitude DOUBLE, passenger_count INT, trip_distance DOUBLE, fare_amount DOUBLE, extra DOUBLE, mta_tax DOUBLE, tip_amount DOUBLE, tolls_amount DOUBLE, ehail_fee DOUBLE, improvement_surcharge DOUBLE, congestion_surcharge DOUBLE, total_amount DOUBLE, payment_type SYMBOL, trip_type SYMBOL, pickup_location_id INT, dropoff_location_id INT ) timestamp(pickup_datetime) PARTITION BY MONTH; |
-
-Each `ddl` value is stored with formatting characters, so pasting a row into a
-text editor expands it to the indented form shown by
+row. Each value preserves newlines and indentation, as in
 [`SHOW CREATE TABLE`](#show-create-table).
 
 For turning the result set into a `.sql` file or replaying it on another server,
@@ -147,13 +144,21 @@ see
 
 #### Output order
 
-Objects are emitted in dependency order: a materialized view or view is never
-reported before the base table or base materialized view it reads from. Within
-that constraint objects are ordered alphabetically. The demo chains several
-materialized views, for example `market_data` then `bbo_1s`, `bbo_1m`, `bbo_1h`,
-`bbo_1d`, and `fx_trades` then `fx_trades_ohlc_1m`, `fx_trades_ohlc_1d`. Each
-view in a chain appears only after the object it depends on, so a top-to-bottom
-replay always succeeds.
+A full Enterprise dump has three parts:
+
+1. Users, groups, and service accounts, ordered by name across all three kinds.
+   A disabled user or service account has an `ALTER ... DISABLE` statement
+   immediately after its `CREATE` statement.
+2. Schema objects in dependency order, with alphabetical ordering where
+   dependencies allow. A view follows the objects it reads, including other
+   views in a chain.
+3. Group memberships, service account assignments, and direct grants, grouped
+   by principal name. Within each principal's grants, database scope precedes
+   table scope, which precedes column scope.
+
+Schema-only dumps contain just the second part. Preserve the returned order
+when replaying: a broader grant can clear a narrower grant option, which a
+later `WITH GRANT OPTION` statement restores.
 
 #### Filtering by category
 
@@ -174,21 +179,18 @@ SHOW CREATE DATABASE INCLUDE (TABLES, MATERIALIZED_VIEWS);
 SHOW CREATE DATABASE EXCLUDE (MATERIALIZED_VIEWS);
 ```
 
-With no clause the statement defaults to `INCLUDE ALL`. In QuestDB open source
-there is no access control layer, so `ALL` and `SCHEMA` produce the same output.
-In [QuestDB Enterprise](/enterprise/) the default `ALL` also dumps the access
-control block, so use `INCLUDE (SCHEMA)` when you want the structure only.
-
 Filtering is applied per category, like `pg_dump -t`. Excluding a category that
 others depend on can leave dangling references, so a dump that omits a base
-table does not replay cleanly for the views built on it.
+table does not replay cleanly for the views built on it. Similarly,
+`INCLUDE (PERMISSIONS)` omits principal creation: those users, groups, and
+service accounts must already exist on the target.
 
 To select individual objects, such as the objects of a single tenant, wrap the
-statement in parentheses and filter the `ddl` column with `WHERE`. Each row
-starts with `CREATE`, so match the object name with a leading wildcard:
+statement in parentheses and filter the `ddl` column with `WHERE`. Match names
+wherever they appear in the statement:
 
-```questdb-sql title="Objects whose DDL mentions fx_" demo
-(SHOW CREATE DATABASE) WHERE ddl ILIKE '%fx_%';
+```questdb-sql title="Schema statements whose DDL mentions fx_" demo
+(SHOW CREATE DATABASE INCLUDE (SCHEMA)) WHERE ddl ILIKE '%fx_%';
 ```
 
 The filtered rows keep dependency order. A pattern also matches views that read
@@ -197,34 +199,112 @@ included before replaying it.
 
 #### Enterprise: access control
 
-In [QuestDB Enterprise](/enterprise/), `SHOW CREATE DATABASE` also dumps the
-access control layer after the schema objects, so a dump captures identities,
-memberships, and permissions alongside the tables and views:
+With access control enabled, selecting any ACL category requires both
+`LIST USERS` and `USER DETAILS`, even `INCLUDE (USERS)` or
+`INCLUDE (PERMISSIONS)` alone. Missing either permission aborts the whole dump;
+it does not return a partial schema-only result.
 
-- `CREATE USER`, `CREATE GROUP`, and `CREATE SERVICE ACCOUNT` for each entity.
-- Memberships, as `ADD USER ... TO ...` and `ASSUME SERVICE ACCOUNT ... TO ...`.
-- Grants, as `GRANT <permissions> [ON ...] TO ... [WITH GRANT OPTION]`.
+:::warning Breaking change
 
-QuestDB stores no owner for an object, so the `GRANT` statements are what
-recreate its permissions. The `CREATE TABLE`, `CREATE VIEW`, and
-`CREATE MATERIALIZED VIEW` statements in an Enterprise dump also carry an
-`OWNED BY` clause, which names the principal that ran the dump, as in
-[`SHOW CREATE TABLE`](#enterprise-variant). Replaying the dump gives that
-principal all permissions on each of these objects, with the `GRANT` option, on
-top of the dumped grants. Edit or remove the clause before replaying if that
-principal should not hold them.
+Starting with QuestDB Enterprise 4.2.0, plain `SHOW CREATE DATABASE` includes
+ACL output and requires both permissions. For callers that only need the visible
+schema, change it to `SHOW CREATE DATABASE INCLUDE (SCHEMA)` rather than granting
+administrative permissions.
 
-Credentials are never dumped: the `CREATE USER` and `CREATE SERVICE ACCOUNT`
-statements carry no password or token, so set these after replaying the dump.
+:::
 
-The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
-`PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
-or `USER DETAILS` permission, while the schema categories need no access control
-permission, so a user with only `SELECT` can still dump the structure of the
-objects it can see. To dump the whole schema, run the statement as a principal
-that sees every object, such as the built-in admin or a user holding
-`DATABASE ADMIN`. When access control is disabled the command degrades to a
-schema-only dump.
+Schema-only categories require neither ACL permission, but still follow
+[object visibility](/docs/security/rbac/#object-visibility). To dump the whole
+user schema, run as the built-in admin or a principal holding `DATABASE ADMIN`.
+These visibility rules do not filter the ACL output: an authorized ACL dump
+lists all stored principals and their direct grants, including grants naming
+objects hidden from the caller. When access control is disabled, the statement
+returns only schema output, without the ACL permission checks.
+
+The `ACL` umbrella selects all four categories:
+
+| Category | Statements included |
+| -------- | ------------------- |
+| `GROUPS` | `CREATE GROUP`, including the external alias reported by `SHOW GROUPS` |
+| `PERMISSIONS` | `ADD USER ... TO ...`, `GRANT ASSUME SERVICE ACCOUNT ... TO ...`, and database-, table-, and column-level `GRANT` statements |
+| `SERVICE_ACCOUNTS` | `CREATE SERVICE ACCOUNT`, followed by `ALTER SERVICE ACCOUNT ... DISABLE` when disabled |
+| `USERS` | `CREATE USER`, followed by `ALTER USER ... DISABLE` when disabled |
+
+Grants preserve `WITH GRANT OPTION`, including grant options held at a narrower
+scope than the permission itself. Only direct grants are emitted. Permissions
+and service account assignments inherited from a group are restored through
+group membership, not copied into direct user grants.
+
+For example, on an otherwise empty instance, run as the built-in admin:
+
+```questdb-sql title="Create a group-based entitlement to export"
+CREATE GROUP fx_readers;
+CREATE USER fx_analyst;
+ADD USER fx_analyst TO fx_readers;
+GRANT SELECT ON ALL TABLES TO fx_readers;
+
+SHOW CREATE DATABASE INCLUDE (ACL);
+```
+
+| ddl |
+| --- |
+| CREATE USER 'fx_analyst'; |
+| CREATE GROUP 'fx_readers'; |
+| ADD USER 'fx_analyst' TO 'fx_readers'; |
+| GRANT SELECT ON ALL TABLES TO 'fx_readers'; |
+
+The built-in admin and external (SSO/OIDC) users are not dumped. External users
+continue to get access through their identity provider and the dumped groups'
+external aliases.
+
+Database dumps also include active table
+[storage policies](#storage-policy-clause). No `SHOW CREATE` statement emits
+`OWNED BY`: object permissions are restored through grants, not an owner field.
+See [Enterprise variant](#enterprise-variant) for creator permissions during
+replay. For an ACL restore, replay on an empty target as its built-in admin to
+avoid adding another principal's creator grants.
+
+#### Replay limits
+
+An Enterprise dump omits the following settings. Reapply them on the target
+before opening it to users:
+
+- Passwords and tokens. Recreated users and service accounts have no
+  credentials until you set them.
+- Per-user, group, and service account
+  [memory limits](/docs/security/rbac/#memory-limits),
+  [resource groups](/docs/concepts/resource-groups/), and resource group
+  mappings. Recreated principals have no per-principal memory override and use
+  the default resource group until you configure them.
+- Older external aliases that may still be active for a group. Only the alias
+  reported by `SHOW GROUPS` is restored. Review identity-provider mappings
+  separately if more than one alias has been assigned to a group.
+
+:::caution Best-effort dump
+
+The dump is not a transactionally consistent snapshot across schema objects,
+principals, and memberships. Each principal's enabled state and direct grants
+come from the same snapshot, but concurrent changes to other entities or group
+memberships may still produce a mixed result. Avoid schema and ACL changes
+while exporting for replay, and verify the target's grants afterwards with
+[`active_grants()`](/docs/query/functions/access-control/#active_grants).
+
+:::
+
+#### Use in views
+
+In QuestDB Enterprise 4.2.0 and later, when access control is enabled:
+
+- A regular view may read an ACL dump in its query body. The dump checks the
+  reader's `LIST USERS` and `USER DETAILS`, not the view definer's permissions.
+- A regular view's `PIVOT IN` subquery cannot read an ACL dump, directly or
+  through another view. Use `INCLUDE (SCHEMA)` if only schema is needed. See
+  [administrative operations in view metadata](/docs/concepts/views/#administrative-operations-in-view-metadata).
+- Materialized and live views reject any ACL category, including the default
+  `SHOW CREATE DATABASE`, even for an administrator. A schema-only form such as
+  `INCLUDE (SCHEMA)` is allowed under the
+  [catalogue statement rules](/docs/query/sql/create-mat-view/#catalogue-functions):
+  it must be in the view's own query, and the creator must hold `SYSTEM ADMIN`.
 
 ### SHOW CREATE LIVE VIEW
 
@@ -238,9 +318,9 @@ SHOW CREATE LIVE VIEW trades_ma;
 
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
-`IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
-output also carries an `OWNED BY` clause naming the user running `SHOW CREATE`.
-See the [Enterprise variant](#enterprise-variant) of `SHOW CREATE TABLE`.
+`IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. Like other `SHOW CREATE`
+statements, it does not include `OWNED BY` or grants. See the
+[Enterprise variant](#enterprise-variant) of `SHOW CREATE TABLE`.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
@@ -319,52 +399,44 @@ CREATE TABLE sensors (
 
 When an active [storage policy](/docs/concepts/storage-policy/) is attached to a
 table (Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in
-the `SHOW CREATE TABLE` output:
+the `SHOW CREATE TABLE` and `SHOW CREATE DATABASE` output:
 
-```questdb-sql
-SHOW CREATE TABLE sensor_data;
+```questdb-sql title="Retrieve a table's storage policy in its DDL"
+SHOW CREATE TABLE fx_quotes;
 ```
 
-```text
-CREATE TABLE 'sensor_data' (
-    ts TIMESTAMP,
-    value DOUBLE
-) timestamp(ts) PARTITION BY DAY
+```questdb-sql title="Returned DDL"
+CREATE TABLE 'fx_quotes' (
+    timestamp TIMESTAMP,
+    bid DOUBLE
+) timestamp(timestamp) PARTITION BY DAY
 STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH);
 ```
 
 Stages that are not configured on the policy are omitted from the clause. Only
 an active policy renders: after `ALTER TABLE ... DISABLE STORAGE POLICY`, the
-policy is not shown in `SHOW CREATE TABLE`. See
+policy is not shown in either dump. See
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 #### Enterprise variant
 
-In [QuestDB Enterprise](/enterprise/), `SHOW CREATE TABLE`, `SHOW CREATE VIEW`,
-`SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW` add an `OWNED BY`
-clause naming the user running `SHOW CREATE`. QuestDB stores no owner for an
-object, so the clause does not tell you who created it or who holds permissions
-on it. To see the permissions on an object, use
-[`active_grants()`](/docs/query/functions/access-control/#active_grants).
+In [QuestDB Enterprise](/enterprise/) 4.2.0 and later, `SHOW CREATE TABLE`,
+`SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW`
+return structure, not permissions. Unlike earlier releases, they do not append
+an `OWNED BY` clause naming the caller. QuestDB stores no owner for an object;
+`OWNED BY` at creation only decides who receives the creator's permissions.
 
-For example, run as `admin`:
+On replay without `OWNED BY`, the principal executing the `CREATE` receives the
+normal creator permissions, with the `GRANT` option. To give those permissions
+to another principal, add an explicit
+[`OWNED BY`](/docs/query/sql/create-table/#owned-by) clause. External users must
+still supply that clause when creating objects.
 
-```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
-	price DOUBLE,
-	amount DOUBLE,
-	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us
-OWNED BY 'admin';
-```
-
-When the statement is replayed, the clause gives that user all permissions on
-the new table, with the `GRANT` option. To give them to a different user, group,
-or service account, change the clause before replaying it. See
-[OWNED BY](/docs/query/sql/create-table/#owned-by).
+To inspect existing permissions, use
+[`active_grants()`](/docs/query/functions/access-control/#active_grants). To
+export them as replayable SQL, use
+[`SHOW CREATE DATABASE INCLUDE (ACL)`](#enterprise-access-control). A schema-only
+dump or a per-object `SHOW CREATE` does not preserve grants.
 
 ### SHOW CREATE VIEW
 

@@ -192,6 +192,17 @@ CREATE VIEW with_timestamp AS (
 )
 ```
 
+## Query constraints
+
+A `PIVOT IN` subquery in a view cannot use administrative functions or
+administrative `SHOW` statements, including Enterprise `SHOW CREATE DATABASE`
+with any ACL category. Use `INCLUDE (SCHEMA)` when only schema metadata is
+needed. The restriction extends to nested queries and other views read by the
+`PIVOT IN` subquery, not to ordinary subqueries elsewhere in the view's query
+body. It is checked when creating, replacing, altering, or recompiling a view. See
+[administrative operations in view metadata](/docs/concepts/views/#administrative-operations-in-view-metadata)
+for existing-view migration guidance.
+
 ## Errors
 
 | Error | Cause |
@@ -200,6 +211,8 @@ CREATE VIEW with_timestamp AS (
 | `table does not exist` | Referenced table doesn't exist |
 | `Invalid column` | Column in query doesn't exist |
 | `circular dependency detected` | View would create circular reference |
+| `administrative function cannot be used in view PIVOT IN subquery: <function>` | The `PIVOT IN` subquery uses an administrative function, directly or through another query or view |
+| `administrative statement cannot be used in view PIVOT IN subquery: SHOW CREATE DATABASE` | The `PIVOT IN` subquery includes an ACL dump (Enterprise); use `INCLUDE (SCHEMA)` if only schema is needed |
 | `variable is not overridable` | Attempted to override a non-`OVERRIDABLE` DECLARE variable |
 | `Access denied [AUDIT VIEW]` | `WITH AUDIT`, or a replacement of an audited view, without the `AUDIT VIEW` permission (Enterprise) |
 | `cannot audit an existing view, drop and re-create it WITH AUDIT` | `CREATE OR REPLACE VIEW ... WITH AUDIT` over a view that is not audited (Enterprise) |

@@ -418,9 +418,10 @@ they can read through `views()` and `SHOW CREATE VIEW`, still names the table.
 The view's definer permissions are preserved even if the creator's account is
 later disabled or deleted.
 
-Access control functions such as `active_grants()` and `active_permissions()`
-are an exception: in a view, they check the permissions of the user who queries
-the view, not those of its definer. See
+Access control functions such as `active_grants()` and `active_permissions()`,
+and [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views) with any ACL
+category, are exceptions: in a view's query body, they check the permissions of
+the user who queries the view, not those of its definer. See
 [access control functions](/docs/query/functions/access-control/#limitations).
 
 ### Metadata functions in views (Enterprise) {#metadata-functions-in-views}
@@ -463,6 +464,43 @@ A view created before QuestDB Enterprise 4.1.0 has no record of the tables its
 table-name functions name, so it resolves them with the reader's own
 permissions until you run [`ALTER VIEW`](/docs/query/sql/alter-view/) or
 `CREATE OR REPLACE VIEW` on it.
+
+### Administrative operations in view metadata
+
+A regular view can use administrative functions and administrative `SHOW`
+statements in its query body, including ordinary subqueries. These operations
+check the permissions of the user who queries the view, not those of its definer.
+
+A [`PIVOT IN` subquery](/docs/query/sql/pivot/#dynamic-in-list-from-subquery) is a
+special case: its result values determine the output column names. QuestDB must
+execute it at compile time to derive the view's columns, not just when a user
+queries the view. This also happens during background recompilation and startup,
+when there is no calling session. The subquery therefore cannot use administrative
+operations that need a calling session or have side effects.
+
+This restriction extends to nested subqueries and other views read by the
+`PIVOT IN` subquery. It does not apply to ordinary subqueries elsewhere in the
+view's query body.
+
+With Enterprise access control enabled, `SHOW CREATE DATABASE` with any ACL
+category counts as an administrative statement. Use
+`SHOW CREATE DATABASE INCLUDE (SCHEMA)` if the subquery only needs schema
+metadata. Catalogue queries that do not require a calling session remain
+allowed.
+
+:::warning Existing views
+
+Starting with QuestDB Enterprise 4.2.0, creating, altering, or replacing a view
+with a prohibited operation fails. Previously accepted views become invalid at
+their next compilation after upgrading, including at startup. Inspect
+`view_status` and `invalidation_reason` in
+[`views()`](/docs/query/functions/meta/#views). Replace ACL dumps with
+`INCLUDE (SCHEMA)` where appropriate, or remove the administrative operation
+from the subquery, then update the definition with
+[`ALTER VIEW`](/docs/query/sql/alter-view/) and run
+[`COMPILE VIEW`](/docs/query/sql/compile-view/).
+
+:::
 
 ### No column-level permissions on views
 

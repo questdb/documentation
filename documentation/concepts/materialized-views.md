@@ -836,6 +836,10 @@ Materialized view queries:
   refresh: `active_grants()`, `active_permissions()`, `backup_instance_name()`,
   `backup_status()`, `backups()`, `permissions()`, `reload_tick_calendars()`,
   and `reload_tls()`
+- Must not use `SHOW CREATE DATABASE` with any ACL category when Enterprise
+  access control is enabled. The default includes ACL output; use
+  `INCLUDE (SCHEMA)` under the
+  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions)
 - Must use join conditions compatible with incremental refresh
 - When the base table uses [deduplication](/docs/concepts/deduplication/), non-aggregate
   columns must be a subset of the `DEDUP` keys
