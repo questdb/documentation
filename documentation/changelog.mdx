@@ -12,16 +12,41 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
+- [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
+- [adbcBridge](/docs/integrations/other/adbcbridge/) - New page for the third-party ADBC drivers that read QuestDB into Apache Arrow from C#, Java, Go, TypeScript, and C: a native QWP driver for QuestDB 10.0 and newer, and an ODBC bridge over PGWire for older servers
 - [UPSERT and SKIP modes](/docs/concepts/deduplication/#upsert-and-skip-modes) - The new `SKIP` deduplication mode keeps the first row written for a key and discards later duplicates, the counterpart of `UPSERT`, which keeps the latest. Covers which row wins within a commit and across connections, choosing a mode, switching modes with [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/), reading the mode from [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause), and how versions without `SKIP` handle such tables
 
 ### Reference
 
+- Added [`qwp.min.idle.ms.before.writer.release`](/docs/configuration/qwp/#qwpminidlemsbeforewriterrelease), which sets how long an idle QWP WebSocket ingestion connection holds its table writers before QuestDB releases them
+- [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the PKCE setting name. The page listed `acl.oidc.pkce.enabled`, which the server rejects as unrecognized, leaving PKCE at its default of `true`
 - [CREATE TABLE](/docs/query/sql/create-table/#deduplication) - `DEDUP { UPSERT | SKIP } KEYS` in the syntax of both creation forms; `CREATE TABLE LIKE` copies the keys and the mode
 - [Standard SQL equivalents](/docs/concepts/deep-dive/sql-extensions/#standard-sql-features-not-supported) - `INSERT ... ON CONFLICT DO NOTHING` maps to `DEDUP SKIP KEYS`
-- Corrected the PKCE setting name in the [OIDC configuration](/docs/configuration/oidc/#acloidcpkcerequired) reference to `acl.oidc.pkce.required`
 
 ### Updated
 
+- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
+  Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
+  materialized view's query that reads its base table (this includes a subquery
+  on the base table) can no longer use `LIMIT`, or a window function nested
+  inside an expression, such as `row_number() OVER (ORDER BY timestamp) + 1`. A
+  window function that makes up a whole column was already rejected. A `LIMIT`
+  in a subquery over a *different* table is still allowed.
+
+  Views created on an earlier version keep refreshing. The restriction only matters
+  when you **recreate** such a view — most often when you run
+  `SHOW CREATE MATERIALIZED VIEW` and replay its output during an upgrade,
+  migration, or restore. That statement is now rejected until you rewrite the
+  query without the `LIMIT` or the window function.
+
+  If the `LIMIT` was only there to return fewer rows to your application, remove
+  it from the view definition and instead add `ORDER BY ... LIMIT ...` to the
+  query you run against the view. This is not an exact swap: once the `LIMIT` is
+  gone from the definition, the view stores all matching rows rather than a
+  capped set. Likewise, move a window function into the query you run against
+  the view.
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) and [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - The table keeps its TTL, `FORMAT PARQUET`, per-column Parquet encoding, and deduplication keys and mode; a table converted to WAL keeps dropping partitions past its TTL
 - [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) - The example output matches what the server returns, without symbol capacities or a `WITH` clause
 
