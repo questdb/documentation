@@ -64,6 +64,21 @@ Resume the table with
 WAL apply catch up, and restart: the next start tries the conversion again. If
 a flush fails during the conversion, QuestDB stops, in every commit mode.
 
+Converting to non-WAL no longer drops the transactions waiting in the WAL: the
+next start applies them first. Convert a table once it has caught up, when
+`writerTxn` equals `sequencerTxn` in
+[`wal_tables()`](/docs/query/functions/meta/#wal_tables).
+
+To drop the transactions not yet applied on purpose, use
+[`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/) instead of
+converting the table to non-WAL and back. No restart required. Enable
+`cairo.wal.apply.suspended.write.denied`, then suspend and rebase the table:
+
+```questdb-sql
+ALTER TABLE trades SUSPEND WAL;
+ALTER TABLE trades REBASE WAL;
+```
+
 A non-WAL table gets no power-loss protection from
 [adaptive commit mode](/docs/concepts/durability/): it behaves as in `nosync`.
 
