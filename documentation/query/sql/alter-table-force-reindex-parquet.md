@@ -143,3 +143,14 @@ holds affected partitions.
 The statement also fails, rather than waiting, when another operation holds the
 table writer, for example while WAL transactions are being applied. Retry it
 once the writer is free.
+
+## See also
+
+- [Parquet](/docs/concepts/parquet/)
+- [Indexes](/docs/concepts/deep-dive/indexes/)
+- [Posting index](/docs/concepts/deep-dive/posting-index/)
+- [REINDEX](/docs/query/sql/reindex/), for native partitions
+- [ALTER TABLE ALTER COLUMN ADD INDEX](/docs/query/sql/alter-table-alter-column-add-index/)
+- [ALTER TABLE ALTER COLUMN DROP INDEX](/docs/query/sql/alter-table-alter-column-drop-index/)
+- [`table_partitions()`](/docs/query/functions/meta/#table_partitions)
+- [VACUUM TABLE](/docs/query/sql/vacuum-table/)
