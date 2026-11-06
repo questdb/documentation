@@ -532,13 +532,13 @@ get it back without someone re-granting it.
 
 ## Audit access control changes
 
-The [ACL audit log](/docs/security/acl-audit-log/) is an upcoming Enterprise
-feature, unavailable in Enterprise 4.1.0 or earlier. It records who changes
-users, groups, service accounts, credentials, and permissions, including both the
-session principal and any assumed service account. Query `sys.acl_audit_log`
-with `LIST USERS`, `USER DETAILS`, and `SELECT` on the table; `SELECT ON ALL
-TABLES` alone does not grant access. Only the built-in admin can change its
-retention policy or remove rows.
+The [ACL audit log](/docs/security/acl-audit-log/) is available in QuestDB
+Enterprise 4.2.0 and later. It records who changes users, groups, service accounts,
+credentials, and permissions, including both the session principal and any
+assumed service account. Query `sys.acl_audit_log` with `LIST USERS`,
+`USER DETAILS`, and `SELECT` on the table; `SELECT ON ALL TABLES` alone does
+not grant access. Only the built-in admin can change its retention policy or
+remove rows.
 
 ## Object visibility {#object-visibility}
 
@@ -594,11 +594,12 @@ and `wait_wal_table()`, and WAL recovery statements such as
 [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/) reach them
 for principals that hold the permission the statement requires.
 
-The upcoming [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
-`sys.acl_audit_log`, is a separate exception: it requires both `LIST USERS`
-and `USER DETAILS` in addition to ordinary table permissions. Without both,
-it looks missing even to a principal with a grant `ON ALL TABLES`. Unlike
-the protected ACL tables, its rows can be read by an authorized auditor.
+The [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
+`sys.acl_audit_log`, is available in QuestDB Enterprise 4.2.0 and later. It is a
+separate exception: it requires both `LIST USERS` and `USER DETAILS` in addition
+to ordinary table permissions. Without both, it looks missing even to a
+principal with a grant `ON ALL TABLES`. Unlike the protected ACL tables, its
+rows can be read by an authorized auditor.
 
 Permissions count from every source the principal is authorized with: its own
 grants and those of its groups or, after

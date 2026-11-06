@@ -585,17 +585,10 @@ the existing recovery copy.
 
 #### Restoring access control tables
 
-:::note Upcoming Enterprise feature
-
-The ACL audit log is not available in QuestDB Enterprise 4.1.0 or earlier. This
-section describes restore behavior on the upcoming release that introduces it.
-
-:::
-
-A backup includes the [ACL audit log](/docs/security/acl-audit-log/),
-`sys.acl_audit_log`, if it exists on the source. Its rows replicate, unlike
-those of `sys.view_audit`, so a primary backup includes the replicated ACL
-change history.
+The [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`, is
+available in QuestDB Enterprise 4.2.0 and later. A backup includes it if it
+exists on the source. Its rows replicate, unlike those of `sys.view_audit`, so
+a primary backup includes the replicated ACL change history.
 
 The following internal ACL and credential tables use a `change_id TIMESTAMP`
 column to link their rows to audit entries:
@@ -611,12 +604,12 @@ column to link their rows to audit entries:
 
 Only these system tables need this column; do not add it to user-created tables.
 
-When a newer server restores a backup taken before the ACL audit log was
-introduced, startup leaves these restored system tables unchanged: it neither
+When QuestDB Enterprise 4.2.0 or later restores a backup taken on a release
+before 4.2.0, startup leaves these restored system tables unchanged: it neither
 adds their `change_id` columns nor creates the missing audit log.
 This allows [forward restore updates](#retrying-or-updating-a-restore) while the
 source still runs the older version. The log and columns arrive with the first
-restored backup taken after the source is upgraded.
+restored backup taken after the source is upgraded to 4.2.0 or later.
 
 Do not run ACL-changing statements on a node that must keep accepting restore
 updates. Such a statement changes the restored tables, and the next update

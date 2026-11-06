@@ -106,9 +106,9 @@ The audit trail of [audited views](/docs/security/audited-views/),
 but whose rows do not: each node records the reads it serves. See
 [Replication, backups, and read-only instances](/docs/security/audited-views/#replication-backups-and-read-only-instances).
 
-The upcoming [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`,
-is not available in Enterprise 4.1.0 or earlier. It differs from the view audit
-trail: both its definition and rows replicate.
+The [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`, is
+available in QuestDB Enterprise 4.2.0 and later. Unlike the view audit trail,
+both its definition and rows replicate.
 A replica promoted before receiving the table creates it using its own
 [`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy)
 setting, so configure that property on every node before upgrading.

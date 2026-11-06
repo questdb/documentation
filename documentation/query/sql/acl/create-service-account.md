@@ -35,13 +35,13 @@ each of the service account's queries may allocate, use
 [`ALTER SERVICE ACCOUNT ... SET MEMORY LIMIT`](/docs/query/sql/acl/alter-service-account-set-memory-limit/)
 after creating it. Service accounts do not inherit group limits.
 
-:::note Upcoming behavior change
+:::note Behavior change in QuestDB Enterprise 4.2.0
 
-The `IF NOT EXISTS` and owner-validation behavior described below is unreleased.
-In QuestDB Enterprise 4.1.0 and earlier, `IF NOT EXISTS` could assign an existing
-account to the statement's owner rather than leave it unchanged. See the
+The `IF NOT EXISTS` and owner-validation behavior described below applies to
+QuestDB Enterprise 4.2.0 and later. Before 4.2.0, `IF NOT EXISTS` could assign an
+existing account to the statement's owner rather than leave it unchanged. See the
 [service account upgrade guidance](/docs/operations/upgrade/#service-account-creation)
-before relying on the new behavior in provisioning scripts.
+before relying on this behavior in provisioning scripts.
 
 :::
 
@@ -78,8 +78,8 @@ CREATE SERVICE ACCOUNT risk_report;
 CREATE SERVICE ACCOUNT IF NOT EXISTS risk_report;
 ```
 
-With the upcoming behavior, the second statement leaves the existing account
-unchanged.
+In QuestDB Enterprise 4.2.0 and later, the second statement leaves the existing
+account unchanged.
 
 ```questdb-sql title="Create an account owned by a group"
 CREATE GROUP analysts;

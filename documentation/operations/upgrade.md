@@ -101,19 +101,14 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
-### ACL audit log
+### Upgrading to 4.2.0
 
-:::note Upcoming Enterprise feature
+#### ACL audit log
 
-This section describes an unreleased feature and its migrations. The ACL audit
-log is not available in QuestDB Enterprise 4.1.0 or earlier. These instructions
-apply when upgrading to a release that includes it.
-
-:::
-
-When upgrading from a version without the
-[ACL audit log](/docs/security/acl-audit-log/), the server creates
-`sys.acl_audit_log` and adds `change_id` columns to ACL and credential tables.
+QuestDB Enterprise 4.2.0 introduces the
+[ACL audit log](/docs/security/acl-audit-log/). When upgrading from an earlier
+release, the server creates `sys.acl_audit_log` and adds `change_id` columns to
+ACL and credential tables.
 Existing rows keep a `NULL` `change_id`; past changes are not reconstructed.
 Review the following before upgrading:
 
@@ -148,12 +143,13 @@ not to a valid audit log.
 
 :::warning Rollback limitations
 
-An older release does not enforce the audit log's special read or write
-protections. It treats the log as an ordinary table, so existing broad table
-grants may expose or allow changes to audit evidence. A later upgrade reuses
-a structurally compatible log, including any rows written during the rollback.
+Releases before QuestDB Enterprise 4.2.0 do not enforce the audit log's special
+read or write protections. They treat the log as an ordinary table, so existing
+broad table grants may expose or allow changes to audit evidence. A later
+upgrade reuses a structurally compatible log, including any rows written during
+the rollback.
 
-An older release also cannot compact `sys.acl_permissions` after it gains
+These releases also cannot compact `sys.acl_permissions` after it gains
 `change_id`. Compaction reports
 `unexpected acl permissions column count, refusing to compact` and is
 disabled until the next restart. Plan rollback around your pre-upgrade backup
@@ -161,7 +157,7 @@ rather than assuming the migrated database behaves as it did before.
 
 :::
 
-#### Embedded Enterprise Java integrations
+##### Embedded Enterprise Java integrations
 
 Applications that directly implement Enterprise Java APIs must update and
 rebuild:
@@ -175,22 +171,14 @@ rebuild:
   and must not change when the session assumes a service account. Forwarding
   contexts must forward this method too.
 
-### Service account creation
+#### Service account creation
 
-:::note Upcoming Enterprise behavior change
-
-The behavior described here is unreleased. It does not apply to QuestDB
-Enterprise 4.1.0 or earlier.
-
-:::
-
-In the upcoming release,
+In QuestDB Enterprise 4.2.0 and later,
 [`CREATE SERVICE ACCOUNT IF NOT EXISTS`](/docs/query/sql/acl/create-service-account/)
-leaves an existing account unchanged. In Enterprise 4.1.0 and earlier, the
-statement could assign the existing account to the statement's owner with grant
-option. With the new behavior, ownership is assigned only when the statement
-creates the account. An invalid owner is rejected before any changes, even when
-the account already exists.
+leaves an existing account unchanged. Before 4.2.0, the statement could assign
+an existing account to the statement's owner with grant option. Ownership is
+now assigned only when the statement creates the account. An invalid owner is
+rejected before any changes, even when the account already exists.
 
 Update provisioning scripts that relied on `IF NOT EXISTS ... OWNED BY` to
 assign an existing account. Use
