@@ -101,6 +101,91 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
+### Upgrading to 4.2.0
+
+#### ACL audit log
+
+QuestDB Enterprise 4.2.0 introduces the
+[ACL audit log](/docs/security/acl-audit-log/). When upgrading from an earlier
+release, the server creates `sys.acl_audit_log` and adds `change_id` columns to
+ACL and credential tables.
+Existing rows keep a `NULL` `change_id`; past changes are not reconstructed.
+Review the following before upgrading:
+
+- **Configure retention before the first start.** Set
+  [`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy)
+  on every node. Its default, `TO PARQUET 1d`, never deletes rows. Once the
+  log exists, only the built-in admin can change its policy, so set retention
+  before disabling that account. Verify it with
+  `SHOW CREATE TABLE 'sys.acl_audit_log'` after startup and promotion.
+- **Grant auditors the required permissions.** Reading the log takes
+  `LIST USERS`, `USER DETAILS`, and `SELECT` on the table. A principal with
+  only `SELECT ON ALL TABLES` cannot read it. Other table grants do not let a
+  principal modify the log.
+- **Check for a name collision.** An existing `sys.acl_audit_log` is reused,
+  with its rows, only if it is a WAL table with the expected columns and types
+  and `change_id` as its designated timestamp. Any other object with that
+  name fails startup before the ACL migrations. Rename or drop the conflicting
+  object using the previous release, then retry the upgrade. Do not disable
+  ACL to get past this check: doing so can mark migrations as complete without
+  applying them.
+- **Check deferred migrations.** Tables with suspended WAL apply do not get
+  `change_id` until a later startup after they are resumed. Databases restored
+  from older backups have separate compatibility rules; see
+  [Restoring access control tables](/docs/operations/backup/#restoring-access-control-tables).
+
+A replica promoted before receiving the log creates it with its own retention
+setting. If an older primary replicated a conflicting object with the log's
+name, promotion itself does not fail, but ACL changes do. The built-in admin
+must drop or rename that conflicting object; the next ACL statement or
+startup creates the log. This exception applies to the conflicting object,
+not to a valid audit log.
+
+:::warning Rollback limitations
+
+Releases before QuestDB Enterprise 4.2.0 do not enforce the audit log's special
+read or write protections. They treat the log as an ordinary table, so existing
+broad table grants may expose or allow changes to audit evidence. A later
+upgrade reuses a structurally compatible log, including any rows written during
+the rollback.
+
+These releases also cannot compact `sys.acl_permissions` after it gains
+`change_id`. Compaction reports
+`unexpected acl permissions column count, refusing to compact` and is
+disabled until the next restart. Plan rollback around your pre-upgrade backup
+rather than assuming the migrated database behaves as it did before.
+
+:::
+
+##### Embedded Enterprise Java integrations
+
+Applications that directly implement Enterprise Java APIs must update and
+rebuild:
+
+- ACL write methods on `AccessListWriter`, and credential write methods on
+  `PasswordStore`, `JwkStore`, and `PersistentRestTokenStore`, now take an
+  `AclChange` as their first argument. Production callers use these methods,
+  not the older overloads retained for tests.
+- `EntSecurityContext` implementations must implement
+  `isSessionPrincipalExternal()`. It describes the authenticated identity
+  and must not change when the session assumes a service account. Forwarding
+  contexts must forward this method too.
+
+#### Service account creation
+
+In QuestDB Enterprise 4.2.0 and later,
+[`CREATE SERVICE ACCOUNT IF NOT EXISTS`](/docs/query/sql/acl/create-service-account/)
+leaves an existing account unchanged. Before 4.2.0, the statement could assign
+an existing account to the statement's owner with grant option. Ownership is
+now assigned only when the statement creates the account. An invalid owner is
+rejected before any changes, even when the account already exists.
+
+Update provisioning scripts that relied on `IF NOT EXISTS ... OWNED BY` to
+assign an existing account. Use
+[`GRANT ASSUME SERVICE ACCOUNT ... WITH GRANT OPTION`](/docs/query/sql/acl/grant-assume-service-account/)
+explicitly, from a principal authorized to grant it. Review existing
+assignments with `SHOW SERVICE ACCOUNTS` for each user or group.
+
 ### Upgrading to 4.1.0
 
 QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no

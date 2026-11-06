@@ -528,12 +528,14 @@ SELECT start_ts FROM backups() WHERE status = 'backup complete';
 If no backup exists at or before the specified timestamp, QuestDB fails to start
 with the error: `backup restore error: No backup timestamp found that is <=`.
 
-:::warning
+:::warning Restore target
 
-Restore requires an empty database directory. If the target database already
-has data (indicated by the presence of `db/.data_id`), restore fails with:
-"The local database is not empty." Use a fresh installation directory for
-restore operations.
+Use an empty database directory for an initial restore. An existing directory
+can be reused for a retry or forward update from the same backup lineage, as
+described in [Retrying or updating a restore](#retrying-or-updating-a-restore).
+The presence of `db/.data_id` alone does not prevent these operations: the local
+data ID must match the backup's data ID. To restore a different lineage, use a
+fresh installation directory.
 
 :::
 
@@ -541,6 +543,102 @@ The QuestDB version performing the restore must have the same major version as
 the version that created the backup (e.g., 8.1.0 and 8.1.1 are compatible).
 
 Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
+
+#### Retrying or updating a restore
+
+QuestDB Enterprise 4.1.0 and later can reuse a restored database directory for
+an interrupted-restore retry or a forward update to a newer backup from the
+same lineage. This does not merge independent databases or roll a database back.
+
+Before reusing the directory, check these restrictions:
+
+- If a local data ID exists, it must match the backup's data ID. Keep the
+  original `db/.data_id` and restore commit markers; do not remove them to
+  bypass this check.
+- The selected backup must not be behind the target's committed table state.
+  A backward restore is refused. Keep the target free of ingestion, ACL changes,
+  and other writes to restored tables while it must accept further updates;
+  changes absent from the selected backup can make the update fail.
+- Forward updates cannot remove a whole table. If a user table exists locally
+  but is absent from the selected backup, for example because it was dropped on
+  the source, the update is refused. Target-only tables also prevent an update.
+  The server preserves its node-local metrics and its own view audit trail as
+  exceptions.
+
+To retry or update:
+
+1. Stop the target QuestDB process. For a failed restore, first resolve the
+   reported error and follow [Restore failure recovery](#restore-failure-recovery)
+   if failure artifacts are present.
+2. Keep the database directory in place. Leave or recreate `_backup_restore`
+   in the install root with the same `backup.object.store` and
+   `backup.instance.name` as the original restore. For a retry, set
+   `backup.restore.timestamp` to the same snapshot. For a forward update, set
+   it to a newer backup timestamp, or omit it to select the latest backup.
+3. Start QuestDB. A successful restore removes `_backup_restore`. The
+   [replication catch-up warning](#restoring-an-older-backup) still applies:
+   a non-empty replication store can advance the node beyond that backup.
+
+If the target has diverged, or you need an older snapshot or an update that
+removes a table, restore into a fresh installation directory instead of deleting
+the existing recovery copy.
+
+#### Restoring access control tables
+
+The [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`, is
+available in QuestDB Enterprise 4.2.0 and later. A backup includes it if it
+exists on the source. Its rows replicate, unlike those of `sys.view_audit`, so
+a primary backup includes the replicated ACL change history.
+
+The following internal ACL and credential tables use a `change_id TIMESTAMP`
+column to link their rows to audit entries:
+
+- `sys.acl_entities`
+- `sys.acl_external_groups`
+- `sys.acl_jwk_tokens`
+- `sys.acl_links`
+- `sys.acl_passwords`
+- `sys.acl_permissions`
+- `sys.acl_permissions_history`
+- `sys.acl_rest_tokens`
+
+Only these system tables need this column; do not add it to user-created tables.
+
+When QuestDB Enterprise 4.2.0 or later restores a backup taken on a release
+before 4.2.0, startup leaves these restored system tables unchanged: it neither
+adds their `change_id` columns nor creates the missing audit log.
+This allows [forward restore updates](#retrying-or-updating-a-restore) while the
+source still runs the older version. The log and columns arrive with the first
+restored backup taken after the source is upgraded to 4.2.0 or later.
+
+Do not run ACL-changing statements on a node that must keep accepting restore
+updates. Such a statement changes the restored tables, and the next update
+refuses those local changes. The first ACL change also creates the audit log
+if it is missing, but without its configured storage policy, to avoid changing
+the restored storage policy tables.
+
+For a standalone recovery that will receive no further restore updates, such
+as recovery into a new cluster:
+
+1. As the built-in admin, run the `ALTER TABLE` statements in the startup log
+   to add `change_id TIMESTAMP` to the system tables listed above that lack
+   it. The log identifies each affected table and the exact statement to run.
+   For example, if it identifies `sys.acl_permissions`:
+
+   ```questdb-sql
+   ALTER TABLE 'sys.acl_permissions' ADD COLUMN change_id TIMESTAMP;
+   ```
+
+   Restarting alone does not add these columns, because restore markers stay
+   on the tables.
+2. Once the audit log exists, check its policy with
+   `SHOW CREATE TABLE 'sys.acl_audit_log'`. If needed, apply the desired
+   [retention policy](/docs/security/acl-audit-log/#retention) as the built-in
+   admin. Changing `acl.audit.storage.policy` does not update an existing
+   table.
+
+Existing rows retain a `NULL` `change_id`; adding the column does not
+reconstruct historical audit entries.
 
 #### Restore failure recovery
 
@@ -616,8 +714,11 @@ If you encounter errors during backup or restore:
 - **"Failed restore directory found"**: A previous restore attempt failed.
   Remove the `.restore_failed/` directory and `_restore_failed` file, then
   restart. See [Restore failure recovery](#restore-failure-recovery).
-- **"The local database is not empty"**: Restore requires an empty database
-  directory. Use a fresh installation or remove the existing `db/` directory.
+- **"The local database belongs to a different lineage"**: The target's data ID
+  differs from the backup's. Restore into a fresh installation directory; do not
+  remove `db/.data_id` from an existing database to bypass the check. For a retry
+  or forward update, verify that the backup source and lineage are unchanged;
+  see [Retrying or updating a restore](#retrying-or-updating-a-restore).
 
 ## QuestDB OSS: manual backups with checkpoints
 

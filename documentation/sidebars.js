@@ -812,6 +812,11 @@ module.exports = {
           label: "OpenID Connect (OIDC)",
         },
         {
+          id: "security/acl-audit-log",
+          type: "doc",
+          label: "ACL audit log",
+        },
+        {
           id: "security/audited-views",
           type: "doc",
           label: "Audited views",

@@ -350,12 +350,19 @@ sets, `TO PARQUET 1d` by default, so older partitions of the trail move to
 Parquet. That default never deletes a row. The setting applies only when the
 server creates the table. After that, change the policy with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/),
-for example to keep a fixed window of the trail:
+for example to keep a minimum 90-day timestamp-based window:
 
-```questdb-sql title="Keep 90 days of trail on every node"
+```questdb-sql title="Set a 90-day minimum timestamp-based retention window"
 ALTER TABLE 'sys.view_audit'
-    SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
+    SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 91d);
 ```
+
+The trail is partitioned by day. `DROP LOCAL 91d` includes a one-day allowance
+because storage policies measure age from
+[each partition's start](/docs/concepts/storage-policy/#ttl-evaluation), not each
+row's timestamp. The window is based on audit timestamps, not elapsed time since
+a row was recorded. With the default reference time, a quiet node can retain
+partitions longer while its latest audit timestamp stops advancing.
 
 - `SET STORAGE POLICY` replaces the whole policy, so restate every stage you
   want to keep.

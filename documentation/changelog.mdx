@@ -12,6 +12,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [ACL audit log](/docs/security/acl-audit-log/) - Documented the access control audit log introduced in QuestDB Enterprise 4.2.0, including principal attribution, read permissions, redaction, delivery guarantees, WAL availability troubleshooting, change-ID recovery limits, replication, and retention
 - [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
 - [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 - [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
@@ -21,6 +22,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 - Added [`qwp.min.idle.ms.before.writer.release`](/docs/configuration/qwp/#qwpminidlemsbeforewriterrelease), which sets how long an idle QWP WebSocket ingestion connection holds its table writers before QuestDB releases them
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the PKCE setting name. The page listed `acl.oidc.pkce.enabled`, which the server rejects as unrecognized, leaving PKCE at its default of `true`
+- [IAM configuration](/docs/configuration/iam/#aclauditstoragepolicy) - Documented `acl.audit.storage.policy`, introduced in QuestDB Enterprise 4.2.0, including its creation-only behavior, partition-start-based conversion and deletion eligibility, supported stages, and built-in-admin requirements for changing an existing log's policy
 
 ### Updated
 
@@ -44,6 +46,11 @@ This page tracks significant updates to the QuestDB documentation.
   gone from the definition, the view stores all matching rows rather than a
   capped set. Likewise, move a window function into the query you run against
   the view.
+
+- [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/) - Documented the QuestDB Enterprise 4.2.0 change that leaves an existing account unchanged under `IF NOT EXISTS`, with explicit assignment through `GRANT ASSUME SERVICE ACCOUNT` and [upgrade guidance](/docs/operations/upgrade/#service-account-creation)
+- [Backup and restore](/docs/operations/backup/#retrying-or-updating-a-restore) - Distinguished fresh restores from same-lineage retries and forward updates, with their procedures and restrictions, and documented [access control recovery](/docs/operations/backup/#restoring-access-control-tables) from backups taken before the ACL audit log was introduced in QuestDB Enterprise 4.2.0
+- [Governance and auditing](/docs/security/governance/#audit-access-control-changes) - Added an ACL audit query covering ordinary grants and revokes as well as service-account assumption assignments and revocations
+- [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected partition-start eligibility across audit retention, TTL migration, Parquet conversion, and Enterprise quick-start guidance, with partition allowances for minimum timestamp-based retention and clearer governance example thresholds
 
 ## October 2026
 

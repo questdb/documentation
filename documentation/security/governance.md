@@ -2,9 +2,8 @@
 title: Data governance and auditing
 sidebar_label: Governance and auditing
 description:
-  How QuestDB controls who can reach your data, records who read it, traces
-  the lineage of derived data, and retains and recovers it, with links to
-  each feature.
+  How QuestDB controls access, audits access control changes and data reads,
+  traces the lineage of derived data, and retains and recovers it.
 ---
 
 Data governance is the set of controls that answer, for any piece of data, who
@@ -27,6 +26,7 @@ available in all editions.
 | What may they even see? | [Object visibility](/docs/security/rbac/#object-visibility) | QuestDB Enterprise 4.1.0+ |
 | How much may they consume? | [Resource groups](/docs/concepts/resource-groups/) and [per-principal memory limits](/docs/security/rbac/#memory-limits) | QuestDB Enterprise 4.1.0+ |
 | Who can do what, right now? | [Access control functions](/docs/query/functions/access-control/), [`SHOW CREATE DATABASE`](/docs/query/sql/show/#enterprise-access-control) | QuestDB Enterprise |
+| Who changed access? | [ACL audit log](/docs/security/acl-audit-log/) | QuestDB Enterprise 4.2.0+ |
 | Who read this data? | [Audited views](/docs/security/audited-views/) | QuestDB Enterprise |
 | What queries ran recently? | [Query tracing](/docs/concepts/deep-dive/query-tracing/), [`query_activity()`](/docs/query/functions/meta/#query_activity) | All |
 | Where does this data come from? | [`SHOW CREATE`](/docs/query/sql/show/), [`views()`](/docs/query/functions/meta/#views), [`materialized_views()`](/docs/query/functions/meta/#materialized_views) | All |
@@ -140,6 +140,38 @@ SHOW CREATE DATABASE INCLUDE (ACL);
 Storing that output on a schedule gives you a history of entitlements that you
 can diff between two reviews.
 
+## Audit access control changes
+
+The [ACL audit log](/docs/security/acl-audit-log/) is available in QuestDB
+Enterprise 4.2.0 and later. It records changes to users, groups, service accounts,
+credentials, and permissions in `sys.acl_audit_log`.
+It identifies both the authenticated principal and any assumed service
+account, with passwords and REST token values redacted from statement text.
+Unlike the view audit trail, its rows replicate.
+
+```questdb-sql title="Who granted or revoked access in the last week"
+SELECT change_id, session_principal, effective_principal, statement_text
+FROM 'sys.acl_audit_log'
+WHERE change_id IN '$now-7d..$now'
+  AND statement_kind IN (
+      'GRANT', 'REVOKE',
+      'GRANT ASSUME SERVICE ACCOUNT',
+      'REVOKE ASSUME SERVICE ACCOUNT'
+  )
+ORDER BY change_id DESC;
+```
+
+The query includes both ordinary permission grants and revokes and assignments
+that let users or groups assume a service account. Other ways to change access,
+such as group membership changes, have different statement kinds.
+
+Reading it requires `LIST USERS`, `USER DETAILS`, and `SELECT` on the log.
+Ordinary ACL changes commit an audit row before writing the change; an audit
+write failure blocks the change. This is not a complete DDL or authentication
+log, and post-DDL grant cleanup has weaker guarantees. See
+[Recorded changes](/docs/security/acl-audit-log/#recorded-changes) and
+[Delivery and failure behavior](/docs/security/acl-audit-log/#delivery-and-failure-behavior).
+
 ## Audit data access
 
 ### Audited views
@@ -207,7 +239,7 @@ its lifecycle on a schedule: conversion to Parquet, upload to
 the local copy, and final deletion. This makes retention a property of the
 table, declared once, instead of a script that has to keep running:
 
-```questdb-sql title="Keep 90 days locally and three years in object storage"
+```questdb-sql title="Tier partitions using age-based thresholds"
 ALTER TABLE fx_trades SET STORAGE POLICY(
     TO PARQUET 7d,
     TO REMOTE 14d,
@@ -215,6 +247,12 @@ ALTER TABLE fx_trades SET STORAGE POLICY(
     DROP REMOTE 3Y
 );
 ```
+
+The delays are
+[partition-age thresholds](/docs/concepts/storage-policy/#ttl-evaluation),
+measured from each partition's start, not each row's timestamp or the upload
+time. For a minimum timestamp-based retention window, allow for the full
+partition interval when choosing the deletion thresholds.
 
 Once `DROP LOCAL` runs, a partition is
 [sealed](/docs/concepts/cold-storage/#immutability-after-drop-local): later
@@ -272,10 +310,13 @@ compliance control:
   on the underlying tables reads the same rows with no audit row, and denied
   reads are usually not recorded.
 - **There is no durable query log.** Query tracing keeps 24 hours.
-- **There is no audit log of DDL, grants, or logins.** Schema changes, grants
-  and revokes, and authentication attempts are not recorded in a queryable
-  table. Snapshots from `SHOW CREATE DATABASE` and the server log are the
-  closest substitutes.
+- **ACL auditing is not a complete DDL or login log.** The
+  [ACL audit log](/docs/security/acl-audit-log/) records grants, revokes, and
+  other persisted access control changes, but not authentication attempts,
+  transient REST tokens, or statements that write nothing. DDL is recorded
+  only when it changes permissions, and some such rows lack principals and
+  statement text. Retention and built-in admin maintenance can remove rows.
+  Keep `SHOW CREATE DATABASE` snapshots for schema history.
 - **There is no session listing.** `sys.metrics` counts open connections per
   protocol, idle ones included, but not who holds them, and
   `query_activity()` shows only running queries.
