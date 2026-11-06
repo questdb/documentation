@@ -17,7 +17,7 @@ API. For QuestDB it has two:
   results are the client's own Arrow batches passed straight through, and bulk
   ingest sends Arrow batches the other way. For QuestDB 10.0 and newer.
 - **The ODBC bridge**, which reaches QuestDB through the PostgreSQL ODBC driver
-  over [PGWire](/docs/connect/wire-protocols/pgwire/). For QuestDB 9 and older,
+  over [PGWire](/docs/connect/compatibility/pgwire/overview/). For QuestDB 9 and older,
   or where one driver has to serve every database an application talks to.
 
 If you work in Python or Rust, the
