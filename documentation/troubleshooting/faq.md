@@ -38,7 +38,7 @@ See more details at
 
 It is possible to change column type from `VARCHAR` to `SYMBOL`.
 
-We recommed converting a column to the `SYMBOL` type when the column has limited
+We recommend converting a column to the `SYMBOL` type when the column has limited
 number of repetitive values:
 
 ```questdb-sql
@@ -181,9 +181,9 @@ you cannot navigate backwards or access result positions as you might with
 scrollable cursors in PostgreSQL.
 
 For more information and for tips to work around, see the
-[PostgreSQL compatability section](/docs/connect/compatibility/pgwire/overview/#forward-only-cursors)
+[PostgreSQL compatibility section](/docs/connect/compatibility/pgwire/overview/#forward-only-cursors)
 in our Query & SQL overview.
 
 ## My table has corrupted WAL data due to a previous full disk or kernel limits error. What do I do?
 
-You need to skip the problematic transation using the [RESUME WAL](/docs/query/sql/alter-table-resume-wal/) SQL statement. If there are multiple transactions that rely on the corrupted WAL data, you may need to follow [this instruction](/docs/query/sql/alter-table-resume-wal/#diagnosing-corrupted-wal-transactions).
+You need to skip the problematic transaction using the [RESUME WAL](/docs/query/sql/alter-table-resume-wal/) SQL statement. If there are multiple transactions that rely on the corrupted WAL data, you may need to follow [this instruction](/docs/query/sql/alter-table-resume-wal/#diagnosing-corrupted-wal-transactions).
