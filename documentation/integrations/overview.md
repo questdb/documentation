@@ -94,6 +94,9 @@ Improve your interactions with QuestDB using these tools and interfaces:
 - [Databento with Python](/docs/integrations/other/databento/): Ingest market data
   into QuestDB Open Source using the Python clients. On QuestDB Enterprise, see
   the [Databento connector](/docs/connect/connectors/databento/).
+- [adbcBridge](/docs/integrations/other/adbcbridge/): Read QuestDB into Apache
+  Arrow through ADBC, natively over QWP on QuestDB 10 or through the PostgreSQL
+  ODBC driver on older servers.
 
 Is there an integration you'd like to see that's not listed? Let us know by
 opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).

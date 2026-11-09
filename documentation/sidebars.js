@@ -390,6 +390,7 @@ module.exports = {
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
                     "query/sql/alter-mat-view-set-ttl",
+                    "query/sql/alter-mat-view-set-expire",
                   ],
                 },
                 {
@@ -700,6 +701,7 @@ module.exports = {
             "concepts/deduplication",
             "concepts/delivery-semantics",
             "concepts/ttl",
+            "concepts/expire-rows",
             "concepts/storage-policy",
             {
               id: "concepts/cold-storage",
@@ -1039,6 +1041,7 @@ module.exports = {
             "integrations/other/ignition",
             "integrations/other/airbyte",
             "integrations/other/databento",
+            "integrations/other/adbcbridge",
           ],
         },
       ],
@@ -1210,6 +1213,7 @@ module.exports = {
                     "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
+                    "cookbook/sql/advanced/subtotals-and-grand-totals",
                     "cookbook/sql/advanced/unpivot-table",
                     "cookbook/sql/advanced/sankey-funnel",
                     "cookbook/sql/advanced/conditional-aggregates",
