@@ -242,6 +242,14 @@ Parquet-related settings.
   blocked.
 * Some parallel queries are not yet optimized for Parquet.
 
+### Rebuilding indexes
+
+To rebuild the indexes of Parquet partitions without taking the table offline,
+use
+[`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/),
+available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.0. Run it after upgrading from QuestDB 9.3.4 through 10.0.1, which could leave
+stale column metadata on Parquet partitions that received out-of-order rows.
+
 ## Export
 
 Query results and whole tables can be exported as external Parquet files. Unlike

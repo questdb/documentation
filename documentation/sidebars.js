@@ -355,6 +355,7 @@ module.exports = {
                     "query/sql/alter-table-detach-partition", // DETACH PARTITION
                     "query/sql/alter-table-drop-column", // DROP COLUMN
                     "query/sql/alter-table-drop-partition", // DROP PARTITION
+                    "query/sql/alter-table-force-reindex-parquet", // FORCE REINDEX PARQUET
                     "query/sql/alter-table-rebase-wal", // REBASE WAL
                     "query/sql/alter-table-rename-column", // RENAME COLUMN
                     "query/sql/alter-table-resume-wal", // RESUME WAL
@@ -389,6 +390,7 @@ module.exports = {
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
                     "query/sql/alter-mat-view-set-ttl",
+                    "query/sql/alter-mat-view-set-expire",
                   ],
                 },
                 {
@@ -517,10 +519,12 @@ module.exports = {
                 "query/sql/asof-join",
                 "query/sql/case",
                 "query/sql/cast",
+                "query/sql/cube",
                 "query/sql/declare",
                 "query/sql/distinct",
                 "query/sql/fill",
                 "query/sql/group-by",
+                "query/sql/grouping-sets",
                 "query/sql/horizon-join",
                 "query/sql/join",
                 "query/sql/lateral-join",
@@ -528,6 +532,7 @@ module.exports = {
                 "query/sql/limit",
                 "query/sql/order-by",
                 "query/sql/pivot",
+                "query/sql/rollup",
                 "query/sql/sample-by",
                 "query/sql/subsample",
                 "query/sql/unnest",
@@ -696,6 +701,7 @@ module.exports = {
             "concepts/deduplication",
             "concepts/delivery-semantics",
             "concepts/ttl",
+            "concepts/expire-rows",
             "concepts/storage-policy",
             {
               id: "concepts/cold-storage",
@@ -708,6 +714,7 @@ module.exports = {
               label: "Resource Groups",
             },
             "concepts/write-ahead-log",
+            "concepts/durability",
           ],
         },
         {
@@ -1035,6 +1042,7 @@ module.exports = {
             "integrations/other/ignition",
             "integrations/other/airbyte",
             "integrations/other/databento",
+            "integrations/other/adbcbridge",
           ],
         },
       ],
@@ -1206,6 +1214,7 @@ module.exports = {
                     "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
+                    "cookbook/sql/advanced/subtotals-and-grand-totals",
                     "cookbook/sql/advanced/unpivot-table",
                     "cookbook/sql/advanced/sankey-funnel",
                     "cookbook/sql/advanced/conditional-aggregates",

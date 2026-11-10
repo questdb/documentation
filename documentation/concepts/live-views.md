@@ -377,19 +377,26 @@ filter:
   later out-of-order commit can recompute emitted rows above the removed range
   from the remaining base data.
 
-An invalidated view keeps serving its existing data and reports the reason in
+If a materialized view this live view reads gets an
+[`EXPIRE ROWS` policy](/docs/concepts/expire-rows/#dependent-materialized-and-live-views),
+the live view notices the conflict on its next refresh and becomes invalid. A
+live view that is idle may keep reporting itself as active, and a refresh already
+running may finish with the data it started from. Once noticed, the view stops
+refreshing, but it does not go back and remove rows it already produced.
+
+An invalid view keeps serving the data it already has and reports why in
 [`live_views()`](/docs/query/functions/meta/#live_views), for example
 `drop column operation [column=price]` or `update operation`. It stops
-refreshing. Invalidation is permanent: reversing the schema change does not
-automatically revalidate the view, and
+refreshing. This is permanent: undoing the schema change or removing the
+source's expiry policy does not make the view valid again, and
 [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/) only
-recovers a suspended WAL writer.
+restarts a suspended WAL writer.
 
-To recover, inspect `invalidation_reason`, repair the base-table schema or
-raise
+To recover, check `invalidation_reason` and fix the cause first: repair the
+base-table schema, drop the source's `EXPIRE ROWS` policy, or raise
 [`cairo.live.view.refresh.memory.limit.bytes`](/docs/configuration/live-views/#cairoliveviewrefreshmemorylimitbytes)
-when the reason is a memory limit breach, and save the definition before
-dropping the view:
+if the reason is a memory limit breach (a recreated view picks up the new value).
+Then save the definition before dropping the view:
 
 ```questdb-sql
 SHOW CREATE LIVE VIEW trades_ma;
@@ -415,7 +422,8 @@ source history is no longer retained by the base table.
 
 Live views over [deduplicated](/docs/concepts/deduplication/) base tables are
 supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
-in the view, and later rows are recomputed. Such a view has no in-memory rows
+in the view, and later rows are recomputed. Under `SKIP`, a discarded duplicate
+never reaches the view. Such a view has no in-memory rows
 ahead of disk, so it trails the base table by up to one `FLUSH EVERY` cycle.
 
 ## Monitoring

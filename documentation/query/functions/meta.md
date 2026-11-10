@@ -419,25 +419,58 @@ Returns a `table` including the following information:
 - `view_table_dir_name` - view directory name
 - `invalidation_reason` - message explaining why the view was marked as invalid
 - `view_status` - view status: 'valid', 'refreshing', or 'invalid'
+- `refresh_period_hi` - end of the last refreshed period, for a view defined
+  with a `REFRESH PERIOD`
 - `refresh_base_table_txn` - the last base table transaction used to refresh the
   materialized view
 - `base_table_txn` - the last committed transaction in the base table
-- `refresh_limit_value` - how many units back in time the refresh limit goes
+- `refresh_limit` - how many units back in time the refresh limit goes
 - `refresh_limit_unit` - how long each unit is
+- `timer_time_zone` - time zone the refresh timer and period boundaries use
 - `timer_start` - start date for the scheduled refresh timer
-- `timer_interval_value` - how many interval units between each refresh
+- `timer_interval` - how many interval units between each refresh
 - `timer_interval_unit` - how long each unit is
+- `period_length` - length of one refresh period (`PERIOD (LENGTH ...)`)
+- `period_length_unit` - how long each period-length unit is
+- `period_delay` - delay before a completed period is refreshed
+  (`PERIOD (DELAY ...)`)
+- `period_delay_unit` - how long each period-delay unit is
+- `refresh_avg_commit_nanos` - recent average time for one refresh commit, in
+  nanoseconds. Kept in memory only, so it resets on restart
+- `refresh_avg_scan_sample_nanos` - recent average time one refresh spends
+  scanning the base table, in nanoseconds. In memory only
+- `refresh_avg_scan_range_ts_units` - recent average size of the time range one
+  refresh covers, in the base table's timestamp unit. In memory only
+- `refresh_gap_threshold_ts_units` - if two time ranges to refresh are closer
+  than this, the refresh job handles them together instead of committing twice.
+  `0` turns this off
+- `expire_clause` - the view's
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy in its canonical form, or
+  `NULL` if the view has no policy
+- `expire_cleanup_every` - how often the cleanup job runs for the policy, or
+  `NULL`
+- `expire_enforcement` - `FILTER_AND_RECLAIM` if the cleanup job also frees disk
+  for the policy, `FILTER_ONLY` if reads hide the expired rows but they stay on
+  disk, `NULL` if the view has no policy
 
 **Examples:**
 
+`materialized_views()` on its own returns every column listed above. The example
+below picks a readable subset of columns over three views: an aggregating one
+with no retention policy, and two passthrough views with an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy.
+
 ```questdb-sql title="List all materialized views"
-materialized_views();
+SELECT view_name, view_status, base_table_name, refresh_base_table_txn,
+       base_table_txn, expire_clause, expire_cleanup_every, expire_enforcement
+FROM materialized_views();
 ```
 
-| view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
-| ---------------- | ------------ | --------------- | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- | ------------------- | ----------- | ---------------------- | -------------- | ------------------- | ------------------ | ----------- | -------------------- | ------------------- |
-| trades_OHLC_15m  | immediate    | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-| trades_latest_1d | immediate    | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+| view_name       | view_status | base_table_name | refresh_base_table_txn | base_table_txn | expire_clause                       | expire_cleanup_every | expire_enforcement |
+| --------------- | ----------- | --------------- | ---------------------- | -------------- | ----------------------------------- | -------------------- | ------------------ |
+| trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                | null                 | null               |
+| trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now()) | 30m                  | FILTER_AND_RECLAIM |
+| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST ON timestamp PARTITION BY symbol | 1h          | FILTER_ONLY        |
 
 ## memory_metrics
 
@@ -995,8 +1028,9 @@ Returns a `table` with the following columns:
   column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
-- `upsertKey` - if this column is a part of UPSERT KEYS list for table
-  [deduplication](/docs/concepts/deduplication)
+- `upsertKey` - if this column is a key column for table
+  [deduplication](/docs/concepts/deduplication), in either the `UPSERT` or the
+  `SKIP` mode
 - `indexType` - the [index type](/docs/concepts/deep-dive/indexes/) (`POSTING`,
   `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
 - `indexInclude` - comma-separated names of columns included in a
@@ -1201,7 +1235,7 @@ SELECT * FROM table_storage();
 | trades         | true       | DAY         | 954            | 1000848308 | 32764798760  |
 | ethblocks_json | true       | DAY         | 3328           | 20688364   | 28311960478  |
 
-<hr />
+---
 
 Filter tables with WAL enabled.
 
@@ -1218,7 +1252,7 @@ WHERE walEnabled = true;
 | trades         | 1000850255 | 32764804264  |
 | ethblocks_json | 20688364   | 28311960478  |
 
-<hr />
+---
 
 Show tables partitioned by `HOUR`.
 
@@ -1243,20 +1277,20 @@ Returns a `table` with the following columns:
 
 ### Basic table information
 
-| Column                | Type    | Description                                                        |
-| --------------------- | ------- | ------------------------------------------------------------------ |
-| `id`                  | INT     | Internal table ID                                                  |
-| `table_name`          | STRING  | Table name                                                         |
-| `designatedTimestamp` | STRING  | Name of the designated timestamp column, or `null`                 |
-| `partitionBy`         | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `walEnabled`          | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`               | BOOLEAN | Whether deduplication is enabled                                   |
-| `ttlValue`            | INT     | TTL (Time-To-Live) value                                           |
-| `ttlUnit`             | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
-| `matView`             | BOOLEAN | Whether this is a materialized view                                |
-| `directoryName`       | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
-| `maxUncommittedRows`  | INT     | Table's `maxUncommittedRows` setting                               |
-| `o3MaxLag`            | LONG    | Table's `o3MaxLag` setting in microseconds                         |
+| Column                 | Type    | Description                                                        |
+| ---------------------- | ------- | ------------------------------------------------------------------ |
+| `id`                   | INT     | Internal table ID                                                  |
+| `table_name`           | STRING  | Table name                                                         |
+| `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
+| `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
+| `dedup`                | BOOLEAN | Whether deduplication is enabled, in either mode. [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause) shows the mode |
+| `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
+| `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
+| `matView`              | BOOLEAN | Whether this is a materialized view                                |
+| `directoryName`        | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
+| `maxUncommittedRows`   | INT     | Table's `maxUncommittedRows` setting                               |
+| `o3MaxLag`             | LONG    | Table's `o3MaxLag` setting in microseconds                         |
 
 :::note
 
@@ -1304,7 +1338,7 @@ highest.
 | Column                            | Type      | Description                                                   |
 | --------------------------------- | --------- | ------------------------------------------------------------- |
 | `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table              |
-| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication (since server start) |
+| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication in either mode (since server start). A duplicate counts even when it is identical to the stored row and `UPSERT` changes nothing |
 | `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)            |
 | `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)     |
 | `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)          |
@@ -1328,6 +1362,16 @@ tracking:
 | `replica_more_pending`   | BOOLEAN | `true` if the last download batch was limited and more data is available |
 
 On primary instances, these columns will be `0` or `false`.
+
+### Row-expiry policy
+
+| Column                 | Type   | Description                                                               |
+| ---------------------- | ------ | --------------------------------------------------------------            |
+| `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy in its canonical form, or `null` |
+| `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                                 |
+
+`tables()` does not include `expire_enforcement`. To check whether a policy is
+`FILTER_AND_RECLAIM` or `FILTER_ONLY`, use `materialized_views()` instead.
 
 ### Data precision and limitations
 
@@ -1681,6 +1725,21 @@ Returns a `table` including the following information:
 - `memoryPressure` - memory pressure level of the table writer: `0` for none,
   `1` when parallelism is reduced, `2` when the writer backs off between
   attempts (equivalent to `table_memory_pressure_level` in `tables()`)
+- `durableEpochSeqTxn` - the sequencer transaction of the table's current save
+  point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
+  the WAL is replayed from here
+- `recoveryIncarnation` - how many times this process put the table's files
+  back to its save point at a start; stays `0` after a clean shutdown, and
+  often after a power loss, when the files are already at the save point
+- `localDurableSeqTxn` - the highest sequencer transaction that is on the disk,
+  with its WAL files and its sequencer record flushed. `-1` after a start until
+  the table's next commit; advances only in `adaptive` and `sync` commit modes
+- `lastEpochTs` - when this process last took a save point for the table, or
+  `NULL` if it has not taken one since it started
+
+The last four columns describe [durability](/docs/concepts/durability/#monitor-adaptive-mode).
+For a table written since the start, `sequencerTxn - localDurableSeqTxn` counts
+the committed transactions that are not yet on the disk.
 
 **Examples:**
 
@@ -1693,6 +1752,18 @@ wal_tables();
 | sensor_wal  | false     | 2         | 1               | 4            |               |                                                                                                                             | 0              |
 | weather_wal | false     | 3         | 0               | 3            |               |                                                                                                                             | 0              |
 | test_wal    | true      | 7         | 1               | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 2              |
+
+The durability columns are omitted from the result above.
+
+```questdb-sql title="Check how much of each table is on the disk"
+SELECT
+  name,
+  sequencerTxn - localDurableSeqTxn AS not_yet_on_disk,
+  sequencerTxn - durableEpochSeqTxn AS replay_after_crash,
+  lastEpochTs
+FROM wal_tables()
+WHERE localDurableSeqTxn >= 0;
+```
 
 ## writer_pool
 

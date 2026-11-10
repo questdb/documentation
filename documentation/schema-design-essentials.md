@@ -238,6 +238,8 @@ DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
 When a row arrives with the same `timestamp` and `symbol`, the old row is replaced.
+To keep the first row and discard later duplicates instead, declare
+`DEDUP SKIP KEYS(timestamp, symbol)`.
 
 **Deduplication has no noticeable performance penalty.**
 
@@ -444,6 +446,7 @@ CREATE TABLE metrics (
     value DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY
 DEDUP UPSERT KEYS(timestamp, name);
+-- For ON CONFLICT ... DO NOTHING, use DEDUP SKIP KEYS(timestamp, name)
 ```
 
 </details>
