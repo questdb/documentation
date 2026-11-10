@@ -1028,8 +1028,9 @@ Returns a `table` with the following columns:
   column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
-- `upsertKey` - if this column is a part of UPSERT KEYS list for table
-  [deduplication](/docs/concepts/deduplication)
+- `upsertKey` - if this column is a key column for table
+  [deduplication](/docs/concepts/deduplication), in either the `UPSERT` or the
+  `SKIP` mode
 - `indexType` - the [index type](/docs/concepts/deep-dive/indexes/) (`POSTING`,
   `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
 - `indexInclude` - comma-separated names of columns included in a
@@ -1283,7 +1284,7 @@ Returns a `table` with the following columns:
 | `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
 | `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
 | `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`                | BOOLEAN | Whether deduplication is enabled                                   |
+| `dedup`                | BOOLEAN | Whether deduplication is enabled, in either mode. [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause) shows the mode |
 | `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
 | `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
 | `matView`              | BOOLEAN | Whether this is a materialized view                                |
@@ -1337,7 +1338,7 @@ highest.
 | Column                            | Type      | Description                                                   |
 | --------------------------------- | --------- | ------------------------------------------------------------- |
 | `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table              |
-| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication (since server start) |
+| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication in either mode (since server start). A duplicate counts even when it is identical to the stored row and `UPSERT` changes nothing |
 | `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)            |
 | `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)     |
 | `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)          |
@@ -1724,6 +1725,21 @@ Returns a `table` including the following information:
 - `memoryPressure` - memory pressure level of the table writer: `0` for none,
   `1` when parallelism is reduced, `2` when the writer backs off between
   attempts (equivalent to `table_memory_pressure_level` in `tables()`)
+- `durableEpochSeqTxn` - the sequencer transaction of the table's current save
+  point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
+  the WAL is replayed from here
+- `recoveryIncarnation` - how many times this process put the table's files
+  back to its save point at a start; stays `0` after a clean shutdown, and
+  often after a power loss, when the files are already at the save point
+- `localDurableSeqTxn` - the highest sequencer transaction that is on the disk,
+  with its WAL files and its sequencer record flushed. `-1` after a start until
+  the table's next commit; advances only in `adaptive` and `sync` commit modes
+- `lastEpochTs` - when this process last took a save point for the table, or
+  `NULL` if it has not taken one since it started
+
+The last four columns describe [durability](/docs/concepts/durability/#monitor-adaptive-mode).
+For a table written since the start, `sequencerTxn - localDurableSeqTxn` counts
+the committed transactions that are not yet on the disk.
 
 **Examples:**
 
@@ -1736,6 +1752,18 @@ wal_tables();
 | sensor_wal  | false     | 2         | 1               | 4            |               |                                                                                                                             | 0              |
 | weather_wal | false     | 3         | 0               | 3            |               |                                                                                                                             | 0              |
 | test_wal    | true      | 7         | 1               | 9            | OUT OF MEMORY | query memory limit exceeded [workload=WAL_APPLY, queryId=12, limit=1073741824, used=1073217536, size=1048576, memoryTag=27] | 2              |
+
+The durability columns are omitted from the result above.
+
+```questdb-sql title="Check how much of each table is on the disk"
+SELECT
+  name,
+  sequencerTxn - localDurableSeqTxn AS not_yet_on_disk,
+  sequencerTxn - durableEpochSeqTxn AS replay_after_crash,
+  lastEpochTs
+FROM wal_tables()
+WHERE localDurableSeqTxn >= 0;
+```
 
 ## writer_pool
 

@@ -11,6 +11,9 @@ QuestDB clients deliver data **at-least-once**: every row your application
 publishes is guaranteed to reach the server, but under failure it may arrive
 more than once. Storing each row exactly once is the application's
 responsibility, and QuestDB provides the mechanisms to make it routine.
+Delivery is separate from durability: whether a row the server acknowledged
+survives a power loss of the server depends on its
+[commit mode](/docs/concepts/durability/#commit-modes).
 
 This page explains where duplicates come from and how to suppress them.
 
@@ -70,8 +73,8 @@ Three things must hold:
    the original send and the replay, so the two rows are not identical and
    deduplication cannot match them.
 2. **A [deduplication](/docs/concepts/deduplication/) key covering row
-   identity.** Declare `DEDUP UPSERT KEYS(...)` on the target table with
-   keys that uniquely identify a logical event. The designated timestamp
+   identity.** Declare `DEDUP UPSERT KEYS(...)` or `DEDUP SKIP KEYS(...)` on
+   the target table with keys that uniquely identify a logical event. The designated timestamp
    is always part of the key; add any other columns needed to distinguish
    two events that share a timestamp.
 3. **Stable values across retransmits.** Any column that participates in
@@ -79,8 +82,8 @@ Three things must hold:
    not from wall-clock time at the moment of sending, and not from a
    per-attempt counter.
 
-When those three hold, the server treats a replayed batch as already-seen
-and skips the write.
+When those three hold, the server recognizes replayed rows as duplicates
+and stores each event once.
 
 ## Recipe
 
@@ -109,13 +112,19 @@ sender.table("trades")
 ```
 
 If two distinct events can share `(ts, symbol, side)` and both should be
-preserved, widen `UPSERT KEYS` to include a column that distinguishes them
+preserved, widen the key list to include a column that distinguishes them
 — for example a `trade_id` or `seq` column.
+
+Both deduplication modes absorb a replay. They differ when a replayed row
+carries a different value in a column outside the key, such as a column
+filled with the send time: `UPSERT` stores the replayed value, and `SKIP`
+keeps the row as first delivered. See
+[UPSERT and SKIP modes](/docs/concepts/deduplication/#upsert-and-skip-modes).
 
 :::warning DEDUP is required on tables behind multi-host failover
 
 When the client fails over from one primary to another, unacknowledged
-batches are replayed against the new primary. Without `DEDUP UPSERT KEYS`
+batches are replayed against the new primary. Without `DEDUP` on keys
 covering row identity, those replays produce duplicate rows in the target
 table.
 
@@ -131,23 +140,26 @@ write path.
 If your application tolerates occasional duplicates — counting events with
 a small tolerance, aggregating over a window where one extra row shifts
 the average by a negligible amount, append-only logs where uniqueness is
-not meaningful — you can skip DEDUP and rely on at-least-once delivery
+not meaningful — you can leave DEDUP off and rely on at-least-once delivery
 directly.
 
 The decision is per-table, not per-deployment: enable DEDUP on the tables
 that need exactly-once, leave it off on the tables that don't.
 
-## Related Enterprise features
+## Related features
 
 These features change *where* the replay window opens, but do not change
 the guarantee — at-least-once still applies, and DEDUP is still the
 mechanism that achieves exactly-once.
 
-- **Durable ACK**
-  ([`request_durable_ack=on`](/docs/connect/clients/connect-string#durable-ack))
-  — the server delays the per-batch acknowledgement until the WAL is
-  shipped to object storage. This narrows the replay window after primary
-  failover but does not eliminate it.
+- **Durable acknowledgement**
+  ([`request_durable_ack`](/docs/connect/clients/connect-string#durable-ack)):
+  the client keeps each batch until the server confirms that it is durable,
+  on the server's disk (`local`, which needs
+  [adaptive commit mode](/docs/concepts/durability/)) or in object storage
+  (`replicated`, QuestDB Enterprise). The client then replays a batch the
+  server lost in a power loss or a primary failover, but replay can still
+  produce duplicates.
 - **[Store-and-forward](/docs/high-availability/store-and-forward/concepts/)**
   — provides at-least-once across sender process restarts. Replay
   semantics from this page apply.
@@ -161,8 +173,10 @@ mechanism that achieves exactly-once.
   mechanism that makes exactly-once achievable.
 - [Designated timestamp](/docs/concepts/designated-timestamp/) — required
   for DEDUP and for explicit-timestamp publishing.
-- [Write-ahead log](/docs/concepts/write-ahead-log/) — when the server
-  considers a batch durable.
+- [Write-ahead log](/docs/concepts/write-ahead-log/) — how the server
+  commits a batch.
+- [Durability and commit modes](/docs/concepts/durability/): what an
+  acknowledged batch survives.
 - [Client failover concepts](/docs/high-availability/client-failover/concepts/)
   — the multi-host replay path in detail.
 - [Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/)
