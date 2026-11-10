@@ -194,13 +194,16 @@ straightforward to set up alerting for upcoming expirations.
 | `questdb_wal_apply_written_rows_total` | counter | Total rows written during WAL apply. |
 | `questdb_wal_apply_physically_written_rows_total` | counter | Total physically written rows during WAL apply. |
 | `questdb_wal_apply_rows_per_second` | gauge | Rate of rows applied per second during WAL apply. |
-| `questdb_wal_seq_txn` | gauge | Sum of all committed transaction sequence numbers. Used with `questdb_wal_writer_txn`. |
-| `questdb_wal_writer_txn` | gauge | Sum of all applied transaction sequence numbers. With no pending WAL transactions, equals `questdb_wal_seq_txn`. A steadily growing lag indicates QuestDB cannot keep up with writes. |
+| `questdb_wal_apply_seq_txn` | gauge | Sum of all committed transaction sequence numbers. Used with `questdb_wal_apply_writer_txn`. |
+| `questdb_wal_apply_writer_txn` | gauge | Sum of all applied transaction sequence numbers. With no pending WAL transactions, equals `questdb_wal_apply_seq_txn`. A steadily growing lag indicates QuestDB cannot keep up with writes. |
+| `questdb_wal_apply_local_durable_seq_txn` | gauge | Sum over all tables of the highest transaction sequence number that is on the disk. Advances only in `adaptive` and `sync` [commit modes](/docs/concepts/durability/#monitor-adaptive-mode). Subtracted from `questdb_wal_apply_seq_txn`, it counts the committed transactions not yet on the disk; the difference reads high after a start until every table has been written. |
+| `questdb_wal_adaptive_epoch_advances_total` | counter | Save points taken in adaptive commit mode. |
+| `questdb_wal_adaptive_recovery_events_total` | counter | Tables whose files a start put back to their save point, as after a killed process. After a power loss the files are often already at the save point, and the table is not counted. |
 
 :::note Renamed WAL metrics
 
-`questdb_wal_seq_txn_total` and `questdb_wal_writer_txn_total` have been renamed
-to `questdb_wal_seq_txn` and `questdb_wal_writer_txn` respectively.
+`questdb_wal_apply_seq_txn_total` and `questdb_wal_apply_writer_txn_total` have been renamed
+to `questdb_wal_apply_seq_txn` and `questdb_wal_apply_writer_txn` respectively.
 
 :::
 
@@ -310,8 +313,8 @@ These gauges track memory allocated by specific QuestDB subsystems.
 | `questdb_workers_job_start_micros_min` | gauge | Minimum time to start a worker job (microseconds). |
 
 Most of the above metrics are volatile, i.e. they're collected since the current
-database start. The exceptions are `questdb_wal_seq_txn` and
-`questdb_wal_writer_txn`, because transaction sequence numbers are persistent.
+database start. The exceptions are `questdb_wal_apply_seq_txn` and
+`questdb_wal_apply_writer_txn`, because transaction sequence numbers are persistent.
 
 ## Configuring Prometheus Alertmanager
 

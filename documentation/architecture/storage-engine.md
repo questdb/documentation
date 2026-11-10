@@ -19,7 +19,7 @@ three-tier storage model.
 ### Tier One: Parallel Write-Ahead Log
 
 - **Two-phase writes**: All changes to data are recorded in a Write-Ahead Log (WAL) before they
-are written to the database files. This means that in case of a system crash or power failure, the database can recover to a consistent state by replaying the log entries.
+are written to the database files. This means that after a crash the database can recover to a consistent state by replaying the log entries. To survive a power failure, the log must also be flushed to the disk, which the `sync` and `adaptive` [commit modes](#durability) do.
 
 - **Commit and write separation**: By decoupling the transaction commit from the disk write process,
 a WAL improves the performance of write-intensive workloads, as it allows sequential disk writes,
@@ -129,15 +129,25 @@ deduplicated on additional columns.
 
 ### Durability
 
-By default, QuestDB relies on OS-level durability, letting the OS write dirty pages to disk.
-For stronger guarantees, enable sync commit mode:
+The commit mode decides when written data is flushed from the operating
+system's page cache to the disk. The default, `nosync`, flushes nothing: a
+crash of the QuestDB process loses nothing, but an operating system crash or a
+power loss can lose recent commits. To protect commits to WAL tables from power
+loss, use adaptive commit mode:
 
 ```ini title="server.conf"
-cairo.commit.mode=sync
+cairo.commit.mode=adaptive
 ```
 
-This invokes `fsync()` on each commit, ensuring data survives OS crashes or power loss
-at the cost of reduced write throughput.
+Adaptive mode flushes the write-ahead log files of each commit, and flushes the
+table files only at periodic save points. After a crash, the start restores each
+table to its last save point and replays the WAL after it. With the default
+50 ms group-commit window, a power loss can still lose the commits acknowledged
+in the last window. `sync` mode flushes the table files on every commit, which
+also protects non-WAL tables but is much slower.
+
+See [Durability and commit modes](/docs/concepts/durability/) for what each mode
+survives, the group-commit window, and what adaptive mode costs.
 
 ## Next up
 

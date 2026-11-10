@@ -18,7 +18,7 @@ This enables concurrent writes, crash recovery, and replication.
 | Capability | Description |
 |------------|-------------|
 | **Concurrent writes** | Multiple clients can write simultaneously without blocking |
-| **Crash recovery** | Committed data is never lost — replay from log after restart |
+| **Crash recovery** | After a restart, committed transactions are replayed from the log. Surviving a power loss needs a [commit mode](/docs/concepts/durability/) that flushes the log, such as `adaptive` |
 | **Replication** | WAL enables high availability and disaster recovery |
 | **Out-of-order handling** | Late-arriving data is merged efficiently. See [Out-of-order data](/docs/concepts/out-of-order-data/). |
 | **Deduplication** | Enables [deduplication](/docs/concepts/deduplication/) with `DEDUP UPSERT KEYS` or `DEDUP SKIP KEYS` |
@@ -110,6 +110,13 @@ larger blocks reduce out-of-order merges but use more memory per block.
 [Adaptive blocks](/docs/configuration/wal/#adaptive-wal-apply-blocks) are enabled
 by default and grow within a memory budget.
 
+Whether an acknowledged transaction survives an operating system crash or a
+power loss depends on the commit mode. In the default `nosync` mode, nothing is
+flushed to the disk. In adaptive commit mode, which is unrelated to the adaptive
+apply blocks above, each commit flushes its WAL files, and the table files are
+flushed at periodic save points. See
+[Durability and commit modes](/docs/concepts/durability/).
+
 <Screenshot
   alt="Diagram showing the sequencer allocating txn numbers to events chronologically"
   title="The sequencer allocates unique transaction numbers and serves as the single source of truth."
@@ -131,6 +138,9 @@ by default and grow within a memory budget.
 WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
+- [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode): when
+  commits are flushed to the disk; see
+  [Durability and commit modes](/docs/concepts/durability/)
 - Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
 - Adaptive WAL apply blocks: [starting size](/docs/configuration/wal/#cairowalapplyblocksize), [row cap](/docs/configuration/wal/#cairowalapplyblockmaxrows), and [memory budget](/docs/configuration/wal/#cairowalapplyblockmemorypercent).
 - `cairo.wal.apply.memory.limit.bytes` — cap on the native memory a WAL apply
@@ -147,6 +157,8 @@ See [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) for details.
 
 ## See also
 
+- [Durability and commit modes](/docs/concepts/durability/): what a commit
+  survives in each commit mode
 - [Replication](/docs/high-availability/overview/) — high availability and failover
 - [Deduplication](/docs/concepts/deduplication/) — requires WAL
 - [CREATE TABLE](/docs/query/sql/create-table/#write-ahead-log-wal-settings) — WAL syntax
