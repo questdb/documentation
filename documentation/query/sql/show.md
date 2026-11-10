@@ -263,22 +263,21 @@ the cadence differs from the default `1h`.
 SHOW CREATE TABLE trades;
 ```
 
-| ddl                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
+| ddl                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------- |
+| CREATE TABLE 'trades' ( symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP ) timestamp(timestamp) PARTITION BY DAY; |
 
 This is printed with formatting, so when pasted into a text editor that support
 formatting characters, you will see:
 
 ```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
+CREATE TABLE 'trades' (
+	symbol SYMBOL,
+	side SYMBOL,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+) timestamp(timestamp) PARTITION BY DAY;
 ```
 
 #### Posting index with covering columns
@@ -290,14 +289,13 @@ index type and covered columns. The designated timestamp is appended to the
 `INCLUDE (price, exchange, timestamp)`:
 
 ```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE INDEX TYPE POSTING INCLUDE (price, exchange, timestamp),
-	exchange SYMBOL CAPACITY 256 CACHE,
+CREATE TABLE 'trades' (
+	symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, exchange, timestamp),
+	exchange SYMBOL,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+) timestamp(timestamp) PARTITION BY DAY;
 ```
 
 #### Per-column Parquet encoding
@@ -306,7 +304,7 @@ When columns have per-column Parquet encoding or compression overrides, they
 appear in the `SHOW CREATE TABLE` output:
 
 ```questdb-sql
-CREATE TABLE sensors (
+CREATE TABLE 'sensors' (
 	ts TIMESTAMP,
 	temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
 	humidity FLOAT PARQUET(rle_dictionary),
@@ -325,7 +323,7 @@ the `SHOW CREATE TABLE` output:
 SHOW CREATE TABLE sensor_data;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'sensor_data' (
     ts TIMESTAMP,
     value DOUBLE
@@ -337,6 +335,31 @@ Stages that are not configured on the policy are omitted from the clause. Only
 an active policy renders: after `ALTER TABLE ... DISABLE STORAGE POLICY`, the
 policy is not shown in `SHOW CREATE TABLE`. See
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+#### Deduplication clause
+
+For a table with [deduplication](/docs/concepts/deduplication/), the output
+includes a `DEDUP` clause with the mode, `UPSERT` or `SKIP`, and the key
+columns:
+
+```questdb-sql
+SHOW CREATE TABLE quotes;
+```
+
+```questdb-sql
+CREATE TABLE 'quotes' (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    bid DOUBLE,
+    ask DOUBLE,
+    received_at TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY
+DEDUP SKIP KEYS(timestamp,symbol);
+```
+
+`SHOW CREATE TABLE` is the only way to read the mode. The `dedup` column of
+[`tables()`](/docs/query/functions/meta/#tables) reports only whether
+deduplication is enabled.
 
 #### Enterprise variant
 

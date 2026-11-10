@@ -180,7 +180,8 @@ caveats), follow the section links from the [Key index](#key-index).
 | Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_segment_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
-| End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
+| Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive commit mode              |
+| Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
 | Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
 | Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
@@ -513,8 +514,8 @@ On unplanned failover — when the primary dies before issuing a durable
 ACK — the client replays unacknowledged frames against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
 replays can produce duplicate rows. Tables ingested through a multi-host
-failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
-row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
+failover connect string **must** declare `DEDUP UPSERT KEYS(...)` or
+`DEDUP SKIP KEYS(...)` covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
 for the full at-least-once / exactly-once model.
 
 :::
@@ -626,8 +627,8 @@ original is never coming back — see [Orphan recovery](#orphan-recovery) below.
 accepted if their acknowledgement hadn't reached the previous sender before
 it stopped.
 To prevent duplicate rows in the target table, declare
-[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` covering row
-identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
+[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` or `SKIP KEYS(...)`
+covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
 the full model and recipe.
 
 ### Backpressure
@@ -741,38 +742,53 @@ Requires QuestDB Enterprise (multi-host).
 
 ## Durable ACK {#durable-ack}
 
-*Applies to: ingress.*
+*Applies to: ingress. The values `local`, `replicated`, and `local,replicated`
+need the Java client after 1.3.11, or the C, C++, and Rust clients after
+7.2.1. Other clients accept `on` and `off`.*
+
+By default, a sender releases its copy of each batch once the server's OK
+response confirms the commit. An OK does not by itself mean that the commit is
+on the disk: that depends on the server's
+[commit mode](/docs/concepts/durability/#commit-modes). With `request_durable_ack`, the
+sender keeps each batch until the server confirms that it reached the requested
+durability, and sends it again after a reconnect if the server lost it.
+
+- `local`: the commit is on the server's disk. Needs a server in adaptive commit
+  mode.
+- `replicated`: the commit reached the replication object store. Needs a
+  QuestDB Enterprise primary with replication.
+- `local,replicated`: both. Needs a QuestDB Enterprise primary with replication
+  in adaptive commit mode.
+- `on`: the original name of `replicated`, and the only value QuestDB
+  Enterprise 4.1.0 and earlier accept.
+- `off` (default): no durable confirmation.
+
+What each tier protects against, and what the server needs, is in
+[Durable acknowledgements](/docs/concepts/durability/#durable-acknowledgements).
+
+The server grants every requested tier or none. When it cannot, for example
+when a server that is not in adaptive mode is asked for `local`, the connection
+fails at once with a durable-ack mismatch, instead of leaving the sender
+waiting for confirmations that never come. Durable acknowledgements work only
+on WebSocket transports.
 
 :::note QuestDB Enterprise
 
-Durable ACK requires QuestDB Enterprise. OSS is single-node and does not
-ship WALs off-box, so the server-side durability-acknowledgement signal
-that drives this protocol is enterprise-only.
+`replicated`, `local,replicated`, and `on` need QuestDB Enterprise with
+replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 
-Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
-QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an
-object store or another file system — typically over the network. After
-durably shipping a WAL, the server emits a `STATUS_DURABLE_ACK` frame to
-the store-and-forward client; the client marks that frame's FSN as durable
-only after this acknowledgement arrives.
+- `durable_ack_keepalive_interval_millis`: how often the sender sends a
+  WebSocket PING while confirmations are pending and it has nothing else to
+  send. The server sends confirmations only while it handles inbound traffic,
+  so the ping keeps them coming. Default: `200` (ms). Set to `0` or a negative
+  value to disable.
 
-The benefit: if the primary dies before shipping a WAL, the client still
-holds the corresponding frames in its SF buffer and replays them against
-the new primary on failover — closing the data-loss window that a
-transport-level OK ACK alone cannot close.
-
-- `request_durable_ack` — when `on`, the client gates trim on
-  `STATUS_DURABLE_ACK` frames from the server, suppressing OK-driven trim.
-  Default: `off`.
-- `durable_ack_keepalive_interval_millis` — interval at which the client
-  emits keepalive PINGs while waiting for durable-ack frames. Required
-  because the server only flushes pending durable acks on inbound recv
-  events. Default: `200` (ms). Set to `0` or a negative value to disable.
-
-See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
-wire protocol for the underlying mechanism.
+See [Durability and commit modes](/docs/concepts/durability/#durable-acknowledgements)
+for what each tier protects, and the
+[QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+for the wire format.
 
 ## Query client keys {#egress-keys}
 
@@ -997,7 +1013,7 @@ description and behaviour notes.
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
 | `replay_exec`                           | enum (`on` / `off`)           | `off` (Go only)               | [Query client keys](#egress-keys)                             |
-| `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
+| `request_durable_ack`                   | enum (`off` / `on` / `local` / `replicated` / `local,replicated`) | `off` | [Durable ACK](#durable-ack) |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
