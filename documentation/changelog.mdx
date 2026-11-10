@@ -16,6 +16,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 - [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
 - [adbcBridge](/docs/integrations/other/adbcbridge/) - New page for the third-party ADBC drivers that read QuestDB into Apache Arrow from C#, Java, Go, TypeScript, and C: a native QWP driver for QuestDB 10.0 and newer, and an ODBC bridge over PGWire for older servers
+- [ALTER TABLE FORCE REINDEX PARQUET](/docs/query/sql/alter-table-force-reindex-parquet/) - Rebuild bitmap and posting indexes on Parquet partitions while the table stays online, available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.0. Use it to repair Parquet partitions left with stale column metadata by QuestDB 9.3.4 through 10.0.1. Covers column and partition selection, cancellation, skipped partitions, automatic repair by `ADD INDEX` and out-of-order writes, and running it on QuestDB Enterprise replicas
 
 ### Reference
 
@@ -24,6 +25,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [REINDEX](/docs/query/sql/reindex/) - Explains that `LOCK EXCLUSIVE` is required and takes the table's writer lock, and that `REINDEX` rebuilds native partitions only: it skips Parquet partitions and rejects a Parquet partition named in `PARTITION`
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
   Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
   materialized view's query that reads its base table (this includes a subquery
