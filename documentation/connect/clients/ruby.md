@@ -194,7 +194,7 @@ still open. Clients and leases cannot be reused after `close` or after
 | --- | --- | --- |
 | Events arriving one at a time | `client.sender` + `row` | Build rows field by field and flush them in batches. |
 | Data already in Ruby arrays | `client.ingest_columns` | Send whole columns in one call, with commit and acknowledgement handled for you. |
-| An Arrow stream, Polars frame, or Red Arrow table | `client.ingest_arrow` | Zero-copy Arrow ingestion; requires `require "questdb/arrow"`. |
+| An Arrow stream, Polars DataFrame, or Red Arrow table | `client.ingest_arrow` | Zero-copy Arrow ingestion; requires `require "questdb/arrow"`. |
 | SQL to execute | `client.query(sql)` | Stream rows or batches, or materialize them. |
 | Several queries in a row | `client.reader` | Lease one reader connection and run queries on it sequentially. |
 | A statement to run (DDL, `INSERT`) | `client.execute(sql)` | Run, drain, and return the connection; output is discarded. |
@@ -310,7 +310,7 @@ published batch's FSN, `await_acked_fsn(fsn, timeout_millis:)` waits for its
 acknowledgement, and `published_fsn` / `acked_fsn` report progress without
 blocking. FSNs belong to the lease's pooled connection, so use them only while
 the lease is held. Set `auto_flush=off` when `flush_and_get_fsn` must define
-exact batches.
+exact application batches.
 
 ### Arrays
 
@@ -441,7 +441,7 @@ end
 | `each_values` | One frozen `Array` of values per row, without a `Row` wrapper. Use it for allocation-sensitive scans. |
 | `each_batch` | One `ResultBatch` at a time, with `columns`, `rows`, and `row_count`. |
 | `to_a` | Every `Row` in memory. |
-| `to_polars`, `to_nanoarrow`, `to_red_arrow_table` | An Arrow-backed frame; requires `require "questdb/arrow"` and the matching gem. |
+| `to_polars`, `to_nanoarrow`, `to_red_arrow_table` | The result as Arrow-backed data; requires `require "questdb/arrow"` and the matching gem. |
 
 Every value is copied into ordinary Ruby objects before the next batch is
 read, so rows stay valid after the result closes.
@@ -531,11 +531,12 @@ result.
 ## Delivery and durability
 
 Row senders always publish through a local store-and-forward queue. Without
-`sf_dir` the queue is in memory. With `sf_dir`, each lease uses its own sender
-directory, and on restart the pool replays unacknowledged rows. Give each
-client that
+`sf_dir` the queue is in memory. With `sf_dir`, each lease uses its own
+[sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout),
+`<sf_dir>/<sender_id>-ingest-<index>/`, and on restart the pool replays
+unacknowledged rows. Give each client that
 shares an `sf_dir` a distinct `sender_id`. With the default
-`sf_durability=memory`, disk mode protects against a client process crash,
+`sf_durability=memory`, SF mode protects against a client process crash,
 but not against a host crash or power loss. Set `sf_durability=periodic` to
 survive host loss: the client also forces the queue files to disk every
 `sf_sync_interval_millis` (default `5000`). It requires `sf_dir`. `flush` and
@@ -609,7 +610,7 @@ client.close
 | `pool_reap` | `auto` | Use `manual` only if your application calls `client.reap_idle`. |
 
 The sender and reader pools grow independently, and columnar ingestion uses a
-third, direct pool. Keep leases short: a sender lease holds its slot until it
+third, direct pool. Keep leases short: a sender lease holds its place in the pool until it
 is returned, even while idle.
 
 ## Failover and errors

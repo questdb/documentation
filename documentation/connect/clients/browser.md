@@ -980,14 +980,14 @@ accepted and `"1.005"` is rejected.
 
 ### Auto-flush
 
-A sender publishes its batch when it completes a row that crosses any of these
-thresholds:
+A sender flushes its buffered rows when it completes a row that crosses any of
+these thresholds:
 
 | Trigger                       | Default | Option                |
 | ----------------------------- | ------- | --------------------- |
-| Rows in the batch             | `1000`  | `autoFlushRows`       |
+| Buffered rows                 | `1000`  | `autoFlushRows`       |
 | Milliseconds since last flush | `100`   | `autoFlushIntervalMs` |
-| Estimated batch bytes         | off     | `autoFlushBytes`      |
+| Estimated buffered bytes      | off     | `autoFlushBytes`      |
 
 `0` disables one trigger, and `autoFlush: false` disables all three. The checks
 run when a row completes. No timer runs, so rows below the thresholds wait for

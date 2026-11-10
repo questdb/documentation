@@ -1385,7 +1385,7 @@ queue and returns before the server acks.
 4. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked rows, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, each sender's
-   queue is a directory on disk, and rows **replay automatically** when a
+   queue is a sender directory on disk, and rows **replay automatically** when a
    pool restarts with the same `sender_id`: it finds the directories the
    previous run left behind, and resends their unacknowledged rows in the
    background without you borrowing anything. Keep `sender_id` stable across
@@ -1394,7 +1394,7 @@ queue and returns before the server acks.
    failover, flushes keep landing on disk instead of filling RAM.
 5. **Backpressure is bounded blocking.** Two caps apply at once: 128 in-flight
    unacked batches, and `sf_max_total_bytes` (default 128 MiB in memory-only
-   mode, 10 GiB in disk mode). On hitting either, `flush` blocks up to
+   mode, 10 GiB in SF mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
    buffer whose single payload exceeds the batch size limit (see
@@ -1625,7 +1625,7 @@ yourself and avoid the background thread; call `reap_idle` on your own schedule.
 Every borrowed sender writes through a local **store-and-forward** queue.
 Without `sf_dir` the queue is in memory and private to the borrow; setting
 `sf_dir` moves it to a directory on disk that survives process restarts. The
-pool gives each borrow its own directory, named
+pool gives each borrow its own sender directory, named
 `<sf_dir>/<sender_id>-ingest-<index>/`, where `index` is the lowest free number
 in `[0, sender_pool_max)`. Because those names are stable, a restarted pool
 re-adopts the directories and replays the unacked rows they hold.
@@ -1639,7 +1639,7 @@ naming the pid that holds the directory. A bare `<sf_dir>/<sender_id>/`
 directory, with no `-ingest-<index>` suffix, is not pool-managed: the pool
 treats it as an orphan and drains it only with `drain_orphans=on`. The
 `sf_max_segment_bytes`, `sf_max_total_bytes`, and `sf_append_deadline_millis` keys
-tune the queue in both memory and disk mode; `sender_id` has no effect
+tune the queue in both memory-only and SF mode; `sender_id` has no effect
 without `sf_dir`. Full `sf_*` key semantics are in the
 [connect string reference](/docs/connect/clients/connect-string/#sf-keys).
 
@@ -1678,8 +1678,9 @@ path up to its own cap in live connections.
 
 Every QWP/WebSocket flush is asynchronous: it publishes into the local queue and
 returns before the server ACKs. Beyond the blocking `wait` barrier, the sender
-exposes **FSNs**, the sequence numbers of published batches, for
-non-blocking progress tracking while the borrow is still held:
+exposes **frame sequence numbers (FSNs)**, the sequence numbers of published
+batches (the protocol calls a batch a frame), for non-blocking progress
+tracking while the borrow is still held:
 
 - Publish with an FSN-returning flush: C
   `qwp_sender_flush_buffer_and_get_fsn` or

@@ -111,7 +111,7 @@ The steps are:
 3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
    and waits for the server ACK**. Auto-flush publishes full batches on its own,
    but the final partial batch is only guaranteed once you call `SendAsync()`.
-   An ACK means QuestDB committed the rows to the WAL, not that the rows are
+   An ACK means QuestDB committed the rows to the WAL, not that they are
    queryable yet: the WAL is applied to the table asynchronously. Rows are
    usually visible within milliseconds, but read-after-write logic should poll
    rather than assume.
@@ -711,7 +711,7 @@ On QWP what `Send` waits for depends on the sender:
   `IngressError` on timeout). A successful `SendAsync()` therefore means the
   rows are delivered.
 - A **pooled** sender (from `BorrowSender`) hands the rows to its send queue
-  and returns immediately; the pooled connection ships it asynchronously and
+  and returns immediately; the pooled connection ships them asynchronously and
   delivery is confirmed with `Flush()` / [`IQuestDBClient.Flush()`](#closing).
 
 Either way, **dispose never sends** — a sender that is disposed without a
@@ -995,7 +995,7 @@ second, which limits what a host crash or power loss can lose.
 | `sf_dir` | unset | Enables disk-backed SF when set. |
 | `sender_id` | `default` | Name of the sender directory under `sf_dir` (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
 | `sf_max_segment_bytes` | 4 MiB | Per-segment size cap. |
-| `sf_max_total_bytes` | 128 MiB (memory-only) / 10 GiB (disk) | Cap on total queued bytes. |
+| `sf_max_total_bytes` | 128 MiB (memory-only) / 10 GiB (SF mode) | Cap on total queued bytes. |
 | `sf_append_deadline_millis` | 30000 | Max time a flush blocks waiting for queue capacity. |
 | `drain_orphans` | `off` | If `on`, take over sender directories left by a crashed sender. |
 
@@ -1562,7 +1562,7 @@ WebSocket options:
 | `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
 | `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
 | `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and the sender directory name under it. |
-| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
+| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (memory-only) · 10 GiB (SF mode) / 30000 | Store-and-forward sizing and append backpressure deadline. |
 | `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
 | `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' sender directories; max concurrent orphan drains. |
 | `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |

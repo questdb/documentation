@@ -200,7 +200,7 @@ Match the API to the shape of the work:
 | Several queries in a row | `db.reader()` | Lease one reader connection and run queries on it sequentially. |
 | A statement to run (DDL, `INSERT`) | `db.execute(sql)` | Run, drain, and return the connection; output is discarded. |
 
-There is no per-column setter or chunk API in the Python client; whole-frame
+There is no per-column setter or chunk API in the Python client; whole-DataFrame
 `dataframe()` is the column-major path. Row senders use store-and-forward;
 `dataframe()` uses a separate direct connection pool and blocks for an ack.
 Call it on the handle: `db.dataframe()`. A sender lease exposes the same
@@ -439,7 +439,7 @@ an integer type.
 ## DataFrame ingestion
 
 Use `db.dataframe()` when the data already lives in columns. Each call
-borrows a direct columnar connection, publishes the frame in batches, blocks
+borrows a direct columnar connection, publishes the DataFrame in batches, blocks
 until the server acknowledges the final batch, and returns the connection to
 the pool:
 
@@ -489,11 +489,11 @@ Parameters:
 
 | Parameter | Meaning |
 | --- | --- |
-| `table_name` | The table to load into; one table per call. `table_name_col` is not supported: split multi-table frames and load each group. |
+| `table_name` | The table to load into; one table per call. `table_name_col` is not supported: split a multi-table DataFrame and load each group. |
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
 | `max_rows_per_batch` | Rows per published batch, default 16384. Sets pipelining granularity, not a safety limit — see below. |
-| `schema_overrides` | Per-column type, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`. Values are `symbol`, `ipv4`, `char`, `uuid`, `long256`, or `("geohash", bits)` with `bits` from 1 to 60. Beats any Arrow field metadata on the column. Needs a frame where every column is Arrow-backed; otherwise it raises `UnsupportedDataFrameShapeError`. |
+| `schema_overrides` | Per-column type, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`. Values are `symbol`, `ipv4`, `char`, `uuid`, `long256`, or `("geohash", bits)` with `bits` from 1 to 60. Beats any Arrow field metadata on the column. Needs a DataFrame where every column is Arrow-backed; otherwise it raises `UnsupportedDataFrameShapeError`. |
 
 `max_rows_per_batch` sets how many DataFrame rows go into each published
 batch. Each batch is encoded, held in memory, and applied on the server as one
@@ -508,7 +508,7 @@ batch size limit on its own, whatever the setting says. What it does control:
 
 The default suits mixed workloads. Raise it for narrow numeric rows,
 lower it for very wide rows or tight memory budgets. This setting only
-applies to materialized frames. When you pass a streaming input such as
+applies to materialized DataFrames. When you pass a streaming input such as
 `pa.RecordBatchReader`, the client sends each incoming batch as it
 arrives, keeping whatever batch size the stream already has. To change
 it, adjust the code that produces the stream.
@@ -518,7 +518,7 @@ Numeric, string, timestamp, and decimal (`pyarrow.decimal32` through
 Arrow `list_` / `large_list` / `fixed_size_list` with a `float64` leaf become
 `DOUBLE[]`. Null cells (`None`, `NaN`, `pd.NA`, and Arrow nulls) are
 stored as SQL nulls, with the same `BOOLEAN`, `BYTE`, and `SHORT` caveat as
-row ingestion. A frame the columnar path cannot express raises
+row ingestion. A DataFrame the columnar path cannot express raises
 `UnsupportedDataFrameShapeError` with per-column failures in
 `column_failures`.
 
@@ -615,12 +615,12 @@ trade_ids = pa.ExtensionArray.from_storage(
 ```
 
 This needs pyarrow 18 or later. Setting `ARROW:extension:name` in field
-metadata does not work in a pandas frame, which keeps a column's Arrow type
+metadata does not work in a pandas DataFrame, which keeps a column's Arrow type
 but not its field metadata.
 
 :::note
 
-In a frame that mixes Arrow-backed and NumPy columns, `schema_overrides` is
+In a DataFrame that mixes Arrow-backed and NumPy columns, `schema_overrides` is
 unavailable, so the client rejects an unlabelled 16- or 32-byte column rather
 than guess its type. To write it as `BINARY`, pass it as an object column of
 `bytes`.
@@ -798,7 +798,7 @@ A pandas dtype does not always identify the QuestDB type. For example,
 This works with every `dtype_backend`. With `"numpy_nullable"`, `UUID` and
 `LONG256` columns hold `bytes` rather than `uuid.UUID` and `int`.
 
-Editing the frame is safe. A column you drop, rename, or convert to another
+Editing the DataFrame is safe. A column you drop, rename, or convert to another
 type simply loses its record, and the write goes ahead with whatever the
 column now is. `symbols` and `schema_overrides` win over it, so you can
 always state a type yourself. Two types do not survive unchanged: `BYTE` and
@@ -824,10 +824,10 @@ df.attrs["questdb"] = {
 }
 ```
 
-For a hand-built frame with no existing metadata, omit the unpacking line.
+For a hand-built DataFrame with no existing metadata, omit the unpacking line.
 `version` is required and must be `1`. `kind` is one of `uuid`, `long256`,
 `ipv4`, `char`, `geohash`, or `date`; `precision_bits` goes with `geohash`
-only. Naming a column that is not in the frame does no harm; it is ignored.
+only. Naming a column that is not in the DataFrame does no harm; it is ignored.
 A dictionary without `version`, or with a version this client does not
 know, is ignored completely.
 
@@ -872,7 +872,7 @@ directory:
 Give each handle that shares an `sf_dir` a distinct `sender_id`. On restart,
 the pool reopens its sender directories that still hold data and replays their
 unacknowledged rows.
-With the default `sf_durability=memory`, disk mode protects against a
+With the default `sf_durability=memory`, SF mode protects against a
 client-process crash but not a host crash or power loss. Set
 `sf_durability=periodic` to survive host loss: the client also forces the
 queue files to disk every `sf_sync_interval_millis` (default `5000`). It
@@ -962,7 +962,7 @@ db.close()
 
 The sender and reader pools grow and cap independently, and `dataframe()`
 uses another internal direct pool, so account for all active paths when
-sizing the server. Keep leases short: a sender lease occupies its slot until
+sizing the server. Keep leases short: a sender lease holds its place in the pool until
 it closes, even while idle.
 
 ## Failover and errors
@@ -1140,7 +1140,7 @@ best-effort basis for `close_flush_timeout_millis` (default five seconds),
 and closes pooled connections. In-flight `QueryResult`s from one-shot
 `query(sql)` calls are not interrupted; they keep streaming and release
 their connections when consumed or closed. An in-memory queue that cannot drain within
-that window loses its remaining tail; disk mode (`sf_dir`) keeps it for
+that window loses its remaining tail; SF mode (`sf_dir`) keeps it for
 restart replay. Before shutdown:
 
 - Call `flush(wait=True)` or `wait()` on each sender when accepted delivery

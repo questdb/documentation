@@ -1024,7 +1024,7 @@ description and behaviour notes.
 | `sf_dir`                                | path                          | unset (memory-only mode)      | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js: also `append`) | [Store-and-forward](#sf-keys)       |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
-| `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
+| `sf_max_total_bytes`                    | size                          | `128 MiB` memory-only / `10 GiB` SF | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |

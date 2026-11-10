@@ -1154,8 +1154,8 @@ replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/tr
 
 ### Awaiting acknowledgements
 
-`flush()` returns once the batch is handed to the send engine, not once the
-server has acknowledged it. ACKs arrive asynchronously on the I/O loop. To
+`flush()` returns once its rows are handed to the send engine, not once the
+server has acknowledged them. ACKs arrive asynchronously on the I/O loop. To
 bridge between publish and acknowledgement, the client numbers what it sends. A
 flush sends its rows to the server as one batch, or as several if they don't
 fit in one; the protocol calls a batch a *frame*. Every published batch gets a

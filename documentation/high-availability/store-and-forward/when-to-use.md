@@ -20,10 +20,11 @@ If you are new to SF, start with
 The single switch that decides this is whether you set `sf_dir` in the
 connect string.
 
-### Memory-only mode — `sf_dir` unset
+### Memory-only mode: `sf_dir` unset {#memory-only-mode}
 
 Unacked rows live in a buffer in process memory. Default cap is
-`128 MiB`.
+`128 MiB`. This is not the same as `sf_durability=memory`, which still writes
+to the sender directory and only skips forcing each write to disk.
 
 **Choose memory-only mode when:**
 
@@ -36,10 +37,10 @@ Unacked rows live in a buffer in process memory. Default cap is
 - Your data volume comfortably fits in RAM during the longest outage you
   care about.
 
-### SF mode — `sf_dir=/path/to/dir`
+### SF mode: `sf_dir=/path/to/dir` {#sf-mode}
 
-Unacked rows are written to memory-mapped files under
-`<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
+Unacked rows are written to memory-mapped files in the sender's **sender
+directory**, `<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
 
 **Choose SF mode when:**
 

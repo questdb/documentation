@@ -55,11 +55,13 @@ applies them again on replay.
 ### Store-and-forward replay across sender restarts
 
 With [store-and-forward](/docs/high-availability/store-and-forward/concepts/)
-enabled, the client persists outgoing frames to disk. After a sender
-process crash or restart, the next sender instance reads the on-disk queue
-and replays everything past the durable-ack watermark. The window between
-"the server applied the frame" and "the client recorded the ack" is
-exactly the window in which replay produces duplicates.
+enabled, the client persists outgoing
+[batches](/docs/high-availability/store-and-forward/concepts/#batches) to
+disk. After a sender process crash or restart, the next sender instance reads
+the on-disk queue and replays everything past the acknowledgement point it
+recovers from disk. The window between "the server applied the batch" and
+"the client recorded the ack" is exactly the window in which replay produces
+duplicates.
 
 This path applies only when `sf_dir` is set on the connect string.
 

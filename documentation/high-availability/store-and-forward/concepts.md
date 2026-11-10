@@ -2,9 +2,9 @@
 title: Store-and-forward concepts
 sidebar_label: Concepts
 description:
-  How the QuestDB store-and-forward client substrate decouples the producer
-  from the wire, masks network outages and server restarts, and replays
-  unacknowledged data against a fresh connection.
+  How QuestDB store-and-forward keeps QWP batches in memory or in a sender
+  directory on disk, tracks them by FSN, and replays them after a reconnect or
+  crash.
 ---
 
 Store-and-forward (SF) is the client-side substrate that sits between your
@@ -18,8 +18,8 @@ returns as soon as data is published into the substrate. Acknowledgements
 arrive asynchronously. A network outage or a server restart leaves your
 producer code unaffected — the I/O thread quietly reconnects and replays
 what remains. In SF mode, even a crash of the sender process itself loses
-no unacked data: the next sender that uses the same sender directory
-recovers it from disk and replays it.
+no unacked data: the next sender that uses the same **sender directory**,
+`<sf_dir>/<sender_id>/`, recovers it from disk and replays it.
 
 ## Two modes
 
@@ -28,7 +28,7 @@ SF runs in either of two modes selected by the connect string:
 | Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Trigger | `sf_dir` is **unset** | `sf_dir` is set |
-| Storage | malloc'd ring in process RAM | mmap'd files under `<sf_dir>/<sender_id>/` |
+| Storage | malloc'd ring in process RAM | mmap'd files in the [sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout), `<sf_dir>/<sender_id>/` |
 | Default capacity | `128 MiB` | `10 GiB` |
 | Unacked data if the sender crashes | Lost | Recovered and replayed on restart |
 | Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
@@ -40,7 +40,7 @@ Both modes share the same reconnect loop, the same backoff and retry
 budgets, and the same on-the-wire behaviour. The only difference is
 where unacked data lives.
 
-## Batches
+## Batches and frames {#batches}
 
 A **batch** is one encoded QWP message carrying rows for one or more
 tables. A flush sends its rows as one batch. A flush too large for one batch
@@ -100,7 +100,7 @@ release ring memory (in memory-only mode) up to that watermark.
 
 Two trim drivers exist:
 
-### Default — OK-driven trim
+### Default: OK-driven trim
 
 Each successful batch produces an **OK response** carrying the highest
 `wireSeq` it acknowledges and the per-table `seqTxn` watermarks that
@@ -305,16 +305,16 @@ directory is preserved for inspection.
 ## Orphan adoption
 
 When the foreground sender's connect string sets `drain_orphans=on`, the
-engine scans `<sf_dir>/*` at startup for **other sender directories** —
-other `sender_id`s under the same group root that contain unacked data
-and are not marked `.failed`. For each one, up to
+engine scans `<sf_dir>/*` at startup for **orphans**: other sender
+directories under the same `sf_dir` that contain unacked data and are not
+marked `.failed`. For each one, up to
 `max_background_drainers` at a time, a background drainer spawns,
 acquires the orphan's lock (skipping if another process holds it),
 opens a separate WebSocket connection, runs the same recovery + replay
 flow, and exits when the orphan is fully drained.
 
-This is the rescue path for a sender that died without draining cleanly
-— a process crash, an OOM kill, a host reboot. The replacement process picks
+This is the rescue path for a sender that died without draining cleanly,
+after a process crash, an OOM kill, or a host reboot. The replacement process takes
 the orphan's lock and clears its disk footprint. Without
 `drain_orphans=on` the dead sender's data persists on disk indefinitely
 until an operator intervenes.

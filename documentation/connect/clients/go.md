@@ -162,7 +162,7 @@ func main() {
 		panic(err)
 	}
 
-	// Query: the ACK above confirms QuestDB accepted the rows. The row becomes
+	// Query: the ACK above confirms QuestDB accepted the row. The row becomes
 	// visible to queries only after the WAL is applied, which happens
 	// asynchronously. Poll for visibility, bounded by a deadline.
 	deadline := time.Now().Add(10 * time.Second)
@@ -220,7 +220,7 @@ real code:
   sends them twice. Call `Flush` to retry. See
   [When rows can't be queued](#when-rows-cant-be-queued).
 - **Durability is not visibility.** An ACK means QuestDB committed the rows to
-  the WAL. The row becomes queryable only once the WAL is applied to the table,
+  the WAL. The rows become queryable only once the WAL is applied to the table,
   which happens asynchronously, so a SELECT issued straight after the ACK can
   still return zero rows. `AwaitAckedFsn` cannot close that gap. For
   read-after-write, poll with a bounded deadline as the quick start does.
@@ -1004,7 +1004,7 @@ What to know about these directories:
 - **Cleaning them up is up to you.** The client never deletes them, and they
   don't count against `sf_max_total_bytes`. A crash loop can leave one per
   restart.
-- **Each sender directory can have at most 64.** `<n>` runs from 0 to 63. When
+- **At most 64 per sender directory.** `<n>` runs from 0 to 63. When
   all 64 names are taken, the sender refuses to start until you move or remove
   some.
 - **Don't rename one back into a sender directory** to have it replayed. It is

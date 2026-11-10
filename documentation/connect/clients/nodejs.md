@@ -949,14 +949,14 @@ values are rescaled to it when that is exact. See
 
 ### Auto-flush
 
-A sender publishes its batch when it completes a row that crosses any of these
-thresholds:
+A sender flushes its buffered rows when it completes a row that crosses any of
+these thresholds:
 
 | Trigger                       | Default | Connect-string key    | Option                |
 | ----------------------------- | ------- | --------------------- | --------------------- |
-| Rows in the batch             | `1000`  | `auto_flush_rows`     | `autoFlushRows`       |
+| Buffered rows                 | `1000`  | `auto_flush_rows`     | `autoFlushRows`       |
 | Milliseconds since last flush | `100`   | `auto_flush_interval` | `autoFlushIntervalMs` |
-| Estimated batch bytes         | off     | `auto_flush_bytes`    | `autoFlushBytes`      |
+| Estimated buffered bytes      | off     | `auto_flush_bytes`    | `autoFlushBytes`      |
 
 `0` disables one row or time trigger: this client rejects `off` for
 `auto_flush_rows` and `auto_flush_interval`, and accepts it for
@@ -1128,7 +1128,8 @@ yet.
 ## Store-and-forward
 
 Setting `sf_dir` writes every batch to disk before it is sent. `flush()` then
-resolves once the batch is on disk, and unacknowledged data survives a
+resolves once the batch is written to the sender directory, and
+unacknowledged data survives a
 process crash or restart: a new sender with the same `sf_dir` and `sender_id`
 replays it. After a crash in a container, the new sender may first need a
 [manual step](#recovering-a-sender-directory-after-a-crash).
@@ -1140,7 +1141,9 @@ ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
 - Each sender keeps its data in its own **sender directory**:
   `<sf_dir>/<sender_id>` for a standalone sender, where `sender_id` defaults to
   `default`, and `<sf_dir>/<sender_id>-<index>` for each pooled sender. Error
-  names call it a replay store, as in `QwpReplayStoreLockedError`.
+  names call it a replay store, as in `QwpReplayStoreLockedError`, and error
+  messages and the client README call it the store-and-forward journal, as in
+  `QWP store-and-forward journal is full`.
 - One live sender owns a sender directory. A second process that opens it
   fails with `QwpReplayStoreLockedError`, which the pooled client reports as
   the `cause` of a `QwpPoolResourceError`, so give concurrent senders distinct
@@ -1181,12 +1184,14 @@ with `QwpReplayStoreAppendTimeoutError`. With the typed option
 `QwpReplayStoreFullError`.
 
 `drain_orphans=on` scans the other sender directories in `sf_dir` at startup
-and every 30 seconds, and replays any that no live process holds. Use it only
-on an `sf_dir` dedicated to this producer group. A sender directory that
-cannot be replayed is marked `.failed` and left on disk. After inspecting it,
-call `retryQwpNodeOrphanSlot(directory)` to make it eligible again.
+and every 30 seconds, and replays any that no live process holds. Such a
+directory is called an orphan. Use it only on an `sf_dir` dedicated to this
+producer group. A sender directory that cannot be replayed is marked `.failed`
+and left on disk. After inspecting it, pass its path to
+`retryQwpNodeOrphanSlot(directory)` to make it eligible again; the function's
+name calls a sender directory a slot.
 
-:::caution Do not share a sender directory with a running Java client
+:::caution Do not share an `sf_dir` with a running Java client
 
 The format of a sender directory is shared with the Java, Rust, and Python
 clients, so one runtime can recover a directory another runtime wrote after it
@@ -2071,9 +2076,9 @@ server must enable the UDP receiver with
 
 A long-running ingestion service with TLS, a bearer token, two endpoints,
 store-and-forward on disk, error and connection callbacks, and a clean
-shutdown. It consumes trades in batches from an upstream queue, such as a Kafka
-topic, and commits each batch upstream once the batch is on disk in the
-sender directory.
+shutdown. It consumes trades from an upstream queue, such as a Kafka topic, in
+upstream batches, and commits each upstream batch once its rows are on disk in
+the sender directory.
 
 The service has one producer and runs no queries, so it uses a standalone
 `Sender` rather than the pooled client, as [Choose an API](#choose-an-api)
@@ -2101,8 +2106,8 @@ For an existing table, add the column with
 `ALTER TABLE trades ADD COLUMN trade_id LONG`, then enable deduplication with
 [`ALTER TABLE trades DEDUP ENABLE UPSERT KEYS(timestamp, symbol, trade_id)`](/docs/query/sql/alter-table-enable-deduplication/).
 
-`ingest()` writes every batch its feed yields, flushes it, commits it upstream,
-and drains when the feed ends:
+`ingest()` writes the rows of every upstream batch its feed yields, flushes
+them, commits the upstream batch, and drains when the feed ends:
 
 ```typescript
 import { Sender } from "@questdb/nodejs-client";
@@ -2155,8 +2160,8 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
   await sender.connect(); // returns at once: initial_connect_retry=async
 
   try {
-    for await (const batch of feed) {
-      for (const trade of batch.trades) {
+    for await (const tradeBatch of feed) {
+      for (const trade of tradeBatch.trades) {
         await sender
           .table("trades")
           .symbol("symbol", trade.symbol)
@@ -2167,10 +2172,10 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
           .at(trade.timestamp, "ms");
       }
       // Auto-flush runs only when a row completes, so flush the end of each
-      // batch. Otherwise its last rows wait for the next trade.
+      // upstream batch. Otherwise its last rows wait for the next trade.
       await sender.flush();
-      // The batch is on disk, so the commit cannot lose it.
-      await batch.commit();
+      // The rows are on disk, so the upstream commit cannot lose them.
+      await tradeBatch.commit();
     }
     // Unacknowledged rows stay in the sender directory for the next start.
     await sender.flushAndWait(10_000);
@@ -2180,19 +2185,19 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
 }
 ```
 
-With `sf_durability=append`, `flush()` resolves only after the batch is synced
-to disk, so a batch committed upstream survives a power loss as well as a
-process crash. With the default `memory` durability, a host crash can lose
-batches in the sender directory: commit upstream after `flushAndWait()`
+With `sf_durability=append`, `flush()` resolves only after the rows are synced
+to disk, so an upstream batch committed after it survives a power loss as well
+as a process crash. With the default `memory` durability, a host crash can
+lose rows in the sender directory: commit upstream after `flushAndWait()`
 instead.
 
 A terminal rejection, such as a schema mismatch, makes the next `at()` or
-`flush()` reject and ends `ingest()`. The rejected batch stays in the sender
-directory, so a restart sends it again and fails the same way until you
+`flush()` reject and ends `ingest()`. The rejected rows stay in the sender
+directory, so a restart sends them again and fails the same way until you
 [fix the cause or move the directory aside](#errors-from-calls).
 
 End the feed on `SIGTERM` so that `ingest()` drains and closes the sender. The
-sender directory keeps every unacknowledged batch, so a restart with the
+sender directory keeps every unacknowledged row, so a restart with the
 same `sender_id` delivers what this process did not, and the deduplication
 keys discard rows that QuestDB had already stored. After a crash, a restarted
 container may first need the

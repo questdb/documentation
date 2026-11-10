@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-An `Ok` ACK confirms that QuestDB accepted the rows, but the row becomes
+An `Ok` ACK confirms that QuestDB accepted the row, but the row becomes
 visible only after the WAL is applied to the table. This happens asynchronously.
 The bounded poll uses a unique value and a bind parameter, so it cannot
 accidentally report an older row. In production, poll for the application
@@ -827,7 +827,7 @@ publication can wait for ACK-driven space and then return an error:
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a sender or pool closes. |
 
 Size the queue for the largest expected outage and ingest rate. If an in-memory
-queue cannot drain before close timeout, its remaining tail is lost. Disk mode
+queue cannot drain before close timeout, its remaining tail is lost. SF mode
 keeps the tail for restart replay, subject to the page-cache durability limit.
 
 ## Concurrency and sizing
@@ -893,7 +893,7 @@ to return a connection, then fails with `ErrorCode::InvalidApiCall`. Set
 mode, an ingestion borrow may first wait up to `close_flush_timeout_millis` for
 a closing sender to release the lock on its sender directory.
 
-Keep borrows short. A borrow occupies its slot until `Drop`, even while the
+Keep borrows short. A borrow holds its place in the pool until `Drop`, even while the
 application is idle.
 
 ## Failover and errors

@@ -34,6 +34,12 @@ string at. `<sender_id>` is the sender directory's name; it defaults to
 `default` but should be set explicitly when more than one sender shares
 the host.
 
+Client APIs and messages often call a sender directory a *slot*, as in
+`UnreplayableSlotException`, the Go client's `QuarantinedSlotPath()`, and
+lock errors such as `sf slot already in use`. Node.js messages call it a
+store-and-forward *journal*, and its error names call it a *replay store*,
+as in `QwpReplayStoreLockedError`.
+
 ### `.lock` and `.lock.pid`
 
 The `.lock` file is held under an advisory exclusive lock for the engine's
@@ -111,14 +117,14 @@ when the new one comes up. Solutions:
 - For containerised deployments, set `sender_id` from a per-pod stable
   identity so two pods with the same template name don't collide.
 
-`drain_orphans=on` does **not** override the lock — a busy orphan is
-skipped, not stolen.
+`drain_orphans=on` does **not** override the lock: a sender directory that
+another process holds is skipped, not stolen.
 
 ## Sizing capacity
 
 Two limits matter:
 
-### `sf_max_segment_bytes` — per-segment file size (default `4 MiB`)
+### `sf_max_segment_bytes`: per-segment file size (default `4 MiB`) {#sf_max_segment_bytes}
 
 This is the rotation threshold and the unit of trim. Segments that are
 smaller release disk faster but waste more space on the active tail;
@@ -130,7 +136,7 @@ For most workloads `4 MiB` is fine. Raise it if you are appending very
 large batches and pre-allocation cost matters; lower it if you observe
 disk usage staying high under slow ack cadence.
 
-### `sf_max_total_bytes` — capacity (default `128 MiB` memory-only / `10 GiB` SF)
+### `sf_max_total_bytes`: per-sender capacity (default `128 MiB` memory-only / `10 GiB` SF) {#sf_max_total_bytes}
 
 This is the **hard cap** on resident SF storage — sealed segments plus
 the active segment. When this fills, producer `appendBlocking` calls
@@ -269,7 +275,7 @@ A conformant client exposes at minimum:
 |---|---|
 | `getTotalReconnectAttempts()` | How often the wire has broken across the sender's lifetime. |
 | `getTotalReconnectsSucceeded()` | How many of those recovered. |
-| `getTotalFramesReplayed()` | Volume re-sent after reconnects. A spike usually means a fresh outage; sustained growth means a flapping wire. |
+| `getTotalFramesReplayed()` | Batches re-sent after reconnects (the protocol calls a batch a frame). A spike usually means a fresh outage; sustained growth means a flapping wire. |
 | `getTotalServerErrors()` | Count of error responses received (any category). |
 | `getDroppedErrorNotifications()` | Error-inbox overflow count. Non-zero means a busy error stream or a slow handler. |
 | `getTotalErrorNotificationsDelivered()` | Errors delivered to the user handler. |

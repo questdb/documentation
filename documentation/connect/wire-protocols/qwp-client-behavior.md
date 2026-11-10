@@ -377,8 +377,8 @@ the steady-state loop:
 1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
    which gives up and throws when the budget expires.
 2. The background drainer's **durable-ack capability-gap budget**, used when
-   draining an orphan repeatedly lands on a node that cannot serve durable
-   acks.
+   the connection that drains an orphan repeatedly lands on a node that cannot
+   serve durable acks.
 
 The practical consequence: what bounds your tolerance of a long outage is
 **buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
