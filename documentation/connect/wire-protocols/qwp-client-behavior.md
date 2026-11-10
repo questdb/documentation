@@ -182,7 +182,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
-| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
+| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory-only mode) |
 | `sf_durability` | `memory` |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
@@ -309,16 +309,25 @@ here.
 
 `sf_dir=...` enables SF. There is no separate boolean enable flag.
 
-- The sender owns one slot: `<sf_dir>/<sender_id>/`. Default `sender_id` is
-  `default`.
+A flush sends rows to the server in batches. A batch is one QWP message; the
+protocol specs call it a *frame*, hence names such as `max_frame_rejections`.
+See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
+
+- The sender owns one sender directory: `<sf_dir>/<sender_id>/`. Default
+  `sender_id` is `default`.
 - Multiple independent senders sharing one `sf_dir` must use distinct
-  `sender_id` values, else the second fails because the slot lock is held.
-- In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
-  pooled senders never collide. The minted name is client-specific: Java uses
-  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
-  `<base>-ingest-0`, `<base>-ingest-1`, ….
+  `sender_id` values, else the second fails because the first holds the
+  directory's lock.
+- In pooled `QuestDB` usage, the pool derives a directory name for each pooled
+  sender from the base so they never collide. The minted name is
+  client-specific: Java uses `<base>-0`, `<base>-1`, …; the pool shared by
+  Rust, C, C++, Python, and Ruby uses `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
-  unacknowledged frames; acknowledged/truncated frames are not replayed.
+  unacknowledged batches. Segments already freed are not replayed, but
+  acknowledged batches in a surviving segment can be, unless the
+  `.ack-watermark` file records them; see
+  [`.ack-watermark`](/docs/high-availability/store-and-forward/concepts/#ack-watermark).
+  Use DEDUP to absorb them.
 
 `flush()` semantics (QWP sender):
 
@@ -326,9 +335,10 @@ here.
 - In SF mode, data is persisted to mmap-backed segment files before `flush()`
   returns.
 - `flush()` does **not** wait for server ACKs unless backpressure requires
-  space. The I/O thread sends frames and trims ACKed frames asynchronously.
+  space. The I/O thread sends batches asynchronously and, as acknowledgements
+  arrive, frees each segment whose batches are all acknowledged.
 - `drain(timeoutMillis)` flushes and waits for the server to ACK all currently
-  published frames, up to the timeout.
+  published batches, up to the timeout.
 - `close()` flushes then waits up to `close_flush_timeout_millis` for ACKs,
   unless that timeout is `<= 0`.
 
@@ -337,24 +347,25 @@ here.
 With `initial_connect_retry=async`:
 
 - `build()` returns without a live socket; `wasEverConnected()` is `false`.
-- Producer calls and `flush()` can run before the server exists; frames
+- Producer calls and `flush()` can run before the server exists; rows
   accumulate in the cursor engine (and on disk with `sf_dir`).
 - The I/O thread retries in the background using the same loop used after wire
   failure, with capped exponential backoff and no wall-clock deadline.
-- When a server appears, buffered frames are sent/replayed and ACK-driven
-  trimming begins.
+- When a server appears, buffered rows are sent or replayed, and acknowledged
+  data starts being freed.
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
 A sender in async mode does not give up because time passed. It ends only on
-a **terminal** condition: an authentication rejection or a durable-ack
-capability mismatch, the poison-frame detector, or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
-`append()`. ⚠ The Java client treats an authentication rejection or a
-durable-ack capability mismatch as terminal only before the sender first
-connects, and retries them afterwards. A Node.js sender that uses
-store-and-forward or `initial_connect_retry=async` does the same once it has
-connected, as do some browser senders: see
+a **terminal** condition: an authentication rejection, a durable-ack capability
+mismatch, or a batch the server keeps rejecting (`max_frame_rejections`).
+Exhausting `sf_append_deadline_millis` on `append()` with `sf_max_total_bytes`
+reached fails only that call; the sender stays alive and keeps retrying.
+⚠ The Java client treats an
+authentication rejection or a durable-ack capability mismatch as terminal only
+before the sender first connects, and retries them afterwards. A Node.js
+sender that uses store-and-forward or `initial_connect_retry=async` does the
+same once it has connected, as do some browser senders: see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
@@ -369,13 +380,14 @@ the steady-state loop:
 
 1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
    which gives up and throws when the budget expires.
-2. The background drainer's **durable-ack capability-gap budget**, used when an
-   orphan slot repeatedly lands on a node that cannot serve durable acks.
+2. The background drainer's **durable-ack capability-gap budget**, used when
+   the connection that drains an orphan repeatedly lands on a node that cannot
+   serve durable acks.
 
 The practical consequence: what bounds your tolerance of a long outage is
 **buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
-available disk; in memory mode it is the same key against RAM. When the cap is
-reached, `append()` blocks and then throws after
+available disk; in memory-only mode it is the same key against RAM. When the
+cap is reached, `append()` blocks and then throws after
 `sf_append_deadline_millis` — that, not a timer, is the signal that an outage
 has outlasted your configuration.
 
@@ -425,8 +437,8 @@ fails, or the token did not change, the phase decides what happens:
 | Initial connect, `on` / `sync` | retry within `reconnect_max_duration_millis` | fail startup | fail startup |
 | Initial connect, `async` | retry indefinitely | retry indefinitely | terminal, reported to the error handler |
 | Sender that has connected | retry indefinitely | retry indefinitely | retry indefinitely |
-| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the slot aside |
-| Orphan drain, fixed credential | n/a | n/a | set the slot aside |
+| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the directory aside |
+| Orphan drain, fixed credential | n/a | n/a | set the directory aside |
 | Query | fail the query | fail the query | fail the query |
 
 *Retry indefinitely* means with capped exponential backoff for as long as the
@@ -469,7 +481,7 @@ unreachable endpoint, and tries the next one.
 
 `QwpQueryClient.connect()` is synchronous. Per endpoint it: opens TCP/TLS,
 performs the WebSocket upgrade to `/read/v1`, reads the initial `SERVER_INFO`
-frame, applies the `target=` role filter, and starts the egress I/O thread on
+message, applies the `target=` role filter, and starts the egress I/O thread on
 the first match. If no endpoint can be used, it throws. There is no async
 initial-connect mode for queries.
 
@@ -540,7 +552,7 @@ reconnect/replay.
 | token provider cannot supply a token | `off` | build throws the provider's exception |
 | token provider cannot supply a token | `on` / `sync` | retryable failure: retried within `reconnect_max_duration_millis`; permanent failure: build throws |
 | token provider cannot supply a token | `async` | build returns; I/O thread retries |
-| server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
+| server appears later, any delay | `initial_connect_retry=async` | buffered rows sent and ACKed — the retry loop has no deadline |
 | server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
 #### Read-replica startup (one bad endpoint, another replica works)
@@ -607,15 +619,16 @@ avoid it.
 
 ### Pooled SF startup recovery nuance
 
-- Live/prewarmed sender slots recover their own unacked data via their
-  `CursorSendEngine`.
-- Non-live managed slots are scanned by the housekeeper startup recovery path,
-  so `build()` does not block on stranded slots.
-- Recovery of non-live stranded slots is best-effort and bounded: a build/drain
-  failure aborts that scan; data stays durable for a later attempt, but the
-  current process does not retry the aborted scan indefinitely.
-- For immediate background drain of all slots, keep enough `sender_pool_min`
-  slots warm or construct direct senders for the slots that must actively retry.
+- Live or prewarmed pooled senders recover the unacked data in their own sender
+  directories via their `CursorSendEngine`.
+- The pool's other sender directories are scanned by the housekeeper startup
+  recovery path, so `build()` does not block on stranded directories.
+- Recovery of those stranded directories is best-effort and bounded: a
+  build/drain failure aborts that scan; data stays durable for a later attempt,
+  but the current process does not retry the aborted scan indefinitely.
+- For immediate background drain of every sender directory, keep enough
+  senders warm with `sender_pool_min`, or construct direct senders for the
+  directories that must actively retry.
 
 ### Reconnect loop (`CursorWebSocketSendLoop`)
 

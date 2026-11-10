@@ -111,7 +111,7 @@ The steps are:
 3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
    and waits for the server ACK**. Auto-flush publishes full batches on its own,
    but the final partial batch is only guaranteed once you call `SendAsync()`.
-   An ACK means QuestDB committed the frame to the WAL, not that the rows are
+   An ACK means QuestDB committed the rows to the WAL, not that they are
    queryable yet: the WAL is applied to the table asynchronously. Rows are
    usually visible within milliseconds, but read-after-write logic should poll
    rather than assume.
@@ -176,15 +176,15 @@ surface (bind parameters, DDL/DML, failover, compression).
 `Sender` is single-threaded and owns one connection. To send in parallel,
 create one sender per producer thread. If those senders share a
 [store-and-forward](#store-and-forward) directory, each must be configured
-with a distinct `sender_id` so they do not contend for the same on-disk
-slot — see [Store-and-forward](#store-and-forward).
+with a distinct `sender_id` so they do not contend for the same sender
+directory — see [Store-and-forward](#store-and-forward).
 
 :::
 
 ## Authentication and TLS
 
 Authentication happens at the HTTP level during the WebSocket upgrade, before
-any binary frames are exchanged.
+any data is exchanged.
 
 ### Basic authentication
 
@@ -235,7 +235,7 @@ that purpose; left unset, it inherits `auth_timeout_ms`.
 ### Production example (TLS + token + multi-host)
 
 A realistic Enterprise deployment combines `wss`, token auth, multi-host
-failover, and a store-and-forward directory so unacked frames survive a
+failover, and a store-and-forward directory so unacked rows survive a
 sender restart:
 
 ```csharp
@@ -401,7 +401,7 @@ await Parallel.ForEachAsync(batches, async (batch, ct) =>
   decimal / extended columns), cast the borrowed `ISender` to
   `IQwpWebSocketSender` — pooled `ws` / `wss` senders implement it.
 - If the handle's ingest config sets `sf_dir`, each pooled sender owns a
-  distinct on-disk slot `<sender_id>-<index>`, so
+  distinct sender directory, `<sender_id>-<index>`, so
   [store-and-forward](#store-and-forward) works across the whole pool without
   extra configuration.
 
@@ -710,8 +710,8 @@ On QWP what `Send` waits for depends on the sender:
   server acknowledges it, bounded by `close_flush_timeout_millis` (throwing
   `IngressError` on timeout). A successful `SendAsync()` therefore means the
   rows are delivered.
-- A **pooled** sender (from `BorrowSender`) hands the frame to the send ring
-  and returns immediately; the pooled connection ships it asynchronously and
+- A **pooled** sender (from `BorrowSender`) hands the rows to its send queue
+  and returns immediately; the pooled connection ships them asynchronously and
   delivery is confirmed with `Flush()` / [`IQuestDBClient.Flush()`](#closing).
 
 Either way, **dispose never sends** — a sender that is disposed without a
@@ -749,8 +749,9 @@ await sender.PingAsync();
 Console.WriteLine($"trades committed seqTxn: {sender.GetHighestAckedSeqTxn("trades")}");
 ```
 
-For frame-level tracking, every flush is assigned a frame sequence number
-(FSN):
+A flush sends rows to the server in batches; the protocol calls a batch a
+*frame*. To track batches, every published batch gets a frame sequence
+number (FSN):
 
 ```csharp
 long fsn = await sender.FlushAndGetSequenceAsync();
@@ -760,7 +761,7 @@ if (!acked) Console.Error.WriteLine("timed out waiting for server ACK");
 
 | Member | Returns |
 |---|---|
-| `FlushAndGetSequenceAsync()` | FSN of the highest frame published by this call. |
+| `FlushAndGetSequenceAsync()` | FSN of the last batch published by this call; if it had nothing to publish, the highest FSN published so far. |
 | `AckedFsn` | Highest FSN the server has acknowledged. |
 | `AwaitAckedFsnAsync(fsn, timeout)` | Block until `AckedFsn` reaches `fsn`. |
 | `GetHighestAckedSeqTxn(table)` | Highest committed `seqTxn` per table (`-1` if none). |
@@ -772,21 +773,24 @@ The server validates batches, and rejections are reported **out of band**:
 they arrive at the [error handler](#error-handler) on a background dispatcher
 rather than being thrown from the `Send` call that published the batch. (A
 standalone `Send` / `SendAsync` waits for the *ACK* of a successful batch, but
-a rejection produces an error frame, not an ACK — so it still surfaces through
-the handler, not the `Send` return.) This section covers how those
+a rejection produces an error response, not an ACK, so it still surfaces
+through the handler, not the `Send` return.) This section covers how those
 asynchronous errors are classified and handled.
 
 ### How errors surface
 
 Each error is classified into a `SenderErrorCategory` and assigned a
-`SenderErrorPolicy`:
+`SenderErrorPolicy`. The client never drops a rejected batch:
 
 | Policy | Effect | Default categories |
 |---|---|---|
-| `DropAndContinue` | The rejected batch is dropped; the sender keeps running. | `SchemaMismatch`, `WriteError` |
-| `Halt` | The sender latches terminal; the next producer call throws `LineSenderServerException`. | `ParseError`, `InternalError`, `SecurityError`, `ProtocolViolation`, `Unknown` |
+| `Retriable` | The client reconnects and replays the rejected batch from the acknowledged watermark. A batch the server keeps rejecting becomes `Terminal` after `max_frame_rejections` rejections in a row. | `WriteError`, `InternalError`, `NotWritable`, `DictionaryGap`, `Unknown` |
+| `Terminal` | The sender stops sending, the next producer call throws `LineSenderServerException`, and the rejected batch stays in the queue. | `SchemaMismatch`, `ParseError`, `SecurityError`, `ProtocolViolation` |
+| `Abandoned` | Rows set aside at `QuarantinedPath` will never be sent. | `DataLoss` only |
 
-After a `Halt`, discard the sender and create a new one.
+After a `Terminal` error, dispose of the sender and create a new one. With
+[store-and-forward](#store-and-forward), the new sender replays the rejected
+batch and fails the same way until you fix the cause.
 
 ### Error handler
 
@@ -814,11 +818,12 @@ Each `SenderError` carries the following fields:
 
 | Field | Description |
 |---|---|
-| `Category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
-| `AppliedPolicy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal; next API call throws `LineSenderServerException`). |
+| `Category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `NotWritable`, `DictionaryGap`, `DataLoss`, `Unknown`. Use for programmatic dispatch. |
+| `AppliedPolicy` | `Retriable` (the client replays the batch), `Terminal` (the sender stopped; the next API call throws `LineSenderServerException`), or `Abandoned` (with `DataLoss` only). |
+| `QuarantinedPath` | For `DataLoss`: where the bytes that will never be sent are kept. `null` otherwise. |
 | `ServerStatusByte` | Raw QWP status byte (e.g. `0x03` for `SchemaMismatch`). `-1` (`SenderError.NoStatusByte`) on `ProtocolViolation` and engine-internal terminal failures. |
 | `ServerMessage` | Human-readable server text (≤ 1024 UTF-8 bytes), or `null`. See [Message stability](#message-stability) and [PII safety](#message-pii). |
-| `MessageSequence` | Server's per-frame QWP wire sequence for the error frame. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
+| `MessageSequence` | The server's sequence number for the rejected batch on this connection. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
 | `FromFsn` / `ToFsn` | Inclusive client-side FSN span of the affected batch. Pair with `FlushAndGetSequenceAsync()` to identify the rejected rows. |
 | `TableName` | Rejected table; `null` for multi-table batches or when the server did not attribute the error. |
 | `DetectedAtUtc` | Wall-clock receipt time on the I/O thread; for ops timelines, not for correlation. |
@@ -828,9 +833,9 @@ Each `SenderError` carries the following fields:
 #### Message stability {#message-stability}
 
 `ServerMessage` is a human-readable diagnostic — **not a stable contract.**
-QWP error frames carry a server-supplied UTF-8 string capped at 1024 bytes by
-the wire spec; the text mirrors QuestDB's normal SQL error formatting and has
-historically been reworded across releases. The field may be empty. Use
+QWP error responses carry a server-supplied UTF-8 string capped at 1024 bytes
+by the wire spec; the text mirrors QuestDB's normal SQL error formatting and
+has historically been reworded across releases. The field may be empty. Use
 `Category` and `ServerStatusByte` for programmatic dispatch; never
 pattern-match on `ServerMessage`.
 
@@ -850,7 +855,7 @@ structural metadata.
 QWP does not surface a server-issued request or connection identifier. The
 closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
 plus the connection start time from your application logs — `MessageSequence`
-resets on reconnect, so it only disambiguates frames within a single
+resets on reconnect, so it only tells batches apart within a single
 connection. When filing a support ticket, include the connection start time
 and the `(MessageSequence, FromFsn, ToFsn)` triple.
 
@@ -869,7 +874,7 @@ rejections). They are thrown directly from the call site:
 | Array `Column(...)` overloads | The `shape` does not match the element count, dimensionality exceeds 32, or the element type is not `double` / `long`. |
 | `ColumnGeohash(...)` | `precisionBits` is outside `[1, 60]`. |
 | `ColumnDecimal*(...)` with explicit `scale` | `scale` is outside `[0, 18]` (DECIMAL64), `[0, 38]` (DECIMAL128), or `[0, 76]` (DECIMAL256). |
-| Producer-thread call after `Halt` policy fired | The next `Table`, `Column`, `AtAsync`, or `SendAsync` throws `LineSenderServerException` carrying the latched `SenderError`. Discard the sender and create a new one. |
+| Producer-thread call after a `Terminal` policy fired | The next `Table`, `Column`, `AtAsync`, or `SendAsync` throws `LineSenderServerException` carrying the terminal `SenderError`. Discard the sender and create a new one. |
 
 Authentication failures surface differently between paths: a `401` / `403`
 during the WebSocket upgrade returns synchronously from `Sender.New` /
@@ -881,26 +886,31 @@ the sender latched terminal.
 ### Per-category policy
 
 Override the default policy per category with the `on_*_error` connect-string
-keys (values `halt` or `drop`):
+keys. Values are `halt` (or `terminal`) and `retry` (or `retriable`); the
+legacy value `drop` means `retry`, since the client no longer drops batches.
+An override can only make a category stricter: categories that default to
+`Terminal` stay `Terminal`.
 
 ```csharp
-// Treat a schema mismatch as fatal instead of dropping the batch.
+// Stop the sender instead of retrying while a table isn't accepting writes.
 using var sender = Sender.New(
-    "ws::addr=localhost:9000;on_schema_mismatch_error=halt;");
+    "ws::addr=localhost:9000;on_write_error=halt;");
 ```
 
 | Key | Scope |
 |---|---|
-| `on_server_error` | Catch-all default for every category. |
-| `on_schema_mismatch_error` (alias: `on_schema_error`) | Schema-validation rejections. |
-| `on_parse_error` | Client-side parse errors. |
-| `on_internal_error` | Unexpected client-side errors. |
-| `on_security_error` | Auth / TLS errors. |
-| `on_write_error` | Transport write failures. |
+| `on_server_error` | Default for every category below that has no key of its own. |
+| `on_schema_mismatch_error` (alias: `on_schema_error`) | Schema-validation rejections. Always `Terminal`. |
+| `on_parse_error` | Batches the server can't parse. Always `Terminal`. |
+| `on_internal_error` | Server-side faults. |
+| `on_security_error` | Authorization failures on a writable node. Always `Terminal`. |
+| `on_write_error` | Tables that aren't accepting writes. |
 
-`ProtocolViolation` and `Unknown` are always `Halt`, regardless of these keys.
-For programmatic control, set `SenderOptions.error_policy_resolver` to a
-`SenderErrorPolicyResolver` delegate.
+`ProtocolViolation` is always `Terminal`. `Unknown`, `NotWritable`, and
+`DictionaryGap` have no key and stay `Retriable` unless a resolver changes
+them. For programmatic control, set `SenderOptions.error_policy_resolver` to a
+`SenderErrorPolicyResolver` delegate; it can't relax a `Terminal` default
+either.
 
 ### Connection-level errors
 
@@ -912,9 +922,9 @@ or as listener events:
 - **Authentication failure** (`401` / `403` during the WebSocket upgrade) —
   terminal across all endpoints. The reconnect / failover loop stops
   immediately rather than replaying the same credential against every host.
-- **Malformed frames** — `QwpDecodeException` (egress) or `IngressError`
-  with a `ProtocolViolation` category (ingress); the WebSocket is closed
-  with a terminal code. The sender / query client transitions to a
+- **Malformed server responses** — `QwpDecodeException` (egress) or
+  `IngressError` with a `ProtocolViolation` category (ingress); the WebSocket
+  is closed with a terminal code. The sender / query client transitions to a
   non-recoverable state.
 - **Role mismatch** — `QwpRoleMismatchException` from `QueryClient.NewAsync`
   or the next `ExecuteReaderAsync` when no endpoint matches the configured
@@ -934,9 +944,10 @@ A summary of how the engine treats each error class on the wire:
 | Auth (`401` / `403`) on any endpoint | Terminal | Halts the failover loop immediately; the sender / query client latches non-recoverable. |
 | Role reject (`421` + `X-QuestDB-Role`) | Topology-level (transient if `PRIMARY_CATCHUP`, otherwise terminal for the loop) | The client tries the next endpoint; if every endpoint rejects, surfaces as `QwpRoleMismatchException` (egress) or the sender's reconnect loop exhausts. |
 | Version mismatch during upgrade | Per-endpoint, **not** terminal | The client moves on to the next endpoint. |
-| Server rejection of a batch (`SchemaMismatch`, `ParseError`, `WriteError`, etc.) | Per the `on_*_error` policy — default is `DropAndContinue` for `SchemaMismatch` / `WriteError`, `Halt` for everything else. | `DropAndContinue` keeps the sender alive; `Halt` latches the sender so the next producer call throws `LineSenderServerException`. |
+| Server rejection of a batch (`SchemaMismatch`, `ParseError`, `WriteError`, etc.) | Per the policy: `Terminal` for `SchemaMismatch`, `ParseError`, and `SecurityError`, `Retriable` for the rest unless an `on_*_error` key raises it. | `Retriable` replays the batch; `Terminal` stops the sender so the next producer call throws `LineSenderServerException`. |
 | TCP / TLS failure, `404`, `503`, mid-stream drop | Transient | Fed into the ingress reconnect loop (`reconnect_max_*` keys) or, on egress, the per-query failover loop (`failover_*` keys). |
-| `ProtocolViolation`, `Unknown` | Terminal | Always `Halt`, regardless of `on_*_error` settings. |
+| `ProtocolViolation` | Terminal | Always `Terminal`, regardless of `on_*_error` settings. |
+| `Unknown` | Transient | `Retriable` by default, so a status byte from a newer server doesn't stop the sender. |
 
 ### Connection events
 
@@ -970,7 +981,7 @@ fell behind the dispatcher inbox.
 
 ## Store-and-forward
 
-With store-and-forward (SF) enabled, unacknowledged frames are persisted to
+With store-and-forward (SF) enabled, unacknowledged rows are persisted to
 disk and replayed after reconnection, surviving sender process restarts:
 
 ```csharp
@@ -992,11 +1003,11 @@ second, which limits what a host crash or power loss can lose.
 | Key | Default | Description |
 |---|---|---|
 | `sf_dir` | unset | Enables disk-backed SF when set. |
-| `sender_id` | `default` | Slot identity (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
+| `sender_id` | `default` | Name of the sender directory under `sf_dir` (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
 | `sf_max_segment_bytes` | 4 MiB | Per-segment size cap. |
-| `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
+| `sf_max_total_bytes` | 128 MiB (memory-only) / 10 GiB (SF mode) | Cap on total queued bytes. |
 | `sf_append_deadline_millis` | 30000 | Max time a flush blocks waiting for queue capacity. |
-| `drain_orphans` | `off` | If `on`, take over stale slots from a crashed sender. |
+| `drain_orphans` | `off` | If `on`, take over sender directories left by a crashed sender. |
 
 ## Durable acknowledgement
 
@@ -1057,18 +1068,18 @@ Row builders (`Table`, `Symbol`, `Column`, `NullableColumn`) never block —
 they only mutate the in-process encode buffer, which grows up to
 `max_buf_size` (default 100 MiB). Backpressure surfaces at flush time:
 
-- **In-memory mode (no `sf_dir`).** The in-flight publish window caps how
-  many unacknowledged frames can sit on the connection. On a standalone sender
+- **Memory-only mode (no `sf_dir`).** The in-flight publish window caps how
+  many unacknowledged batches can sit on the connection. On a standalone sender
   `SendAsync()` drains, so when the server is reachable but slow it waits for
   ACK-driven capacity before returning. When the server is unreachable, the
   drain waits up to `close_flush_timeout_millis` and then throws a timeout
   `IngressError`. Dispose does **not** drain, so anything unsent at that point
-  is dropped; in-memory mode does **not** survive a process exit either —
-  unacked frames are lost.
+  is dropped; memory-only mode does **not** survive a process exit either —
+  unacked rows are lost.
 - **Store-and-forward mode (`sf_dir` set).** `SendAsync()` appends to the
   on-disk segment and returns quickly; the I/O loop drains it in the
   background. If the disk queue is at its `sf_max_total_bytes` cap, the
-  append blocks waiting for the loop to trim acknowledged frames, bounded by
+  append blocks until acknowledgements free space, bounded by
   `sf_append_deadline_millis` (default 30 000 ms). If the deadline elapses
   the engine latches a terminal error and the next producer call surfaces it.
   No data is dropped while the publisher is parked.
@@ -1080,11 +1091,17 @@ payload.
 
 ## Transactions
 
-:::caution WebSocket / QWP does not support transactions
+:::caution QWP transactions work differently from HTTP transactions
 
-The `Transaction` / `Commit` / `Rollback` API is **HTTP-only**. The QWP
-WebSocket sender rejects it — QWP frames are independently acknowledged batches.
-Use [store-and-forward](#store-and-forward) plus
+On QWP, the per-table `Transaction(table)` call and `Rollback()` throw
+`IngressError`. Set `transaction=on` in the connect string instead:
+auto-flushes then send rows without committing them, and `Commit()`,
+`CommitAsync()`, or `SendAsync()` commits everything sent since the last
+commit. Rows already sent can't be rolled back, because they are already on
+the server waiting for the commit. See
+[`FLAG_DEFER_COMMIT`](/docs/connect/wire-protocols/qwp-ingress-websocket/#flag_defer_commit)
+for how the server handles uncommitted rows. Use
+[store-and-forward](#store-and-forward) plus
 [DEDUP](/docs/concepts/deduplication/) keys for delivery guarantees on QWP.
 
 :::
@@ -1313,7 +1330,7 @@ There are two ways to cancel an in-flight query, and they differ in whether
 the connection survives:
 
 - **`reader.Cancel()`** (or `client.Cancel()`) — cooperative. Posts a QWP
-  `CANCEL` frame to the server; the stream then ends with a `ReadBatchAsync()`
+  `CANCEL` message to the server; the stream then ends with a `ReadBatchAsync()`
   that returns `false` and `reader.WasCancelled == true` (or, if the server
   raced to finish, a normal end with `WasCancelled == false`). The WebSocket
   stays open and the client is reusable for the next query. `Cancel()` is
@@ -1342,10 +1359,10 @@ Its `Status` (a `QwpStatusCode`) carries the QWP wire status byte and
 
 `QwpQueryException` can be thrown before the first batch (parse failure,
 schema mismatch on binds) or mid-stream (storage failure, server shutdown). It
-ends the query at a clean frame boundary, so the client stays usable — the next
-query on the same client starts fresh. A transport-level failure instead
-surfaces as a plain `IngressError` (or `OperationCanceledException` from a hard
-cancel), which **is** terminal — see Failover below.
+ends the query cleanly between result batches, so the client stays usable —
+the next query on the same client starts fresh. A transport-level failure
+instead surfaces as a plain `IngressError` (or `OperationCanceledException`
+from a hard cancel), which **is** terminal — see Failover below.
 
 ```csharp
 try
@@ -1500,7 +1517,7 @@ keys it honours:
 | Streaming | `compression`, `compression_level`, `max_batch_rows`, `initial_credit` |
 
 `initial_credit` (bytes; `0` = unbounded) caps how much data the server may
-emit before pausing for a `CREDIT` frame from the client — useful when a
+emit before pausing for a `CREDIT` message from the client — useful when a
 single result is much larger than the consumer's working set. The client
 auto-replenishes credit per consumed batch.
 
@@ -1539,7 +1556,7 @@ await using var sender = Sender.New("ws::addr=localhost:9000;");
 await sender.SendAsync();   // flush + await ACK; dispose alone would drop these rows
 ```
 
-With `sf_dir` set, frames that were already **sent** (handed to the on-disk
+With `sf_dir` set, rows that were already **sent** (handed to the on-disk
 ring) but not yet ACKed persist to disk and replay on the next run with the
 same `sf_dir` / `sender_id`. Rows that were only buffered — never sent — are
 not on disk and are lost regardless.
@@ -1560,10 +1577,10 @@ WebSocket options:
 | `tls_verify` / `tls_roots` / `tls_roots_password` | `on` / — / — | TLS configuration (`wss` only). |
 | `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
 | `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
-| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and slot identity. |
-| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
+| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and the sender directory name under it. |
+| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (memory-only) · 10 GiB (SF mode) / 30000 | Store-and-forward sizing and append backpressure deadline. |
 | `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
-| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
+| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' sender directories; max concurrent orphan drains. |
 | `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |
 | `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Sync initial-connect budget, plus the backoff the running loop uses while retrying indefinitely. |
 | `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |
@@ -1663,7 +1680,7 @@ await sender.AwaitAckedFsnAsync(fsn, TimeSpan.FromSeconds(10));
 //   EndpointAttemptFailed db-primary:9000   — retries during outage
 //   FailedOver db-replica:9000              — replica took over
 //
-// With sf_dir set, unacked frames are persisted to disk during the
+// With sf_dir set, unacked rows are persisted to disk during the
 // outage and replayed once the new primary is reachable.
 
 

@@ -305,8 +305,8 @@ def zigzag_decode(n):
 
 #### `FLAG_DEFER_COMMIT`
 
-This flag is how a client sends one logical batch that does not fit in a single
-frame. The server appends the frame's rows to WAL writers but does **not**
+This flag is how a client sends rows that do not fit in a single frame but must
+commit together. The server appends the frame's rows to WAL writers but does **not**
 commit them; they commit when a later frame arrives with the flag clear. The
 reference client sets the flag on every frame of a split except the last.
 
@@ -315,8 +315,9 @@ Four consequences an implementer must handle:
 - **An OK on a deferred frame is not durability.** While deferred rows are
   uncommitted, the server withholds advancement of the cumulative OK
   watermark. Do not treat the ack as a commit.
-- **Deferred rows are rolled back on disconnect.** A store-and-forward slot
-  whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
+- **Deferred rows are rolled back on disconnect.** A store-and-forward
+  [sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout)
+  (`<sf_dir>/<sender_id>/`) whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
   frame is an aborted group. The reference client detects and skips it during
   recovery.
 - **An empty message with the flag clear forces a commit** without sending any
@@ -1153,8 +1154,8 @@ want larger batches must raise `http.recv.buffer.size` on the server (e.g.,
 `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom); the next
 handshake will advertise the new ceiling automatically.
 
-A logical batch that exceeds the cap does not have to be split into separate
-transactions. Send it as several frames, setting
+Rows that exceed the cap do not have to be split into separate transactions.
+Send them as several frames, setting
 [`FLAG_DEFER_COMMIT`](#flag_defer_commit) on all but the last, and the server
 commits the whole group when the final frame arrives with the flag clear.
 
@@ -1192,11 +1193,14 @@ differ only in where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
-  the next sender bound to the same slot.
-- **`sf_dir` unset** (memory mode): segments are allocated in process memory.
-  Unacknowledged data is lost if the sender process dies. The reconnect loop
-  still spans transient server outages such as rolling upgrades, but the RAM
-  buffer caps how much data can accumulate during the outage.
+  the next sender that uses the same
+  [sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout),
+  `<sf_dir>/<sender_id>/`.
+- **`sf_dir` unset** (memory-only mode): segments are allocated in process
+  memory. Unacknowledged data is lost if the sender process dies. The
+  reconnect loop still spans transient server outages such as rolling
+  upgrades, but the RAM buffer caps how much data can accumulate during the
+  outage.
 
 Connect-string keys that control ingress failover are documented in the
 [reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)

@@ -42,7 +42,7 @@ The ingress reconnect loop is driven by store-and-forward connect-string
 keys. See
 [Store-and-forward configuration](/docs/high-availability/store-and-forward/configuration/#reconnect-keys)
 and the
-[connect-string reference](/docs/connect/clients/connect-string#sf-keys)
+[connect-string reference](/docs/connect/clients/connect-string#reconnect-keys)
 for the full list. The failover-relevant keys are:
 
 | Key | Type | Default | Notes |

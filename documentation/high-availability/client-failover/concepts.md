@@ -208,8 +208,8 @@ fails the current `execute()` call.
 Everything else: TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or
 receive failures, `404` / `426` / `503` on upgrade, version mismatches
 (per-endpoint — a rolling upgrade in flight does not lock out compatible
-peers), and generic frame-decode errors. The client records `TransportError`
-and walks to the next host.
+peers), and generic errors decoding server messages. The client records
+`TransportError` and walks to the next host.
 
 The Go query client doesn't resubmit after a server response it can't read
 that may have ended the statement; see
