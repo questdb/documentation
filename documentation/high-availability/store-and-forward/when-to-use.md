@@ -86,7 +86,7 @@ When the connect string sets
 trim is held back until a separate durable-ack frame confirms more:
 
 - `local`: the commit is on the server's own disk. The server must run in
-  adaptive commit mode.
+  adaptive durability mode.
 - `replicated`, or its original name `on`: the WAL has been uploaded to the
   **configured object store** (S3, Azure Blob, GCS, or NFS). QuestDB
   Enterprise only.
@@ -95,7 +95,7 @@ trim is held back until a separate durable-ack frame confirms more:
 ### Choose durable-ack when
 
 - A power loss of the server must not lose in-flight data, and the server
-  runs in adaptive commit mode with a group-commit window above `0`
+  runs in adaptive durability mode with a group-commit window above `0`
   (`local`).
 - You require object-store durability before considering a write
   acknowledged — e.g. compliance requirements, end-to-end exactly-once
@@ -110,11 +110,11 @@ trim is held back until a separate durable-ack frame confirms more:
 
 - Losing the last commits in a power loss of the primary is acceptable, or
   the primary already flushes every commit before it acknowledges it (`sync`
-  mode, or adaptive mode with a group-commit window of `0`).
+  mode, or adaptive durability mode with a group-commit window of `0`).
 - You want minimum steady-state disk usage.
 - The server cannot provide the tier you need: QuestDB open source has no
-  `replicated` tier, and only a server in adaptive mode has the `local`
-  tier. (The handshake fails loudly if you opt in but the server cannot
+  `replicated` tier, and only a server in adaptive durability mode has the
+  `local` tier. (The handshake fails loudly if you opt in but the server cannot
   deliver — see below.)
 
 ### Caveats
@@ -123,7 +123,7 @@ trim is held back until a separate durable-ack frame confirms more:
   `X-QWP-Request-Durable-Ack` on the upgrade (`true` for `on`). The server
   must confirm all of them in `X-QWP-Durable-Ack` (`enabled` for `on`). If
   it does not, the connect **fails loudly**, by design: for example a server
-  not in adaptive mode asked for `local`, an OSS build asked for
+  not in adaptive durability mode asked for `local`, an OSS build asked for
   `replicated`, an uninitialised primary, a missing registry, or a replica.
   Silently waiting for ack frames that never arrive would let the SF disk
   fill up.
@@ -187,7 +187,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | No data loss on a sender crash | No | No | Yes (SF mode) |
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
-| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive commit mode](/docs/concepts/durability/)) |
+| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive durability mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive durability mode](/docs/concepts/durability/)) |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
 | Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
 
@@ -226,7 +226,7 @@ graph TD
     SF --> Q3
     Q3 -->|Yes| Durable[Add request_durable_ack=on]
     Q3 -->|No| Q3L
-    Q3L -->|"Yes, server in adaptive commit mode"| Local[Add request_durable_ack=local]
+    Q3L -->|"Yes, server in adaptive durability mode"| Local[Add request_durable_ack=local]
     Q3L -->|No| Q4
     Local --> Q4
     Durable --> Q4
