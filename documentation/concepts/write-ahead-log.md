@@ -21,7 +21,7 @@ This enables concurrent writes, crash recovery, and replication.
 | **Crash recovery** | Committed data is never lost — replay from log after restart |
 | **Replication** | WAL enables high availability and disaster recovery |
 | **Out-of-order handling** | Late-arriving data is merged efficiently. See [Out-of-order data](/docs/concepts/out-of-order-data/). |
-| **Deduplication** | Enables [DEDUP UPSERT KEYS](/docs/concepts/deduplication/) |
+| **Deduplication** | Enables [deduplication](/docs/concepts/deduplication/) with `DEDUP UPSERT KEYS` or `DEDUP SKIP KEYS` |
 
 In QuestDB Enterprise, WAL segments are sent to object storage immediately
 on commit, enabling real-time replication to standby nodes.

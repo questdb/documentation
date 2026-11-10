@@ -95,8 +95,9 @@ DuckLake catalog.
 
 ### Data Deduplication
 
-When enabled, [data deduplication](https://questdb.com/docs/concepts/deduplication/) works on all the data inserted into
-the table and replaces matching rows with the new versions. Only new rows that do not match existing data will be inserted.
+When enabled, [data deduplication](/docs/concepts/deduplication/) works on all the data inserted into
+the table. In `UPSERT` mode, a new row replaces the stored row with the same key values. In `SKIP` mode, the stored row
+is kept and the new row is discarded. Rows that match no stored row are inserted in both modes.
 
 Generally, if the data has mostly unique timestamps across all the rows, the performance impact of deduplication is low.
 Conversely, the most demanding data pattern occurs when there are many rows with the same timestamp that need to be

@@ -173,8 +173,8 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
 
 QWP replay is at-least-once, so a reconnect can write rows twice. Use
-table-level `DEDUP UPSERT KEYS` with stable event timestamps and row identity
-to suppress replayed rows.
+table-level `DEDUP UPSERT KEYS` or `DEDUP SKIP KEYS` with stable event
+timestamps and row identity to suppress replayed rows.
 See [Delivery semantics](/docs/concepts/delivery-semantics/) for the
 [deduplication](/docs/concepts/deduplication/) requirements.
 
