@@ -1091,11 +1091,17 @@ payload.
 
 ## Transactions
 
-:::caution WebSocket / QWP does not support transactions
+:::caution QWP transactions work differently from HTTP transactions
 
-The `Transaction` / `Commit` / `Rollback` API is **HTTP-only**. The QWP
-WebSocket sender rejects it — QWP acknowledges each batch independently.
-Use [store-and-forward](#store-and-forward) plus
+On QWP, the per-table `Transaction(table)` call and `Rollback()` throw
+`IngressError`. Set `transaction=on` in the connect string instead:
+auto-flushes then send rows without committing them, and `Commit()`,
+`CommitAsync()`, or `SendAsync()` commits everything sent since the last
+commit. Rows already sent can't be rolled back, because they are already on
+the server waiting for the commit. See
+[`FLAG_DEFER_COMMIT`](/docs/connect/wire-protocols/qwp-ingress-websocket/#flag_defer_commit)
+for how the server handles uncommitted rows. Use
+[store-and-forward](#store-and-forward) plus
 [DEDUP](/docs/concepts/deduplication/) keys for delivery guarantees on QWP.
 
 :::
