@@ -497,8 +497,9 @@ Parameters:
 
 `max_rows_per_batch` sets how many DataFrame rows go into each published
 batch. Each batch is encoded, held in memory, and applied on the server as one
-unit. The setting is not a size limit: the client splits any batch over the
-batch size limit on its own, whatever the setting says. What it does control:
+unit. The setting is not a size limit: when that many rows exceed the batch
+size limit, the client sends them as several smaller batches, whatever the
+setting says. What it does control:
 
 - Peak client memory: each batch is encoded and held in memory whole.
 - Commit frequency: the client commits about every 100 batches, so roughly

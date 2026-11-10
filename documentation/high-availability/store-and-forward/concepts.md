@@ -102,9 +102,9 @@ Two trim drivers exist:
 
 ### Default: OK-driven trim
 
-Each successful batch produces an **OK response** carrying the highest
-`wireSeq` it acknowledges and the per-table `seqTxn` watermarks that
-batch updated. On receipt:
+The server acknowledges successful batches with cumulative **OK responses**.
+Each one carries the highest `wireSeq` it acknowledges and the per-table
+`seqTxn` watermarks that the acknowledged batches updated. On receipt:
 
 1. The substrate translates `wireSeq` back to FSN.
 2. `ackedFsn` advances to the new value.
@@ -133,9 +133,8 @@ watermarks:
 
 With any of these values:
 
-- OK responses still arrive for every batch, but they no longer advance the
-  trim watermark. Instead, they are stashed alongside their per-table
-  `seqTxn` values.
+- OK responses still arrive, but they no longer advance the trim watermark.
+  Instead, they are stashed alongside their per-table `seqTxn` values.
 - A durable-ack message names tables and their durable `seqTxn`
   watermarks. The client matches the head of the OK queue against these
   watermarks; each fully-covered head entry pops, and `ackedFsn`

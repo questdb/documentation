@@ -468,9 +468,9 @@ clients. Flushing every row collapses throughput.
 
 :::
 
-A flush sends rows to the server in batches. The protocol calls a batch a
-*frame* and numbers batches with frame sequence numbers (FSNs). A buffer is
-sent as one batch, so a single flush must stay under the batch size limit:
+A buffer flush always sends exactly one batch to the server. The protocol
+calls a batch a *frame* and numbers batches with frame sequence numbers
+(FSNs). A single buffer flush must therefore stay under the batch size limit:
 the smallest of `max_buf_size` (default 100 MiB), the batch size the server
 advertises, and the `sf_max_segment_bytes` segment payload capacity (just
 under 4 MiB by default). `line_sender_buffer_size` (C++ `buffer.size()`) is at

@@ -761,7 +761,7 @@ if (!acked) Console.Error.WriteLine("timed out waiting for server ACK");
 
 | Member | Returns |
 |---|---|
-| `FlushAndGetSequenceAsync()` | FSN of the last batch published by this call. |
+| `FlushAndGetSequenceAsync()` | FSN of the last batch published by this call; if it had nothing to publish, the highest FSN published so far. |
 | `AckedFsn` | Highest FSN the server has acknowledged. |
 | `AwaitAckedFsnAsync(fsn, timeout)` | Block until `AckedFsn` reaches `fsn`. |
 | `GetHighestAckedSeqTxn(table)` | Highest committed `seqTxn` per table (`-1` if none). |

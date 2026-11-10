@@ -324,7 +324,11 @@ See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
   pool uses
   `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
-  unacknowledged batches; acknowledged batches are not replayed.
+  unacknowledged batches. Segments already freed are not replayed, but
+  acknowledged batches in a surviving segment can be, unless the
+  `.ack-watermark` file records them; see
+  [`.ack-watermark`](/docs/high-availability/store-and-forward/concepts/#ack-watermark).
+  Use DEDUP to absorb them.
 
 `flush()` semantics (QWP sender):
 
@@ -332,8 +336,8 @@ See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
 - In SF mode, data is persisted to mmap-backed segment files before `flush()`
   returns.
 - `flush()` does **not** wait for server ACKs unless backpressure requires
-  space. The I/O thread sends batches and deletes acknowledged ones
-  asynchronously.
+  space. The I/O thread sends batches asynchronously and, as acknowledgements
+  arrive, frees each segment whose batches are all acknowledged.
 - `drain(timeoutMillis)` flushes and waits for the server to ACK all currently
   published batches, up to the timeout.
 - `close()` flushes then waits up to `close_flush_timeout_millis` for ACKs,

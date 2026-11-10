@@ -227,10 +227,9 @@ successful local publication and retains its allocated capacity. Use
 `flush_buffer_and_keep()` only when you need to retain the rows for another
 destination or operation.
 
-A flush sends rows to the server in batches. The protocol calls a batch a
-*frame* and numbers batches with frame sequence numbers (FSNs). A buffer is
-published as one batch and is never split, so it must stay under the batch size
-limit: the smallest of `max_buf_size` (default 100 MiB), the batch size the
+A buffer flush always publishes exactly one batch and is never split. The
+protocol calls a batch a *frame* and numbers batches with frame sequence
+numbers (FSNs). A buffer must therefore stay under the batch size limit: the smallest of `max_buf_size` (default 100 MiB), the batch size the
 server advertises, and the `sf_max_segment_bytes` segment payload capacity
 (just under 4 MiB by default). `buffer.len()` is at least the size of the batch
 a flush encodes, so a buffer flushed before its length reaches the limit fits
@@ -747,7 +746,8 @@ rejected at build time.
 | Per-call deadline | Publish, then `wait(level, timeout)` | Wait with an explicit no-progress timeout. |
 | Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
-`AckLevel::Ok` means the server accepted all batches up to the boundary.
+`AckLevel::Ok` means the server accepted all batches up to and including the
+boundary.
 `AckLevel::LocalDurable` waits until the server flushed them to its own disk. It
 needs `request_durable_ack=local` and a server running
 [`cairo.commit.mode=adaptive`](/docs/concepts/durability/).

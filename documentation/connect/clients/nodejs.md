@@ -963,8 +963,8 @@ these thresholds:
 `auto_flush_bytes`. `auto_flush=off` (`autoFlush: false`) disables all three.
 The checks run when a row completes. No timer runs, so rows below the
 thresholds wait for the next row, `flush()`, or `close()`. A byte threshold is
-capped at 90% of the batch size the server advertises, and a batch above the
-server limit is split automatically.
+capped at 90% of the batch size limit the server advertises, and a flush whose
+rows exceed that limit is sent as several batches.
 
 ### Waiting for acknowledgements
 

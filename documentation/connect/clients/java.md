@@ -1029,9 +1029,11 @@ confirm a batch is durable before moving on, wait for its ack with
 :::note Server-advertised batch cap
 
 The server advertises its maximum accepted batch size on the WebSocket upgrade
-(`X-QWP-Max-Batch-Size`), and the client clamps batches to it. A single row
-larger than the cap, or a batch that would exceed it at flush time, surfaces as
-a `LineSenderException` from the offending column call or from `flush()`.
+(`X-QWP-Max-Batch-Size`), and the client clamps batches to it. A flush whose
+rows exceed the cap is sent as one batch per table. A single row larger than
+the cap, or one table's rows that still exceed it at flush time, surface as a
+`LineSenderException` from the offending column call or from `flush()`, and
+the rows stay buffered.
 
 :::
 
@@ -1157,8 +1159,10 @@ replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/tr
 `flush()` returns once its rows are handed to the send engine, not once the
 server has acknowledged them. ACKs arrive asynchronously on the I/O loop. To
 bridge between publish and acknowledgement, the client numbers what it sends. A
-flush sends its rows to the server as one batch, or as several if they don't
-fit in one; the protocol calls a batch a *frame*. Every published batch gets a
+flush sends its rows to the server as one batch; the protocol calls a batch a
+*frame*. If the rows exceed the server's batch size limit, the client sends
+one batch per table, and the server commits them together. Every published
+batch gets a
 frame sequence number (FSN). `flushAndGetSequence()` returns the highest FSN
 the call published, and `awaitAckedFsn(targetFsn, timeoutMillis)` blocks until
 the server has acknowledged up to that FSN:

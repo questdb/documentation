@@ -126,7 +126,9 @@ Two limits matter:
 
 ### `sf_max_segment_bytes`: per-segment file size (default `4 MiB`) {#sf_max_segment_bytes}
 
-This is the rotation threshold and the unit of trim. Segments that are
+This is the rotation threshold and the unit of trim, and each
+[batch](/docs/high-availability/store-and-forward/concepts/#batches) must
+fit in one segment. Segments that are
 smaller release disk faster but waste more space on the active tail;
 larger segments waste less on the active tail but hold acked batches in
 the same file as the still-unacked tail until every batch in the segment
