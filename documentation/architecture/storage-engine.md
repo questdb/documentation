@@ -133,21 +133,21 @@ The commit mode decides when written data is flushed from the operating
 system's page cache to the disk. The default, `nosync`, flushes nothing: a
 crash of the QuestDB process loses nothing, but an operating system crash or a
 power loss can lose recent commits. To protect commits to WAL tables from power
-loss, use adaptive commit mode:
+loss, use adaptive durability mode:
 
 ```ini title="server.conf"
 cairo.commit.mode=adaptive
 ```
 
-Adaptive mode flushes the write-ahead log files of each commit, and flushes the
-table files only at periodic save points. After a crash, the start restores each
-table to its last save point and replays the WAL after it. With the default
-50 ms group-commit window, a power loss can still lose the commits acknowledged
-in the last window. `sync` mode flushes the table files on every commit, which
-also protects non-WAL tables but is much slower.
+Adaptive durability mode flushes the write-ahead log files of each commit, and
+flushes the table files only at periodic save points. After a crash, the start
+restores each table to its last save point and replays the WAL after it. With
+the default 50 ms group-commit window, a power loss can still lose the commits
+acknowledged in the last window. `sync` mode flushes the table files on every
+commit, which also protects non-WAL tables but is much slower.
 
 See [Durability and commit modes](/docs/concepts/durability/) for what each mode
-survives, the group-commit window, and what adaptive mode costs.
+survives, the group-commit window, and what adaptive durability mode costs.
 
 ## Next up
 

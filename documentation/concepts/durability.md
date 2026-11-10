@@ -2,8 +2,9 @@
 title: Durability and commit modes
 sidebar_label: Durability and commit modes
 description:
-  QuestDB commit modes set what a commit survives. Adaptive mode keeps commits
-  to WAL tables safe from power loss, and durable acknowledgements confirm it.
+  QuestDB commit modes set what a commit survives. Adaptive durability mode
+  keeps commits to WAL tables safe from power loss, and durable acknowledgements
+  confirm it.
 ---
 
 QuestDB writes data through the operating system's page cache. The commit mode,
@@ -16,15 +17,15 @@ flushed to the disk survives an operating system crash or a power loss.
 The default mode, `nosync`, flushes nothing. The `adaptive` mode makes commits
 to [WAL tables](/docs/concepts/write-ahead-log/) survive a power loss at a much
 lower cost than `sync`: each commit flushes only its small write-ahead log
-files, and the table files are flushed at periodic save points. Adaptive mode
-does not change when or how often commits happen. It changes what a commit
-survives. This page also covers durable acknowledgements, which tell a QWP
-client when its rows are on the disk, and how to monitor adaptive mode,
-troubleshoot it, and run it on QuestDB Enterprise.
+files, and the table files are flushed at periodic save points. Adaptive
+durability mode does not change when or how often commits happen. It changes
+what a commit survives. This page also covers durable acknowledgements, which
+tell a QWP client when its rows are on the disk, and how to monitor adaptive
+durability mode, troubleshoot it, and run it on QuestDB Enterprise.
 
 :::note Availability
 
-Adaptive commit mode and the `local` durable acknowledgement are available
+Adaptive durability mode and the `local` durable acknowledgement are available
 since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0.
 
 :::
@@ -63,10 +64,10 @@ the table unreadable, or break queries on the indexed column
 [#7844](https://github.com/questdb/questdb/issues/7844),
 [#7845](https://github.com/questdb/questdb/issues/7845)).
 
-## How adaptive commit mode works {#how-adaptive-commit-mode-works}
+## How adaptive durability mode works {#how-adaptive-commit-mode-works}
 
-Adaptive mode treats a table's write-ahead log (WAL) as the durable copy of the
-table, and the table files as a copy that can be rebuilt from it.
+Adaptive durability mode treats a table's write-ahead log (WAL) as the durable
+copy of the table, and the table files as a copy that can be rebuilt from it.
 
 1. **Commit.** The writer flushes the WAL files of the commit. The commit then
    gets its transaction number from the table's sequencer, which records it in
@@ -102,7 +103,7 @@ column, and index files that later writes replaced or dropped. They are removed
 one to two save point intervals later, which is one to two minutes at the
 defaults. `VACUUM TABLE` does not remove them sooner.
 
-## Enable adaptive commit mode {#enable-adaptive-commit-mode}
+## Enable adaptive durability mode {#enable-adaptive-commit-mode}
 
 Set the mode in `server.conf` and restart QuestDB:
 
@@ -111,9 +112,9 @@ cairo.commit.mode=adaptive
 ```
 
 Existing tables need no migration, including tables created by an earlier
-release. Each WAL table switches to adaptive mode when a writer first opens it,
-usually at its next write. Its first save point flushes the whole table: one
-`syncfs` call on Linux, every file of the table on macOS and Windows.
+release. Each WAL table switches to adaptive durability mode when a writer first
+opens it, usually at its next write. Its first save point flushes the whole
+table: one `syncfs` call on Linux, every file of the table on macOS and Windows.
 
 On macOS and Windows, the first save point of every new table writer flushes
 every file of the table again. This happens once after each start, and again
@@ -122,7 +123,7 @@ whenever the table's writer was closed after
 without use (10 minutes by default). The cost grows with the number of
 partitions and columns.
 
-For QWP clients, pair adaptive mode with
+For QWP clients, pair adaptive durability mode with
 [durable acknowledgements](#durable-acknowledgements): `request_durable_ack=local`,
 or `local,replicated` on QuestDB Enterprise. Each client then keeps its batches
 until they are on the disk, and sends them again if a power loss within the
@@ -227,10 +228,10 @@ after 1.3.11, or the C, C++, or Rust client after 7.2.1. The other clients
 accept `on` and `off`. The wire format is in the
 [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement).
 
-## What adaptive mode guarantees
+## What adaptive durability mode guarantees {#what-adaptive-mode-guarantees}
 
-These hold for WAL tables on a server running in adaptive mode (on QuestDB
-Enterprise, on the primary), on storage that honours flushes:
+These hold for WAL tables on a server running in adaptive durability mode (on
+QuestDB Enterprise, on the primary), on storage that honours flushes:
 
 - **Commits on the disk survive.** After a power loss, an operating system
   crash, or a killed process, once the WAL apply has caught up after the
@@ -254,7 +255,7 @@ Enterprise, on the primary), on storage that honours flushes:
 - **The mode can change at any restart**, in any direction, including the
   restart right after a crash. See [Change the commit mode](#change-the-commit-mode).
 
-## What adaptive mode does not cover
+## What adaptive durability mode does not cover {#what-adaptive-mode-does-not-cover}
 
 - **Non-WAL tables.** A table created with, or
   [converted to](/docs/query/sql/alter-table-set-type/), `BYPASS WAL` has no
@@ -271,9 +272,9 @@ Enterprise, on the primary), on storage that honours flushes:
   window is above `0`.
 - **Loss of the disk.** A save point limits the replay after a crash; it is not
   a backup. Keep [backups](/docs/operations/backup/).
-- **Power losses before the switch.** A power loss during a `nosync` or
-  `async` run loses what those modes lose, even if you switch to adaptive mode
-  later.
+- **Power losses before the switch.** A power loss during a `nosync` or `async`
+  run loses what those modes lose, even if you switch to adaptive durability
+  mode later.
 - **Damage other than half-written files.** The checks detect files that a
   power loss left half-written, not every kind of corruption. For example, in
   the sequencer log format that QuestDB open source uses by default, later
@@ -281,28 +282,28 @@ Enterprise, on the primary), on storage that honours flushes:
 - **Going back to an older release and returning.** See
   [Downgrade to an earlier release](#downgrade).
 
-## What adaptive mode costs
+## What adaptive durability mode costs {#what-adaptive-mode-costs}
 
 These figures were measured on Linux, on ext4 and an NVMe SSD. Other storage,
 macOS, and Windows can differ widely.
 
 - **Commit latency.** A commit flushes each WAL file it wrote, about 11 flushes
   for a table with nine columns. One writer that waited for each 100-row commit
-  took 4.06 ms per commit in adaptive mode with the default window, against
-  0.33 ms in `nosync`: about 12 times slower. The cost is per commit, not per
-  row, so larger batches and concurrent writers spread it. In an older test of
-  one-row commits, `sync` took about 12 ms and adaptive 5 to 7 ms. On Windows
-  each flush is much slower than on Linux, so measure there before you rely on
-  adaptive mode.
+  took 4.06 ms per commit in adaptive durability mode with the default window,
+  against 0.33 ms in `nosync`: about 12 times slower. The cost is per commit,
+  not per row, so larger batches and concurrent writers spread it. In an older
+  test of one-row commits, `sync` took about 12 ms and adaptive 5 to 7 ms. On
+  Windows each flush is much slower than on Linux, so measure there before you
+  rely on adaptive durability mode.
 - **Save points.** About 20 ms each, whatever the size of the table, and mostly
   spent in one `syncfs` call. A table being written takes one a minute. On
   Linux, `syncfs` flushes the whole file system, so its cost also depends on
   other unflushed data on that file system.
 - **Disk space.** The WAL, and the partition files that later writes replaced
   or dropped, stay on the disk one to two save point intervals longer.
-- **Starts.** A clean start of 1,000 tables in adaptive mode took about 0.24 s.
-  After a crash, each table is restored and replays its WAL since the save
-  point: about 34 ms per table with 20 commits to replay.
+- **Starts.** A clean start of 1,000 tables in adaptive durability mode took
+  about 0.24 s. After a crash, each table is restored and replays its WAL since
+  the save point: about 34 ms per table with 20 commits to replay.
 
 ## Change the commit mode {#change-the-commit-mode}
 
@@ -310,14 +311,15 @@ Change `cairo.commit.mode` and restart. The mode can change in any direction,
 any number of times.
 
 - **Into adaptive.** Each WAL table switches at its first writer open, as
-  described in [Enable adaptive commit mode](#enable-adaptive-commit-mode).
+  described in [Enable adaptive durability mode](#enable-adaptive-commit-mode).
 - **Out of adaptive** (to `nosync`, `async`, or `sync`). The first start in the
-  new mode flushes every table that ran in adaptive mode, removes its save
-  point files, and logs
+  new mode flushes every table that ran in adaptive durability mode, removes its
+  save point files, and logs
   `table left adaptive commit mode, its save point is removed [table=...]`.
 - **Right after a crash.** The start first recovers every table that ran in
-  adaptive mode from its save point, then applies the new mode. A crash in
-  adaptive mode is repaired even when the next start runs in another mode.
+  adaptive durability mode from its save point, then applies the new mode. A
+  crash in adaptive durability mode is repaired even when the next start runs in
+  another mode.
 - **From `nosync` or `async` to `sync` or `adaptive`, after a run that did not
   stop cleanly.** The first start reads and flushes each WAL table's sequencer
   log once, because the earlier run never flushed it: a few seconds for 1,000
@@ -332,16 +334,17 @@ again is not supported, in any commit mode.
 
 To go back to one of these releases:
 
-1. If the instance ran in adaptive mode, set `cairo.commit.mode=nosync` and
-   restart the current release once. Let the start finish: it flushes every
-   table that ran in adaptive mode and removes its save point files.
+1. If the instance ran in adaptive durability mode, set
+   `cairo.commit.mode=nosync` and restart the current release once. Let the
+   start finish: it flushes every table that ran in adaptive durability mode and
+   removes its save point files.
 2. Stop QuestDB cleanly.
 3. Install the earlier release.
 
 After the earlier release has written to the database, do not start a later
 release on it again.
 
-## Monitor adaptive mode
+## Monitor adaptive durability mode {#monitor-adaptive-mode}
 
 [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reports the durable
 state of each table:
@@ -445,8 +448,8 @@ could not rewrite adaptive save point header [path=...]
 ```
 
 Or `could not open read-write` naming an `_epoch.manifest` file. Every start in
-adaptive mode rewrites and flushes the header of each table's current save
-point. The file has the wrong owner or permissions, the file system is
+adaptive durability mode rewrites and flushes the header of each table's current
+save point. The file has the wrong owner or permissions, the file system is
 read-only, or the disk fails. Fix the cause and start again. Nothing is lost.
 
 **Both save points are damaged.**
@@ -567,7 +570,7 @@ WebSocket upgrade failed: server did not enable durable ACK [...]
 
 The first line is the Java client's error, the second the C, C++, and Rust
 clients' error. The server cannot grant every requested tier, most often
-`local` from a server that is not in adaptive mode. See
+`local` from a server that is not in adaptive durability mode. See
 [Durable acknowledgements](#durable-acknowledgements) for what each tier needs.
 
 ## QuestDB Enterprise
@@ -580,18 +583,18 @@ clients' error. The server cannot grant every requested tier, most often
   replica resumes downloading after the last transaction in its own log, and is
   not guaranteed to repair the local state it lost; if its tables do not
   recover, [recreate it](/docs/high-availability/disaster-recovery/#failure-scenarios).
-- **Durable acknowledgements.** Only a primary running in adaptive mode grants
-  `local` and `local,replicated`. QuestDB Enterprise 4.1.0 and earlier accept
-  only `on`.
-- **Replication delay.** In adaptive mode, a primary uploads a transaction only
-  once it is on its disk. With a window above `0`, replicas and `replicated`
-  confirmations see the newest commits later than in `nosync` mode: up to about
-  one second with the default settings.
-- **Role switches.** Promoting a node in adaptive mode flushes once what it
-  applied as a replica: on Linux, one `syncfs` for the database root and one
-  for each volume. Demoting an adaptive primary flushes each of its adaptive
-  tables before it starts to replicate: about 20 ms per table on Linux, so
-  about 20 s for 1,000 tables.
+- **Durable acknowledgements.** Only a primary running in adaptive durability
+  mode grants `local` and `local,replicated`. QuestDB Enterprise 4.1.0 and
+  earlier accept only `on`.
+- **Replication delay.** In adaptive durability mode, a primary uploads a
+  transaction only once it is on its disk. With a window above `0`, replicas and
+  `replicated` confirmations see the newest commits later than in `nosync` mode:
+  up to about one second with the default settings.
+- **Role switches.** Promoting a node in adaptive durability mode flushes once
+  what it applied as a replica: on Linux, one `syncfs` for the database root and
+  one for each volume. Demoting an adaptive primary flushes each of its adaptive
+  tables before it starts to replicate: about 20 ms per table on Linux, so about
+  20 s for 1,000 tables.
 - **A primary can refuse to start after a power loss.** In `nosync` and `async`
   mode, a primary uploads transactions before they are flushed to its disk.
   After a power loss or an operating system crash, its log of a table can end
