@@ -63,7 +63,7 @@ instead.
 | Mode        | Use                                                                | Data effect                                                                                                                                                                                                                                       |
 | ----------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Planned`   | Healthy primary and live replica                                   | Drains the old primary and verifies the target before promotion. Fails rather than becoming lossy.                                                                                                                                                |
-| `Emergency` | Primary is lost/wedged and service restoration outweighs data loss | Skips the drain. Unreplicated writes may be lost, but QWP clients using [durable acknowledgements](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) retain and retry writes that were not durably acknowledged. |
+| `Emergency` | Primary is lost/wedged and service restoration outweighs data loss | Skips the drain. Unreplicated writes may be lost, but QWP clients using replicated [durable acknowledgements](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) (`request_durable_ack=replicated` or `on`) retain and retry writes that were not durably acknowledged. |
 
 ### Planned prechecks
 
@@ -186,9 +186,10 @@ Use the same object shape with `mode: Emergency` only after selecting a live
 target and accepting data loss.
 
 :::danger Emergency promotion may lose writes that the old primary had not
-replicated. QWP clients configured with
+replicated. QWP clients configured with replicated
 [durable acknowledgements](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in)
-retain writes until object-store durability is confirmed and retry
+(`request_durable_ack=replicated` or `on`) retain writes until object-store
+durability is confirmed and retry
 unacknowledged writes after connecting to the new primary. Clients connected
 directly to the old pod can briefly receive acknowledgements for writes that
 will be discarded while it detects loss of store ownership. Stop/repoint writers
