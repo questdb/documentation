@@ -75,17 +75,29 @@ string.
 
 By default the client frees a
 [batch](/docs/high-availability/store-and-forward/concepts/#batches) as soon
-as the server acknowledges it into the WAL. The batch is then durable on the
-**primary's** disk; whether it has been replicated to the object store or to
-replicas is a separate matter.
+as the server acknowledges it into the WAL. Whether the batch is on the
+**primary's** disk at that point depends on the server's
+[commit mode](/docs/concepts/durability/#commit-modes): in the default
+`nosync` mode, a power loss of the server can still lose it. Whether it has
+been replicated to the object store or to replicas is a separate matter.
 
-When the connect string sets `request_durable_ack=on`, the client keeps the
-batch until a separate `STATUS_DURABLE_ACK` message confirms the data has
-been uploaded from the WAL to the **configured object store** (S3, Azure
-Blob, GCS, or NFS).
+When the connect string sets
+[`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
+the client keeps the batch until a separate durable-ack message confirms
+more:
+
+- `local`: the commit is on the server's own disk. The server must run in
+  adaptive commit mode.
+- `replicated`, or its original name `on`: the WAL has been uploaded to the
+  **configured object store** (S3, Azure Blob, GCS, or NFS). QuestDB
+  Enterprise only.
+- `local,replicated`: both. The client waits for the object store.
 
 ### Choose durable-ack when
 
+- A power loss of the server must not lose in-flight data, and the server
+  runs in adaptive commit mode with a group-commit window above `0`
+  (`local`).
 - You require object-store durability before considering a write
   acknowledged — e.g. compliance requirements, end-to-end exactly-once
   pipelines with cross-region recovery.
@@ -97,26 +109,33 @@ Blob, GCS, or NFS).
 
 ### Stay on the default OK trim when
 
-- WAL-local durability on the primary is sufficient.
+- Losing the last commits in a power loss of the primary is acceptable, or
+  the primary already flushes every commit before it acknowledges it (`sync`
+  mode, or adaptive mode with a group-commit window of `0`).
 - You want minimum steady-state disk usage.
-- You are running OSS or a build that does not support durable-ack.
-  (The handshake fails loudly if you opt in but the server cannot
+- The server cannot provide the tier you need: QuestDB open source has no
+  `replicated` tier, and only a server in adaptive mode has the `local`
+  tier. (The handshake fails loudly if you opt in but the server cannot
   deliver — see below.)
 
 ### Caveats
 
-- **Server support is required.** The client sends
-  `X-QWP-Request-Durable-Ack: true` on the upgrade. The server must echo
-  back `X-QWP-Durable-Ack: enabled`. If it does not — OSS build,
-  uninitialised primary, missing registry, hitting a replica — the
-  connect **fails loudly**, by design. Silently waiting for acknowledgements
-  that never arrive would let the SF disk fill up.
-- **Idle keepalive.** The OSS server only sends pending durable
+- **Server support is required.** The client sends the requested tiers in
+  `X-QWP-Request-Durable-Ack` on the upgrade (`true` for `on`). The server
+  must confirm all of them in `X-QWP-Durable-Ack` (`enabled` for `on`). If
+  it does not, the connect **fails loudly**, by design: for example a server
+  not in adaptive mode asked for `local`, an OSS build asked for
+  `replicated`, an uninitialised primary, a missing registry, or a replica.
+  Silently waiting for acknowledgements that never arrive would let the SF
+  disk fill up.
+- **Idle keepalive.** The server only sends pending durable
   acknowledgements during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
-  `ingest_rate × time_to_object_store_durability`. Size
+  `ingest_rate × time_to_durability`: for `local`, about one group-commit
+  window, plus up to one `durable_ack_keepalive_interval_millis` when the
+  producer is idle; for `replicated`, the upload time. Size
   `sf_max_total_bytes` accordingly.
 
 ## Orphan adoption: when to enable
@@ -169,12 +188,13 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | No data loss on a sender crash | No | No | Yes (SF mode) |
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
+| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive commit mode](/docs/concepts/durability/)) |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
 | Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
 
 QWP replay is at-least-once, so a reconnect can write rows twice. Use
-table-level `DEDUP UPSERT KEYS` with stable event timestamps and row identity
-to suppress replayed rows.
+table-level `DEDUP UPSERT KEYS` or `DEDUP SKIP KEYS` with stable event
+timestamps and row identity to suppress replayed rows.
 See [Delivery semantics](/docs/concepts/delivery-semantics/) for the
 [deduplication](/docs/concepts/deduplication/) requirements.
 
@@ -197,6 +217,7 @@ graph TD
     Q1{Will the producer outlive any single outage you care about?}
     Q2{A sender crash must not lose in-flight data?}
     Q3{Is object-store durability required before ack?}
+    Q3L{Must a server power loss not lose acknowledged data?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 
     Q1 -->|"No (ephemeral job)"| Memory[Memory-only mode — leave sf_dir unset]
@@ -205,7 +226,10 @@ graph TD
     Q2 -->|Yes| SF[SF mode — set sf_dir]
     SF --> Q3
     Q3 -->|Yes| Durable[Add request_durable_ack=on]
-    Q3 -->|No| Q4
+    Q3 -->|No| Q3L
+    Q3L -->|"Yes, server in adaptive commit mode"| Local[Add request_durable_ack=local]
+    Q3L -->|No| Q4
+    Local --> Q4
     Durable --> Q4
     Q4 -->|Yes| Orphans[Add drain_orphans=on]
     Q4 -->|No| Done[Configuration complete]

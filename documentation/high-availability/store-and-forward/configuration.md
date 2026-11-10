@@ -59,12 +59,13 @@ Cross-reference:
 
 ## Durable-ack keys
 
-Opt in to object-store-durable trim. See
+Opt in to trim on durable acknowledgements: from the server's disk, the object
+store, or both. See
 [Durable-ack: when to opt in](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | bool | `off` | Opt-in via the upgrade header `X-QWP-Request-Durable-Ack: true`. The client then frees acknowledged data only after `STATUS_DURABLE_ACK` messages. Connect fails loudly if the server does not echo `X-QWP-Durable-Ack: enabled`. WebSocket transports only. |
+| `request_durable_ack` | enum: `off`, `local`, `replicated`, `local,replicated`, `on` | `off` | The client frees acknowledged data only after a durable-ack message covers it: `STATUS_LOCAL_DURABLE_ACK` for `local` (the server's disk; needs [adaptive commit mode](/docs/concepts/durability/)), and `STATUS_DURABLE_ACK` for `replicated`, `on`, and `local,replicated` (the object store; QuestDB Enterprise). Connect fails loudly if the server does not confirm every requested tier in `X-QWP-Durable-Ack`. WebSocket transports only. See [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) for client and server versions. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys
@@ -111,7 +112,7 @@ The parser rejects:
   except that the Node.js client accepts `append` and rejects `flush` when
   parsing.
 - `sender_id` containing path separators or empty.
-- `request_durable_ack=on` on non-WebSocket transports.
+- `request_durable_ack` other than `off` on non-WebSocket transports.
 
 ## Example configurations
 

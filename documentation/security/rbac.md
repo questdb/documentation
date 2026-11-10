@@ -124,6 +124,24 @@ querying it fails with `table does not exist [table=trades]`.
 To also record who read the view, and with which parameters, create it as an
 [audited view](/docs/security/audited-views/).
 
+### Materialized views with row expiry
+
+A reader with column-level access to a materialized view that has `EXPIRE ROWS`
+needs SELECT on the columns they query *and* on the columns the policy uses. So
+turning expiry on or changing it can mean you have to update those grants. Note
+that granting a policy column also lets the reader query that column directly.
+
+To keep policy columns hidden, give readers access to an ordinary SQL view that
+exposes only the columns they should see. Those readers need no grant on the
+materialized view itself. If expiry adds new column dependencies under an existing
+ordinary view, wait for the change to take effect (WAL applied), then run the
+view's original definition again with `ALTER VIEW`; reads may be denied until you
+do. `COMPILE VIEW` does not fix these dependencies.
+
+See [restricted access with row expiry](/docs/concepts/materialized-views/#restricted-access-with-row-expiry)
+for grant examples, the COUNT limitation and workaround, and the policy-change
+procedure.
+
 ## Common scenarios
 
 ### Read-only analyst
@@ -1164,7 +1182,7 @@ SELECT * FROM all_permissions();
 | CREATE TABLE              | Database                            | Create tables                           |
 | CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
-| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication                    |
+| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
 | DEDUP DISABLE             | Database &#124; Table               | Disable deduplication                   |
 | DETACH PARTITION          | Database &#124; Table               | Detach partitions                       |
 | DISABLE STORAGE POLICY    | Database &#124; Table               | Disable storage policies                |

@@ -99,6 +99,15 @@ Use `COMPILE VIEW` when you want to:
 4. **Diagnose issues**: Check why a view is invalid by triggering compilation
    errors
 
+### Expiry-policy dependency changes
+
+When an expiry policy adds hidden column dependencies under an ordinary view,
+`COMPILE VIEW` does not update its saved dependency permissions. In Enterprise,
+restricted readers may keep getting "access denied" errors even though the view
+is valid. Wait for the policy to take effect, then run the view's original
+definition again with `ALTER VIEW`. See the
+[policy-change procedure](/docs/concepts/materialized-views/#change-expiry-beneath-an-existing-ordinary-view).
+
 ## Errors
 
 | Error | Cause |

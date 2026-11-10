@@ -721,7 +721,8 @@ on_error:;
   queue took the rows; a background thread then delivers them and collects the
   server's ack, which `qwp_sender_wait` (C++ `sender.wait()`) observes. For
   throughput, publish many chunks with `flush`, then `wait` once
-  (`qwpws_ack_level_durable` waits for durable upload, Enterprise). See
+  (`qwpws_ack_level_local_durable` waits for the server's disk,
+  `qwpws_ack_level_durable` for replication storage on Enterprise). See
   [Durability and backpressure](#durability-and-backpressure).
 - **Return the borrow.** C: `questdb_db_return_sender` (recycle) or
   `questdb_db_drop_sender` (retire a possibly in-doubt sender); C++ does
@@ -1333,16 +1334,25 @@ queue and returns before the server acks.
    pool, so queued rows still reach the server.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
-   - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
-     rows. `qwpws_ack_level_durable` additionally waits until they are
-     uploaded to object storage, not just in the server's WAL (Enterprise
-     with replication; see the protocol page's
-     [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-     section). Durable acks must be requested at pool open with
-     `request_durable_ack=on`; the connect fails with
-     `protocol_version_error` when the server cannot provide them, and
-     without the key any durable-level `wait` or `flush_and_wait` fails up
-     front with `invalid_api_call`, leaving the buffer or chunk untouched.
+   - **Ack levels.** `qwpws_ack_level_ok` (C++ `qwpws_ack_level::ok`) means
+     the server accepted the rows.
+     `qwpws_ack_level_local_durable` (C++ `qwpws_ack_level::local_durable`)
+     waits until the server flushed them to its own disk. It needs
+     `request_durable_ack=local` and a server running
+     [`cairo.commit.mode=adaptive`](/docs/concepts/durability/).
+     `qwpws_ack_level_durable` (C++ `qwpws_ack_level::durable`) waits until
+     they reached replication storage. It needs QuestDB Enterprise and
+     `request_durable_ack=on`, `replicated`, or `local,replicated`. The tier
+     names `local`, `replicated`, and `local,replicated` need a client release
+     after 7.2.1; `on` is the only one QuestDB Enterprise 4.1.0 and earlier
+     accept (see [Durable ACK](/docs/connect/clients/connect-string/#durable-ack)).
+     If the server does not grant every requested tier, the connect fails with
+     `protocol_version_error` and the message
+     `WebSocket upgrade failed: server did not enable durable ACK [...]`. The
+     local durable level is accepted only with `request_durable_ack=local`, and
+     the durable level only with a set that includes `replicated` (or `on`).
+     Any other wait fails `wait` or `flush_and_wait` up front with
+     `invalid_api_call`, leaving the buffer or chunk untouched.
    - **Ack is not visibility.** Rows become visible to queries after WAL
      apply, typically within milliseconds of the ack, so a query issued
      right after the ack can miss the newest rows. An empty read-back is
@@ -1581,7 +1591,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
 | `batch_too_large` | A buffer, or a chunk batch that cannot be split further, exceeds the batch size limit | Usable | A buffer published nothing and keeps its rows: flush fewer rows at a time, or raise the limit that binds (by default `sf_max_segment_bytes`). A chunk may have queued the batches before the oversized one, so check `in_doubt` before resending it. |
-| `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
+| `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without its matching `request_durable_ack` tier | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool
 inspects the connection and retires it if unhealthy, so a broken connection

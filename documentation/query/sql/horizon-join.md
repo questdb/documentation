@@ -672,6 +672,8 @@ the results. Recreate affected [views](/docs/concepts/views/) with
   JOIN. Use `GROUP BY` with a time-bucketing expression instead, or apply
   `SAMPLE BY` in an outer query over a HORIZON JOIN
   [without aggregate functions](#row-order-and-designated-timestamp).
+- **No grouping sets**: `ROLLUP`, `CUBE`, and `GROUPING SETS` cannot be used in
+  the same query as HORIZON JOIN.
 - **WHERE filters left-hand table only**: The `WHERE` clause can only reference
   columns from the left-hand table. References to any right-hand table columns
   or horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
@@ -687,7 +689,10 @@ the results. Recreate affected [views](/docs/concepts/views/) with
 - **Restricted right-hand side**: Each right-hand side must be a table with an
   optional filter, in one of the
   [forms in the grammar](#select-list-right-hand-side-and-on-condition), see
-  [Filter restrictions](#filter-restrictions).
+  [Filter restrictions](#filter-restrictions). A materialized view with an
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy qualifies only when the
+  policy compares the designated timestamp with a constant, `now()`, or
+  `dateadd()` over `now()`, such as `WHEN ts < dateadd('d', -30, now())`.
 - **Restricted left-hand side**: A table with an optional filter works best.
   Some other queries are supported, but don't run in parallel.
 - **RANGE constraints**: `STEP` must be positive; `FROM` must be less than or
