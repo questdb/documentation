@@ -65,7 +65,7 @@ store, or both. See
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `request_durable_ack` | enum: `off`, `local`, `replicated`, `local,replicated`, `on` | `off` | `local` trims on `STATUS_LOCAL_DURABLE_ACK` frames (the server's disk; needs [adaptive commit mode](/docs/concepts/durability/)). `replicated` and `on` trim on `STATUS_DURABLE_ACK` frames (the object store; QuestDB Enterprise). `local,replicated` trims on `STATUS_DURABLE_ACK`. OK frames then no longer advance the trim watermark. Connect fails loudly if the server does not confirm every requested tier in `X-QWP-Durable-Ack`. WebSocket transports only. See [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) for client and server versions. |
+| `request_durable_ack` | enum: `off`, `local`, `replicated`, `local,replicated`, `on` | `off` | `local` trims on `STATUS_LOCAL_DURABLE_ACK` frames (the server's disk; needs [adaptive durability mode](/docs/concepts/durability/)). `replicated` and `on` trim on `STATUS_DURABLE_ACK` frames (the object store; QuestDB Enterprise). `local,replicated` trims on `STATUS_DURABLE_ACK`. OK frames then no longer advance the trim watermark. Connect fails loudly if the server does not confirm every requested tier in `X-QWP-Durable-Ack`. WebSocket transports only. See [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) for client and server versions. |
 | `durable_ack_keepalive_interval_millis` | int (ms) | `200` | Cadence of WebSocket PING the I/O loop sends while there are pending durable confirmations and the producer is idle. `0` or negative disables. |
 
 ## Error-handling keys

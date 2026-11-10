@@ -1726,8 +1726,8 @@ Returns a `table` including the following information:
   `1` when parallelism is reduced, `2` when the writer backs off between
   attempts (equivalent to `table_memory_pressure_level` in `tables()`)
 - `durableEpochSeqTxn` - the sequencer transaction of the table's current save
-  point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
-  the WAL is replayed from here
+  point in [adaptive durability mode](/docs/concepts/durability/). After a
+  crash, the WAL is replayed from here
 - `recoveryIncarnation` - how many times this process put the table's files
   back to its save point at a start; stays `0` after a clean shutdown, and
   often after a power loss, when the files are already at the save point

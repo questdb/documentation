@@ -353,11 +353,11 @@ ORDER BY wal_pending_row_count DESC;
 See the [`tables()` reference](/docs/query/functions/meta/#tables) for the
 complete list of columns and additional example queries.
 
-### Detect adaptive commit problems
+### Detect adaptive durability problems {#detect-adaptive-commit-problems}
 
-In [adaptive commit mode](/docs/concepts/durability/), commits reach the disk
-within about one group-commit window, and a table that is being written takes a
-save point about once a minute.
+In [adaptive durability mode](/docs/concepts/durability/), commits reach the
+disk within about one group-commit window, and a table that is being written
+takes a save point about once a minute.
 
 **Detection:**
 
@@ -367,7 +367,7 @@ save point about once a minute.
 - The server exits with code 55 after `fatal durability barrier failure`: a
   flush failed, and the data it covered may not be on the disk.
 - A `not_yet_on_disk` value that keeps growing, from the query in
-  [Monitor adaptive mode](/docs/concepts/durability/#monitor-adaptive-mode):
+  [Monitor adaptive durability mode](/docs/concepts/durability/#monitor-adaptive-mode):
   the disk does not keep up with the flushes.
 
 **Resolution:** see

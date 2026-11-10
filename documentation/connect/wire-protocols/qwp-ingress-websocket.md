@@ -1038,9 +1038,9 @@ Which tiers a server grants:
 
 | Tier | Granted by |
 | --- | --- |
-| `local` | a server in [adaptive commit mode](/docs/concepts/durability/) (on QuestDB Enterprise, the primary) |
+| `local` | a server in [adaptive durability mode](/docs/concepts/durability/) (on QuestDB Enterprise, the primary) |
 | `replicated`, `true` | a QuestDB Enterprise primary with replication |
-| `local,replicated` | a QuestDB Enterprise primary with replication, in adaptive commit mode |
+| `local,replicated` | a QuestDB Enterprise primary with replication, in adaptive durability mode |
 
 QuestDB Enterprise 4.1.0 and earlier understand only `true`. QuestDB 10.1.0
 and earlier grant no durable acknowledgement.

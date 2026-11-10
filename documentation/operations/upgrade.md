@@ -109,8 +109,8 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 ### Upgrading to 4.2.0
 
 QuestDB Enterprise 4.2.0 adds
-[adaptive commit mode](/docs/concepts/durability/). The default stays `nosync`.
-Check the following before upgrading:
+[adaptive durability mode](/docs/concepts/durability/). The default stays
+`nosync`. Check the following before upgrading:
 
 - A replicating primary in `nosync` or `async` mode now refuses to start when,
   after a power loss or an operating system crash, its log of a table ends
