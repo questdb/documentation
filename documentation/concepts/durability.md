@@ -16,10 +16,11 @@ flushed to the disk survives an operating system crash or a power loss.
 The default mode, `nosync`, flushes nothing. The `adaptive` mode makes commits
 to [WAL tables](/docs/concepts/write-ahead-log/) survive a power loss at a much
 lower cost than `sync`: each commit flushes only its small write-ahead log
-files, and the table files are flushed at periodic save points. This page also
-covers durable acknowledgements, which tell a QWP client when its rows are on
-the disk, and how to monitor adaptive mode, troubleshoot it, and run it on
-QuestDB Enterprise.
+files, and the table files are flushed at periodic save points. Adaptive mode
+does not change when or how often commits happen. It changes what a commit
+survives. This page also covers durable acknowledgements, which tell a QWP
+client when its rows are on the disk, and how to monitor adaptive mode,
+troubleshoot it, and run it on QuestDB Enterprise.
 
 :::note Availability
 
@@ -120,6 +121,14 @@ whenever the table's writer was closed after
 [`cairo.inactive.writer.ttl`](/docs/configuration/cairo-engine/#cairoinactivewriterttl)
 without use (10 minutes by default). The cost grows with the number of
 partitions and columns.
+
+For QWP clients, pair adaptive mode with
+[durable acknowledgements](#durable-acknowledgements): `request_durable_ack=local`,
+or `local,replicated` on QuestDB Enterprise. Each client then keeps its batches
+until they are on the disk, and sends them again if a power loss within the
+[group-commit window](#group-commit-window) took them. Use
+[deduplication](/docs/concepts/deduplication/) so a resent batch the server had
+already stored is not written twice.
 
 On QuestDB Enterprise, see also [QuestDB Enterprise](#questdb-enterprise).
 
