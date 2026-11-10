@@ -17,6 +17,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
 - [adbcBridge](/docs/integrations/other/adbcbridge/) - New page for the third-party ADBC drivers that read QuestDB into Apache Arrow from C#, Java, Go, TypeScript, and C: a native QWP driver for QuestDB 10.0 and newer, and an ODBC bridge over PGWire for older servers
 - [Durability and commit modes](/docs/concepts/durability/) - New page on what a commit survives in each commit mode, and on adaptive commit mode, which keeps commits to WAL tables safe from power loss without flushing every table file on each commit. Covers how it works, the group-commit window, durable acknowledgements, guarantees and limits, costs, changing the mode and downgrading, monitoring, and troubleshooting
+- [UPSERT and SKIP modes](/docs/concepts/deduplication/#upsert-and-skip-modes) - The new `SKIP` deduplication mode in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0 keeps the first row written for a key and discards later duplicates, the counterpart of `UPSERT`, which keeps the latest. Covers which row wins within a commit and across connections, choosing a mode, switching modes with [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/), reading the mode from [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause), and how earlier versions handle such tables
+- [ALTER TABLE FORCE REINDEX PARQUET](/docs/query/sql/alter-table-force-reindex-parquet/) - Rebuild bitmap and posting indexes on Parquet partitions while the table stays online, available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.0. Use it to repair Parquet partitions left with stale column metadata by QuestDB 9.3.4 through 10.0.1. Covers column and partition selection, cancellation, skipped partitions, automatic repair by `ADD INDEX` and out-of-order writes, and running it on QuestDB Enterprise replicas
 
 ### Reference
 
@@ -25,9 +27,12 @@ This page tracks significant updates to the QuestDB documentation.
 - Added the `adaptive` value of [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) and the [adaptive commit settings](/docs/configuration/cairo-engine/#commit-and-write-behavior) `cairo.adaptive.commit.group.window`, `cairo.adaptive.epoch.interval`, `cairo.adaptive.epoch.max.rows`, `cairo.adaptive.epoch.flush.on.close`, `cairo.adaptive.epoch.column.sync.batched`, and `cairo.wal.commit.writeback.drain`
 - [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) - `request_durable_ack` accepts the `local`, `replicated`, and `local,replicated` tiers in the Java, C, C++, and Rust clients, and the [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement) documents tier negotiation and `STATUS_LOCAL_DURABLE_ACK`
 - Added the `durableEpochSeqTxn`, `recoveryIncarnation`, `localDurableSeqTxn`, and `lastEpochTs` columns to [`wal_tables()`](/docs/query/functions/meta/#wal_tables) and three adaptive commit [metrics](/docs/integrations/other/prometheus/#wal-metrics), and corrected the names of `questdb_wal_apply_seq_txn` and `questdb_wal_apply_writer_txn`
+- [CREATE TABLE](/docs/query/sql/create-table/#deduplication) - `DEDUP { UPSERT | SKIP } KEYS` in the syntax of both creation forms; `CREATE TABLE LIKE` copies the keys and the mode
+- [Standard SQL equivalents](/docs/concepts/deep-dive/sql-extensions/#standard-sql-features-not-supported) - `INSERT ... ON CONFLICT DO NOTHING` maps to `DEDUP SKIP KEYS`
 
 ### Updated
 
+- [REINDEX](/docs/query/sql/reindex/) - Explains that `LOCK EXCLUSIVE` is required and takes the table's writer lock, and that `REINDEX` rebuilds native partitions only: it skips Parquet partitions and rejects a Parquet partition named in `PARTITION`
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
   Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
   materialized view's query that reads its base table (this includes a subquery
@@ -49,9 +54,11 @@ This page tracks significant updates to the QuestDB documentation.
   capped set. Likewise, move a window function into the query you run against
   the view.
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) - A conversion to non-WAL applies the WAL first, and is refused while it cannot
+- [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) and [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - The table keeps its TTL, `FORMAT PARQUET`, per-column Parquet encoding, and deduplication keys and mode; a table converted to WAL keeps dropping partitions past its TTL
 - [Disaster recovery](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss) - A QuestDB Enterprise primary refuses to start when its log of a table ends before the object store, and how to recover
 - [Upgrade QuestDB](/docs/operations/upgrade/#upgrading-to-420) - What to check before upgrading to QuestDB Enterprise 4.2.0, and the limits on going back to an earlier release
 - [Monitoring and alerting](/docs/operations/monitoring-alerting/#detect-adaptive-commit-problems) - What to alert on in adaptive commit mode
+- [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) - The example output matches what the server returns, without symbol capacities or a `WITH` clause
 
 ## October 2026
 

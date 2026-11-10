@@ -166,8 +166,8 @@ On every successful (re)connect:
    memory).
 4. Frames stream to the wire in FSN order. A frame that landed before the
    disconnect but was not acknowledged is sent again and can duplicate rows;
-   use table-level `DEDUP UPSERT KEYS` with stable row identity when this must
-   be suppressed.
+   use table-level `DEDUP UPSERT KEYS` or `DEDUP SKIP KEYS` with stable row
+   identity when this must be suppressed.
 5. New frames appended by the producer during replay are picked up
    automatically — the I/O loop watches a volatile `publishedFsn`
    cursor.

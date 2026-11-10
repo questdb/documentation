@@ -355,6 +355,7 @@ module.exports = {
                     "query/sql/alter-table-detach-partition", // DETACH PARTITION
                     "query/sql/alter-table-drop-column", // DROP COLUMN
                     "query/sql/alter-table-drop-partition", // DROP PARTITION
+                    "query/sql/alter-table-force-reindex-parquet", // FORCE REINDEX PARQUET
                     "query/sql/alter-table-rebase-wal", // REBASE WAL
                     "query/sql/alter-table-rename-column", // RENAME COLUMN
                     "query/sql/alter-table-resume-wal", // RESUME WAL

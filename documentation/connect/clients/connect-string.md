@@ -514,8 +514,8 @@ On unplanned failover — when the primary dies before issuing a durable
 ACK — the client replays unacknowledged frames against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
 replays can produce duplicate rows. Tables ingested through a multi-host
-failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
-row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
+failover connect string **must** declare `DEDUP UPSERT KEYS(...)` or
+`DEDUP SKIP KEYS(...)` covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
 for the full at-least-once / exactly-once model.
 
 :::
@@ -627,8 +627,8 @@ original is never coming back — see [Orphan recovery](#orphan-recovery) below.
 accepted if their acknowledgement hadn't reached the previous sender before
 it stopped.
 To prevent duplicate rows in the target table, declare
-[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` covering row
-identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
+[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` or `SKIP KEYS(...)`
+covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
 the full model and recipe.
 
 ### Backpressure
