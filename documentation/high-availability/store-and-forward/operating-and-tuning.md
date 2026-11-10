@@ -23,7 +23,8 @@ In SF mode every sender owns one **sender directory**:
 ├── .lock              # advisory exclusive lock (kernel-released on process exit)
 ├── .lock.pid          # UTF-8 text: holder PID + '\n' (diagnostic only)
 ├── .failed            # optional drainer-failure sentinel (UTF-8 reason text)
-├── .ack-watermark     # optional 16-byte durable-ack high-water mark
+├── .ack-watermark     # optional durable-ack high-water mark
+├── .symbol-dict       # the sender's SYMBOL dictionary
 ├── sf-0000000000000001.sfa
 ├── sf-0000000000000002.sfa
 └── ...
@@ -152,7 +153,7 @@ rate:
 sf_max_total_bytes ≥ ingest_rate × max_tolerated_outage
 ```
 
-A 5-minute reconnect budget at 10 MB/s of compressed data implies at
+A 5-minute outage at 10 MB/s of compressed data implies at
 least 3 GB. Add safety margin for trim latency — in particular,
 `request_durable_ack=on` or `replicated` extends time-to-trim by the
 WAL→object-store upload window, and `local` by about one group-commit
@@ -190,8 +191,9 @@ When an SF-mode sender opens, it runs this sequence:
    - Walk the batches forward verifying each CRC32C-Castagnoli checksum.
    - The first invalid batch becomes end-of-data; any non-zero bytes
      past that point are logged as a torn-tail count.
-3. Sort segments by `baseSeq` and verify no gaps. A gap is a fatal
-   recovery error.
+3. Sort segments by `baseSeq` and verify no gaps. A gap means the chain
+   is incomplete: the reference client sets the sender directory aside as
+   `<sf_dir>/<sender_id>.unreplayable-<n>` and starts on an empty one.
 4. Open `.ack-watermark` (if present) and read the cumulative
    durable-ack FSN. Reject a watermark that exceeds the on-disk
    ceiling — it would seed `ackedFsn` past every un-acked batch and
@@ -208,8 +210,8 @@ fresh start: no segments, no replay.
 
 | Symptom | Likely cause | Operator action |
 |---|---|---|
-| "Slot held by PID `<n>`" | Two processes claiming the same `sender_id`; the message calls the sender directory a slot. | Stop the duplicate. The lock releases on its exit. |
-| "Gap between segments" | Corruption — a segment was deleted out of band. | Restore from backup or accept data loss; the substrate refuses to start. |
+| A lock error that names the holder's PID: `sf slot already in use` (Java), `slot already in use` (Go), `store-and-forward slot is already in use` (Rust, C, C++, Python), `slot … is already locked` (.NET), or `store-and-forward directory is already in use` (Node.js) | Two processes claiming the same `sender_id`. Most clients call the sender directory a slot. | Stop the duplicate. The lock releases on its exit. A crashed Node.js sender can leave its `.lock.owner` directory behind; see [`.lock` and `.lock.pid`](#lock-and-lockpid). |
+| `FSN gap in recovered segments` (Java) | A segment was deleted or damaged out of band. | The client sets the sender directory aside as `<sender_id>.unreplayable-<n>`, reports a `DATA_LOSS` error, and starts on an empty one. Re-ingest the set-aside rows from their source. |
 | "Watermark exceeds publishedFsn" | `.ack-watermark` is corrupt; the engine falls back to the no-watermark seed. | Logged as `WARN`. Replay will re-send the lowest segment's batches; rely on server deduplication. |
 | Torn tail count > 0 | The previous process crashed while writing a batch. | Informational; the CRC + zero-fill design discards the partial batch. |
 
@@ -219,7 +221,7 @@ fresh start: no segments, no replay.
 
 | Value | Behaviour |
 |---|---|
-| `5000` (default) | Block up to 5 s waiting for `ackedFsn ≥ publishedFsn`. Log `WARN` on timeout; un-acked tail stays on disk (SF) or is lost (memory-only). |
+| `60000` on Java and .NET, `5000` on the other clients (default) | Block up to that long waiting for `ackedFsn ≥ publishedFsn`. On timeout the un-acked tail stays on disk (SF) or is lost (memory-only). How the timeout is reported depends on the client; see [Close and shutdown](/docs/high-availability/store-and-forward/concepts/#close-and-shutdown). |
 | `0` or `-1` | Skip the drain wait. Pending data persists on disk (SF) for the next sender, or is lost (memory-only). |
 | any other positive value | That timeout in milliseconds. |
 

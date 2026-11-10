@@ -985,7 +985,10 @@ unsent rows stay in `<sf_dir>/<dir>.unreplayable-<n>/`, where `<dir>` is the
 inside it gives the reason, when the client could write one.
 
 Check for set-aside data after you get a sender. `QuarantinedSlotPath()`
-returns the path of the set-aside directory, or an empty string:
+returns the path of the set-aside directory, or an empty string when the
+sender started on a readable directory. On a borrowed sender, read it before
+`Close` returns the sender to the pool; afterwards it always returns an empty
+string:
 
 ```go
 if qs, ok := sender.(qdb.QwpSender); ok {

@@ -52,12 +52,14 @@ length, and a CRC32C checksum. The append protocol writes the payload first,
 the checksum last, and a partial write left behind by a crash is detected and
 discarded by the recovery scanner on next start.
 
-Batches in SF mode are **self-sufficient**: every batch carries the full
-schema for every table it touches and the full symbol-dictionary delta
-from id 0. That makes a batch replayable against any server connection,
-weeks or months later, even after a process restart that wiped all
-in-memory schema state. The cost is a small per-batch overhead which is
-accepted for correctness.
+Batches in SF mode can be replayed against any server connection, weeks or
+months later, even after a process restart that wiped all in-memory state.
+Every batch carries the full schema for every table it touches, at the cost
+of a small per-batch overhead. SYMBOL values travel as numeric ids, and each
+symbol string is sent only once. Before it replays, the client registers the
+whole dictionary with the new connection from the sender directory's
+[`.symbol-dict`](#symbol-dict) file, so the server knows every id a replayed
+batch uses.
 
 ## The FSN model
 
@@ -204,15 +206,17 @@ The exception message distinguishes the two scenarios:
 `publishedFsn` — i.e. for the server to acknowledge everything the producer has
 handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
 C, C++, Python, and Node.js. If the wait succeeds, all data is acked. If the
-timeout fires, a `WARN` is logged and:
+timeout fires:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender that uses the same sender directory;
 - in **memory-only mode**, the un-acked tail is lost.
 
-The Node.js client reports the timeout differently: `close()` rejects with
-`QwpSenderCloseTimeoutError` instead of logging, with the same outcome for the
-data. Its pooled client logs a warning when a sender it closes times out.
+How the timeout is reported depends on the client. Java logs a `WARN` and
+`close()` throws `LineSenderException`, Go's `Close` returns an error, and
+Node.js's `close()` rejects with `QwpSenderCloseTimeoutError`. The Node.js
+pooled client logs a warning when a sender it closes times out. See your
+[client's page](/docs/connect/overview/#client-libraries) for the others.
 
 Setting `close_flush_timeout_millis=0` (or `-1`) skips the drain wait
 entirely — useful for fast shutdown paths where you do not want to block.
@@ -233,7 +237,9 @@ When the engine opens an SF-mode sender, it scans the sender directory:
    the file's end-of-data; anything past it is discarded.
 3. **Reconcile gaps.** Segments are sorted by their `baseSeq` and adjacent
    pairs must satisfy `prev.baseSeq + prev.frameCount == curr.baseSeq`.
-   A gap is a fatal recovery error — the engine refuses to start.
+   A gap means the chain is incomplete and can't be replayed safely. The
+   reference client then sets the sender directory aside and starts on an
+   empty one, as described under [`.symbol-dict`](#symbol-dict).
 4. **Seed the ack watermark.** Either from `.ack-watermark` (if your
    client maintains it; see below) or from the lowest surviving FSN minus
    one.
@@ -245,7 +251,7 @@ thread replays the un-acked tail and then drains forward.
 
 ### `.ack-watermark`
 
-An optional 16-byte file in the sender directory persists the cumulative
+An optional file in the sender directory persists the cumulative
 durable-ack FSN across process restarts. Without it, recovery seeds the
 ack watermark from the lowest surviving segment's `baseSeq - 1` — which
 guarantees no data loss, but cannot distinguish which batches inside that
@@ -296,10 +302,11 @@ neither from the side-file's intact prefix nor from the surviving batches' own
 delta sections — the sender directory is **unreplayable**, and the client sets
 it aside rather than shipping batches whose ids nothing still backs. The
 reference client raises `UnreplayableSlotException` (its API calls the sender
-directory a slot): `Sender.build()` sets the directory aside and starts the
-producer on a fresh one, and the background drainer marks it with a `.failed`
-sentinel so later orphan scans skip it. No data is silently discarded; the
-directory is preserved for inspection.
+directory a slot). `Sender.build()` renames the directory to
+`<sf_dir>/<sender_id>.unreplayable-<n>`, reports a `DATA_LOSS` error, and
+starts the producer on a fresh directory. The background drainer marks an
+unreplayable orphan with a `.failed` sentinel so later orphan scans skip it.
+No data is silently discarded; the directory is preserved for inspection.
 
 ## Orphan adoption
 

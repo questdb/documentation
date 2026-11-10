@@ -74,13 +74,16 @@ string.
 
 ## Durable-ack: when to opt in
 
-By default the client frees a
-[batch](/docs/high-availability/store-and-forward/concepts/#batches) as soon
-as the server acknowledges it into the WAL. Whether the batch is on the
-**primary's** disk at that point depends on the server's
-[commit mode](/docs/concepts/durability/#commit-modes): in the default
-`nosync` mode, a power loss of the server can still lose it. Whether it has
-been replicated to the object store or to replicas is a separate matter.
+The client keeps every
+[batch](/docs/high-availability/store-and-forward/concepts/#batches) until the
+server acknowledges it, then trims it: it frees the space a whole segment at a
+time, once every batch in the segment is acknowledged. By default the server
+acknowledges a batch once it is committed to the WAL on the **primary**. With
+the server's default
+[`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) of
+`nosync`, that commit doesn't wait for the disk, so a crash of the primary's
+host can still lose it. Whether the batch has been replicated to the object
+store or to replicas is a separate matter.
 
 When the connect string sets
 [`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
@@ -187,7 +190,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 |---|---|---|---|
 | Non-blocking producer | No (request waits) | No (TCP backpressure) | Yes (buffer absorbs publishes) |
 | No data loss on a sender crash | No | No | Yes (SF mode) |
-| Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
+| Server outage tolerance | Best-effort retry | None | Reconnect loop that retries indefinitely, bounded by `sf_max_total_bytes` |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
 | Ack once the data is on the server's disk | Only in `sync` mode, or adaptive mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive commit mode](/docs/concepts/durability/)) |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |

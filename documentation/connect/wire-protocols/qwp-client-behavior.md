@@ -320,9 +320,8 @@ See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
   directory's lock.
 - In pooled `QuestDB` usage, the pool derives a directory name for each pooled
   sender from the base so they never collide. The minted name is
-  client-specific: Java uses `<base>-0`, `<base>-1`, …; the Rust, C and C++
-  pool uses
-  `<base>-ingest-0`, `<base>-ingest-1`, ….
+  client-specific: Java uses `<base>-0`, `<base>-1`, …; the pool shared by
+  Rust, C, C++, Python, and Ruby uses `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
   unacknowledged batches. Segments already freed are not replayed, but
   acknowledged batches in a surviving segment can be, unless the

@@ -708,7 +708,8 @@ architecture is that a producer survives an arbitrarily long outage.
   share the same Rust core, and `5000` on Node.js.
 
   This is the shutdown data-loss window. Setting it to `0` skips the drain
-  entirely and drops un-ACKed batches on every clean shutdown.
+  entirely: in memory-only mode, un-ACKed batches are lost on every clean
+  shutdown; in SF mode they stay in the sender directory for the next sender.
 
 In most clients, rejections of the upgrade request during reconnect
 (authentication rejected, version mismatch, durable-ack mismatch, non-101
