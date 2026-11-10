@@ -929,10 +929,16 @@ batch a *frame*, hence the key's name.
 - `on_write_error` — transient write failures (disk pressure, suspended
   table). Default: `retriable`.
 - `max_frame_rejections` — number of consecutive server rejections
-  (retriable NACK, or non-orderly close after a send) of the oldest
-  unacknowledged batch, with no ack progress in between, before the sender
-  records a terminal error instead of replaying forever. Integer ≥ 1;
-  default `4`.
+  (retriable NACK, or non-orderly close after a send) of the same batch, the
+  oldest one the server hasn't accepted yet, with no OK acknowledgement in
+  between, before the sender records a terminal error instead of replaying
+  forever. Integer ≥ 1; default `4`.
+- `poison_min_escalation_window_millis` — minimum time the same batch must
+  keep being rejected before `max_frame_rejections` makes the error terminal,
+  so a brief outage that rejects a few batches can clear first. An OK
+  acknowledgement for that batch resets the count. `0` escalates as soon as
+  `max_frame_rejections` is reached. Default `5000`. The Go client doesn't
+  accept this key.
 
 **Resolution precedence**, from highest to lowest (as documented on
 `SenderError.Policy`):

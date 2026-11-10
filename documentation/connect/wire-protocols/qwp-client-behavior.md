@@ -359,9 +359,10 @@ With `initial_connect_retry=async`:
 
 A sender in async mode does not give up because time passed. It ends only on
 a **terminal** condition: an authentication rejection, a durable-ack capability
-mismatch, a batch the server keeps rejecting (`max_frame_rejections`), or the
-producer hitting `sf_max_total_bytes` and exhausting
-`sf_append_deadline_millis` on `append()`. ⚠ The Java client treats an
+mismatch, or a batch the server keeps rejecting (`max_frame_rejections`).
+Exhausting `sf_append_deadline_millis` on `append()` with `sf_max_total_bytes`
+reached fails only that call; the sender stays alive and keeps retrying.
+⚠ The Java client treats an
 authentication rejection or a durable-ack capability mismatch as terminal only
 before the sender first connects, and retries them afterwards. A Node.js
 sender that uses store-and-forward or `initial_connect_retry=async` does the

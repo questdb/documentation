@@ -1906,7 +1906,7 @@ try {
 | `serverStatusByte` | `number` | The QWP status code, such as `3` for a schema mismatch                                                   |
 | `serverMessage`    | `string` | The server's explanation, when it sent one                                                               |
 | `fromFsn`, `toFsn` | `bigint` | Sequence numbers of the first and last rejected batch, comparable with `flushAndGetSequence()` results   |
-| `messageSequence`  | `bigint` | The sequence of the server response                                                                      |
+| `messageSequence`  | `bigint` | The server's sequence number for the rejected batch on this connection; it resets on reconnect           |
 | `tableName`        | `string` | The table, when the rejection concerns one                                                               |
 | `detectedAtMs`     | `number` | Client time of the rejection                                                                             |
 | `quarantinedPath`  | `string` | For `data-loss`: where store-and-forward kept the bytes it could not replay                              |
@@ -1931,7 +1931,9 @@ Dispatch on `category`, not on the message. Messages are English text written
 by the server, may change between versions, and can quote table names, column
 names, and the rejected values, so sanitize them before showing them to end
 users or sending them to an external error tracker. QuestDB returns no request
-ID: correlate with server logs through the sequence range and `detectedAtMs`.
+ID: correlate with server logs through `messageSequence` and `detectedAtMs`.
+`fromFsn` and `toFsn` are client-side and match your `flushAndGetSequence()`
+results instead.
 
 ### Query errors
 

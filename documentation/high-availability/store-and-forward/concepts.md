@@ -324,17 +324,37 @@ surprising.
 
 ## Error responses
 
-Not every server response is an OK. Server errors fall into six
-categories, each with a default policy:
+Not every server response is an OK. An error response carries a category,
+and the client applies a policy to it. There is no policy that drops a batch
+and carries on:
 
-| Category | Default | Meaning |
+- `retriable`: reconnect and replay from the acknowledged watermark.
+- `retriable_other`: the same, but on the next endpoint.
+- `terminal`: stop sending, and fail later calls. In memory-only mode the
+  unacknowledged batches are lost when the sender closes. In SF mode the
+  rejected batch stays in the sender directory, so a new sender replays it and
+  fails the same way until you fix the cause or move the sender directory
+  aside.
+- `abandoned`: used only with `DATA_LOSS`, which the client raises itself
+  when it sets an unreplayable sender directory aside.
+
+| Category | Default policy | Meaning |
 |---|---|---|
-| `SCHEMA_MISMATCH` | `DROP_AND_CONTINUE` | The batch's schema doesn't match the server. Replay won't help — the substrate logs and advances trim past the rejected span. |
-| `WRITE_ERROR` | `DROP_AND_CONTINUE` | Per-batch write failure (e.g. table is not currently accepting writes). |
-| `PARSE_ERROR` | `HALT` | Almost certainly a client bug. The substrate preserves on-disk batches for postmortem. |
-| `INTERNAL_ERROR` | `HALT` | Catch-all server fault. |
-| `SECURITY_ERROR` | `HALT` | Cluster-wide auth / authorization failure. |
-| `PROTOCOL_VIOLATION` | `HALT` (forced) | Connection is gone after a terminal WebSocket close code; no choice. |
+| `SCHEMA_MISMATCH` | `terminal` | The batch doesn't match the table: a missing column, a type clash, or no such table. Replaying the same bytes fails the same way. |
+| `PARSE_ERROR` | `terminal` | The server can't parse the batch. Almost certainly a client bug. |
+| `SECURITY_ERROR` | `terminal` | Authentication or authorization failure on a writable node. |
+| `WRITE_ERROR` | `retriable` | The table isn't accepting writes right now, for example while it is suspended. |
+| `INTERNAL_ERROR` | `retriable` | Catch-all server fault. |
+| `DICTIONARY_GAP` | `retriable` | The batch uses symbol ids the connection hasn't registered. The client registers the dictionary again and replays. |
+| `NOT_WRITABLE` | `retriable_other` | The node can't serve writes, such as a read-only replica or a demoting primary. Reserved: current servers close the connection instead. |
+| `UNKNOWN` | `retriable` (forced) | A status the client doesn't recognize, from a newer server. |
+| `PROTOCOL_VIOLATION` | `terminal` (forced) | The server rejected the same batch `max_frame_rejections` times in a row with no acknowledgement in between, so replaying it can't succeed. |
+| `DATA_LOSS` | `abandoned` | Client-side: the rows in a set-aside sender directory will never be sent. Page on this one. |
+
+The `on_*_error` connect-string keys override the defaults that aren't
+forced; see
+[Error handling](/docs/connect/clients/connect-string#error-handling) for
+which clients apply them.
 
 Errors are also delivered to an **error inbox** — a bounded queue
 consumed by a daemon dispatcher that invokes your registered handler.

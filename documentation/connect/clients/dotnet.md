@@ -773,21 +773,24 @@ The server validates batches, and rejections are reported **out of band**:
 they arrive at the [error handler](#error-handler) on a background dispatcher
 rather than being thrown from the `Send` call that published the batch. (A
 standalone `Send` / `SendAsync` waits for the *ACK* of a successful batch, but
-a rejection produces an error message, not an ACK — so it still surfaces
+a rejection produces an error response, not an ACK, so it still surfaces
 through the handler, not the `Send` return.) This section covers how those
 asynchronous errors are classified and handled.
 
 ### How errors surface
 
 Each error is classified into a `SenderErrorCategory` and assigned a
-`SenderErrorPolicy`:
+`SenderErrorPolicy`. The client never drops a rejected batch:
 
 | Policy | Effect | Default categories |
 |---|---|---|
-| `DropAndContinue` | The rejected batch is dropped; the sender keeps running. | `SchemaMismatch`, `WriteError` |
-| `Halt` | The sender latches terminal; the next producer call throws `LineSenderServerException`. | `ParseError`, `InternalError`, `SecurityError`, `ProtocolViolation`, `Unknown` |
+| `Retriable` | The client reconnects and replays the rejected batch from the acknowledged watermark. A batch the server keeps rejecting becomes `Terminal` after `max_frame_rejections` rejections in a row. | `WriteError`, `InternalError`, `NotWritable`, `DictionaryGap`, `Unknown` |
+| `Terminal` | The sender stops sending, the next producer call throws `LineSenderServerException`, and the rejected batch stays in the queue. | `SchemaMismatch`, `ParseError`, `SecurityError`, `ProtocolViolation` |
+| `Abandoned` | Rows set aside at `QuarantinedPath` will never be sent. | `DataLoss` only |
 
-After a `Halt`, discard the sender and create a new one.
+After a `Terminal` error, dispose of the sender and create a new one. With
+[store-and-forward](#store-and-forward), the new sender replays the rejected
+batch and fails the same way until you fix the cause.
 
 ### Error handler
 
@@ -815,8 +818,9 @@ Each `SenderError` carries the following fields:
 
 | Field | Description |
 |---|---|
-| `Category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
-| `AppliedPolicy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal; next API call throws `LineSenderServerException`). |
+| `Category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `NotWritable`, `DictionaryGap`, `DataLoss`, `Unknown`. Use for programmatic dispatch. |
+| `AppliedPolicy` | `Retriable` (the client replays the batch), `Terminal` (the sender stopped; the next API call throws `LineSenderServerException`), or `Abandoned` (with `DataLoss` only). |
+| `QuarantinedPath` | For `DataLoss`: where the bytes that will never be sent are kept. `null` otherwise. |
 | `ServerStatusByte` | Raw QWP status byte (e.g. `0x03` for `SchemaMismatch`). `-1` (`SenderError.NoStatusByte`) on `ProtocolViolation` and engine-internal terminal failures. |
 | `ServerMessage` | Human-readable server text (≤ 1024 UTF-8 bytes), or `null`. See [Message stability](#message-stability) and [PII safety](#message-pii). |
 | `MessageSequence` | The server's sequence number for the rejected batch on this connection. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
@@ -870,7 +874,7 @@ rejections). They are thrown directly from the call site:
 | Array `Column(...)` overloads | The `shape` does not match the element count, dimensionality exceeds 32, or the element type is not `double` / `long`. |
 | `ColumnGeohash(...)` | `precisionBits` is outside `[1, 60]`. |
 | `ColumnDecimal*(...)` with explicit `scale` | `scale` is outside `[0, 18]` (DECIMAL64), `[0, 38]` (DECIMAL128), or `[0, 76]` (DECIMAL256). |
-| Producer-thread call after `Halt` policy fired | The next `Table`, `Column`, `AtAsync`, or `SendAsync` throws `LineSenderServerException` carrying the latched `SenderError`. Discard the sender and create a new one. |
+| Producer-thread call after a `Terminal` policy fired | The next `Table`, `Column`, `AtAsync`, or `SendAsync` throws `LineSenderServerException` carrying the terminal `SenderError`. Discard the sender and create a new one. |
 
 Authentication failures surface differently between paths: a `401` / `403`
 during the WebSocket upgrade returns synchronously from `Sender.New` /
@@ -882,26 +886,31 @@ the sender latched terminal.
 ### Per-category policy
 
 Override the default policy per category with the `on_*_error` connect-string
-keys (values `halt` or `drop`):
+keys. Values are `halt` (or `terminal`) and `retry` (or `retriable`); the
+legacy value `drop` means `retry`, since the client no longer drops batches.
+An override can only make a category stricter: categories that default to
+`Terminal` stay `Terminal`.
 
 ```csharp
-// Treat a schema mismatch as fatal instead of dropping the batch.
+// Stop the sender instead of retrying while a table isn't accepting writes.
 using var sender = Sender.New(
-    "ws::addr=localhost:9000;on_schema_mismatch_error=halt;");
+    "ws::addr=localhost:9000;on_write_error=halt;");
 ```
 
 | Key | Scope |
 |---|---|
-| `on_server_error` | Catch-all default for every category. |
-| `on_schema_mismatch_error` (alias: `on_schema_error`) | Schema-validation rejections. |
-| `on_parse_error` | Client-side parse errors. |
-| `on_internal_error` | Unexpected client-side errors. |
-| `on_security_error` | Auth / TLS errors. |
-| `on_write_error` | Transport write failures. |
+| `on_server_error` | Default for every category below that has no key of its own. |
+| `on_schema_mismatch_error` (alias: `on_schema_error`) | Schema-validation rejections. Always `Terminal`. |
+| `on_parse_error` | Batches the server can't parse. Always `Terminal`. |
+| `on_internal_error` | Server-side faults. |
+| `on_security_error` | Authorization failures on a writable node. Always `Terminal`. |
+| `on_write_error` | Tables that aren't accepting writes. |
 
-`ProtocolViolation` and `Unknown` are always `Halt`, regardless of these keys.
-For programmatic control, set `SenderOptions.error_policy_resolver` to a
-`SenderErrorPolicyResolver` delegate.
+`ProtocolViolation` is always `Terminal`. `Unknown`, `NotWritable`, and
+`DictionaryGap` have no key and stay `Retriable` unless a resolver changes
+them. For programmatic control, set `SenderOptions.error_policy_resolver` to a
+`SenderErrorPolicyResolver` delegate; it can't relax a `Terminal` default
+either.
 
 ### Connection-level errors
 
@@ -935,9 +944,10 @@ A summary of how the engine treats each error class on the wire:
 | Auth (`401` / `403`) on any endpoint | Terminal | Halts the failover loop immediately; the sender / query client latches non-recoverable. |
 | Role reject (`421` + `X-QuestDB-Role`) | Topology-level (transient if `PRIMARY_CATCHUP`, otherwise terminal for the loop) | The client tries the next endpoint; if every endpoint rejects, surfaces as `QwpRoleMismatchException` (egress) or the sender's reconnect loop exhausts. |
 | Version mismatch during upgrade | Per-endpoint, **not** terminal | The client moves on to the next endpoint. |
-| Server rejection of a batch (`SchemaMismatch`, `ParseError`, `WriteError`, etc.) | Per the `on_*_error` policy — default is `DropAndContinue` for `SchemaMismatch` / `WriteError`, `Halt` for everything else. | `DropAndContinue` keeps the sender alive; `Halt` latches the sender so the next producer call throws `LineSenderServerException`. |
+| Server rejection of a batch (`SchemaMismatch`, `ParseError`, `WriteError`, etc.) | Per the policy: `Terminal` for `SchemaMismatch`, `ParseError`, and `SecurityError`, `Retriable` for the rest unless an `on_*_error` key raises it. | `Retriable` replays the batch; `Terminal` stops the sender so the next producer call throws `LineSenderServerException`. |
 | TCP / TLS failure, `404`, `503`, mid-stream drop | Transient | Fed into the ingress reconnect loop (`reconnect_max_*` keys) or, on egress, the per-query failover loop (`failover_*` keys). |
-| `ProtocolViolation`, `Unknown` | Terminal | Always `Halt`, regardless of `on_*_error` settings. |
+| `ProtocolViolation` | Terminal | Always `Terminal`, regardless of `on_*_error` settings. |
+| `Unknown` | Transient | `Retriable` by default, so a status byte from a newer server doesn't stop the sender. |
 
 ### Connection events
 

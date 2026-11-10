@@ -73,11 +73,16 @@ store, or both. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
+| `max_frame_rejections` | int (≥1) | `4` | How many times in a row the server may reject the same batch, with no acknowledgement in between, before the sender records a terminal error instead of replaying it again. The protocol calls a batch a *frame*. |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`terminal`, `retriable`, or `retriable_other`) for a category; `on_server_error` also accepts `auto`. Every client accepts these keys, but the Java and Node.js clients don't apply them yet. |
+| `poison_min_escalation_window_millis` | int (ms) | `5000` | Minimum time the same batch must keep being rejected before `max_frame_rejections` makes the error terminal, so a brief outage can clear first. `0` escalates at once. Not supported by the Go client. |
 
 The per-category defaults are documented in
-[Concepts § Error responses](/docs/high-availability/store-and-forward/concepts/#error-responses).
-`PROTOCOL_VIOLATION` and `UNKNOWN` are forced `HALT` and not user-overridable.
+[Concepts § Error responses](/docs/high-availability/store-and-forward/concepts/#error-responses),
+and the override rules in
+[Error handling](/docs/connect/clients/connect-string#error-handling).
+`PROTOCOL_VIOLATION` is always `terminal` and `UNKNOWN` always `retriable`;
+neither can be overridden.
 
 ## Other relevant keys
 

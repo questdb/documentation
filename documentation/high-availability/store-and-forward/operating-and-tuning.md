@@ -298,11 +298,11 @@ A conformant client exposes at minimum:
 - **Backpressure:** `backpressure_stalls` rate. Any non-zero rate is a
   capacity signal.
 - **Error rate by category:** instrument your error handler to bucket
-  by category. Background `SCHEMA_MISMATCH` is usually a schema-drift
-  symptom worth alerting on.
+  by category. A `SCHEMA_MISMATCH` is terminal by default and stops the
+  sender, so alert on it, and page on `DATA_LOSS`.
 
-The default error handler logs every received `SenderError` —
-`ERROR`-level for HALT, `WARN`-level for DROP. Replace it only if you
+The default error handler logs every received `SenderError`: `ERROR` for
+terminal and abandoned errors, `WARN` for retriable ones. Replace it only if you
 are also routing the errors somewhere else (Sentry, structured logs):
 silence is forbidden by the contract.
 
