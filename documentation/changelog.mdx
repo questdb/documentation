@@ -10,8 +10,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## November 2026
 
+### Releases
+
+- [10.2.0](https://questdb.com/release-notes/) - Released November 10, 2026
+
 ### New
 
+- [Passthrough materialized views](/docs/concepts/materialized-views/#passthrough-views) - A materialized view no longer has to aggregate: a query without `SAMPLE BY` copies base rows one-for-one, so the view is a live copy of some columns or rows of one table. Covers what it inherits from the base table (designated timestamp, partitioning, symbol indexes), why its columns are fixed at creation, [which queries qualify](/docs/concepts/materialized-views/#which-queries-are-passthrough), and that `REFRESH PERIOD` is rejected
 - [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
 - [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 - [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
@@ -33,28 +38,10 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [REINDEX](/docs/query/sql/reindex/) - Explains that `LOCK EXCLUSIVE` is required and takes the table's writer lock, and that `REINDEX` rebuilds native partitions only: it skips Parquet partitions and rejects a Parquet partition named in `PARTITION`
-- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) -
-  Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a
-  materialized view's query that reads its base table (this includes a subquery
-  on the base table) can no longer use `LIMIT`, or a window function nested
-  inside an expression, such as `row_number() OVER (ORDER BY timestamp) + 1`. A
-  window function that makes up a whole column was already rejected. A `LIMIT`
-  in a subquery over a *different* table is still allowed.
-
-  Views created on an earlier version keep refreshing. The restriction only matters
-  when you **recreate** such a view — most often when you run
-  `SHOW CREATE MATERIALIZED VIEW` and replay its output during an upgrade,
-  migration, or restore. That statement is now rejected until you rewrite the
-  query without the `LIMIT` or the window function.
-
-  If the `LIMIT` was only there to return fewer rows to your application, remove
-  it from the view definition and instead add `ORDER BY ... LIMIT ...` to the
-  query you run against the view. This is not an exact swap: once the `LIMIT` is
-  gone from the definition, the view stores all matching rows rather than a
-  capped set. Likewise, move a window function into the query you run against
-  the view.
+- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) - Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a materialized view's query that reads its base table (this includes a subquery on the base table) can no longer use `LIMIT`, or a window function nested inside an expression, such as `row_number() OVER (ORDER BY timestamp) + 1`. A window function that makes up a whole column was already rejected. A `LIMIT` in a subquery over a *different* table is still allowed
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) - A conversion to non-WAL applies the WAL first, and is refused while it cannot
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) and [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - The table keeps its TTL, `FORMAT PARQUET`, per-column Parquet encoding, and deduplication keys and mode; a table converted to WAL keeps dropping partitions past its TTL
+- [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/) - In adaptive commit mode, `RESUME WAL` may first take a save point and need the table's writer, so it can fail with `table busy` or leave the table suspended until you retry
 - [Disaster recovery](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss) - A QuestDB Enterprise primary refuses to start when its log of a table ends before the object store, and how to recover
 - [Upgrade QuestDB](/docs/operations/upgrade/#upgrading-to-420) - What to check before upgrading to QuestDB Enterprise 4.2.0, and the limits on going back to an earlier release
 - [Monitoring and alerting](/docs/operations/monitoring-alerting/#detect-adaptive-commit-problems) - What to alert on in adaptive commit mode
