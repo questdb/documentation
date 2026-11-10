@@ -158,7 +158,7 @@ mechanism that achieves exactly-once.
   ([`request_durable_ack`](/docs/connect/clients/connect-string#durable-ack)):
   the client keeps each batch until the server confirms that it is durable,
   on the server's disk (`local`, which needs
-  [adaptive commit mode](/docs/concepts/durability/)) or in object storage
+  [adaptive durability mode](/docs/concepts/durability/)) or in object storage
   (`replicated`, QuestDB Enterprise). The client then replays a batch the
   server lost in a power loss or a primary failover, but replay can still
   produce duplicates.

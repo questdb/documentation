@@ -180,7 +180,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_segment_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
-| Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive commit mode              |
+| Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive durability mode              |
 | Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
 | Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
 | Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
@@ -760,7 +760,7 @@ durability, and sends it again after a reconnect if the server lost it.
 - `replicated`: the commit reached the replication object store. Needs a
   QuestDB Enterprise primary with replication.
 - `local,replicated`: both. Needs a QuestDB Enterprise primary with replication
-  in adaptive commit mode.
+  in adaptive durability mode.
 - `on`: the original name of `replicated`, and the only value QuestDB
   Enterprise 4.1.0 and earlier accept.
 - `off` (default): no durable confirmation.
@@ -768,11 +768,11 @@ durability, and sends it again after a reconnect if the server lost it.
 What each tier protects against, and what the server needs, is in
 [Durable acknowledgements](/docs/concepts/durability/#durable-acknowledgements).
 
-The server grants every requested tier or none. When it cannot, for example
-when a server that is not in adaptive mode is asked for `local`, the connection
-fails at once with a durable-ack mismatch, instead of leaving the sender
-waiting for confirmations that never come. Durable acknowledgements work only
-on WebSocket transports.
+The server grants every requested tier or none. When it cannot, for example when
+a server that is not in adaptive durability mode is asked for `local`, the
+connection fails at once with a durable-ack mismatch, instead of leaving the
+sender waiting for confirmations that never come. Durable acknowledgements work
+only on WebSocket transports.
 
 :::note QuestDB Enterprise
 

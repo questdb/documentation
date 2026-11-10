@@ -126,8 +126,8 @@ watermarks:
 
 - `local`: `STATUS_LOCAL_DURABLE_ACK` messages, for commits that are **on the
   server's own disk** (WAL and sequencer record flushed). The server must run in
-  [adaptive commit mode](/docs/concepts/durability/).
-- `replicated`, or its original name `on`: `STATUS_DURABLE_ACK` messages, for
+  [adaptive durability mode](/docs/concepts/durability/).
+- `replicated`, or its original name `on`: `STATUS_DURABLE_ACK` frames, for
   data the server has **already uploaded from the WAL to the configured object
   store** (S3, Azure Blob, GCS, or NFS). QuestDB Enterprise only.
 - `local,replicated`: `STATUS_DURABLE_ACK` messages drive trim. The
