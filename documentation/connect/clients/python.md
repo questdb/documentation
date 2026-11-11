@@ -142,8 +142,8 @@ token = questdb.connect(
 )
 ```
 
-Authentication happens during the WebSocket upgrade, before any data frames
-are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
+Authentication happens during the WebSocket upgrade, before any data is
+exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
 first operation that needs the connection, not from `connect()`. Queries and
 `dataframe()` calls raise it directly. Row senders connect in the
 background, so a fire-and-forget `flush()` can return before the upgrade
@@ -200,7 +200,7 @@ Match the API to the shape of the work:
 | Several queries in a row | `db.reader()` | Lease one reader connection and run queries on it sequentially. |
 | A statement to run (DDL, `INSERT`) | `db.execute(sql)` | Run, drain, and return the connection; output is discarded. |
 
-There is no per-column setter or chunk API in the Python client; whole-frame
+There is no per-column setter or chunk API in the Python client; whole-DataFrame
 `dataframe()` is the column-major path. Row senders use store-and-forward;
 `dataframe()` uses a separate direct connection pool and blocks for an ack.
 Call it on the handle: `db.dataframe()`. A sender lease exposes the same
@@ -357,9 +357,9 @@ type when the distinction matters.
 :::note Auto-flush
 
 The pooled sender auto-flushes by default at 1,000 rows, after 100 ms, or when
-its estimated encoded size reaches 90% of the current QWP frame limit. Until
-the server advertises that limit, the byte threshold is 8 MiB (or the lower
-local queue limit). The interval is checked only by `row()`; there is no
+its estimated encoded size reaches 90% of the current QWP batch size limit.
+Until the server advertises that limit, the byte threshold is 8 MiB (or the
+lower local queue limit). The interval is checked only by `row()`; there is no
 background timer that flushes an idle buffer.
 
 Override the thresholds with `auto_flush_rows`, `auto_flush_interval`, and
@@ -385,9 +385,10 @@ buffered in it. To keep them, catch the exception inside the block.
 The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
 and no manual progress pump; those exist only on the standalone
 [legacy `Sender`](#legacy-ilp-clients). The rest of the ws delivery
-surface is on the lease: `flush_and_get_fsn()` /
-`flush_and_keep_and_get_fsn()` return the published frame's sequence
-number, `await_acked_fsn(fsn, timeout_millis)` waits for its
+surface is on the lease. A flush sends rows to the server in batches; the
+protocol calls a batch a *frame* and numbers batches with frame sequence
+numbers (FSNs). `flush_and_get_fsn()` / `flush_and_keep_and_get_fsn()` return
+the published batch's FSN, `await_acked_fsn(fsn, timeout_millis)` waits for its
 acknowledgement, `published_fsn()` / `acked_fsn()` report progress without
 blocking, and `poll_error()` / `error_events_dropped()` pull the
 rejections recorded since the lease was borrowed. FSNs are watermarks of
@@ -438,7 +439,7 @@ an integer type.
 ## DataFrame ingestion
 
 Use `db.dataframe()` when the data already lives in columns. Each call
-borrows a direct columnar connection, publishes the frame in batches, blocks
+borrows a direct columnar connection, publishes the DataFrame in batches, blocks
 until the server acknowledges the final batch, and returns the connection to
 the pool:
 
@@ -488,19 +489,19 @@ Parameters:
 
 | Parameter | Meaning |
 | --- | --- |
-| `table_name` | The table to load into; one table per call. `table_name_col` is not supported: split multi-table frames and load each group. |
+| `table_name` | The table to load into; one table per call. `table_name_col` is not supported: split a multi-table DataFrame and load each group. |
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
 | `max_rows_per_batch` | Rows per published batch, default 16384. Sets pipelining granularity, not a safety limit — see below. |
-| `schema_overrides` | Per-column type, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`. Values are `symbol`, `ipv4`, `char`, `uuid`, `long256`, or `("geohash", bits)` with `bits` from 1 to 60. Beats any Arrow field metadata on the column. Needs a frame where every column is Arrow-backed; otherwise it raises `UnsupportedDataFrameShapeError`. |
+| `schema_overrides` | Per-column type, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`. Values are `symbol`, `ipv4`, `char`, `uuid`, `long256`, or `("geohash", bits)` with `bits` from 1 to 60. Beats any Arrow field metadata on the column. Needs a DataFrame where every column is Arrow-backed; otherwise it raises `UnsupportedDataFrameShapeError`. |
 
-`max_rows_per_batch` decides how the frame is cut into published batches,
-and each batch is one unit of encoding, memory, and server-side apply.
-It is not a safety limit: the client splits any batch that exceeds the
-negotiated per-batch byte cap regardless of this setting, and a single row
-is never bounded by it. What it does control:
+`max_rows_per_batch` sets how many DataFrame rows go into each published
+batch. Each batch is encoded, held in memory, and applied on the server as one
+unit. The setting is not a size limit: when that many rows exceed the batch
+size limit, the client sends them as several smaller batches, whatever the
+setting says. What it does control:
 
-- Peak client memory: each batch is encoded and held as one frame.
+- Peak client memory: each batch is encoded and held in memory whole.
 - Commit frequency: the client commits about every 100 batches, so roughly
   `max_rows_per_batch × 100` rows are in flight between commits.
 - Per-batch overhead: very small batches pay framing and server-side
@@ -508,7 +509,7 @@ is never bounded by it. What it does control:
 
 The default suits mixed workloads. Raise it for narrow numeric rows,
 lower it for very wide rows or tight memory budgets. This setting only
-applies to materialized frames. When you pass a streaming input such as
+applies to materialized DataFrames. When you pass a streaming input such as
 `pa.RecordBatchReader`, the client sends each incoming batch as it
 arrives, keeping whatever batch size the stream already has. To change
 it, adjust the code that produces the stream.
@@ -518,7 +519,7 @@ Numeric, string, timestamp, and decimal (`pyarrow.decimal32` through
 Arrow `list_` / `large_list` / `fixed_size_list` with a `float64` leaf become
 `DOUBLE[]`. Null cells (`None`, `NaN`, `pd.NA`, and Arrow nulls) are
 stored as SQL nulls, with the same `BOOLEAN`, `BYTE`, and `SHORT` caveat as
-row ingestion. A frame the columnar path cannot express raises
+row ingestion. A DataFrame the columnar path cannot express raises
 `UnsupportedDataFrameShapeError` with per-column failures in
 `column_failures`.
 
@@ -615,12 +616,12 @@ trade_ids = pa.ExtensionArray.from_storage(
 ```
 
 This needs pyarrow 18 or later. Setting `ARROW:extension:name` in field
-metadata does not work in a pandas frame, which keeps a column's Arrow type
+metadata does not work in a pandas DataFrame, which keeps a column's Arrow type
 but not its field metadata.
 
 :::note
 
-In a frame that mixes Arrow-backed and NumPy columns, `schema_overrides` is
+In a DataFrame that mixes Arrow-backed and NumPy columns, `schema_overrides` is
 unavailable, so the client rejects an unlabelled 16- or 32-byte column rather
 than guess its type. To write it as `BINARY`, pass it as an object column of
 `bytes`.
@@ -798,7 +799,7 @@ A pandas dtype does not always identify the QuestDB type. For example,
 This works with every `dtype_backend`. With `"numpy_nullable"`, `UUID` and
 `LONG256` columns hold `bytes` rather than `uuid.UUID` and `int`.
 
-Editing the frame is safe. A column you drop, rename, or convert to another
+Editing the DataFrame is safe. A column you drop, rename, or convert to another
 type simply loses its record, and the write goes ahead with whatever the
 column now is. `symbols` and `schema_overrides` win over it, so you can
 always state a type yourself. Two types do not survive unchanged: `BYTE` and
@@ -824,10 +825,10 @@ df.attrs["questdb"] = {
 }
 ```
 
-For a hand-built frame with no existing metadata, omit the unpacking line.
+For a hand-built DataFrame with no existing metadata, omit the unpacking line.
 `version` is required and must be `1`. `kind` is one of `uuid`, `long256`,
 `ipv4`, `char`, `geohash`, or `date`; `precision_bits` goes with `geohash`
-only. Naming a column that is not in the frame does no harm; it is ignored.
+only. Naming a column that is not in the DataFrame does no harm; it is ignored.
 A dictionary without `version`, or with a version this client does not
 know, is ignored completely.
 
@@ -862,15 +863,17 @@ network.
 ## Delivery and durability
 
 Row senders always publish through a local store-and-forward queue. Without
-`sf_dir` the queue is in memory. With `sf_dir`, each lease uses a disk slot:
+`sf_dir` the queue is in memory. With `sf_dir`, each lease uses its own sender
+directory:
 
 ```text
 <sf_dir>/<sender_id>-ingest-<index>/
 ```
 
 Give each handle that shares an `sf_dir` a distinct `sender_id`. On restart,
-the pool reopens managed dirty slots and replays their unacknowledged frames.
-With the default `sf_durability=memory`, disk mode protects against a
+the pool reopens its sender directories that still hold data and replays their
+unacknowledged rows.
+With the default `sf_durability=memory`, SF mode protects against a
 client-process crash but not a host crash or power loss. Set
 `sf_durability=periodic` to survive host loss: the client also forces the
 queue files to disk every `sf_sync_interval_millis` (default `5000`). It
@@ -888,7 +891,7 @@ background delivery continues, so retry `wait()` rather than flushing the
 same rows again.
 
 `flush(wait=True)` and `wait()` observe the accepted (`Ok`) acknowledgement:
-the server took responsibility for the frames. They are pure barriers —
+the server took responsibility for the rows. They are pure barriers —
 data-fate notification is a separate channel, the
 [rejection handler](#server-rejections). A durable-level wait (waiting
 for object-storage upload on Enterprise deployments) is not exposed on the
@@ -960,7 +963,7 @@ db.close()
 
 The sender and reader pools grow and cap independently, and `dataframe()`
 uses another internal direct pool, so account for all active paths when
-sizing the server. Keep leases short: a sender lease occupies its slot until
+sizing the server. Keep leases short: a sender lease holds its place in the pool until
 it closes, even while idle.
 
 ## Failover and errors
@@ -975,7 +978,7 @@ db = questdb.connect(
 )
 ```
 
-The background runner reconnects and replays queued frames. The retry budget
+The background runner reconnects and replays queued rows. The retry budget
 uses these keys:
 
 | Key | Default |
@@ -989,7 +992,7 @@ rejections are not retried. When a `flush(wait=True)` or `wait()` makes no
 progress within the budget it raises `QuestDBErrorCode.FailoverRetry`: the
 rows remain queued and background delivery continues, so retry the wait or
 extend the budget — do not rebuild and flush the same rows, which would
-duplicate them once the original frames land.
+duplicate them once the original rows land.
 
 To observe connection state, pass a listener when connecting. It receives
 one `ConnectionEvent` per state transition — `kind`
@@ -1018,7 +1021,7 @@ totals. [`server_info()`](#server-information) snapshots the handshake.
 
 ### Server rejections
 
-The server can reject published frames — a schema mismatch, a parse error —
+The server can reject published batches — a schema mismatch, a parse error —
 after `flush()` has already returned. Rejections are pushed to the pool's
 rejection handler, one `SenderError` per rejection, on a dedicated dispatcher
 thread with a bounded drop-oldest inbox (`error_event_inbox_capacity`,
@@ -1108,7 +1111,7 @@ Codes you will most often dispatch on:
 `QuestDBServerRejectionError` marks a terminal server rejection; its
 `sender_error` payload carries `category` (schema mismatch, parse error,
 security error, ...), `applied_policy` (retriable or terminal), `status`,
-`message`, and the affected `from_fsn` / `to_fsn` frame range.
+`message`, and the affected `from_fsn` / `to_fsn` FSN range.
 `UnsupportedDataFrameShapeError` reports per-column DataFrame failures. The
 legacy `IngressError` name remains an alias of `QuestDBError`.
 
@@ -1138,12 +1141,12 @@ best-effort basis for `close_flush_timeout_millis` (default five seconds),
 and closes pooled connections. In-flight `QueryResult`s from one-shot
 `query(sql)` calls are not interrupted; they keep streaming and release
 their connections when consumed or closed. An in-memory queue that cannot drain within
-that window loses its remaining tail; disk mode (`sf_dir`) keeps it for
+that window loses its remaining tail; SF mode (`sf_dir`) keeps it for
 restart replay. Before shutdown:
 
 - Call `flush(wait=True)` or `wait()` on each sender when accepted delivery
   is required.
-- Configure `sf_dir` when undelivered frames must replay after a process
+- Configure `sf_dir` when undelivered rows must replay after a process
   restart.
 
 ## Production shape: TLS, token, multi-host
@@ -1183,7 +1186,7 @@ except QuestDBError as e:
     sys.exit(1)
 ```
 
-Flushed frames land in the `sf_dir` spool, so a process restart with the same
+Flushed rows land on disk under `sf_dir`, so a process restart with the same
 `sender_id` replays anything unacknowledged. For acknowledgement semantics,
 including the durable-ack limitation of the pooled Python API, see
 [Delivery and durability](#delivery-and-durability).
@@ -1194,7 +1197,7 @@ The 4.x-style standalone `Sender` remains available for InfluxDB Line
 Protocol ingestion (`http::`, `https::`, `tcp::`, `tcps::`), including
 `Sender.from_conf()`, auto-flush, and HTTP transactions, and also speaks
 QWP directly: `udp::` for fire-and-forget datagrams and `ws::` / `wss::`
-with explicit frame-sequence-number tracking. The `questdb.ingress` import
+with explicit FSN tracking. The `questdb.ingress` import
 path still works as a deprecated alias module. It is
 documented on
 [ReadTheDocs](https://py-questdb-client.readthedocs.io/en/latest/), and the

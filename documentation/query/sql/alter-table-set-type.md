@@ -94,7 +94,8 @@ ALTER TABLE trades REBASE WAL;
 ```
 
 A non-WAL table gets no power-loss protection from
-[adaptive commit mode](/docs/concepts/durability/): it behaves as in `nosync`.
+[adaptive durability mode](/docs/concepts/durability/): it behaves as in
+`nosync`.
 
 ## Examples
 

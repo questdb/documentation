@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-An `Ok` ACK confirms that QuestDB accepted the frame, but the row becomes
+An `Ok` ACK confirms that QuestDB accepted the row, but the row becomes
 visible only after the WAL is applied to the table. This happens asynchronously.
 The bounded poll uses a unique value and a bind parameter, so it cannot
 accidentally report an older row. In production, poll for the application
@@ -128,8 +128,8 @@ let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 `QuestDb::connect` parses the connect string and doesn't normally perform any
 blocking network I/O. The exception to that happens when store-and-forward
 durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the dirty slots at construction
-and start replaying them in the background.
+previously crashed client. The pool may reopen the sender directories that
+hold that data at construction and start replaying them in the background.
 
 The ingestion sender creates its local producer on first borrow and connects its
 delivery runner in the background, so it can queue data while the server is
@@ -227,12 +227,13 @@ successful local publication and retains its allocated capacity. Use
 `flush_buffer_and_keep()` only when you need to retain the rows for another
 destination or operation.
 
-A buffer is published as one frame and is never split, so it must stay under
-the frame cap: the smallest of `max_buf_size` (default 100 MiB), the batch size
-the server advertises, and the `sf_max_segment_bytes` segment payload capacity
-(just under 4 MiB by default). `buffer.len()` is at least the size of the frame
-a flush encodes, so a buffer flushed before its length reaches the cap fits in
-one frame. A buffer over the cap fails with `ErrorCode::BatchTooLarge`,
+A buffer flush always publishes exactly one batch and is never split. The
+protocol calls a batch a *frame* and numbers batches with frame sequence
+numbers (FSNs). A buffer must therefore stay under the batch size limit: the smallest of `max_buf_size` (default 100 MiB), the batch size the
+server advertises, and the `sf_max_segment_bytes` segment payload capacity
+(just under 4 MiB by default). `buffer.len()` is at least the size of the batch
+a flush encodes, so a buffer flushed before its length reaches the limit fits
+in one batch. A buffer over the limit fails with `ErrorCode::BatchTooLarge`,
 publishes nothing, and keeps its rows.
 
 ### Buffer column setters
@@ -331,19 +332,20 @@ The `at_*` setters take raw epoch `i64` values.
 `TimestampNanos::now().as_i64()` supplies the current time for `at_nanos`, and
 `TimestampMicros` has the same `as_i64()` accessor for `at_micros`.
 
-Use one `Chunk` per batch. Create the chunk after creating the batch's backing
-buffers, append the columns, and flush it before leaving that scope.
+Use one `Chunk` for each set of rows you flush. Create the chunk after
+creating the backing buffers for those rows, append the columns, and flush it
+before leaving that scope.
 
-A chunk too large for one frame is split across several, each published on its
-own. The client targets about 2 MiB per frame — half of `sf_max_segment_bytes` (default
-4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. That matters
-because a flush failing partway through leaves the earlier frames queued and
-never accepts the rest, which is why chunk recovery differs from buffer
+A chunk too large for one batch is split across several, each published on its
+own. The client targets about 2 MiB per batch — half of `sf_max_segment_bytes`
+(default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. That
+matters because a flush failing partway through leaves the earlier batches
+queued and never accepts the rest, which is why chunk recovery differs from buffer
 recovery; see [Recovering from a failed flush](#recovering-from-a-failed-flush).
 
-The client halves the row range until each frame fits, stopping at 8 rows:
-validity bitmaps and boolean columns pack one bit per row, so a frame must
-start on a byte boundary. An 8-row frame is checked against the full 4 MiB
+The client halves the row range until each batch fits, stopping at 8 rows:
+validity bitmaps and boolean columns pack one bit per row, so a batch must
+start on a byte boundary. An 8-row batch is checked against the full 4 MiB
 rather than the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very
 large string, binary, or array values — the flush fails instead of splitting.
 
@@ -484,11 +486,11 @@ Pass `&[]` for `overrides` when no column needs one. `max_rows(0)` uses the
 default batch size. Omitting `timestamp_column` asks the server to assign
 timestamps. Omitting `ack_level` uses the pool default.
 
-`flush_polars_dataframe` checkpoints the frame and automatically retries the
-uncommitted tail after a transient failover. `flush_arrow_batch` returns a
-transient error for the caller to retry because the caller still owns the
-batch. Polars replay is at-least-once, and retrying an Arrow batch after an
-uncertain failure can also duplicate rows. Use
+`flush_polars_dataframe` checkpoints its progress through the DataFrame and
+automatically retries the uncommitted tail after a transient failover.
+`flush_arrow_batch` returns a transient error for the caller to retry because
+the caller still owns the Arrow batch. Polars replay is at-least-once, and
+retrying an Arrow batch after an uncertain failure can also duplicate rows. Use
 [deduplication](/docs/concepts/deduplication/) when duplicates would be
 harmful.
 
@@ -715,21 +717,23 @@ If you disable default features, also enable `sync-reader-zstd`.
 ## Delivery and durability
 
 The ingestion sender pool always uses store-and-forward. Without `sf_dir`, the
-queue is in memory. With `sf_dir`, each borrowed sender uses a disk slot:
+queue is in memory. With `sf_dir`, each borrowed sender uses its own sender
+directory:
 
 ```text
 <sf_dir>/<sender_id>-ingest-<index>/
 ```
 
 Give each pool that shares an `sf_dir` a distinct `sender_id`. On restart, the
-pool reopens managed dirty slots and replays their unacknowledged frames.
+pool reopens its sender directories that still hold data and replays their
+unacknowledged rows.
 
 The default `sf_durability=memory` does not call `fsync`. It is page-cache
 durable, which protects against a client-process crash but does not guarantee
 survival of a host crash or power loss.
 
 Set `sf_durability=periodic` to survive host loss. It requires `sf_dir` and
-checkpoints published frames in the background every `sf_sync_interval_millis`
+forces the queued data to disk in the background every `sf_sync_interval_millis`
 (default `5000`). `flush` and `append` are reserved: they parse but are
 rejected at build time.
 
@@ -742,7 +746,8 @@ rejected at build time.
 | Per-call deadline | Publish, then `wait(level, timeout)` | Wait with an explicit no-progress timeout. |
 | Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
-`AckLevel::Ok` means the server accepted all frames through the boundary.
+`AckLevel::Ok` means the server accepted all batches up to and including the
+boundary.
 `AckLevel::LocalDurable` waits until the server flushed them to its own disk. It
 needs `request_durable_ack=local` and a server running
 [`cairo.commit.mode=adaptive`](/docs/concepts/durability/).
@@ -768,7 +773,7 @@ portable receipts that can be checked through an arbitrary later borrow.
 A successful FSN-returning flush of a non-empty buffer or chunk always returns
 `Some(fsn)`; `Ok(None)` only means there was nothing to publish. Similarly,
 `published_fsn()` and `acked_fsn()` return `Ok(None)` until this borrow
-publishes or completes its first frame, so treat `None` from `acked_fsn()` as
+publishes or completes its first batch, so treat `None` from `acked_fsn()` as
 "nothing acked yet", not as a failure. A saved boundary is covered once
 `acked_fsn()` returns a value at or above it.
 
@@ -781,8 +786,9 @@ For these low-level APIs, the flag describes only the failed operation's
 input. The DataFrame-level aggregation described above applies specifically to
 `flush_polars_dataframe`.
 
-When `in_doubt()` is `false`, the flush failed before the queue took the frame,
-so the rows never entered the send path and your input is intact: re-flush it.
+When `in_doubt()` is `false`, the flush failed before the queue accepted
+anything, so the rows never entered the send path and your input is intact:
+re-flush it.
 When `in_doubt()` is `true`, delivery is
 uncertain — do not blindly replay, because the queue may already hold the rows.
 Waiting never duplicates, so `wait()` (or observe `acked_fsn()`) for whatever
@@ -796,13 +802,13 @@ retryable code before re-sending.
 
 How much waiting recovers depends on the API:
 
-- A `Buffer` publishes as one indivisible frame, and every publication failure
+- A `Buffer` publishes as one indivisible batch, and every publication failure
   is provably-not-delivered. So an in-doubt buffer failure means the ACK wait
   failed with every row already queued, and `wait()` recovers it.
-- A `Chunk` may be [split](#sending-data-column-major) across frames. A failure
-  partway through queues the earlier frames and never accepts the rest, so
-  waiting delivers only part of the batch. Recovering the remainder means
-  resending the chunk, which is safe only under dedup keys.
+- A `Chunk` may be [split](#sending-data-column-major) into several batches. A
+  failure partway through queues the earlier batches and never accepts the
+  rest, so waiting delivers only part of the chunk. Recovering the remainder
+  means resending the chunk, which is safe only under dedup keys.
 
 Buffer and chunk state is not a substitute for this flag. An in-doubt chunk is
 cleared after a failed ACK wait but populated when a split remainder fails, so
@@ -821,7 +827,7 @@ publication can wait for ACK-driven space and then return an error:
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a sender or pool closes. |
 
 Size the queue for the largest expected outage and ingest rate. If an in-memory
-queue cannot drain before close timeout, its remaining tail is lost. Disk mode
+queue cannot drain before close timeout, its remaining tail is lost. SF mode
 keeps the tail for restart replay, subject to the page-cache durability limit.
 
 ## Concurrency and sizing
@@ -885,9 +891,9 @@ A borrow at the pool's cap waits up to `acquire_timeout_ms` for another thread
 to return a connection, then fails with `ErrorCode::InvalidApiCall`. Set
 `acquire_timeout_ms=0` to fail fast instead. In disk-backed store-and-forward
 mode, an ingestion borrow may first wait up to `close_flush_timeout_millis` for
-a closing slot to release its disk lock.
+a closing sender to release the lock on its sender directory.
 
-Keep borrows short. A borrow occupies its slot until `Drop`, even while the
+Keep borrows short. A borrow holds its place in the pool until `Drop`, even while the
 application is idle.
 
 ## Failover and errors
@@ -934,7 +940,7 @@ visible within the deadline I chose". `questdb::Error` implements
 `Box<dyn Error>`, an `anyhow::Error`, or a `thiserror` enum with `?`, and a
 worker thread can return client and application failures through one type.
 
-The writer background runner reconnects and replays queued frames. The
+The writer background runner reconnects and replays queued rows. The
 ingestion retry budget uses these keys:
 
 | Key | Default |
@@ -994,7 +1000,7 @@ Closing drains store-and-forward queues on a best-effort basis for
 - Call `wait(AckLevel::LocalDurable, timeout)` or
   `wait(AckLevel::Durable, timeout)` when durable ACKs are configured and
   required.
-- Configure `sf_dir` when undelivered frames must replay after a process
+- Configure `sf_dir` when undelivered rows must replay after a process
   restart.
 
 Under `pool_reap=manual`, call `reap_idle()` periodically if the pool should
@@ -1049,7 +1055,7 @@ These are the supported pool entry points:
 | `borrow_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedSender` for buffers, chunks, or Arrow batches. |
 | `borrow_reader()` | `sync-sender-qwp-ws` + `sync-reader-qwp-ws` | Borrow a `BorrowedReader`. |
 | `flush_arrow_batch(table, batch, timestamp_column, overrides, ack_level)` | `arrow-ingress` | Ingest one Arrow batch through an internally borrowed direct sender. |
-| `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars frame with checkpointed failover replay. |
+| `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars DataFrame with checkpointed failover replay. |
 | `reap_idle()` | `sync-sender-qwp-ws` | Close expired idle connections above the warm minimum and return the number closed. |
 | `close(self)` | `sync-sender-qwp-ws` | Consume and close the pool. Dropping it has the same effect. |
 
@@ -1068,11 +1074,11 @@ borrowed-slice `Chunk` values:
 | `flush_buffer(&mut Buffer)` | Publish a buffer locally and clear it on success. |
 | `flush_buffer_and_wait(&mut Buffer, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
 | `flush_buffer_and_keep(&Buffer)` | Publish without clearing the buffer. |
-| `flush_buffer_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final frame sequence number. |
+| `flush_buffer_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final FSN. |
 | `flush_buffer_and_keep_and_get_fsn(&Buffer)` | Publish without clearing and return the final FSN. |
 | `flush(&mut Chunk)` | Publish a chunk locally and clear it on success. |
 | `flush_and_wait(&mut Chunk, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
-| `flush_and_get_fsn(&mut Chunk)` | Publish and return the final frame sequence number. |
+| `flush_and_get_fsn(&mut Chunk)` | Publish and return the final FSN. |
 | `published_fsn()` | Read the highest locally published FSN. |
 | `acked_fsn()` | Read the highest completed FSN. |
 | `wait(AckLevel, Duration)` | Wait for everything published on this borrow, using an explicit no-progress timeout. |

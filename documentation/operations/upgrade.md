@@ -109,8 +109,8 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 ### Upgrading to 4.2.0
 
 QuestDB Enterprise 4.2.0 adds
-[adaptive commit mode](/docs/concepts/durability/). The default stays `nosync`.
-Check the following before upgrading:
+[adaptive durability mode](/docs/concepts/durability/). The default stays
+`nosync`. Check the following before upgrading:
 
 - A replicating primary in `nosync` or `async` mode now refuses to start when,
   after a power loss or an operating system crash, its log of a table ends
@@ -183,8 +183,8 @@ check how these changes affect your users and clients:
   skew. Earlier versions never checked the expiry, so a token kept working
   after it expired. A client that sends a fixed token, such as
   `token=<ID token>` in a connect string, stops working once that token
-  expires, and an orphan drainer that presents an expired token sets its
-  store-and-forward slot aside, and reports data loss, instead of draining
+  expires, and an orphan drainer that presents an expired token sets the
+  orphan's store-and-forward sender directory aside, and reports data loss, instead of draining
   it. Such a client must switch to a new token before the old one expires,
   or use a
   [token provider](/docs/connect/clients/java/#token-providers) in the Java
