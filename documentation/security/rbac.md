@@ -1175,11 +1175,14 @@ SELECT * FROM all_permissions();
 | ADD INDEX                 | Database &#124; Table &#124; Column | Add index on symbol columns             |
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
+| ALTER VIEW                | Database &#124; Table               | Change view definitions                 |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
 | AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
+| COMPILE VIEW              | Database &#124; Table               | Compile views                           |
 | CREATE TABLE              | Database                            | Create tables                           |
+| CREATE VIEW               | Database                            | Create views                            |
 | CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
 | DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
@@ -1190,6 +1193,7 @@ SELECT * FROM all_permissions();
 | DROP INDEX                | Database &#124; Table &#124; Column | Drop indexes                            |
 | DROP PARTITION            | Database &#124; Table               | Drop partitions                         |
 | DROP TABLE                | Database &#124; Table               | Drop tables                             |
+| DROP VIEW                 | Database &#124; Table               | Drop views                              |
 | DROP MATERIALIZED VIEW    | Database &#124; Table               | Drop materialized views                 |
 | DROP LIVE VIEW            | Database &#124; Table               | Drop live views                         |
 | ENABLE STORAGE POLICY     | Database &#124; Table               | Enable storage policies                 |
