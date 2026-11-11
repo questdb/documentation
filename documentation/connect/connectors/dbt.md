@@ -529,26 +529,51 @@ connector: changing an existing task's table name requires a new `state_dir`.
 
 ## Authentication and permissions
 
-In production, run dbt as a
-[service account](/docs/security/rbac/#users-and-service-accounts) that
-authenticates with a REST API token. A service account has only the permissions
-granted to it directly, so dbt's access does not change with a person's group
-memberships. [Grant](/docs/query/sql/acl/grant/) it:
+The quick start connects with a username and password, which is the fastest way
+to try the connector. For production, such as a scheduled job or a CI pipeline,
+run dbt as a service account that authenticates with a token. This section
+explains how to set that up, which permissions dbt needs, and how to give other
+users access to what dbt builds.
 
-- `HTTP`, to connect over QWP.
-- `CREATE TABLE`, for table and incremental models, seeds, and snapshots.
+A [service account](/docs/security/rbac/#users-and-service-accounts) is a
+QuestDB identity for an application rather than a person. Unlike a user, it
+can't belong to groups, so it has exactly the permissions you grant it and
+nothing more. dbt's access then stays the same when people join or leave groups,
+and it doesn't depend on any person's account.
+
+A token is the recommended way for an application to authenticate with QuestDB
+Enterprise. It has an expiry time, and you can revoke it by
+[dropping it](/docs/query/sql/acl/alter-service-account-drop-token/), without
+changing anything else about the account.
+
+### Permissions dbt needs
+
+dbt creates tables and views, and it reads the tables that your sources point
+to. [Grant](/docs/query/sql/acl/grant/) the service account these permissions:
+
+- `HTTP`, to connect. QWP runs on the HTTP port.
+- `CREATE TABLE`, for table models, incremental models, seeds, and snapshots.
+  All of them store their results in tables.
 - `CREATE VIEW`, for view models.
 - `CREATE MATERIALIZED VIEW`, for materialized view models.
-- `SELECT ON` each table that a source declares.
+- `SELECT` on each table that a source reads.
 
-The account [owns](/docs/security/rbac/#owner-grants) the objects it creates, so
-later runs can insert into, rebuild, and drop them without further grants.
-QuestDB [hides](/docs/security/rbac/#object-visibility) tables that the account
-holds no permission on, so a model that reads such a source fails as if the
-table did not exist.
+Later runs also insert into, rename, rebuild, and drop the objects dbt created,
+but they need no further permissions. QuestDB makes the account the
+[owner](/docs/security/rbac/#owner-grants) of every object it creates, and the
+owner holds all permissions on it.
 
-For the project in [Use existing tables](#use-existing-tables), which reads
-`equs_trades`:
+QuestDB Enterprise [hides](/docs/security/rbac/#object-visibility) a table from
+any account that holds no permission on it. If the account has no permission on
+a source table, for example because you forgot to grant `SELECT`, dbt doesn't
+report an "access denied" error. Instead, the model fails as if the table did
+not exist.
+
+### Create the service account
+
+These statements create a service account named `dbt_runner` for the project in
+[Use existing tables](#use-existing-tables), which reads `equs_trades`. Run them
+as a database administrator, for example in the Web Console:
 
 ```questdb-sql title="Service account for dbt"
 CREATE SERVICE ACCOUNT dbt_runner;
@@ -558,10 +583,20 @@ ALTER SERVICE ACCOUNT dbt_runner
     CREATE TOKEN TYPE REST WITH TTL '365d' REFRESH;
 ```
 
-QuestDB does not store the token, so save it when it is returned. Set it in an
-environment variable whose name starts with `DBT_ENV_SECRET_`, and leave
-`username` and `password` out of the profile: the adapter rejects a profile that
-sets both a token and a username or password.
+The last statement creates the token and returns it in its result. QuestDB
+doesn't store the token, so copy it right away. If you lose it, you have to
+create a new one.
+
+### Configure the profile
+
+Store the token in an environment variable, and read it in `profiles.yml` with
+`env_var()`. Start the variable's name with `DBT_ENV_SECRET_`, so that dbt hides
+its value in its logs.
+
+The profile sets `token` and leaves out `username` and `password`. dbt connects
+with either a token or a username and password, never both: the adapter reports
+a configuration error if the profile sets a token together with a username or
+password.
 
 ```yaml title="profiles.yml"
 market_analytics:
@@ -577,24 +612,152 @@ market_analytics:
       threads: 4
 ```
 
-With `REFRESH`, each successful connection extends the token's expiry. QuestDB
-extends it only on connections to the primary, which is where the adapter
-connects, so the token stays valid in a replicated cluster too. Choose a TTL
-longer than the longest gap between dbt runs. If runs stop for longer than the
-TTL, the token expires, and dbt cannot connect until you create a new one.
+### Keep the token valid
 
-Readers need `SELECT` on the objects dbt creates, which QuestDB otherwise hides
-from them. The adapter rejects dbt's `grants` configuration, so grant access in
-a post-hook. The account owns the objects, so it can grant access to them. A
-post-hook runs after every build, which also covers a `table` model that is
-rebuilt on each run. This one grants the `analysts` group access to every model
-in the project:
+The example token expires 365 days after dbt last connected with it.
+`TTL '365d'` sets how long the token lives, and `REFRESH` restarts that period
+every time dbt connects successfully. As long as dbt runs at least once a year,
+the token stays valid.
+
+Choose a TTL comfortably longer than the longest pause between dbt runs you
+expect. If the job stops for longer than that, the token expires, and dbt can no
+longer connect. To resume, create a new token and update the environment
+variable.
+
+In a replicated cluster, QuestDB restarts the period only when dbt connects to
+the primary. dbt always connects to the primary, as
+[High availability](#high-availability) explains, so `REFRESH` works there too.
+
+### Give readers access
+
+When dbt runs as a service account, that account owns everything dbt builds.
+Other users can't query those tables and views until someone grants them access,
+and until then QuestDB hides the objects from them. Administrators and users
+with database-wide permissions are the exception.
+
+dbt usually manages access with its `grants` configuration, but the QuestDB
+adapter doesn't support it. Use a post-hook instead: a SQL statement that dbt
+runs right after it builds a model. The service account owns the model, so it is
+allowed to grant access to it.
+
+Set the post-hook once in `dbt_project.yml` to cover every model in the project.
+This one gives the `analysts` group read access:
 
 ```yaml title="dbt_project.yml"
 models:
   market_analytics:
     +post-hook: "GRANT SELECT ON {{ this }} TO analysts"
 ```
+
+dbt runs the hook after every build, so the grant is in place even for objects
+that dbt replaces on each run, such as table models. Seeds and snapshots take
+the same setting under `seeds:` and `snapshots:`.
+
+## High availability
+
+QuestDB Enterprise can run as a
+[replicated cluster](/docs/high-availability/overview/). One node, the primary,
+accepts writes, and one or more replicas copy its data. The primary role can
+move to another node. An operator may move it on purpose, or a replica may take
+over after the primary fails. This section explains how to point dbt at a
+replicated cluster, and what happens to a dbt run when the primary role moves.
+
+### Connect to a replicated cluster
+
+List every node of the cluster in the `addr` setting, separated by commas. You
+don't need to know which node is the primary. When dbt connects, the driver
+checks each node's role and picks the primary.
+
+dbt always works with the primary, never with a replica. A dbt run writes tables
+and reads them back in later models, and a replica may not have caught up with
+those writes yet.
+
+```yaml title="profiles.yml"
+market_analytics:
+  target: prod
+  outputs:
+    prod:
+      type: questdb
+      addr: "node-a.example.com:9000,node-b.example.com:9000"
+      tls: true
+      token: "{{ env_var('DBT_ENV_SECRET_QDB_TOKEN') }}"
+      schema_mode: flat
+      threads: 4
+```
+
+Because the profile lists every node, it keeps working after the primary role
+moves. You don't need to edit it after a failover.
+
+### Planned switchover
+
+Operators move the primary role with
+[`SWITCH ROLE`](/docs/high-availability/failover/), for example before
+maintenance on the primary node. The old primary becomes a replica, and another
+node becomes the primary. No committed data is lost.
+
+A dbt run that is in progress during the switch fails at its next write. The
+switch leaves existing client connections open, so dbt keeps using its
+connections to the old primary. That node no longer accepts writes, so the
+statement fails with `replica access is read-only`. dbt reports the model as an
+error and skips every model that depends on it.
+
+To recover, wait for the switch to complete, then run `dbt retry`. It reruns
+only the models that failed or were skipped, and it connects to the new primary.
+To avoid the failure, schedule switchovers between dbt runs.
+
+### Unplanned failover
+
+When the primary fails, dbt's connections to it break. QuestDB does not promote
+a replica on its own: an operator, or an external coordinator, has to run
+`SWITCH ROLE TO PRIMARY` on one of the replicas.
+
+In the meantime, the driver tries to keep the dbt run going. When a statement
+fails because its connection broke, the driver retries it on the other nodes
+listed in `addr`, looking for a new primary. It doesn't wait long. By default it
+gives up after 8 attempts or 30 seconds, whichever comes first. When the nodes
+fail quickly, the 8 attempts are used up in a few seconds. These limits are the
+driver's
+[egress failover](/docs/connect/clients/connect-string/#egress-failover)
+settings.
+
+What happens next depends on how quickly a replica is promoted:
+
+- **If a replica becomes primary within these limits,** the driver runs the
+  statement again on the new primary, and the dbt run continues. The statement
+  may already have taken effect on the old primary before the failure, so
+  running it again can repeat a write.
+  [Failures and limitations](#failures-and-limitations) describes how that
+  affects each kind of model.
+- **If the promotion takes longer,** the statement fails, and dbt reports the
+  model as an error.
+
+A promotion done by hand usually takes longer than a few seconds. To let dbt
+wait for one, raise both limits with `extra_conf`. This setting makes the driver
+wait for up to three minutes:
+
+```yaml
+extra_conf: "failover_max_attempts=1000;failover_max_duration_ms=180000"
+```
+
+### Rerun dbt after an unplanned failover
+
+An unplanned failover can lose the most recent writes. The primary uploads each
+committed transaction to an object store, and the replicas copy it from there. A
+transaction the old primary committed but hadn't uploaded yet never reaches the
+new primary. Models that dbt built shortly before the failure can therefore be
+missing rows on the new primary, or be missing altogether.
+
+dbt can't detect this. After the promotion, run `dbt build` for the whole
+project rather than `dbt retry`: `dbt retry` reruns only the models that failed,
+so it would skip models that completed but then lost data. A full build repairs
+them:
+
+- Table models and seeds are rebuilt from scratch.
+- An incremental model whose filter reads its own table, like
+  `trades_incremental`, finds an earlier latest timestamp and selects the
+  missing rows again.
+- A model with `wal: false` is missing on the new primary, because only WAL
+  tables replicate. The build creates it again.
 
 ## Connection settings
 
@@ -604,7 +767,7 @@ Configure these fields under the selected output in `profiles.yml`:
 | ---------------------- | ------------------- | -------------------------------------------------------------------------------- |
 | `type`                 | Required            | Use `questdb`.                                                                   |
 | `host`, `port`         | `localhost`, `9000` | QuestDB QWP endpoint.                                                            |
-| `addr`                 | Unset               | Comma-separated `host:port` endpoints for failover; overrides `host` and `port`. |
+| `addr`                 | Unset               | Comma-separated `host:port` of every cluster node; overrides `host` and `port`.  |
 | `username`, `password` | Unset               | Database credentials. Use environment variables for secrets.                     |
 | `token`                | Unset               | REST API token; cannot be combined with `username` and `password`.               |
 | `tls`                  | `false`             | Enable TLS.                                                                      |
@@ -625,9 +788,8 @@ function. Start secret names with `DBT_ENV_SECRET_` so dbt masks them in its
 logs. [Authentication and permissions](#authentication-and-permissions) shows a
 profile that reads a token this way.
 
-The adapter targets the primary by default. Its reader pool is sized to
-`threads + 1`. Keep `wait_for_wal` enabled for normal runs so dependent models
-see completed writes.
+The adapter's reader pool is sized to `threads + 1`. Keep `wait_for_wal` enabled
+for normal runs so dependent models see completed writes.
 
 QuestDB has one flat namespace. In `flat` mode, model `trades` writes table
 `trades`, regardless of the profile's `schema`. In `prefix` mode, a schema
