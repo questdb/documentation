@@ -1175,11 +1175,18 @@ SELECT * FROM all_permissions();
 | ADD INDEX                 | Database &#124; Table &#124; Column | Add index on symbol columns             |
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
+| ALTER SYMBOL CAPACITY     | Database &#124; Table &#124; Column | Change symbol column capacity           |
+| ALTER VIEW                | Database &#124; Table               | Change view definitions                 |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
 | AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
+| BACKUP TABLE              | Database &#124; Table               | Grantable, but no statement requires it |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
+| COMPILE VIEW              | Database &#124; Table               | Compile views                           |
+| CONVERT PARTITION TO NATIVE | Database &#124; Table             | Convert Parquet partitions to native format |
+| CONVERT PARTITION TO PARQUET | Database &#124; Table            | Convert partitions to Parquet           |
 | CREATE TABLE              | Database                            | Create tables                           |
+| CREATE VIEW               | Database                            | Create views                            |
 | CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
 | DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
@@ -1190,6 +1197,7 @@ SELECT * FROM all_permissions();
 | DROP INDEX                | Database &#124; Table &#124; Column | Drop indexes                            |
 | DROP PARTITION            | Database &#124; Table               | Drop partitions                         |
 | DROP TABLE                | Database &#124; Table               | Drop tables                             |
+| DROP VIEW                 | Database &#124; Table               | Drop views                              |
 | DROP MATERIALIZED VIEW    | Database &#124; Table               | Drop materialized views                 |
 | DROP LIVE VIEW            | Database &#124; Table               | Drop live views                         |
 | ENABLE STORAGE POLICY     | Database &#124; Table               | Enable storage policies                 |
@@ -1202,7 +1210,11 @@ SELECT * FROM all_permissions();
 | RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, read `resource_groups()` |
 | RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
 | SELECT                    | Database &#124; Table &#124; Column | Read data                               |
+| SET PARQUET SETTINGS      | Database &#124; Table               | Set column Parquet encoding and compression |
+| SET REFRESH LIMIT         | Database &#124; Table               | Set materialized view refresh limits    |
+| SET REFRESH TYPE          | Database &#124; Table               | Change materialized view refresh strategy |
 | SET STORAGE POLICY        | Database &#124; Table               | Set storage policies                    |
+| SET TABLE FORMAT          | Database &#124; Table               | Change the partition storage format     |
 | SET TABLE PARAM           | Database &#124; Table               | Set table parameters                    |
 | SET TABLE TYPE            | Database &#124; Table               | Change table type                       |
 | SETTINGS                  | Database                            | Change instance settings in Web Console |
