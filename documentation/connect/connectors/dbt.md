@@ -29,9 +29,10 @@ materialized views, seeds, and snapshots.
   default.
 - Python 3.10 or later. Installation also installs dbt Core and the QuestDB
   Python driver.
-- A database user or service account with `HTTP` access and `SELECT` on its
-  input tables. The example also needs `CREATE TABLE`, `CREATE VIEW`, and
-  `CREATE MATERIALIZED VIEW`. The account owns the objects it creates.
+- A database user with `HTTP`, `CREATE TABLE`, `CREATE VIEW`, and
+  `CREATE MATERIALIZED VIEW` permissions. For production, set up a service
+  account as described in
+  [Authentication and permissions](#authentication-and-permissions).
 
 ### 1. Install the adapter
 
@@ -69,8 +70,11 @@ cp profiles.example.yml profiles.yml
 
 Set `QDB_HOST`, `QDB_USERNAME`, and `DBT_ENV_SECRET_QDB_PASSWORD` in your shell
 or job environment. dbt masks variables whose names start with `DBT_ENV_SECRET_`
-in its logs. Edit `profiles.yml` to match your instance's port and TLS setting.
-This profile connects over TLS:
+in its logs. For production jobs, use a service account token instead; see
+[Authentication and permissions](#authentication-and-permissions).
+
+Edit `profiles.yml` to match your instance's port and TLS setting. This profile
+connects over TLS:
 
 ```yaml title="profiles.yml"
 questdb_trades:
@@ -523,6 +527,75 @@ A `prefix` project cannot read an unprefixed table such as `equs_trades`; use
 `flat` mode for that. Choose the table name when you first configure the
 connector: changing an existing task's table name requires a new `state_dir`.
 
+## Authentication and permissions
+
+In production, run dbt as a
+[service account](/docs/security/rbac/#users-and-service-accounts) that
+authenticates with a REST API token. A service account has only the permissions
+granted to it directly, so dbt's access does not change with a person's group
+memberships. [Grant](/docs/query/sql/acl/grant/) it:
+
+- `HTTP`, to connect over QWP.
+- `CREATE TABLE`, for table and incremental models, seeds, and snapshots.
+- `CREATE VIEW`, for view models.
+- `CREATE MATERIALIZED VIEW`, for materialized view models.
+- `SELECT ON` each table that a source declares.
+
+The account [owns](/docs/security/rbac/#owner-grants) the objects it creates, so
+later runs can insert into, rebuild, and drop them without further grants.
+QuestDB [hides](/docs/security/rbac/#object-visibility) tables that the account
+holds no permission on, so a model that reads such a source fails as if the
+table did not exist.
+
+For the project in [Use existing tables](#use-existing-tables), which reads
+`equs_trades`:
+
+```questdb-sql title="Service account for dbt"
+CREATE SERVICE ACCOUNT dbt_runner;
+GRANT HTTP, CREATE TABLE, CREATE VIEW, CREATE MATERIALIZED VIEW TO dbt_runner;
+GRANT SELECT ON equs_trades TO dbt_runner;
+ALTER SERVICE ACCOUNT dbt_runner
+    CREATE TOKEN TYPE REST WITH TTL '365d' REFRESH;
+```
+
+QuestDB does not store the token, so save it when it is returned. Set it in an
+environment variable whose name starts with `DBT_ENV_SECRET_`, and leave
+`username` and `password` out of the profile: the adapter rejects a profile that
+sets both a token and a username or password.
+
+```yaml title="profiles.yml"
+market_analytics:
+  target: prod
+  outputs:
+    prod:
+      type: questdb
+      host: "{{ env_var('QDB_HOST') }}"
+      port: 9000
+      tls: true
+      token: "{{ env_var('DBT_ENV_SECRET_QDB_TOKEN') }}"
+      schema_mode: flat
+      threads: 4
+```
+
+With `REFRESH`, each successful connection extends the token's expiry. QuestDB
+extends it only on connections to the primary, which is where the adapter
+connects, so the token stays valid in a replicated cluster too. Choose a TTL
+longer than the longest gap between dbt runs. If runs stop for longer than the
+TTL, the token expires, and dbt cannot connect until you create a new one.
+
+Readers need `SELECT` on the objects dbt creates, which QuestDB otherwise hides
+from them. The adapter rejects dbt's `grants` configuration, so grant access in
+a post-hook. The account owns the objects, so it can grant access to them. A
+post-hook runs after every build, which also covers a `table` model that is
+rebuilt on each run. This one grants the `analysts` group access to every model
+in the project:
+
+```yaml title="dbt_project.yml"
+models:
+  market_analytics:
+    +post-hook: "GRANT SELECT ON {{ this }} TO analysts"
+```
+
 ## Connection settings
 
 Configure these fields under the selected output in `profiles.yml`:
@@ -533,7 +606,7 @@ Configure these fields under the selected output in `profiles.yml`:
 | `host`, `port`         | `localhost`, `9000` | QuestDB QWP endpoint.                                                            |
 | `addr`                 | Unset               | Comma-separated `host:port` endpoints for failover; overrides `host` and `port`. |
 | `username`, `password` | Unset               | Database credentials. Use environment variables for secrets.                     |
-| `token`                | Unset               | Token authentication, as an alternative to username and password.                |
+| `token`                | Unset               | REST API token; cannot be combined with `username` and `password`.               |
 | `tls`                  | `false`             | Enable TLS.                                                                      |
 | `tls_verify`           | `true`              | `false` skips certificate checks, for development only; requires `tls: true`.    |
 | `tls_ca`               | Unset               | PEM certificate authority file for a private CA; requires `tls: true`.           |
@@ -549,19 +622,8 @@ If you don't want to store your secrets in the YAML file, read them from
 environment variables with dbt's
 [`env_var()`](https://docs.getdbt.com/reference/dbt-jinja-functions/env_var)
 function. Start secret names with `DBT_ENV_SECRET_` so dbt masks them in its
-logs. For token authentication:
-
-```yaml title="profiles.yml"
-questdb_trades:
-  target: dev
-  outputs:
-    dev:
-      type: questdb
-      host: "{{ env_var('QDB_HOST', 'localhost') }}"
-      port: 9000
-      tls: true
-      token: "{{ env_var('DBT_ENV_SECRET_QDB_TOKEN') }}"
-```
+logs. [Authentication and permissions](#authentication-and-permissions) shows a
+profile that reads a token this way.
 
 The adapter targets the primary by default. Its reader pool is sized to
 `threads + 1`. Keep `wait_for_wal` enabled for normal runs so dependent models
@@ -610,8 +672,10 @@ unpartitioned non-WAL table. Such a table does not replicate.
   query execution.
 - `merge` and `delete+insert` incremental strategies, Python models, and the
   `indexes` configuration are not supported.
-- Constraints are not enforced. The adapter rejects `grants`; manage privileges
-  separately or through a post-hook. `persist_docs` is ignored with a warning.
+- Constraints are not enforced. The adapter rejects `grants`; grant access
+  through a post-hook, as shown in
+  [Authentication and permissions](#authentication-and-permissions).
+  `persist_docs` is ignored with a warning.
 
 For the complete adapter reference and SQL-specific behavior, see the README
 included in the release archive.
