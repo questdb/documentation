@@ -14,7 +14,7 @@ When using the PostgreSQL wire interface, you can insert data passing `sslmode=r
 
 ## Solution: Configure TLS CA
 
-QuestDB clients support the `tls_ca` parameter, which has multiple values to configure certificate authority validation:
+The Rust, C, C++, Python and Ruby clients support the `tls_ca` parameter, which selects the certificate authorities used for validation. Java, Go, .NET and Node.js reject `tls_ca`: they validate against the system or JVM trust store, and all but Go take a custom CA through `tls_roots`. See [TLS](/docs/connect/clients/connect-string/#tls) in the connect string reference.
 
 ### Option 1: Use WebPKI and OS certificate roots (recommended for production)
 
@@ -28,10 +28,10 @@ This will work with certificates signed by standard certificate authorities.
 
 ### Option 2: Use a custom PEM file
 
-Point to a PEM-encoded certificate file for self-signed or custom CA certificates:
+Point to a PEM-encoded certificate file for self-signed or custom CA certificates. Setting `tls_roots` selects the file, so no `tls_ca` value is needed:
 
 ```
-https::addr=localhost:9000;username=admin;password=quest;tls_ca=pem_file;tls_roots=/path/to/cert.pem;
+https::addr=localhost:9000;username=admin;password=quest;tls_roots=/path/to/cert.pem;
 ```
 
 This is useful for self-signed certificates or internal CAs.
@@ -57,39 +57,37 @@ This is a very bad idea for production and should only be used for testing on a 
 | `webpki_roots` | Mozilla's WebPKI root certificates only |
 | `os_roots` | Operating system certificate store only |
 | `webpki_and_os_roots` | Both WebPKI and OS roots (recommended) |
-| `pem_file` | Load from a PEM file (requires `tls_roots` parameter) |
+
+A PEM file is not a `tls_ca` value in the connect string: set `tls_roots`
+instead. In the Rust crate, `os_roots` and `webpki_and_os_roots` need the
+`tls-native-certs` feature.
 
 ## Example: Rust client
 
 ```rust
-use questdb::ingress::{Sender, SenderBuilder};
+use questdb::ingress::{CertificateAuthority, Protocol, SenderBuilder};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let sender = SenderBuilder::new("https", "localhost", 9000)?
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut sender = SenderBuilder::new(Protocol::Https, "localhost", 9000)
         .username("admin")?
         .password("quest")?
-        .tls_ca("webpki_and_os_roots")?  // Use standard CAs
-        .build()
-        .await?;
+        .tls_ca(CertificateAuthority::WebpkiAndOsRoots)? // Use standard CAs
+        .build()?;
 
     // Use sender...
 
-    sender.close().await?;
     Ok(())
 }
 ```
 
-For self-signed certificates with a PEM file:
+For self-signed certificates with a PEM file, `tls_roots` selects the file:
 
 ```rust
-let sender = SenderBuilder::new("https", "localhost", 9000)?
+let mut sender = SenderBuilder::new(Protocol::Https, "localhost", 9000)
     .username("admin")?
     .password("quest")?
-    .tls_ca("pem_file")?
     .tls_roots("/path/to/questdb.crt")?
-    .build()
-    .await?;
+    .build()?;
 ```
 
 The examples are in Rust but the concepts are similar in other languages. Check the documentation for your specific client.
