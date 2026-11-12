@@ -381,7 +381,7 @@ ALTER TABLE trades DROP STORAGE POLICY;
 | Trading data       | `TO PARQUET 7d`                                | Keep Parquet locally for long-term queries                       |
 | Regulatory history | `TO PARQUET 7d, TO REMOTE 14d, DROP LOCAL 90d` | Keep years of queryable history without keeping it on local disk |
 | IoT telemetry      | `TO PARQUET 1d, DROP LOCAL 90d`                | High volume, convert early to save disk before dropping the data |
-| Aggregated views   | `TO PARQUET 30d`                               | Low volume, keep locally in Parquet                              |
+| Materialized views | Not supported, use `TTL` instead               | Storage policies do not apply to materialized views              |
 
 **Tips:**
 
