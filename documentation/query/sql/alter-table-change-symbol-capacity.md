@@ -6,10 +6,13 @@ description: ALTER TABLE SYMBOL CAPACITY SQL keyword reference documentation.
 
 Changes the capacity of an existing SYMBOL column in a table.
 
-The capacity of the SYMBOL column is altered without rewriting the data already
-stored in the table partitions. This operation allows you to adjust the maximum
-number of distinct values that can be stored in a SYMBOL column without the
-overhead of rebuilding the entire table.
+The capacity is the number of distinct values the column holds before its
+symbol table is resized. It is altered without rewriting the data already
+stored in the table partitions.
+
+This is rarely needed, as capacity grows on its own after each commit (see
+[symbol capacity](/docs/query/sql/create-table/#symbol-capacity)). Use it to
+presize a column before a load that adds many distinct values at once.
 
 ## Syntax
 
