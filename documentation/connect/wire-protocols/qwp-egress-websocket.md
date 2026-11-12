@@ -629,9 +629,11 @@ When `target=primary`, zone preference is still recorded but every host's zone
 tier is treated as equivalent (the primary must be followed across zones).
 
 The `421 + X-QuestDB-Role` (and optional `X-QuestDB-Zone`) upgrade-reject
-convention is shared with ingress: the server returns HTTP 421 when the
-connecting client's role filter does not match, allowing the client to try the
-next endpoint without completing the WebSocket handshake.
+convention is shared with ingress: the server returns HTTP 421 when its role
+cannot serve the connection (for example, a replica refusing a write), allowing
+the client to try the next endpoint without completing the WebSocket handshake.
+The `target` filter itself is applied by the client after it reads
+`SERVER_INFO`.
 
 ## Null sentinel conventions
 
