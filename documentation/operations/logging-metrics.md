@@ -484,11 +484,12 @@ endpoint exposes one series per group, labelled with `resource_group`:
 | `questdb_resource_group_admission_timeouts_total`   | counter | Queries that timed out while queued                          |
 
 `cpu_nanos_total` counts only CPU that managed scheduling measured, so treat it
-as a floor rather than a full account. While `DEFAULT` is the only group, CPU
-scheduling is disengaged and nothing is sampled, so the series reads `0` however
-busy the instance is. It also undercounts once scheduling is engaged: a query
-already running when a second group was created stays outside scheduling until
-it next suspends, and a degraded scheduler stops sampling altogether.
+as a floor rather than a full account. While `DEFAULT` is the only group and has
+no CPU limit or `fair` policy, CPU scheduling is disengaged and nothing is
+sampled, so the series reads `0` however busy the instance is. It also
+undercounts once scheduling is engaged: a query already running when scheduling
+engaged stays outside it until it next suspends, and a degraded scheduler stops
+sampling altogether.
 
 A flat counter therefore does not imply an idle group. Check
 `questdb_resource_groups_cpu_managed_dispatch` and

@@ -44,6 +44,10 @@ table's current columns with an optional `EXCLUDE` list:
 | * [EXCLUDE (columnName [, columnName ...])] }
 ```
 
+```questdb-sql title="Resource group scope"
+GRANT USE ON RESOURCE GROUP groupName TO entityName;
+```
+
 ## Description
 
 - `GRANT [permissions] TO entity` - grant database level permissions on database
@@ -56,6 +60,8 @@ table's current columns with an optional `EXCLUDE` list:
   permissions on column level to an entity
 - `GRANT [permissions] ON [table(*)] TO entity` - grant column level permissions
   on all of the table's current columns, with an optional `EXCLUDE` list
+- `GRANT USE ON RESOURCE GROUP [group] TO entity` - allow an entity to run its
+  queries in one resource group
 
 ### Grant database level permissions
 
@@ -193,6 +199,58 @@ timestamp keeps that permission as an
 [implicit permission](#implicit-permissions) shown with origin `I`.
 
 :::
+
+### Grant use of resource groups
+
+`USE RESOURCE GROUP` lets an entity run its queries in a
+[resource group](/docs/concepts/resource-groups/) other than the one it is
+mapped to, chosen with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/) or with the
+`resource_group` parameter of an HTTP request. It is available from QuestDB
+Enterprise 4.2.0. Grant it for one group:
+
+```questdb-sql
+GRANT USE ON RESOURCE GROUP alerts TO monitoring;
+```
+
+| permission         | table_name | column_name | grant_option | origin |
+| ------------------ | ---------- | ----------- | ------------ | ------ |
+| USE RESOURCE GROUP | alerts     |             | f            | G      |
+
+Or grant it at database level, for every group:
+
+```questdb-sql
+GRANT USE RESOURCE GROUP TO monitoring;
+```
+
+| permission         | table_name | column_name | grant_option | origin |
+| ------------------ | ---------- | ----------- | ------------ | ------ |
+| USE RESOURCE GROUP |            |             | f            | G      |
+
+The database-level grant replaces the entity's grants on single groups, as a
+grant on all tables replaces table grants, so `alerts` no longer has a row of its
+own.
+
+The two forms are authorized differently:
+
+- `GRANT USE ON RESOURCE GROUP` takes the
+  [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission. It
+  names one group and one entity, and accepts neither `WITH GRANT OPTION` nor
+  `WITH VERIFICATION`. Both must exist: unlike a table grant, it cannot be
+  issued ahead of the entity's creation.
+- `GRANT USE RESOURCE GROUP` is an ordinary database permission. Granting it
+  takes the permission with the grant option, and it can itself carry
+  `WITH GRANT OPTION`.
+
+A grant to an ACL group covers its members, and the group an entity is mapped to
+needs no grant at all. `SHOW PERMISSIONS`,
+[`active_grants()`](/docs/query/functions/access-control/#active_grants) and
+[`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
+show a grant on one group with the group's current name in `table_name`. The
+grant follows the group, not its name, so it survives
+`ALTER RESOURCE GROUP ... RENAME TO`, and `DROP RESOURCE GROUP` removes it. To
+take it away, see
+[REVOKE](/docs/query/sql/acl/revoke/#revoke-use-of-resource-groups).
 
 ### Grant option
 

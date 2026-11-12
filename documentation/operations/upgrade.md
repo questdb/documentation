@@ -120,6 +120,23 @@ QuestDB Enterprise 4.2.0 adds
 - Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
+It also adds [CPU limits](/docs/concepts/resource-groups/#a-cpu-limit-is-a-ceiling-not-a-share),
+[fair scheduling](/docs/concepts/resource-groups/#the-scheduling-policy-divides-a-group-between-its-users)
+and [per-session group choice](/docs/query/sql/acl/set-resource-group/) to
+resource groups:
+
+- Existing groups keep `fifo` order and no CPU limit, so nothing changes until
+  you set the new parameters. CPU sharing between groups now holds its weights
+  over time: a group that used CPU the others left idle no longer pays for it
+  when they return, which on earlier releases could stall it for longer the
+  longer the instance had run.
+- With resource groups enabled, the instance keeps reduce queues reserved for
+  groups with a CPU limit, at about 150 KB to 2.3 MB of additional native
+  memory. See [Limitations](/docs/operations/resource-groups/#limitations).
+- The primary adds the `cpu_limit_pct` and `scheduling_policy` columns to the
+  resource group catalog. A replica upgraded before its primary reads the
+  catalog without them until the primary has migrated it.
+
 ### Upgrading to 4.1.0
 
 QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no

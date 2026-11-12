@@ -32,6 +32,12 @@ Mapping an ACL group is how you cover a team without naming each member. It
 requires the [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission,
 and affects queries that start after the change rather than one already running.
 
+The mapping decides the group a member's sessions start in. A member can still
+run a session's queries in another group with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/) given
+`USE RESOURCE GROUP` on it, which can be granted to the ACL group to cover every
+member.
+
 This is workload mapping: it decides how much of the instance the group's
 queries may consume. It is unrelated to
 [`WITH EXTERNAL ALIAS`](/docs/query/sql/acl/alter-group-with-external-alias/),

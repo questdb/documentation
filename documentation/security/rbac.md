@@ -1224,6 +1224,7 @@ SELECT * FROM all_permissions();
 | SYSTEM ADMIN              | Database                            | System functions (reload_tls, reader_pool, etc.); makes objects [visible](#object-visibility) |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
 | UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
+| USE RESOURCE GROUP        | Database &#124; Resource group      | Run queries in a resource group chosen with [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/); see [GRANT](/docs/query/sql/acl/grant/#grant-use-of-resource-groups) |
 | VACUUM TABLE              | Database &#124; Table               | Reclaim storage                         |
 
 ### User management permissions
@@ -1313,6 +1314,7 @@ replication role, is an ordinary grantable permission.
 - [REMOVE USER](/docs/query/sql/acl/remove-user/)
 - [REVOKE](/docs/query/sql/acl/revoke/)
 - [REVOKE ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/revoke-assume-service-account/)
+- [SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/)
 - [SHOW USER](/docs/query/sql/show/#show-user)
 - [SHOW USERS](/docs/query/sql/show/#show-users)
 - [SHOW GROUPS](/docs/query/sql/show/#show-groups)

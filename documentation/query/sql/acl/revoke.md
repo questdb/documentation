@@ -40,6 +40,10 @@ table's current columns with an optional `EXCLUDE` list:
 | * [EXCLUDE (columnName [, columnName ...])] }
 ```
 
+```questdb-sql title="Resource group scope"
+REVOKE USE ON RESOURCE GROUP groupName FROM entityName;
+```
+
 ## Description
 
 - `REVOKE [permissions] FROM entity` - revoke database level permissions from an
@@ -53,6 +57,8 @@ table's current columns with an optional `EXCLUDE` list:
 - `REVOKE [permissions] ON [table(*)] FROM entity` - revoke column level
   permissions on all of the table's current columns, with an optional `EXCLUDE`
   list
+- `REVOKE USE ON RESOURCE GROUP [group] FROM entity` - revoke the use of one
+  resource group from an entity
 
 ### Revoke database level permissions
 
@@ -116,6 +122,30 @@ and the list can neither be empty nor cover every column of the table. When the
 permission was originally granted at table level, revoking it from a subset of
 columns this way triggers
 [permission level readjustment](#permission-level-readjustment).
+
+### Revoke use of resource groups
+
+Revoke the use of one resource group, granted with
+[`GRANT USE ON RESOURCE GROUP`](/docs/query/sql/acl/grant/#grant-use-of-resource-groups):
+
+```questdb-sql
+REVOKE USE ON RESOURCE GROUP alerts FROM monitoring;
+```
+
+Like the grant, this form takes the
+[`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and the
+group must exist.
+
+`REVOKE USE RESOURCE GROUP FROM monitoring` revokes the database-level
+permission, and with it every grant the entity holds on single groups.
+`REVOKE ALL FROM monitoring` and dropping the entity clear them as well, and
+`DROP RESOURCE GROUP` removes every grant on the dropped group.
+
+The permission is checked at the start of every managed query, so a revoke
+reaches sessions that already chose the group: their next such query fails with
+`Access denied for <principal> [USE RESOURCE GROUP on alerts]` until they choose
+another group or run `RESET RESOURCE GROUP`. A query already running finishes in
+its group.
 
 ### Implicit permissions
 
