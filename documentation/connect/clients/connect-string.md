@@ -301,6 +301,15 @@ Selecting the `wss` schema enables TLS.
 - `tls_roots_password` — password for the `tls_roots` file. Required only for
   a JKS or PKCS#12 trust store; PEM needs no password. Setting it without
   `tls_roots` is an error.
+- `tls_ca` — **Rust, C, C++, Python and Ruby only.** Selects the trust store
+  when `tls_roots` is not set: `webpki_roots` (the bundled Mozilla roots),
+  `os_roots` (the operating-system store), or `webpki_and_os_roots` (both).
+  Default: `webpki_roots`; Python defaults to `webpki_and_os_roots`. In the
+  Rust crate, `os_roots` needs the `tls-native-certs` feature. Setting
+  `tls_roots` selects the file instead, so do not combine the two. Java, Go,
+  .NET and Node.js reject `tls_ca` as an unknown key, and already start from
+  the system or JVM trust store: leave it out of a connect string that other
+  clients share.
 
 :::caution `tls_roots` and `tls_verify=unsafe_off` cannot be combined
 
@@ -1050,6 +1059,7 @@ description and behaviour notes.
 | `sf_max_total_bytes`                    | size                          | `128 MiB` memory-only / `10 GiB` SF | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
+| `tls_ca`                                | enum (`webpki_roots` / `os_roots` / `webpki_and_os_roots`) | `webpki_roots` (Python: `webpki_and_os_roots`; Java, Go, .NET, Node.js: rejected) | [TLS](#tls) |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only; Node.js: rejected) | [TLS](#tls)                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
