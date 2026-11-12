@@ -726,7 +726,7 @@ Returns a table with these columns:
 | `cpu_wait_nanos_total`     | `LONG`    | Cumulative time queries spent waiting for CPU, in nanoseconds                                |
 | `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                             |
 | `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                |
-| `cpu_min_share_pct`        | `DOUBLE`  | `cpu_weight` as a percentage of the weights of all groups: the share of query CPU the group can count on while every group has work |
+| `cpu_min_share_pct`        | `DOUBLE`  | `cpu_weight` as a percentage of the weights of all groups: the share of query CPU the group can count on while every group has work, up to its CPU limit |
 | `cpu_limit_pct`            | `INT`     | CPU limit as a percentage of the node's CPUs; `0` when the group sets none                     |
 | `cpu_limit_cores`          | `DOUBLE`  | What `cpu_limit_pct` comes to in cores on this node; `0.0` when the group sets no limit         |
 | `scheduling_policy`        | `VARCHAR` | How the group divides its CPU between its users and queries: `fifo` or `fair`                 |
@@ -746,7 +746,9 @@ working.
 `cpu_limit_cores` is computed from the CPUs available to the QuestDB process,
 so the same percentage reads differently on nodes of different sizes, or in a
 container with a CPU limit. `cpu_min_share_pct` changes whenever a group is
-created, dropped or reweighted, because it is relative to all weights.
+created, dropped or reweighted, because it is relative to all weights, and it
+does not account for CPU limits: a group whose limit is below its percentage
+gets only its limit, and the rest goes to the other groups.
 
 **Inspecting group policy:**
 
@@ -795,7 +797,7 @@ signal that distinguishes a concurrency limit from a slow query.
 
 **Inspecting CPU policy:**
 
-```questdb-sql title="Each group's guaranteed share, ceiling and scheduling policy"
+```questdb-sql title="Each group's share under contention, ceiling and scheduling policy"
 SELECT name, cpu_weight, cpu_min_share_pct, cpu_limit_pct, cpu_limit_cores,
        scheduling_policy
 FROM resource_groups()
@@ -813,7 +815,9 @@ With the `reporting` group above and a `tenant_a` group created with
 
 While all three groups have work, `reporting` can count on a fifth of query
 CPU. `tenant_a` uses at most 4 cores on average, even when the other groups are
-idle.
+idle. That limit is below its 40% share, which would be 6.4 of the 16 CPUs, so
+while every group is busy it gets its 4 cores and the rest of its share goes to
+`DEFAULT` and `reporting`.
 
 **Constraints and edge cases:**
 

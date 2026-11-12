@@ -504,12 +504,14 @@ Instance-wide series describe the feature itself:
 | `questdb_resource_groups_enabled`                             | gauge   | `1` when the feature is on                                            |
 | `questdb_resource_groups_catalog_current`                     | gauge   | `1` when the group catalog is current; `0` while a replica catches up |
 | `questdb_resource_groups_catalog_lag_unmanaged_queries_total` | counter | Queries that ran unmanaged because the catalog was not current yet    |
-| `questdb_resource_groups_cpu_managed_dispatch`                | gauge   | `1` while managed CPU scheduling is engaged                           |
+| `questdb_resource_groups_cpu_managed_dispatch`                | gauge   | `1` while the groups and their policies require CPU scheduling        |
 | `questdb_resource_groups_cpu_scheduler_degraded`              | gauge   | `1` after an internal fault has disengaged CPU scheduling             |
 
-A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU shares are
-no longer enforced until the instance restarts. Admission and memory limits stay
-enforced.
+A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU weights,
+CPU limits and the `fair` policy are no longer enforced until the instance
+restarts. Admission and memory limits stay enforced.
+`questdb_resource_groups_cpu_managed_dispatch` stays at `1` in that state,
+because it reports whether scheduling is required, not whether it works.
 
 ### Prometheus Alertmanager
 

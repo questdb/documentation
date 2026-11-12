@@ -2,8 +2,9 @@
 title: GRANT reference
 sidebar_label: GRANT
 description:
-  "GRANT SQL keywords reference documentation.  Applies to RBAC in QuestDB
-  Enterprise."
+  "GRANT gives a user, group or service account permissions on the database,
+  tables, columns or resource groups, optionally with the grant option. Applies
+  to RBAC in QuestDB Enterprise."
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -43,6 +44,9 @@ table's current columns with an optional `EXCLUDE` list:
 { columnName [, columnName ...]
 | * [EXCLUDE (columnName [, columnName ...])] }
 ```
+
+The `USE RESOURCE GROUP` permission can also be granted on a single resource
+group:
 
 ```questdb-sql title="Resource group scope"
 GRANT USE ON RESOURCE GROUP groupName TO entityName;
@@ -236,14 +240,20 @@ The two forms are authorized differently:
 - `GRANT USE ON RESOURCE GROUP` takes the
   [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission. It
   names one group and one entity, and accepts neither `WITH GRANT OPTION` nor
-  `WITH VERIFICATION`. Both must exist: unlike a table grant, it cannot be
-  issued ahead of the entity's creation.
+  `WITH VERIFICATION`. The group and the entity must both exist: unlike other
+  grants, this form cannot be issued before the user, group or service account
+  it names is created.
 - `GRANT USE RESOURCE GROUP` is an ordinary database permission. Granting it
   takes the permission with the grant option, and it can itself carry
   `WITH GRANT OPTION`.
 
-A grant to an ACL group covers its members, and the group an entity is mapped to
-needs no grant at all. `SHOW PERMISSIONS`,
+Because the database-level grant covers every group, revoking one group from an
+entity that holds it changes nothing, see
+[REVOKE](/docs/query/sql/acl/revoke/#revoke-use-of-resource-groups).
+
+A grant to an ACL group covers its members, and the group an entity is mapped
+to, or `DEFAULT` for an unmapped entity, needs no grant at all.
+`SHOW PERMISSIONS`,
 [`active_grants()`](/docs/query/functions/access-control/#active_grants) and
 [`active_permissions()`](/docs/query/functions/access-control/#active_permissions)
 show a grant on one group with the group's current name in `table_name`. The

@@ -56,8 +56,13 @@ The statement requires the
 `DEFAULT` can be altered but not renamed. `ALTER RESOURCE GROUP DEFAULT RENAME TO`
 fails with `built-in Resource Group cannot be renamed`.
 
-Renaming preserves the policy and every principal mapping, because mappings
-attach to the group's identity rather than its name.
+Renaming preserves the policy, every principal mapping and every
+`USE RESOURCE GROUP` grant on the group, because they attach to the group's
+identity rather than its name. A session that chose the group with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), or an HTTP
+client that sends its name in the `resource_group` parameter, refers to it by
+name instead: its next managed query fails until it uses the new name or, for a
+session, runs `RESET RESOURCE GROUP`.
 
 ### Effect on queries already running
 
@@ -66,12 +71,12 @@ moment `ALTER` executes:
 
 | Change                 | Effect on existing work                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------- |
-| `cpu_limit`            | Running and waiting queries are held to the new limit from their next CPU slice                   |
+| `cpu_limit`            | Running and waiting queries are held to the new limit from their next CPU slice. A query that was running before CPU scheduling engaged is reached when it next suspends |
 | `cpu_weight`           | Subsequent scheduling uses the new policy                                                         |
 | `max_active_queries`   | Existing slots are retained; subsequent admission, including a resumed cursor, uses the new limit |
 | `max_queued_queries`, `queue_timeout` | New admission requests use the new settings; an already queued request keeps its deadline |
 | `memory_limit`         | Subsequent allocations check the new budget; existing memory is released normally                 |
-| `scheduling_policy`    | Work waiting for CPU is re-queued under the new policy in arrival order; subsequent admission uses the new policy |
+| `scheduling_policy`    | Work waiting for CPU is re-queued in arrival order and then served under the new policy; subsequent admission uses the new policy |
 
 Lowering `memory_limit` below current usage does not fail running queries
 retroactively, but it can make their subsequent allocations fail. The
@@ -116,7 +121,8 @@ ALTER RESOURCE GROUP analytics RENAME TO reporting;
 ```
 
 `DEFAULT` takes limits like any other group, which is how you bound everything
-that is not explicitly mapped:
+that is not explicitly mapped, including the built-in admin, which cannot be
+mapped:
 
 ```questdb-sql title="Cap the default workload"
 ALTER RESOURCE GROUP DEFAULT SET (max_active_queries = 16);

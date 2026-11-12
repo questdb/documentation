@@ -186,7 +186,7 @@ parameters. `POST` is not supported and returns `405`.
 | `timings`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include a `timings` property in the response which gives details about the execution times.                                   |
 | `explain`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include an `explain` property in the response which gives details about the execution plan.                                   |
 | `quoteLargeNum` | No       | `false` | `true` or `false`. When set to `true`, QuestDB will surround `LONG` type numbers with double quotation marks that will make them parsed as strings.                                    |
-| `resource_group` | No      |         | QuestDB Enterprise 4.2.0 and later. Runs the query in this [resource group](/docs/concepts/resource-groups/), which takes the `USE RESOURCE GROUP` permission unless it is the group the principal is mapped to. The HTTP counterpart of [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), for this request only. |
+| `resource_group` | No      |         | QuestDB Enterprise 4.2.0 and later. Runs the query in this [resource group](/docs/concepts/resource-groups/). A group other than the principal's own, its mapped group or `DEFAULT` when unmapped, takes the `USE RESOURCE GROUP` permission. The name is case-sensitive except `DEFAULT`, and it is checked when the query starts, so a statement that resource groups do not manage ignores it. The HTTP counterpart of [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/#permissions), for this request only; `/exp` does not take it. |
 
 The parameters must be URL encoded.
 

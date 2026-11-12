@@ -34,9 +34,10 @@ and affects queries that start after the change rather than one already running.
 
 The mapping decides the group a member's sessions start in. A member can still
 run a session's queries in another group with
-[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/) given
-`USE RESOURCE GROUP` on it, which can be granted to the ACL group to cover every
-member.
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), or an HTTP
+request with the `resource_group` parameter, given `USE RESOURCE GROUP` on it,
+which can be granted to the ACL group to cover every member. The group a member
+resolves to through its mappings needs no such grant.
 
 This is workload mapping: it decides how much of the instance the group's
 queries may consume. It is unrelated to

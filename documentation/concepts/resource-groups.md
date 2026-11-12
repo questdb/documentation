@@ -20,7 +20,7 @@ at once: dashboards that must answer in milliseconds, an ad-hoc analyst, and a
 nightly report that scans a year of data. When these workloads compete without
 resource controls, the report can increase dashboard latency.
 [Common scenarios](/docs/operations/resource-groups/#common-scenarios) walks
-through that case and five others as policies you can copy.
+through that case and others as policies you can copy.
 
 Creating one takes two statements:
 [`CREATE RESOURCE GROUP`](/docs/query/sql/acl/create-resource-group/) for the
@@ -125,9 +125,12 @@ SET RESOURCE GROUP alerts;
 ```
 
 Choosing a group per session or request is available from QuestDB Enterprise
-4.2.0. The chosen group replaces the mapping for every query the session starts
-afterwards, until `RESET RESOURCE GROUP`. A group other than the principal's own
-requires the `USE RESOURCE GROUP` permission, granted for one group with
+4.2.0. The chosen group replaces the mapping for every managed query the session
+starts afterwards, until `RESET RESOURCE GROUP`, `RESET ALL` or `DISCARD ALL`,
+or until the session ends. It covers only the session's or the request's own
+queries: a `COPY ... TO` export, the `/exp` endpoint and clients that query over
+QWP keep the mapped group. A group other than the principal's own requires the
+`USE RESOURCE GROUP` permission, granted for one group with
 [`GRANT USE ON RESOURCE GROUP`](/docs/query/sql/acl/grant/#grant-use-of-resource-groups)
 or for every group with `GRANT USE RESOURCE GROUP`, so users cannot move
 themselves into a heavier group. The permission is checked at the start of every
@@ -143,22 +146,22 @@ Resource groups govern the statements that read data:
 
 - `SELECT`
 - the source query of `CREATE TABLE ... AS SELECT` and `INSERT ... SELECT`
-- query exports
+- query exports, including `COPY ... TO`
 
 Everything else runs outside the feature and consumes no admission slot, CPU
 grant or group memory budget: `EXPLAIN`, value `INSERT`, `UPDATE`, ordinary DDL,
-`COPY`, transaction and session control, ILP and QWP ingestion, WAL apply,
-materialized and live view refresh, and QuestDB's own internal SQL.
+`COPY` imports, transaction and session control, ILP and QWP ingestion, WAL
+apply, materialized and live view refresh, and QuestDB's own internal SQL.
 
-For `CREATE TABLE ... AS SELECT` and `INSERT ... SELECT` the group is charged
-for reading the source and producing rows, including parallel work. Where
-writing a row cannot be separated from producing it, that CPU is charged to the
-group as well. The commit, durability and any work handed to writer or WAL
-queues are outside the guarantee. The parallel tasks of a
-`CREATE TABLE ... AS SELECT` are an exception: they run outside the group and
-are not charged to it, unless the group has a CPU limit, in which case the copy
-runs them itself on its own thread. See
-[A CPU limit is a ceiling](#a-cpu-limit-is-a-ceiling-not-a-share).
+`CREATE TABLE ... AS SELECT` and `INSERT ... SELECT` charge the group for
+reading the source and producing rows. For `INSERT ... SELECT` that includes its
+parallel work. The parallel tasks of a `CREATE TABLE ... AS SELECT` run outside
+the group and are not charged to it, unless the group has a CPU limit, in which
+case the copy runs them itself on its own thread; see
+[A CPU limit is a ceiling](#a-cpu-limit-is-a-ceiling-not-a-share). Where writing
+a row cannot be separated from producing it, that CPU is charged to the group as
+well. The commit, durability and any work handed to writer or WAL queues are
+outside the guarantee.
 
 Resource groups account **tracked native query memory**. They do not represent
 JVM heap, resident set size, memory-mapped table pages or long-lived engine
@@ -182,10 +185,13 @@ rejected immediately. A queued query that waits longer than `queue_timeout`
 fails, and the instance-wide `query.timeout` keeps running while it waits, so
 whichever of the two expires first ends the wait.
 
-A slot is held only while the query is running on a worker. A protocol cursor
-that is suspended between pages releases its slot and passes through the gate
-again when the client asks for more rows, so a paging client does not hold
-capacity while the application thinks. The consequence is that admission can be
+A query keeps its slot for as long as it runs, including while it waits for a
+worker or for its group's CPU budget, so a tight
+[CPU limit](#a-cpu-limit-is-a-ceiling-not-a-share) also makes the admission
+queue grow. A protocol cursor that is suspended between pages is the exception:
+it releases its slot and passes through the gate again when the client asks for
+more rows, so a paging client does not hold capacity while the application
+thinks. The consequence is that admission can be
 refused on a later page: a client that received its first rows may still see the
 queue-full or timeout error when it asks for more, and the connection stays
 usable.
@@ -207,13 +213,14 @@ that was running alone starts sharing at its next checkpoint.
 Weights are relative. 100 and 50 are the same as 2 and 1.
 [`resource_groups()`](/docs/query/functions/meta/#resource_groups) shows each
 weight as a percentage of all weights in `cpu_min_share_pct`: the share a group
-can count on while every group has work. Adding a group lowers every other
-group's percentage, and the column shows by how much.
+can count on while every group has work, up to its CPU limit if it has one.
+Adding a group lowers every other group's percentage, and the column shows by
+how much.
 
-Idle CPU is not banked in either direction. A group that becomes active takes
-the next free worker and then runs at its share: it gains nothing for the time
-it left its share unused, and a group that used the spare CPU meanwhile owes
-nothing for it. This holds however long the instance has been running. A
+From QuestDB Enterprise 4.2.0, idle CPU is not banked in either direction. A
+group that becomes active takes the next free worker and then runs at its
+share: it gains nothing for the time it left its share unused, and a group that
+used the spare CPU meanwhile owes nothing for it. This holds however long the instance has been running. A
 group's CPU is counted once for the whole process, so its queries over HTTP and
 over PostgreSQL draw on the same share.
 
@@ -231,22 +238,34 @@ CREATE RESOURCE GROUP tenant_a WITH (cpu_limit = '25%');
 available to the QuestDB process, which respects a container's CPU limit. On 16
 CPUs, `'25%'` is 4 cores and `'5%'` is 0.8 of a core. A weight lets a group use
 CPU that others leave idle; a limit does not, so the group stays at its limit
-when the rest of the node has nothing to do. That makes a limit the tool for
-capacity sold by the core, for performance that does not change with the
-neighbours' load, and for keeping room for work outside resource groups, such as
-ingestion. Below its limit a group still competes by weight as usual. CPU
-limits are available from QuestDB Enterprise 4.2.0.
+when the rest of the node has nothing to do. Use a limit for capacity sold by
+the core, or to keep room for work outside resource groups, such as ingestion.
+CPU limits are available from QuestDB Enterprise 4.2.0.
+
+A limit only caps. Below it the group competes by weight as usual, so while
+other groups are busy it can get less than its limit. To keep a group at its
+limit under contention as well, give it a weight whose `cpu_min_share_pct` is at
+least its `cpu_limit_pct`.
 
 The limit holds on average over a short window, and it is enforced in two
 parts:
 
 - A group holds at most as many workers at once as its limit rounded up to
-  whole cores, across every worker pool. A limit of a whole number of cores
-  needs nothing more, because a worker uses at most one core.
+  whole cores, across every worker pool, apart from the one exception described
+  below. A limit that comes to a whole number of cores needs nothing more,
+  because a worker uses at most one core.
 - A fractional limit, such as 0.8 or 3.5 cores, adds a CPU budget that refills
   at the limit's rate. The group can run ahead of the rate by about 100
   milliseconds' worth of it, and then waits until the budget has refilled. Idle
   time is not banked beyond that.
+
+Only some percentages come to whole cores: `'25%'`, `'50%'`, `'75%'` and
+`'100%'` on 16 CPUs, but only `'50%'` and `'100%'` on 14. `cpu_limit_cores` in
+`resource_groups()` shows what a limit comes to. A whole-core limit has no
+budget, so the budget behaviour described below does not apply to it: the group
+cannot burst above its rate or carry debt, and only the exception for
+statements that cannot give up their worker takes it past its cap. That makes a
+whole-core limit the stricter choice for a hard cap.
 
 Only the CPU that queries use on their workers counts. Work outside them, such
 as garbage collection, JIT compilation and WAL apply, does not, so the process
@@ -269,14 +288,20 @@ group's workers until it finishes. When that is the last worker the group may
 hold, the group's other queries wait for the copy, under either scheduling
 policy.
 
+While every running query of a group is a statement like this, the group may
+run one parallel task beyond its cap on workers. That task only finishes work
+the group's other queries already handed out to shared queues, so that it does
+not hold up other groups' queries there. This is the one exception to the cap.
+
 Under a fractional limit a copy's CPU is recorded in full, but the debt such
 statements leave the group is capped at what its limit refills in 10 seconds.
 After a long copy the group therefore waits at most about 10 seconds, instead of
 however long its limit would take to repay the whole copy: about 7 hours for a
-one-hour copy under a limit of 0.14 cores. A group that runs long copies back to back can use far more
-than its limit as a result: in one measurement on 14 cores, 100-second copies
-under `cpu_limit = '1%'` used about 6.5% of the node, close to a whole core.
-Under a whole-core limit there is no budget, and a copy only keeps its worker.
+one-hour copy under a limit of 0.14 cores. A group that runs long copies back to
+back can use far more than its limit as a result: in one measurement on 14
+cores, 100-second copies under `cpu_limit = '1%'` used about 6.5% of the node,
+close to a whole core. Under a whole-core limit there is no budget, and a copy
+only keeps its worker.
 
 `INSERT ... SELECT` gives up its worker like any query, so none of this applies
 to it. Any statement that waits for the budget keeps its locks while it waits,
@@ -372,8 +397,9 @@ engaged its CPU is still charged when the slice ends, but no cooperative limit
 can shorten that stretch.
 
 Faults are contained rather than escalated. If the scheduler itself hits an
-internal fault it degrades: queries keep running without CPU grants, admission
-and memory limits stay enforced, and
+internal fault it degrades: queries keep running without CPU grants, so CPU
+weights, CPU limits and the `fair` policy no longer apply, while admission and
+memory limits stay enforced, and
 `questdb_resource_groups_cpu_scheduler_degraded` reports `1` until the instance
 restarts. A fault in one query affects only that query, leaving other queries
 and other groups alone, and its CPU is still charged to its group.

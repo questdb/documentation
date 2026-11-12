@@ -2,7 +2,8 @@
 title: REVOKE reference
 sidebar_label: REVOKE
 description:
-  "REVOKE SQL keywords reference documentation. Applies to RBAC in QuestDB
+  "REVOKE takes permissions on the database, tables, columns or resource groups
+  away from a user, group or service account. Applies to RBAC in QuestDB
   Enterprise."
 ---
 
@@ -39,6 +40,8 @@ table's current columns with an optional `EXCLUDE` list:
 { columnName [, columnName ...]
 | * [EXCLUDE (columnName [, columnName ...])] }
 ```
+
+The `USE RESOURCE GROUP` permission on a single resource group is revoked with:
 
 ```questdb-sql title="Resource group scope"
 REVOKE USE ON RESOURCE GROUP groupName FROM entityName;
@@ -136,13 +139,23 @@ Like the grant, this form takes the
 [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and the
 group must exist.
 
+It removes only the grant on that group. An entity that also holds the
+database-level `USE RESOURCE GROUP`, directly or through an ACL group, can still
+use the group afterwards, because
+[permission level readjustment](#permission-level-readjustment) does not apply
+to resource groups: revoking one group never splits the database-level grant
+into grants on the others. To take every group away, revoke the database-level
+permission.
+
 `REVOKE USE RESOURCE GROUP FROM monitoring` revokes the database-level
 permission, and with it every grant the entity holds on single groups.
 `REVOKE ALL FROM monitoring` and dropping the entity clear them as well, and
 `DROP RESOURCE GROUP` removes every grant on the dropped group.
 
 The permission is checked at the start of every managed query, so a revoke
-reaches sessions that already chose the group: their next such query fails with
+reaches sessions that already chose the group with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/): their next such
+query fails with
 `Access denied for <principal> [USE RESOURCE GROUP on alerts]` until they choose
 another group or run `RESET RESOURCE GROUP`. A query already running finishes in
 its group.

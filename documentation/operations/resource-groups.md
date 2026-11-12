@@ -80,7 +80,8 @@ Three things are worth knowing before you change policy on a running system:
 - **Changes apply online.** An `ALTER` does not cancel anything running at that
   moment. Slots already held are kept, an already queued request keeps its
   deadline, and only subsequent allocations check a new memory budget. A new CPU
-  limit reaches running queries at their next CPU slice, and a new scheduling
+  limit reaches running queries at their next CPU slice, or for a query that was
+  running before CPU scheduling engaged, when it next suspends. A new scheduling
   policy re-queues the work waiting for CPU. See
   [effect on queries already running](/docs/query/sql/acl/alter-resource-group/#effect-on-queries-already-running).
 - **A drop is refused while principals are still mapped.** Unmap them first. Once
@@ -88,7 +89,9 @@ Three things are worth knowing before you change policy on a running system:
   they carry on under the settings it had. See
   [what happens to queries still using it](/docs/query/sql/acl/drop-resource-group/#what-happens-to-queries-still-using-it).
 - **`DEFAULT` is alterable but cannot be dropped or renamed.** Giving it limits
-  is how you bound everything that is not explicitly mapped.
+  is how you bound everything that is not explicitly mapped. That includes the
+  built-in admin, which cannot be mapped and runs in `DEFAULT` unless its
+  session [chooses another group](/docs/query/sql/acl/set-resource-group/).
 
 Mapping changes affect queries that start after the change, never one already
 running. For the resolution order, including `ASSUME SERVICE ACCOUNT`, see
@@ -112,10 +115,14 @@ What matters when picking them:
   all of it when `DEFAULT` is idle. Setting a weight on a lone group does
   nothing.
 - **A weight shares, a limit caps.** A weight decides the split while groups
-  compete and lets a group use what the others leave idle. `cpu_limit` holds a
-  group to a fixed part of the node even when the rest is idle, so leave it unset
+  compete and lets a group use what the others leave idle. `cpu_limit` caps a
+  group at a part of the node even when the rest is idle, so leave it unset
   unless the group must never use more. Below its limit a group still competes
-  by weight.
+  by weight: if it must also reach its limit while others are busy, give it a
+  weight whose `cpu_min_share_pct` is at least its `cpu_limit_pct`.
+- **Whole cores make the strictest cap.** A limit that comes to a whole number
+  of cores, such as `'25%'` on 16 CPUs, has no CPU budget, so the group cannot
+  burst above it or carry debt. `cpu_limit_cores` shows what a limit comes to.
 - **A small limit changes how queries run.** A group limited to one core or less
   runs parallel queries single-threaded, and a `CREATE TABLE ... AS SELECT`
   keeps one of the group's workers until it finishes. Leave room for short
@@ -223,8 +230,8 @@ CREATE RESOURCE GROUP exports WITH (cpu_weight = 10, max_active_queries = 1);
 
 Under contention the job receives a tenth of the CPU that a group at the default
 weight of 100 receives, and it runs one query at a time. When nothing else has
-work it uses the CPU that would otherwise be idle; resource groups do not hold
-CPU back from a group that is alone.
+work it uses the CPU that would otherwise be idle; unless it has a CPU limit,
+resource groups do not hold CPU back from a group that is alone.
 
 ### One workload must not exhaust query memory
 
@@ -279,8 +286,7 @@ this from the client's own session with `SELECT current_resource_group();`.
 
 ### A tenant must never use more than its part of the node
 
-Capacity sold by the core, or performance that must not change with the
-neighbours' load, needs a ceiling rather than a share:
+Capacity sold by the core needs a ceiling rather than a share:
 
 ```questdb-sql
 CREATE RESOURCE GROUP tenant_a WITH (cpu_limit = '25%');
@@ -290,11 +296,14 @@ ALTER SERVICE ACCOUNT tenant_a_app SET RESOURCE GROUP tenant_a;
 ALTER SERVICE ACCOUNT tenant_b_app SET RESOURCE GROUP tenant_b;
 ```
 
-Each tenant uses at most a quarter of the node's CPUs on average, even while
-the rest of the node is idle, and `cpu_limit_cores` in
+On a node with 16 CPUs each tenant uses at most 4 cores, even while the rest of
+the node is idle, and `cpu_limit_cores` in
 [`resource_groups()`](/docs/query/functions/meta/#resource_groups) shows what
-that comes to on this node. Below their limits the tenants still compete by
-weight. A limit also leaves the remaining CPU to work outside resource groups,
+the limit comes to on a given node. A quarter of 16 CPUs is a whole number of
+cores, so the cap has no budget to run ahead of. A limit only caps, though: with
+the default weights each tenant's `cpu_min_share_pct` is about 33, above its
+limit, so each tenant also gets its 4 cores while `DEFAULT` is busy. The CPU the
+tenants cannot use goes to the other groups and to work outside resource groups,
 such as ingestion.
 
 Size the limit for the tenant's heaviest statements. A
@@ -331,17 +340,22 @@ ALTER USER monitoring SET RESOURCE GROUP dashboards;
 GRANT USE ON RESOURCE GROUP alerts TO monitoring;
 ```
 
-The connections that evaluate alert rules run `SET RESOURCE GROUP alerts` once
-after connecting, and an HTTP client sends `resource_group=alerts` with each
-alert query instead. Everything else stays in `dashboards`. Other users cannot
-choose `alerts` without the same grant, so the heavier group stays reserved for
-the work you grant it to. A connection pooler that resets sessions with
-`DISCARD ALL` or `RESET ALL` clears the choice as well. See
+The connections that evaluate alert rules come from a pool of their own and run
+`SET RESOURCE GROUP alerts` once after connecting. A pool shared with dashboards
+would hand a switched connection to dashboard queries, unless it resets every
+session with `DISCARD ALL` or `RESET ALL`. An HTTP client sends
+`resource_group=alerts` with each alert query instead. Everything else stays in
+`dashboards`. Other users cannot choose `alerts` without the same grant, so the
+heavier group stays reserved for the work you grant it to. See
 [SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/).
 
 ### Operators need a protected share
 
-Give operators an ordinary group with a small weight:
+Management statements such as `ALTER RESOURCE GROUP` and `CANCEL QUERY` are not
+managed, so they never wait for a group's admission or CPU however busy the
+instance is. The queries operators run to diagnose a busy instance, such as
+`SELECT * FROM query_activity()` or `resource_groups()`, are managed, so give
+them a group of their own:
 
 ```questdb-sql
 CREATE RESOURCE GROUP ops WITH (cpu_weight = 5);
@@ -349,12 +363,14 @@ CREATE RESOURCE GROUP ops WITH (cpu_weight = 5);
 ALTER USER dba SET RESOURCE GROUP ops;
 ```
 
-While every group is busy, `ops` receives its percentage of all weights, which
-`cpu_min_share_pct` shows, and more when other groups are idle. The built-in
-admin needs no grant to run `SET RESOURCE GROUP ops`. Management statements do
-not depend on the share at all: only queries are managed, so statements such as
-`ALTER RESOURCE GROUP` and `CANCEL QUERY` never wait for a group's admission or
-CPU.
+While every group is busy, `ops` can count on its `cpu_min_share_pct`, and it
+uses more when other groups are idle. Diagnostic queries are light, so a small
+weight is enough: what matters is that they do not wait behind the workload.
+Leave the group's admission limits unset, so they are not queued either.
+
+The built-in admin cannot be mapped. It runs in `DEFAULT` unless its session runs
+`SET RESOURCE GROUP ops`, which needs no grant, so lowering the weight of
+`DEFAULT` also lowers the built-in admin's share.
 
 ## Inspecting
 
@@ -369,15 +385,15 @@ that matter day to day:
 - `admission_rejections` and `admission_timeouts` for work already turned away.
 - `memory_used_bytes` against `memory_limit_bytes` for headroom.
 - `cpu_min_share_pct` for the share of query CPU each group can count on while
-  every group has work, and `cpu_limit_pct`, `cpu_limit_cores` and
-  `scheduling_policy` for its CPU limit and policy.
+  every group has work, up to its CPU limit, and `cpu_limit_pct`,
+  `cpu_limit_cores` and `scheduling_policy` for its CPU limit and policy.
 
 Weights are relative, so they need not add up to 100, but weights that do read
 directly as percentages:
 
 ```questdb-sql title="A share scheme in percent"
 ALTER RESOURCE GROUP DEFAULT SET (cpu_weight = 1);
-CREATE RESOURCE GROUP ops WITH (cpu_weight = 5);
+CREATE RESOURCE GROUP IF NOT EXISTS ops WITH (cpu_weight = 5);
 CREATE RESOURCE GROUP trading WITH (
     cpu_weight = 45,
     scheduling_policy = 'fair'
@@ -399,9 +415,12 @@ On a node with 16 CPUs:
 | research | 49         | 49.0              | 75            | 12.0            | fifo              |
 | trading  | 45         | 45.0              | 0             | 0.0             | fair              |
 
-Weights start at 1, so `DEFAULT` takes at least one point of a scheme that adds
-up to 100. `research` can use idle CPU up to 12 cores, while the other groups can
-use all of it.
+The smallest weight is 1, so `DEFAULT`, which also holds the built-in admin's
+queries, takes at least one point of a scheme that adds up to 100. `research`
+can count on 49% of query CPU, about 7.8 cores, while every group is busy, and
+can use idle CPU up to its limit of 12 cores, while the other groups can use all
+of it. `cpu_min_share_pct` does not account for limits: a group whose limit is
+below its percentage gets only its limit, and the rest goes to the other groups.
 
 Mappings are attributes of the principals themselves. `SHOW USERS` and
 `SHOW SERVICE ACCOUNTS` carry a `resource_group` column, and `SHOW GROUPS`
@@ -445,10 +464,13 @@ meaning is in the
 [metrics reference](/docs/operations/logging-metrics/#resource-group-metrics).
 
 Two signals are worth alerting on: a non-zero
-`questdb_resource_groups_cpu_scheduler_degraded`, which means CPU shares are no
-longer enforced until the next restart, and a steadily growing
-`questdb_resource_group_admission_timeouts_total`, which means a group's queue
-settings are rejecting work the application expects to succeed.
+`questdb_resource_groups_cpu_scheduler_degraded`, which means CPU weights, CPU
+limits and the `fair` policy are no longer enforced until the next restart, and
+a steadily growing `questdb_resource_group_admission_timeouts_total`, which
+means a group's queue settings are rejecting work the application expects to
+succeed. `questdb_resource_groups_cpu_managed_dispatch` stays at `1` after the
+scheduler degrades, because it reports whether the groups and their policies
+require CPU scheduling, not whether it is working.
 
 ## Errors clients see
 
@@ -462,7 +484,7 @@ settings are rejecting work the application expects to succeed.
 | `built-in Resource Group cannot be dropped` / `cannot be renamed` | `DROP` or `RENAME` on `DEFAULT`                                               | Alter it instead                                                                                             |
 | `Access denied for <principal> [USE RESOURCE GROUP on <group>]`   | The session or request chose a group the principal may not use, or the permission was revoked since | `GRANT USE ON RESOURCE GROUP`, or `RESET RESOURCE GROUP` to return to the mapped group |
 | `Resource Group does not exist [name=...]`                        | `SET RESOURCE GROUP` named a group that does not exist                        | Correct the name                                                                                             |
-| `Resource Group chosen by SET RESOURCE GROUP or the resource_group parameter does not exist` | The session's group was dropped, or the `resource_group` parameter names no group | `SET RESOURCE GROUP` to an existing group, `RESET RESOURCE GROUP`, or correct the parameter |
+| `Resource Group chosen by SET RESOURCE GROUP or the resource_group parameter does not exist` | The session's group was dropped or renamed, or the `resource_group` parameter names no group; names are case-sensitive except `DEFAULT` | `SET RESOURCE GROUP` to an existing group, `RESET RESOURCE GROUP`, or correct the parameter |
 | `Resource Group switching needs a session, ...`                   | `SET RESOURCE GROUP` sent over HTTP or another connection without a session   | Send the `resource_group` parameter with the HTTP request                                                    |
 | `SET LOCAL RESOURCE GROUP is not supported, ...`                  | `SET LOCAL` used for a group, which applies to the whole session              | Use `SET RESOURCE GROUP`                                                                                     |
 
@@ -473,7 +495,8 @@ groups compete. Check `active_queries` on both groups at the same moment: if one
 is idle, the other is expected to use everything, unless it has a CPU limit. A
 query that started before CPU scheduling engaged stays outside it until it next
 suspends or finishes; every other query starts sharing at its next checkpoint.
-Also
+A degraded scheduler, reported by
+`questdb_resource_groups_cpu_scheduler_degraded`, stops sharing altogether. Also
 confirm the work you are watching is managed at all, since ingestion, WAL apply
 and view refresh are outside the feature. `query_activity()` shows the group
 each running query belongs to, which is the quickest way to tell whether the
@@ -485,14 +508,22 @@ runs. Compare the group's use with `cpu_limit_cores`. If the group should use
 idle CPU, raise the limit or remove it with `RESET (cpu_limit)` and rely on its
 weight instead.
 
-**A group uses more CPU than its limit.** The limit counts the CPU that queries
-use on their workers, so process-level tools also show garbage collection, JIT
-compilation and WAL apply, which no group is charged for. Within the group,
-under a fractional limit, a `CREATE TABLE ... AS SELECT` leaves at most about
-10 seconds of the limit's CPU to repay however long it ran, so back-to-back
-copies can keep a group close to a whole core, and a parallel query above one
-core can run past the rate for a moment before it repays it. Compare the growth of `cpu_nanos_total` over a
-minute or more with `cpu_limit_cores` rather than reading an instant.
+**A group uses more CPU than its limit.** Measure over a minute or more rather
+than reading an instant: sample `cpu_nanos_total` twice and divide the
+difference by the elapsed nanoseconds to get the cores the group used, which
+compares directly with `cpu_limit_cores`. The counter covers the CPU that
+queries use on their workers; process-level tools also show garbage collection,
+JIT compilation and WAL apply, which no group is charged for. Under a fractional
+limit a group can also exceed its rate on purpose: a parallel query above one
+core runs past it for a moment before it repays it, and back-to-back
+`CREATE TABLE ... AS SELECT` copies can keep a group close to a whole core. A
+limit that comes to whole cores avoids both.
+
+**Queries queue at admission in a group with a CPU limit.** A query keeps its
+admission slot while it waits for its group's CPU budget, so under a tight limit
+`queued_queries` grows although the group uses no more CPU than its limit. Raise
+the limit if the wait is too long; raising `max_active_queries` only lets more
+queries wait for the same budget.
 
 **A short query waits behind a copy in a group with a limit.** A
 `CREATE TABLE ... AS SELECT` keeps one of the group's workers until it finishes,
@@ -561,27 +592,34 @@ running.
   one core can run past the rate before it repays it, and while every running
   query of a group is a statement that cannot give up its worker, such as a
   `CREATE TABLE ... AS SELECT`, the group may run one parallel task beyond its
-  limit so that work already handed out does not hold up other groups. See
+  cap. See
   [A CPU limit is a ceiling](/docs/concepts/resource-groups/#a-cpu-limit-is-a-ceiling-not-a-share).
 - In a group with a CPU limit, a `CREATE TABLE ... AS SELECT` runs
-  single-threaded and keeps its worker until it finishes. Under a fractional
-  limit it leaves the group at most about 10 seconds of the limit's CPU to
-  repay, so back-to-back copies can keep a group close to a whole core however
-  small its limit. In a group without a limit, its parallel tasks are not
-  charged to the group.
+  single-threaded and keeps its worker until it finishes, and under a
+  fractional limit back-to-back copies can keep a group close to a whole core
+  however small its limit. In a group without a limit, its parallel tasks are
+  not charged to the group.
+- A group chosen per session or request does not reach `COPY ... TO` exports,
+  exports through `/exp`, or queries over QWP, which run in the principal's
+  mapped group. See
+  [SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/#which-connections-can-switch).
 - A statement waiting for its group's CPU budget keeps its locks, such as the
   table writer of an `INSERT ... SELECT`.
 - `fair` has no weights between users, and `cpu_limit` applies to a whole group,
   not to one user. A user who needs a different share or a cap of its own needs
   its own group.
 - With resource groups enabled, the instance keeps as many reduce queues
-  reserved for groups with a CPU limit as it has shared ones, at about 2.3 KB of
-  native memory per queue slot: about 150 KB with 4 query workers, and about 2.3
-  MB at the largest default queue size. Each group takes the next reserved queue
-  the first time it runs a query under a limit and keeps it, so groups start to
-  share reserved queues once more groups have taken one than there are queues,
-  counting groups that were dropped since. A parallel query that started before
-  its group had a limit stays on a shared queue until it finishes.
+  reserved for groups with a CPU limit as it has shared ones, which
+  [`cairo.page.frame.shard.count`](/docs/configuration/parallel-sql-execution/#cairopageframeshardcount)
+  sets: 4, or the number of query workers if that is smaller. They cost about
+  2.3 KB of native memory per queue slot: about 150 KB with 4 query workers, and
+  about 2.3 MB at the largest default queue size. Each group takes the next
+  reserved queue the first time it runs a query under a limit and keeps it, so
+  groups start to share reserved queues once more groups have taken one than
+  there are queues, counting groups that were dropped since. Groups that share a
+  reserved queue can hold up each other's parallel queries while one of them
+  waits for its budget. A parallel query that started before its group had a
+  limit stays on a shared queue until it finishes.
 
 ## See also
 
