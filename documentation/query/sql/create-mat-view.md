@@ -447,7 +447,11 @@ See [meta functions](/docs/query/functions/meta/) for all available columns.
 
 Materialized view queries must:
 
-- Use `SAMPLE BY` or `GROUP BY` with designated timestamp
+- Either aggregate with `SAMPLE BY` or `GROUP BY` on the designated timestamp,
+  or be a [passthrough](/docs/concepts/materialized-views/#passthrough-views)
+  query over a single table
+- Not use `LIMIT` or window functions on the base table (see
+  [LIMIT and window function restrictions](#limit-and-window-function-restrictions))
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Not use non-deterministic functions (`now()`, `rnd_*`)

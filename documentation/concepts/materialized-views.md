@@ -825,7 +825,10 @@ Materialized view queries:
 - Must either aggregate with `SAMPLE BY` / `GROUP BY` on a designated timestamp
   column, or be a [passthrough](#passthrough-views) projection over a single
   table
+- Must not use `LIMIT` or window functions on the base table (see
+  [Which queries are passthrough](#which-queries-are-passthrough))
 - Must not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
+- Must not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Must not use non-deterministic functions (`now()`, `rnd_uuid4()`)
 - Must not read
   [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions),
