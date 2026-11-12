@@ -155,12 +155,12 @@ Connections that do not switch keep running in `dashboards`, the group
 ```bash title="Run one query in the alerts group"
 curl -G --data-urlencode "query=SELECT count() FROM fx_trades;" \
     --data-urlencode "resource_group=alerts" \
-    -u "monitoring:my_password" \
+    -u monitoring \
     http://localhost:9000/api/v1/sql/execute
 ```
 
-The parameter applies to that request only, and needs the same permission as
-`SET RESOURCE GROUP`.
+curl prompts for the password of `monitoring`. The parameter applies to that
+request only, and needs the same permission as `SET RESOURCE GROUP`.
 
 ### Return to the mapped group
 
