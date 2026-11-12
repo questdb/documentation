@@ -63,8 +63,9 @@ client. Reach for it when you want a `curl` one-liner, a shell script, a health
 check, or a bulk file load without pulling in a client library. It is not
 superseded by QWP.
 
-- **[REST API](/docs/connect/compatibility/rest-api/)**: `/exec` runs SQL and
-  returns JSON, `/imp` uploads CSV, `/exp` exports results as CSV or Parquet.
+- **[REST API](/docs/connect/compatibility/rest-api/)**: `/api/v1/sql/execute`
+  runs SQL and returns JSON, `/imp` uploads CSV, `/exp` exports results as CSV
+  or Parquet.
 - **[CSV import](/docs/connect/compatibility/import-csv/)**: bulk loading a CSV
   file, over HTTP or with `COPY`.
 - **[Parquet export](/docs/concepts/parquet/#export)**: writing query results to

@@ -515,10 +515,10 @@ individual field value length in text input.
 
 ### http.context.execute
 
-- **Default**: `/exec`
+- **Default**: `/exec`, `/api/v1/sql/execute`
 - **Reloadable**: no
 
-Context path for the SQL execution service.
+Context paths for the SQL execution service. Both paths serve the same handler.
 
 ### http.context.export
 

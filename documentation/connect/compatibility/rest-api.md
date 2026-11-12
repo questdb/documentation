@@ -41,7 +41,7 @@ insert-capable entrypoints:
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
-| `/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
+| `/api/v1/sql/execute?query=..`  | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/connect/compatibility/rest-api/) docs.
@@ -223,9 +223,9 @@ A HTTP status code of `200` is returned with the following response body:
       "type": "DOUBLE"
     }
   ],
-  "timestamp": 0
+  "timestamp": 0,
   "dataset": [
-    ["2024-01-01T00:00:00.000000Z", 142.50],
+    ["2024-01-01T00:00:00.000000Z", 142.5],
     ["2024-01-01T00:00:01.000000Z", 142.75]
   ],
   "count": 2

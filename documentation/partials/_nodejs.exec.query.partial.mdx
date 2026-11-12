@@ -8,7 +8,7 @@ async function run() {
     const query = "SELECT x FROM long_sequence(5);"
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     )
     const json = await response.json()
 

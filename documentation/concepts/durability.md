@@ -156,8 +156,9 @@ cairo.adaptive.commit.group.window=0
 
 Only commits made through a writer that stays open share a flush: ILP over TCP,
 ILP over HTTP on a kept-alive connection, and QWP. A SQL `INSERT` through the
-HTTP `/exec` endpoint or the embedded API flushes the sequencer log before it
-returns, as with a window of `0`. So does each PostgreSQL wire protocol Sync:
+HTTP `/api/v1/sql/execute` endpoint or the embedded API flushes the sequencer
+log before it returns, as with a window of `0`. So does each PostgreSQL wire
+protocol Sync:
 one per statement, or one per batch for drivers that batch statements. These
 commits are on the disk when they are acknowledged. The flush holds the table's
 sequencer lock, so commits from other writers to the same table wait for it.
