@@ -602,9 +602,26 @@ looked up in database files.
 - **Default**: `256`
 - **Reloadable**: no
 
-Approximate capacity for `SYMBOL` columns. Should equal the number of unique
-symbol values stored in the table. Getting this value significantly wrong
-causes performance degradation. Must be a power of 2.
+Starting capacity for `SYMBOL` columns created without `CAPACITY`. Capacity
+grows automatically afterwards, see `cairo.auto.scale.symbol.capacity`. Must
+be a power of 2.
+
+### cairo.auto.scale.symbol.capacity
+
+- **Default**: `true`
+- **Reloadable**: no
+
+When `true`, a `SYMBOL` column's capacity grows automatically after a commit
+that leaves it holding more than `cairo.auto.scale.symbol.capacity.threshold`
+of its capacity. The new capacity is at least double the old one.
+
+### cairo.auto.scale.symbol.capacity.threshold
+
+- **Default**: `0.8`
+- **Reloadable**: no
+
+Fraction of a `SYMBOL` column's capacity that, once exceeded, triggers the
+automatic resize. Must be greater than zero.
 
 ### cairo.index.value.block.size
 

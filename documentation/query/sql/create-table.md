@@ -151,20 +151,6 @@ TTL 1 WEEK
 DEDUP UPSERT KEYS (timestamp, symbol);
 ```
 
-Finally, we add additional parameters for our SYMBOL type:
-
-```questdb-sql title="Adding parameters for symbol type"
-CREATE TABLE trades (
-  timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 256 NOCACHE,
-  price DOUBLE,
-  amount DOUBLE
-) TIMESTAMP(timestamp)
-PARTITION BY DAY
-TTL 1 WEEK
-DEDUP UPSERT KEYS (timestamp, symbol);
-```
-
 ## Write-Ahead Log (WAL) Settings
 
 By default, created tables are
@@ -528,18 +514,17 @@ benefits of using this type, see the [symbol](/docs/concepts/symbol/) overview.
 
 #### Symbol capacity
 
-`CAPACITY` is an optional keyword used when defining a symbol type on table
-creation to indicate how many distinct values this column is expected to have.
-When `distinctValueEstimate` is not explicitly specified, a default value of
-`cairo.default.symbol.capacity` is used.
-
-`distinctValueEstimate` - the value used to size data structures for
-[symbols](/docs/concepts/symbol/).
+`CAPACITY` is optional and sets the starting capacity of the column's symbol
+table, `cairo.default.symbol.capacity` (256) by default. Capacity grows
+automatically: after each commit, a column holding more than 80% of its
+capacity is resized, which is cheap. Set `CAPACITY` only when a large number
+of distinct values arrives at once, as in a large
+[`COPY`](/docs/query/sql/copy/), so the column starts at the right size:
 
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 50,
+  account SYMBOL CAPACITY 100000,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp)
@@ -554,7 +539,7 @@ default value is `CACHE` unless otherwise specified.
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 50 NOCACHE,
+  symbol SYMBOL NOCACHE,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp);
