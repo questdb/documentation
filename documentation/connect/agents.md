@@ -95,7 +95,8 @@ SHOW COLUMNS FROM trades;
 SELECT * FROM tables();
 ```
 
-Over REST, the same queries run as `GET /exec?query=SHOW%20TABLES`.
+Over REST, the same queries run as
+`GET /api/v1/sql/execute?query=SHOW%20TABLES`.
 
 On QuestDB Enterprise, these queries return only the objects the agent's user
 [can see](/docs/security/rbac/#object-visibility), and a hidden table fails
@@ -120,8 +121,8 @@ possible:
 Pick the transport by data volume:
 
 - **Small queries** — schema inspection, parameter lookup, a few hundred
-  rows — fit naturally on REST `/exec`. The JSON response is directly
-  consumable by the agent without an SDK.
+  rows — fit naturally on REST `/api/v1/sql/execute`. The JSON response is
+  directly consumable by the agent without an SDK.
 - **Large result sets** — exporting data into another system, materializing
   analytics output — should go through a
   [QWP egress client](/docs/connect/wire-protocols/qwp-egress-websocket/). Byte-credit
@@ -159,8 +160,8 @@ recommended path for all writes**:
   protocol is fully documented for clean-room implementations and a
   minimum-viable client is on the order of a few hundred lines.
 - **Quick one-off inserts** during exploration: `INSERT INTO ...` via REST
-  `/exec` is acceptable for ad-hoc testing, but production write paths
-  should always be on QWP.
+  `/api/v1/sql/execute` is acceptable for ad-hoc testing, but production write
+  paths should always be on QWP.
 
 ### Observability
 

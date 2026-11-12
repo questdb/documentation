@@ -35,8 +35,9 @@ If your language already has a QuestDB client, use it — the
 rest of this section is for implementers writing a new one (e.g., to bring
 QWP query support to PHP or runtimes that the existing clients don't cover).
 
-Compared with the row-oriented HTTP `/exec` JSON endpoint, QWP egress trades
-a denser binary encoding for higher throughput and lower CPU on both ends:
+Compared with the row-oriented HTTP `/api/v1/sql/execute` JSON endpoint, QWP
+egress trades a denser binary encoding for higher throughput and lower CPU on
+both ends:
 
 - **Columnar result batches.** Each batch is a single QWP table block — the
   same shape QuestDB uses on disk. No per-row type tags, no JSON parsing.
