@@ -361,18 +361,14 @@ act independently: whichever threshold trips first sends the batch.
   When `off`, the application must call `flush()` explicitly to send
   buffered rows.
 - `auto_flush_rows` — flush when the buffered row count reaches this
-  threshold. Set to `off` to disable. Default where supported: `1000`.
+  threshold. Set to `off` to disable.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
   since the first buffered row. The client evaluates the interval on the
   next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
-  disable. Default where supported: `100` (100 ms).
+  disable.
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Accepts
-  [size suffixes](#size-suffixes). **The default differs by client**: Java
-  and Node.js ship it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and
-  Rust, C and C++ reject the key outright. A Java application that assumes an
-  8 MiB byte trigger is active will size batches expecting a flush that never
-  fires.
+  [size suffixes](#size-suffixes).
   When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
   advertised `X-QWP-Max-Batch-Size` at handshake (one-way: the client
@@ -383,6 +379,26 @@ act independently: whichever threshold trips first sends the batch.
   responsibility for not producing oversized batches. Older servers
   that do not advertise the header leave the configured value
   untouched.
+
+**Defaults differ by client.** On `ws::` / `wss::`:
+
+| Client | `auto_flush_rows` | `auto_flush_interval` | `auto_flush_bytes` |
+| --- | --- | --- | --- |
+| Java | `1000` | `100` ms | off (`0`) |
+| Node.js, browser | `1000` | `100` ms | off (`0`) |
+| Go | `1000` | `100` ms | `8m`, clamped as above |
+| .NET | `1000` | `100` ms | `8m`, clamped as above |
+| Python, Ruby: pooled client (`connect()`) | `1000` | `100` ms | 90% of the server-advertised batch size |
+| Python: standalone `Sender` | `600` | `1000` ms | 90% of the server-advertised batch size |
+| Ruby: standalone `Sender` | `600` | `1000` ms | off |
+| Rust, C, C++ | not supported | not supported | not supported |
+
+A Java application that assumes an 8 MiB byte trigger is active will size
+batches expecting a flush that never fires.
+
+On ILP over HTTP (`http::` / `https::`), clients that auto-flush default to
+`75000` rows and `1000` ms. Java and Node.js reject `auto_flush_bytes` there,
+Go rejects a nonzero value, and Python and .NET accept it (default off).
 
 :::note Rust support
 
@@ -971,9 +987,9 @@ description and behaviour notes.
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | Java, Node.js `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)           |
-| `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_bytes`                      | size                          | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
+| `auto_flush_interval`                   | int (ms) / `off`              | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
+| `auto_flush_rows`                       | int / `off`                   | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
 | `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
 | `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
 | `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |

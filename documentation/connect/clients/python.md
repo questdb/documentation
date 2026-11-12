@@ -1197,7 +1197,9 @@ The 4.x-style standalone `Sender` remains available for InfluxDB Line
 Protocol ingestion (`http::`, `https::`, `tcp::`, `tcps::`), including
 `Sender.from_conf()`, auto-flush, and HTTP transactions, and also speaks
 QWP directly: `udp::` for fire-and-forget datagrams and `ws::` / `wss::`
-with explicit FSN tracking. The `questdb.ingress` import
+with explicit FSN tracking. Its auto-flush defaults differ from the pooled
+sender: `75000` rows and `1000` ms over HTTP, `600` rows and `1000` ms on
+every other transport. The `questdb.ingress` import
 path still works as a deprecated alias module. It is
 documented on
 [ReadTheDocs](https://py-questdb-client.readthedocs.io/en/latest/), and the
