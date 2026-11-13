@@ -334,15 +334,13 @@ records arrive.
 #### Enrichment behavior
 
 - A record with no mapping is written immediately with the column null, and is
-  not backfilled later. Unmapped keys are logged when they change.
+  not backfilled later.
 - A row gets the value known when the connector processes the record, not the
   value valid at the record's timestamp.
 - A redelivered record can get a different value. Do not include the enriched
   column in `DEDUP UPSERT KEYS`.
 - The query must succeed when a task starts; an empty lookup table is fine. A
   rejected query (bad SQL, missing table or permission) fails the task.
-  Connection errors, timeouts, and server limits are retried until
-  `qwp.progress.timeout.ms` expires.
 - If a later reload fails, the connector keeps the previous lookup and
   ingestion continues.
 - A reload blocks the task until the query finishes, at most
@@ -354,8 +352,6 @@ records arrive.
   `timestamp.field.name`, `symbols`, `doubles`, or `timestamp.string.fields`
   fails the load. Other clashes send the records to the
   [dead letter queue](#dead-letter-queue), or fail the task without one.
-- Use only `SELECT`. Other statements, such as `INSERT`, execute once per task
-  before the load fails.
 
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ### Delivery guarantees {#fault-tolerance}
