@@ -319,17 +319,21 @@ The query must return two columns: the lookup key, then the value. The value is
 written as a [symbol](/docs/concepts/symbol/) column named after the second
 column; alias it in the SQL to rename it (`ticker AS instrument_ticker`). An
 existing `VARCHAR` or `STRING` column of that name keeps its type. The value
-must be text; the key can be text or an integer.
+column must be `VARCHAR`, `STRING` or `SYMBOL`; the key column can also be
+`BYTE`, `SHORT`, `INT` or `LONG`. Cast other types in the SQL, for example
+`instrument_id::varchar`.
 
 `enrichment.key.field` is the [flattened](#how-data-is-mapped) field name, such
 as `address_city`, including any `value.prefix`. A primitive key or value takes
-the name of its prefix, or `key` or `value` if the prefix is empty. Keys are
-compared as text, so `42.0` does not match `42`.
+the name of its prefix, or `key` or `value` if the prefix is empty. The field
+can hold a string, an integer, a floating-point number or a boolean. It
+matches by value, whatever its type: `42` and `"42"` both match the integer key
+`42`. `42.0` and `"042"` do not.
 
 The query runs with the address and credentials from `client.conf.string`,
 which need read access to the lookup table. Each task keeps the whole result in
-memory and reloads it every `enrichment.refresh.ms` (default 5 seconds) while
-records arrive.
+memory and reloads it in the background every `enrichment.refresh.ms` (default
+5 seconds), also while no records arrive.
 
 #### Enrichment behavior
 
@@ -343,15 +347,21 @@ records arrive.
   rejected query (bad SQL, missing table or permission) fails the task.
 - If a later reload fails, the connector keeps the previous lookup and
   ingestion continues.
-- A reload blocks the task until the query finishes, at most
-  `enrichment.query.timeout.ms` (default 10 seconds) unless QuestDB is
-  unreachable. Keep the query small and the timeout well below the consumer's
-  `max.poll.interval.ms`.
+- The first load, when a task starts, blocks the task until the query
+  finishes, at most `enrichment.query.timeout.ms` (default 10 seconds) unless
+  QuestDB is unreachable. Later reloads do not hold up ingestion. Keep the query
+  small and the timeout well below the consumer's `max.poll.interval.ms`.
 - The value column must not share a name with a record field. A clash with
   `timestamp` or a field named in `enrichment.key.field`,
   `timestamp.field.name`, `symbols`, `doubles`, or `timestamp.string.fields`
   fails the load. Other clashes send the records to the
   [dead letter queue](#dead-letter-queue), or fail the task without one.
+- If the enriched column stays null, check the connector log. Each task logs
+  how many keys have no mapping whenever that number changes, with the keys
+  themselves at `DEBUG`. It warns once when records have no value in
+  `enrichment.key.field`, usually a misspelled or unflattened name, and once
+  when the field holds a value that cannot be a key: a struct, array, bytes or
+  decimal.
 
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ### Delivery guarantees {#fault-tolerance}
@@ -800,7 +810,7 @@ These options apply only to `ws` and `wss`. Set `enrichment.sql` and
 |------|------|---------|-------------|
 | enrichment.sql | `string` | N/A | Query that returns two columns: the lookup key, then the value |
 | enrichment.key.field | `string` | N/A | Flattened name of the record field to look up |
-| enrichment.refresh.ms | `long` | 5000 | Minimum time between lookup reloads, in milliseconds. A task reloads only while records arrive |
+| enrichment.refresh.ms | `long` | 5000 | Time between lookup reloads, in milliseconds, at least 100. Each task reloads in the background, also while idle |
 | enrichment.query.timeout.ms | `long` | 10000 | Maximum time for one lookup query, in milliseconds. Also caps `connect_timeout` and `auth_timeout_ms` for the query connection unless `client.conf.string` sets them |
 
 #### Client configuration string
