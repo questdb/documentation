@@ -39,6 +39,12 @@ The statement requires the
 [`RESOURCE GROUP ADMIN`](/docs/security/rbac/#permissions) permission, and affects
 queries that start after the change rather than one already running.
 
+The mapping decides the group the user's sessions start in. A session can still
+run its queries in another group with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), or an HTTP
+request with the `resource_group` parameter, if the user holds
+`USE RESOURCE GROUP` on it. The mapped group needs no such grant.
+
 ## Examples
 
 ```questdb-sql

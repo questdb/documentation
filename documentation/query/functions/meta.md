@@ -137,7 +137,10 @@ group, while `null` says the feature was not in force for that query.
 
 The group is resolved when the query starts and stays fixed for its lifetime,
 including across the pages of a suspended cursor. Changing a mapping affects the
-next query, never one already running.
+next query, never one already running. A session that chose a group with
+[`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), or a request
+that sent the `resource_group` parameter, sees the chosen group instead of the
+mapped one.
 
 **Confirming a mapping end to end:**
 
@@ -723,12 +726,29 @@ Returns a table with these columns:
 | `cpu_wait_nanos_total`     | `LONG`    | Cumulative time queries spent waiting for CPU, in nanoseconds                                |
 | `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                             |
 | `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                |
+| `cpu_min_share_pct`        | `DOUBLE`  | `cpu_weight` as a percentage of the weights of all groups: the share of query CPU the group can count on while every group has work, up to its CPU limit |
+| `cpu_limit_pct`            | `INT`     | CPU limit as a percentage of the node's CPUs; `0` when the group sets none                     |
+| `cpu_limit_cores`          | `DOUBLE`  | What `cpu_limit_pct` comes to in cores on this node; `0.0` when the group sets no limit         |
+| `scheduling_policy`        | `VARCHAR` | How the group divides its CPU between its users and queries: `fifo` or `fair`                 |
 
 The policy columns do not all report the same thing. `max_active_queries` and
 `max_queued_queries` show what the group itself sets, and are `null` when it sets
-nothing. `memory_limit_bytes`, `queue_timeout_millis` and `cpu_weight` show the
-effective value after instance defaults and the process budget have been applied,
-so they are never `null`.
+nothing. `memory_limit_bytes`, `queue_timeout_millis`, `cpu_weight` and
+`scheduling_policy` show the effective value after instance defaults and the
+process budget have been applied, so they are never `null`. `cpu_limit_pct` and
+`cpu_limit_cores` report `0` for a group without a CPU limit.
+
+The `cpu_min_share_pct`, `cpu_limit_pct`, `cpu_limit_cores` and
+`scheduling_policy` columns are available from QuestDB Enterprise 4.2.0. They
+follow the existing columns, so a client that reads columns by position keeps
+working.
+
+`cpu_limit_cores` is computed from the CPUs available to the QuestDB process,
+so the same percentage reads differently on nodes of different sizes, or in a
+container with a CPU limit. `cpu_min_share_pct` changes whenever a group is
+created, dropped or reweighted, because it is relative to all weights, and it
+does not account for CPU limits: a group whose limit is below its percentage
+gets only its limit, and the rest goes to the other groups.
 
 **Inspecting group policy:**
 
@@ -775,16 +795,41 @@ A high `queued_queries` with a rising `oldest_queue_wait_millis` means work is
 being held at the admission gate rather than by a busy machine, which is the
 signal that distinguishes a concurrency limit from a slow query.
 
+**Inspecting CPU policy:**
+
+```questdb-sql title="Each group's share under contention, ceiling and scheduling policy"
+SELECT name, cpu_weight, cpu_min_share_pct, cpu_limit_pct, cpu_limit_cores,
+       scheduling_policy
+FROM resource_groups()
+ORDER BY name;
+```
+
+With the `reporting` group above and a `tenant_a` group created with
+`cpu_limit = '25%'` and `scheduling_policy = 'fair'`, on a node with 16 CPUs:
+
+| name      | cpu_weight | cpu_min_share_pct | cpu_limit_pct | cpu_limit_cores | scheduling_policy |
+| --------- | ---------- | ----------------- | ------------- | --------------- | ----------------- |
+| DEFAULT   | 100        | 40.0              | 0             | 0.0             | fifo              |
+| reporting | 50         | 20.0              | 0             | 0.0             | fifo              |
+| tenant_a  | 100        | 40.0              | 25            | 4.0             | fair              |
+
+While all three groups have work, `reporting` can count on a fifth of query
+CPU. `tenant_a` uses at most 4 cores on average, even when the other groups are
+idle. That limit is below its 40% share, which would be 6.4 of the 16 CPUs, so
+while every group is busy it gets its 4 cores and the rest of its share goes to
+`DEFAULT` and `reporting`.
+
 **Constraints and edge cases:**
 
 - Counters describe the current runtime. They reset when the instance restarts,
   and recreating a group under the same name starts it from zero.
 - `cpu_nanos_total` counts only CPU that managed scheduling actually measured, so
   it is a floor rather than a full account of query CPU. While `DEFAULT` is the
-  only group, scheduling is disengaged and nothing is sampled, so the column sits
-  at `0` however busy the instance is. It also undercounts once scheduling is
-  engaged: a query already running when a second group was created stays outside
-  scheduling until it next suspends or finishes, and a scheduler that has
+  only group and has no CPU limit or `fair` policy, scheduling is disengaged and
+  nothing is sampled, so the column sits at `0` however busy the instance is. It
+  also undercounts once scheduling is engaged: a query already running when
+  scheduling engaged stays outside it until it next suspends or finishes, and a
+  scheduler that has
   degraded after an internal fault stops sampling from then on, which
   `questdb_resource_groups_cpu_scheduler_degraded` reports as `1`.
 - `memory_used_bytes` can lag real usage, because workers accumulate allocation

@@ -1207,7 +1207,7 @@ SELECT * FROM all_permissions();
 | REMOVE STORAGE POLICY     | Database &#124; Table               | Remove storage policies                 |
 | RENAME COLUMN             | Database &#124; Table &#124; Column | Rename columns                          |
 | RENAME TABLE              | Database &#124; Table               | Rename tables                           |
-| RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, read `resource_groups()` |
+| RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, grant and revoke `USE ON RESOURCE GROUP`, read `resource_groups()` |
 | RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
 | SELECT                    | Database &#124; Table &#124; Column | Read data                               |
 | SET PARQUET SETTINGS      | Database &#124; Table               | Set column Parquet encoding and compression |
@@ -1224,6 +1224,7 @@ SELECT * FROM all_permissions();
 | SYSTEM ADMIN              | Database                            | System functions (reload_tls, reader_pool, etc.); makes objects [visible](#object-visibility) |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
 | UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
+| USE RESOURCE GROUP        | Database                            | Run queries in a resource group chosen with [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/) or the `resource_group` HTTP parameter; also grantable on one group, see [GRANT](/docs/query/sql/acl/grant/#grant-use-of-resource-groups) |
 | VACUUM TABLE              | Database &#124; Table               | Reclaim storage                         |
 
 ### User management permissions
@@ -1313,6 +1314,7 @@ replication role, is an ordinary grantable permission.
 - [REMOVE USER](/docs/query/sql/acl/remove-user/)
 - [REVOKE](/docs/query/sql/acl/revoke/)
 - [REVOKE ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/revoke-assume-service-account/)
+- [SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/)
 - [SHOW USER](/docs/query/sql/show/#show-user)
 - [SHOW USERS](/docs/query/sql/show/#show-users)
 - [SHOW GROUPS](/docs/query/sql/show/#show-groups)

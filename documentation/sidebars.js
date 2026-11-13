@@ -542,6 +542,7 @@ module.exports = {
                 "query/sql/with",
               ],
             },
+            "query/sql/acl/set-resource-group",
             "query/sql/show",
             "query/sql/snapshot",
             "query/sql/switch-cold-storage-role",
