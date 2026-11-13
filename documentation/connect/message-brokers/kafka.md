@@ -296,6 +296,71 @@ development but in production, pre-create tables using
 [CREATE TABLE](/docs/query/sql/create-table/) for control over partitioning,
 indexes, and column types.
 
+### Lookup enrichment
+
+Events often carry only an identifier, such as `instrument_id`, while the
+readable attribute, such as `ticker`, lives in a reference table in the same
+QuestDB instance. The connector can look up that attribute and add it to every
+row as it is written, so queries need no join. Lookup enrichment requires `ws`
+or `wss` and connector 0.26 or newer.
+
+```properties
+enrichment.sql=SELECT instrument_id, ticker FROM instruments LATEST ON ts PARTITION BY instrument_id
+enrichment.key.field=instrument_id
+```
+
+A record `{"instrument_id": 42, "price": 101.5}` lands as:
+
+| instrument_id | price | ticker |
+|---------------|-------|--------|
+| 42            | 101.5 | ACME   |
+
+The query returns two columns: the lookup key, then the value. The value is
+written as a [symbol](/docs/concepts/symbol/) column named after the second
+column. To rename it, alias it in the SQL (`ticker AS instrument_ticker`). If
+the target table already has a `VARCHAR` or `STRING` column of that name, the
+value goes there and the column keeps its type. The value must be text. The key
+can be text or an integer.
+
+`enrichment.key.field` names the field as it is
+[flattened](#how-data-is-mapped): it includes the value prefix, with
+underscores between nested names (`address_city`). A primitive key or value is
+named after its column, which is `key` or `value` when the prefix is empty.
+Keys are compared as text, so `42.0` in a record does not match the integer key
+`42`.
+
+The query runs with the address and credentials from `client.conf.string`,
+which need read access to the lookup table. Each task keeps the whole result in
+memory and reloads it every `enrichment.refresh.ms` (default 5 seconds) while
+records arrive.
+
+#### Enrichment behavior
+
+- A record with no mapping is written immediately with the column left null,
+  and the column is not filled in later. Unmapped keys are logged when they
+  change.
+- A row gets the value known when the connector processes the record, not the
+  value valid at the record's timestamp.
+- A redelivered record can get a different value. Do not include the enriched
+  column in `DEDUP UPSERT KEYS`.
+- The query must succeed when a task starts. The lookup table must exist, but
+  it can be empty. A rejected query, such as bad SQL, a missing table, or a
+  missing permission, fails the task. Connection errors, timeouts, and server
+  limits are retried until `qwp.progress.timeout.ms` expires.
+- If a later reload fails, the connector keeps the previous lookup and
+  ingestion continues.
+- A reload blocks the task for up to `enrichment.query.timeout.ms` (default 10
+  seconds), or longer if QuestDB is unreachable. Use a small, fast query, and
+  keep the timeout well below the consumer's `max.poll.interval.ms`.
+- The value column must not have the same name as a record field. The lookup
+  fails to load if the name is `timestamp`, `enrichment.key.field`,
+  `timestamp.field.name`, or a field listed in `symbols`, `doubles`, or
+  `timestamp.string.fields`. Any other name clash rejects the affected records.
+  They go to the [dead letter queue](#dead-letter-queue), or fail the task if
+  there is none.
+- Use a `SELECT` statement. Another statement, such as `INSERT`, runs once per
+  task and then the load fails.
+
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ### Delivery guarantees {#fault-tolerance}
 
@@ -660,7 +725,8 @@ client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
 ```
 
 HTTP retries temporary errors for up to `retry_timeout` milliseconds (default
-10,000), then fails the task. The `qwp.*` options have no effect. You can still
+10,000), then fails the task. The `qwp.*` options have no effect, and
+[lookup enrichment](#lookup-enrichment) is not available. You can still
 use a DLQ for invalid records and deduplication to prevent duplicates on retry.
 
 To migrate an HTTP pipeline to QWP:
@@ -732,6 +798,18 @@ Pre-release builds of the QWP transport used the names `max.inflight.rows` and
 `qwp.max.inflight.rows` and `qwp.progress.timeout.ms`.
 
 </details>
+
+#### Lookup enrichment options
+
+These options apply only to `ws` and `wss`. Set `enrichment.sql` and
+`enrichment.key.field` together. See [Lookup enrichment](#lookup-enrichment).
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| enrichment.sql | `string` | N/A | Query that returns two columns: the lookup key, then the value |
+| enrichment.key.field | `string` | N/A | Flattened name of the record field to look up |
+| enrichment.refresh.ms | `long` | 5000 | Minimum time between lookup reloads, in milliseconds. A task reloads only while records arrive |
+| enrichment.query.timeout.ms | `long` | 10000 | Maximum time for one lookup query, in milliseconds. Also caps `connect_timeout` and `auth_timeout_ms` for the query connection unless `client.conf.string` sets them |
 
 #### Client configuration string
 
