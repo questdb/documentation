@@ -1,6 +1,6 @@
 ---
-title: OpenID Connect (OIDC) Integration
-description: Set up OpenID Connect (OIDC) in QuestDB Enterprise for Web Console SSO, service authentication with Entra ID managed identities, token validation, and troubleshooting.
+title: OpenID Connect (OIDC) integration
+description: Configure OIDC for QuestDB Enterprise, including Web Console SSO, client device-flow sign-in, rotating bearer tokens, and token validation.
 ---
 
 import Screenshot from "@theme/Screenshot";
@@ -15,6 +15,9 @@ QuestDB.
 
 It is a convenient way to integrate QuestDB into your enterprise environment,
 and it provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/).
+Client applications can use [device-flow sign-in](#device-authorization-flow),
+and services can use [rotating bearer-token providers](#rotating-bearer-tokens)
+to keep authenticating as credentials expire.
 
 Microsoft Active Directory and Azure AD, for example, can be turned into an
 Identity Provider.
@@ -330,6 +333,104 @@ Interactive clients usually fall into one of the following categories:
 - Non-browser based clients, usually some kind of command line interface (CLI)
   or a standalone application, such as Microsoft Access
 
+### Device authorization flow
+
+The [C and C++](/docs/connect/clients/c-and-cpp/#oidc-device-flow),
+[Rust](/docs/connect/clients/rust/#oidc-device-flow), and
+[Python](/docs/connect/clients/python/#oidc-device-flow) clients implement the
+OAuth 2.0 Device Authorization Grant (RFC 8628). Use it for a CLI, desktop
+application, or notebook where a person can sign in through a browser, even
+if the client runs on a remote machine. It requires native client 7.3.0 or
+Python client 6.1.0 or later, QuestDB Enterprise configured for OIDC, and an
+IdP application that allows the device grant.
+
+1. The application calls `sign_in()` explicitly. The client requests a device
+   code and displays the verification URL and user code.
+2. The user opens the URL on any device and completes the IdP's sign-in and
+   MFA steps. Passwords stay in the browser; the application does not collect
+   them or need an inbound redirect listener.
+3. The client polls the token endpoint until authorization succeeds, is
+   denied, or the device code expires.
+4. Attach the authentication object to the QuestDB pool or sender. It
+   supplies cached or silently refreshed bearer credentials on later requests
+   and reconnects without rebuilding clients.
+
+Only `sign_in()` can prompt. Token reads, ingestion, query failover, and pool
+connection setup never launch a device flow. When no cached or silently
+refreshable credential is available, they report `InteractionRequired`;
+Python exposes this as `OidcInteractionRequired`. Arrange a new explicit
+sign-in on your UI thread rather than repeatedly retrying the data operation.
+
+#### Discovery, scopes, and token selection
+
+`from_questdb` reads the client ID, scope, endpoints, and groups mode from
+QuestDB's public `/settings` endpoint. Pass the IdP's `issuer` explicitly to
+pin the provider and discover its device-authorization endpoint from
+`/.well-known/openid-configuration` when QuestDB does not advertise one.
+Use HTTPS for QuestDB discovery and non-loopback IdP endpoints.
+
+Explicit client ID, endpoint, scope, audience, and groups-mode arguments
+override discovered values. You can also skip QuestDB discovery and supply
+the client ID, device-authorization endpoint, token endpoint, and scope
+explicitly. The two credential endpoints must share an origin (scheme, host,
+and port); explicit endpoints configured together with an issuer must also
+match the issuer's origin.
+
+The device-flow helper chooses the token to send based on QuestDB's mode:
+
+- User Info mode uses the access token.
+- `acl.oidc.groups.encoded.in.token=true` selects the ID token. With explicit
+  client configuration, set `groups_in_token=true` and include `openid` in
+  the scope so the IdP issues an ID token.
+
+Silent refresh requires an IdP-issued refresh token. Most providers require
+`offline_access`, for example `scope="openid offline_access"`, and may require
+additional consent or IdP configuration. A scope override replaces the whole
+scope string; retain any groups or API scopes your deployment needs. The
+client does not add `openid` or `offline_access` automatically to an explicit
+scope. Without a refresh token, sign in again after the token expires.
+
+A retryable refresh failure uses bounded backoff. If a dispatched refresh
+loses its response, the IdP may already have rotated the refresh token; the
+client can discard that credential and require sign-in rather than risk
+reusing a rotated refresh token.
+
+#### Credential storage and shutdown
+
+Credentials remain in memory unless you opt into `FileTokenStore` (the
+`default_file_token_store` builder option in C/C++). Its default directory is
+`~/.questdb/oidc-tokens/`; `QUESTDB_CLIENT_OIDC_TOKEN_STORE_DIR` overrides it
+with an absolute path. The store coordinates refresh across processes and
+uses atomic replacement for rotated credentials.
+
+:::warning Plaintext token storage
+
+The file store persists access, ID, and long-lived refresh tokens as plaintext
+JSON. On Unix, directories use `0700` and files use `0600`; dedicate the
+directory to this store. Mutations currently require Unix/POSIX storage.
+Use memory-only auth on other platforms, or a custom Rust `TokenStore` backed
+by a keychain or secrets manager. Custom Python token stores are not supported.
+Never log tokens, authorization headers, or PGWire connection passwords.
+
+:::
+
+Cancellation, credential removal, and shutdown are different operations:
+
+- `cancel_sign_in()` cancels only the current attempt and leaves the shared
+  auth usable. Python Ctrl-C has the same effect.
+- `clear()` removes cached and persisted local credentials. It does not revoke
+  them at the IdP or close an established database session.
+- `close()` permanently disables the shared provider. Attached clients stop
+  acquiring tokens on their next lookup; recovery requires a new provider
+  and new clients. Close clients before closing their provider.
+- Releasing a native handle or dropping a Rust reference only releases that
+  reference; other attached clients retain shared ownership. Python auth
+  context-manager exit calls `close()`.
+
+Providers and clients must not be inherited across `fork()`. Construct them
+in fresh worker processes, or fork before constructing any providers or
+clients.
+
 ### Browser-based clients
 
 If the tool is browser based and can handle HTTP redirects, it can implement two
@@ -351,6 +452,11 @@ access token can be used for authentication and authorization when communicating
 with QuestDB as explained in the [above 7th step](#7-database-access).
 
 ### Jupyter notebook
+
+For Python applications, prefer the client's
+[device flow](/docs/connect/clients/python/#oidc-device-flow). It displays a
+clickable notebook prompt and works when the kernel and browser run on
+different machines, without collecting the user's password.
 
 JupyterHub can integrate with OAuth2 providers using OAuthenticator, as
 described in its
@@ -515,8 +621,11 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 ### CLI, standalone applications
 
-When using CLI tools, such as `psql`, or standalone applications like Microsoft
-Access, the best option may be the Resource Owner Password Credentials flow.
+Applications built with the C, C++, Rust, or Python clients can use the
+[device flow](#device-authorization-flow). For other tools such as `psql` or
+Microsoft Access, token-as-password authentication is available through
+[PGWire](#oidc-for-the-pgwire-endpoint). The legacy Resource Owner Password
+Credentials flow is another option when the tool cannot acquire a token.
 
 The user logs in with their SSO credentials, and the server validates the
 details with the OAuth2 provider:
@@ -533,12 +642,79 @@ testldap=>
 
 ## Non-interactive clients
 
-Non-interactive clients are usually jobs or standalone applications, such as a
-client for ingesting data. It is practical to manage their credentials via an
-OAuth2 provider too.
+For services without a user present, use a managed identity, service
+principal, OAuth2 client-credentials flow, or a QuestDB service-account token.
+Interactive device sign-in is not a substitute for unattended credentials.
 
-As seen in the Jupyter notebook examples, the clients can request a token
-themselves and then use it to authorise data ingestion:
+### Rotating bearer tokens
+
+A fixed `token=` is captured once and cannot follow credential rotation. A
+token provider supplies a current bearer token without recreating the pool,
+sender, or reader. Client examples:
+
+- [C and C++ 7.3.0 or later](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens).
+- [Rust 7.3.0 or later](/docs/connect/clients/rust/#rotating-bearer-tokens).
+- [Python 6.1.0 or later](/docs/connect/clients/python/#rotating-bearer-tokens).
+- [Java token providers](/docs/connect/clients/java/#token-providers).
+
+The C, C++, Rust, and Python refreshing providers wrap a token source that
+your application supplies. Fetch a token and its expiry using your identity
+SDK, OAuth2 flow, or secrets manager; the provider handles caching,
+background refresh, concurrent acquisitions, expiry safeguards, and backoff.
+No Azure or other identity SDK is bundled with these clients. If your
+application already maintains a cache, attach an application provider instead.
+
+Refreshing providers start fetching immediately. They normally refresh around
+half the token lifetime with jitter, honor earlier refresh hints, and retry
+failures with bounded backoff. By default, a token is handed out only while
+more than 60 seconds remain, and a caller without a usable token waits up to
+30 seconds. Lower the handout floor for tokens whose full lifetime is at most
+60 seconds. These proactive refresh rules apply to `RefreshingTokenProvider`,
+not the device-flow helper, which silently refreshes on demand.
+
+Attach providers in code, not connection strings. In these four clients,
+`token_provider`, `azure_resource`, `azure_client_id`, and `azure_credential`
+are rejected connection-string keys. Choose one credential source: OIDC,
+a bearer-token provider, a fixed `token`, or `username`/`password`.
+
+#### Token refresh and reconnects
+
+Providers work with ILP/HTTP senders and QWP/WebSocket senders, readers, and
+pools, not TCP or UDP. Use `https::` or `wss::`; plaintext transports warn but
+do not prevent bearer-token exposure.
+
+- ILP/HTTP normally resolves a token once per flush and reuses it for ordinary
+  HTTP retries. A transient acquisition failure or eligible HTTP 401 can
+  cause another lookup.
+- QWP/WebSocket resolves a token for each connect/reconnect round, including
+  query failover, not for each batch on an established connection. Tokens are
+  not replaced in-band on an open WebSocket.
+- An HTTP 401 with no Bearer error or `error="invalid_token"` notifies the
+  provider and allows one retry of the request or handshake if the token
+  changed. A `403` or a challenge such as `insufficient_scope` does not trigger
+  this refresh retry.
+- A caller-awaited initial connection still fails on rejected credentials.
+  An established QWP sender keeps reconnecting with capped backoff and retains
+  unacknowledged data, including when fixed credentials are rejected. A
+  failure to obtain credentials is reported as `credential_unavailable`,
+  separately from the server rejecting them (`auth_failed`).
+
+Retryability governs foreground retry decisions; it does not by itself stop
+background reconnects. Close the sender or provider if the application wants
+to give up. Closing a provider stops later token pulls but does not delete
+queued disk-backed store-and-forward data, which a later process can replay.
+A query has its own failure and replay policy; see
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+For Microsoft Entra ID server configuration and permissions, see
+[Managed identities and service principals](#managed-identities-and-service-principals).
+
+### Legacy password-grant clients
+
+Where the legacy Resource Owner Password Credentials flow is already enabled,
+a client can request a token itself and then use it for ingestion. The
+following examples capture fixed credentials; use a provider above for a
+long-running application:
 
 ```python
 import json
@@ -596,10 +772,9 @@ with Sender.from_conf(conf) as sender:
 A token that a client requests itself expires, and the client keeps sending it
 unchanged. A client that runs longer than its token lives must switch to a new
 token before QuestDB stops accepting the old one, as described in
-[Sessions and token expiry](#sessions-and-token-expiry). The
-[Java client](/docs/connect/clients/java/#token-providers) can request and
-renew its tokens itself with a token provider. For Azure services, see
-[Managed identities and service principals](#managed-identities-and-service-principals).
+[Sessions and token expiry](#sessions-and-token-expiry). Use a
+[rotating bearer-token provider](#rotating-bearer-tokens) instead of copying
+one token into a long-lived client's configuration.
 
 ## OIDC for the PGWire endpoint
 
@@ -609,6 +784,12 @@ However, in this case the client's responsibility to source the token required f
 This method works wherever a Postgres client library is available, including jupyter notebooks.
 
 Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
+
+The Python client's [PGWire adapters](/docs/connect/clients/python/#pgwire-adapters)
+pass a current token to psycopg or to each new SQLAlchemy physical connection.
+They accept both the device-flow helper and application token providers;
+connection setup never prompts. With other drivers, resolve the token in your
+pool's connection factory rather than capturing it when the pool is created.
 
 The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option:
 
@@ -889,8 +1070,10 @@ expected audience, and logs an advisory at startup.
 QuestDB checks a token when a request or a new connection presents it. An
 established connection, such as a QWP or PGWire connection, stays open after
 its token expires. Every new connection and reconnect presents a token again,
-so a client that runs longer than its tokens live must present new ones, as
-the [Java client does with a token provider](/docs/connect/clients/java/#token-providers).
+so a client that runs longer than its tokens live must present new ones. Use
+[device-flow authentication](#device-authorization-flow) for interactive
+applications or [rotating bearer-token providers](#rotating-bearer-tokens)
+for services.
 
 The Web Console opens an HTTP session when the user logs in, identified by the
 `qdb_session` cookie, and also sends its token with every request. In QuestDB
