@@ -16,7 +16,7 @@ Add the client:
 
 ```text title="Cargo.toml"
 [dependencies]
-questdb-rs = "7"
+questdb-rs = "7.3"
 ```
 
 The default features enable both directions: `sync-sender` for pooled
@@ -125,20 +125,21 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-`QuestDb::connect` parses the connect string and doesn't normally perform any
-blocking network I/O. The exception to that happens when store-and-forward
-durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the sender directories that
-hold that data at construction and start replaying them in the background.
+In client 7.3.0, `QuestDb::connect` opens the warm minimum connections eagerly,
+so authentication, TLS, and connection errors can surface from `connect()`.
+Set `lazy_connect=true` to defer connections: ingestion senders queue data
+locally and connect in the background, and readers connect on first borrow.
 
-The ingestion sender creates its local producer on first borrow and connects its
-delivery runner in the background, so it can queue data while the server is
-temporarily unavailable. Reader errors and direct Arrow/Polars transport errors
-surface from the borrow or during operation rather than from `connect()`.
+With disk-backed store-and-forward, the pool may also reopen sender directories
+holding unsent data from a previous process and replay them in the background.
+Later borrows and operations can still fail when opening or reconnecting a
+connection.
 
 ## Authentication and TLS
 
-Put the credentials and TLS settings in the connect string:
+Put fixed credentials and TLS settings in the connect string. For interactive
+sign-in or expiring credentials, attach an [OIDC helper](#oidc-device-flow) or
+[rotating token provider](#rotating-bearer-tokens) instead:
 
 ```rust
 use questdb::QuestDb;
@@ -162,6 +163,155 @@ choices have feature requirements:
 | `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
 | `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
 | `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
+
+### OIDC device flow
+
+Client **7.3.0 or later** provides `OidcDeviceAuth` for interactive sign-in to
+QuestDB Enterprise through an identity provider. Enable the optional `oidc`
+feature in addition to the default features:
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7.3", features = ["oidc"] }
+```
+
+The IdP application must allow the device grant. The client discovers settings
+from QuestDB's `/settings`; pin the issuer so it can also discover the IdP's
+device endpoint when QuestDB does not advertise one. Replace both URLs below
+with your deployment's values:
+
+```rust title="Sign in and share OIDC across the pool"
+use std::sync::Arc;
+
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://db.example.com:9000")
+            .issuer("https://idp.example.com/realms/questdb")
+            .scope("openid offline_access")
+            .build()?,
+    );
+    auth.sign_in()?; // Only this call may prompt or open a browser.
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=db.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    let mut reader = db.borrow_reader()?;
+    let mut cursor = reader.execute("SELECT current_user()")?;
+    while let Some(batch) = cursor.next_batch()? {
+        println!("{} row(s)", batch.row_count());
+    }
+    Ok(())
+}
+```
+
+The same provider serves every pooled sender and reader. Token lookups never
+prompt: they use the cache or refresh silently if the IdP issued a refresh
+token, usually requested with `offline_access`. Without a usable refresh
+token after expiry, they report `OidcErrorKind::InteractionRequired`; call
+`sign_in()` again on a UI thread. See
+[Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for scope overrides and access-token versus ID-token selection.
+
+Use `.open_browser(false)` on the builder for a remote terminal; the code and
+verification URL are still printed. A custom `oidc::Renderer` can own the UI.
+Credentials stay in memory unless the builder receives
+`.token_store(FileTokenStore::at_default_location()?)`, with
+`FileTokenStore` imported from `questdb::oidc`. That opt-in writes plaintext
+credentials and currently supports mutations only on Unix. For encrypted
+storage, implement `oidc::TokenStore`. See
+[Credential storage and shutdown](/docs/security/oidc/#credential-storage-and-shutdown).
+
+### Rotating bearer tokens
+
+For machine credentials, `RefreshingTokenProvider` wraps an application-defined
+`TokenSource` with a shared cache and proactive background refresh. No `oidc`
+feature is required for this API, and no identity SDK is bundled. A source can
+be a closure returning `questdb::Result<ExpiringToken>` or a type implementing
+`TokenSource`:
+
+```rust title="Attach an application token source"
+use questdb::{
+    token_provider::{RefreshingTokenProvider, TokenSource},
+    QuestDb,
+};
+
+fn query_with_tokens(
+    source: impl TokenSource + 'static,
+) -> questdb::Result<()> {
+    let tokens = RefreshingTokenProvider::builder(source)
+        .name("market-data-service")
+        .build()?;
+    {
+        let db = QuestDb::connect_with_token_provider(
+            "wss::addr=db.example.com:9000;",
+            tokens.clone(),
+        )?;
+        let mut reader = db.borrow_reader()?;
+        let mut cursor = reader.execute("SELECT current_user()")?;
+        while cursor.next_batch()?.is_some() {}
+    } // Close clients before their provider.
+    tokens.close();
+    Ok(())
+}
+```
+
+Your source obtains credentials through an identity SDK, OAuth2 flow, or
+secrets manager. Return `ExpiringToken::new(token, expires_at)` with a
+`SystemTime`, or `ExpiringToken::expires_in(token, lifetime)` with a `Duration`
+computed from the IdP's reported lifetime, not an invented expiry. Return
+`Error::token_unavailable(retryable, retry_after, message)` for failures.
+
+The source runs serially on a dedicated thread. Bound its network calls and
+do not call into clients attached to the provider. Refresh is scheduled at
+roughly half the token lifetime, with jitter and failure backoff. Defaults
+include a 60-second `handout_floor` and a 30-second `cold_wait`; reduce the
+floor through the builder if your IdP issues tokens that live for 60 seconds
+or less. Use `await_ready(Duration)` to gate startup and `status()` to inspect
+fetch diagnostics without reading credentials.
+
+If your application already caches tokens, pass a closure returning
+`questdb::Result<String>` directly, or implement `BearerTokenProvider` with
+`token()` and optional `on_rejected()`. Return the raw token, without
+`Bearer `. These callbacks must be fast and thread-safe.
+
+### Attachment, failures, and shutdown
+
+For standalone clients, attach a provider with:
+
+- `SenderBuilder::http_token_provider` for ILP/HTTP.
+- `SenderBuilder::qwp_ws_token_provider` for QWP/WebSocket ingestion.
+- `ReaderConfig::token_provider` for QWP/WebSocket queries.
+
+Use `https::` or `wss::`. Providers are not supported over TCP or UDP, and
+cannot be combined with fixed `token`, `username`, or `password` credentials.
+The `token_provider` and `azure_*` connection-string keys are rejected; attach
+providers through the Rust API.
+
+Tokens are resolved per WebSocket connect/reconnect round and normally once
+per ILP/HTTP flush. An eligible HTTP 401 triggers one retry only if the
+provider supplies a different token; `403` and `insufficient_scope` do not
+trigger that refresh retry. An established WebSocket is not reauthenticated
+for each batch. See
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
+
+Inspect `err.oidc_error()` (with `oidc` enabled) for OIDC details and
+`err.as_token_unavailable()` for a provider's retryability and retry-after
+hint. `CredentialUnavailable` connection events distinguish acquisition
+failures from the server rejecting a credential (`AuthFailed`). `ReaderConfig::upgrade_headers()` now returns
+`Result<Vec<_>>`, because acquiring the credential can fail.
+
+Cloned refreshing providers share one cache. Dropping one clone, or an `Arc`
+reference to OIDC auth, does not close the others. Explicit `close()` disables
+the shared provider permanently, so close clients first. It does not cancel
+an in-flight source fetch; that fetch finishes before its source is dropped,
+and its result is discarded. Do not carry providers or clients across
+`fork()`; create them in fresh worker processes.
 
 ## The pool
 
@@ -870,7 +1020,7 @@ and is not part of that thread-bound borrow list.
 | --- | --- | --- |
 | `sender_pool_min` | `1` | Warm minimum of ingestion connections retained once they have been opened. Set it near steady concurrent use. |
 | `sender_pool_max` | `4` | Ingestion pool growth cap. Set it at or above peak concurrent sender borrows. |
-| `query_pool_min` | `1` | Warm minimum of reader connections retained once they have been opened. |
+| `query_pool_min` | `1` (`0` with `lazy_connect=true`) | Warm minimum of reader connections retained once they have been opened. |
 | `query_pool_max` | `4` | Reader pool growth cap. Set it at or above peak concurrent reader borrows. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits for a returned connection once its pool is at its cap. `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the warm minimum. |
@@ -949,9 +1099,18 @@ ingestion retry budget uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-Authentication failures, protocol-version failures, and terminal data
-rejections are not retried. A terminal writer is retired when its borrow is
-dropped; there is no pooled `must_close()` or async-error polling API.
+A caller-awaited initial connection fails on authentication rejection. Once
+a QWP/WebSocket sender has connected, later HTTP 401/403 rejections are retried
+with capped backoff, including with fixed credentials; unacknowledged rows
+stay queued. A `CredentialUnavailable` event means the provider could not
+supply a token, while `AuthFailed` means the server rejected one. A permanent
+foreground token-fetch failure does not by itself stop background reconnects;
+close the provider or sender to stop them. See
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+Protocol-version failures and terminal data rejections are not retried. A
+terminal writer is retired when its borrow is dropped; there is no pooled
+`must_close()` or async-error polling API.
 
 Reader failover has a separate policy:
 
@@ -1019,6 +1178,7 @@ integrations only when your application uses them:
 | `ring-crypto` | Yes | The default TLS cryptography backend. Do not combine it with `aws-lc-crypto`. |
 | `arrow-ingress` / `arrow-egress` | No | Arrow ingestion / Arrow query results. The `arrow` feature enables both. |
 | `polars-ingress` / `polars-egress` | No | Polars ingestion / Polars query results. The `polars` feature enables both. |
+| `oidc` | No | OIDC device-flow sign-in and silent refresh with `OidcDeviceAuth`. Rotating application token providers do not need this feature. |
 | `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
 | `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
 | `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
@@ -1027,8 +1187,8 @@ integrations only when your application uses them:
 | `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |
 
 `almost-all-features` is intended for client development and CI. It extends
-the defaults with QWP/UDP, both TLS root sources, `insecure-skip-verify`, JSON
-test helpers, timestamp and array integrations, and both decimal crates. It
+the defaults with QWP/UDP, OIDC, both TLS root sources, `insecure-skip-verify`,
+JSON test helpers, timestamp and array integrations, and both decimal crates. It
 selects `ring-crypto`, omits the mutually exclusive `aws-lc-crypto`, and
 excludes `arrow` and `polars`. Prefer the specific features your application
 uses.
@@ -1051,6 +1211,7 @@ These are the supported pool entry points:
 | Method | Feature | Purpose |
 | --- | --- | --- |
 | `QuestDb::connect(conf: &str)` | `sync-sender-qwp-ws` | Parse the connect string and create the pool. |
+| `QuestDb::connect_with_token_provider(conf, provider)` | `sync-sender-qwp-ws` | Share one rotating bearer-token provider across ingestion and query connections. |
 | `new_buffer()` | `sync-sender-qwp-ws` | Create a caller-owned QWP/WebSocket `Buffer` using the pool's name limit. |
 | `borrow_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedSender` for buffers, chunks, or Arrow batches. |
 | `borrow_reader()` | `sync-sender-qwp-ws` + `sync-reader-qwp-ws` | Borrow a `BorrowedReader`. |

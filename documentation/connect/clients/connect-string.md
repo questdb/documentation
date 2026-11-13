@@ -242,12 +242,33 @@ the TLS handshake is server-authenticated only. `tls_roots` /
 
 ### Token providers {#token-providers}
 
-*Applies to: ingress and egress. Java client 1.3.11 or later only.*
+*Applies to: ingress and egress.*
 
-A fixed `token` stops working when it expires. A token provider requests
-bearer tokens from an identity provider instead, and renews them in the
-background before they expire, so every connection, reconnect, and failover
-presents a valid token:
+A fixed `token` does not follow credential rotation. A token provider supplies
+a current bearer token for each connection, reconnect, and failover without
+rebuilding the client. The C, C++, Rust, and Python clients accept providers
+through their in-code APIs, not this configuration string:
+
+- [C and C++](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens): native
+  client 7.3.0 or later.
+- [Rust](/docs/connect/clients/rust/#rotating-bearer-tokens): `questdb-rs` 7.3.0
+  or later.
+- [Python](/docs/connect/clients/python/#rotating-bearer-tokens): client 6.1.0
+  or later.
+
+These clients also support interactive
+[OIDC device sign-in](/docs/security/oidc/#device-authorization-flow). A
+provider cannot be combined with fixed `token`, `username`, or `password`
+credentials, or with a second provider. The `token_provider`, `azure_resource`,
+`azure_client_id`, and `azure_credential` keys below are rejected by these
+clients on every connection-string scheme. Use `wss` for QWP or `https` for
+ILP so the bearer token is encrypted in transit.
+
+#### Java connection-string providers
+
+The following provider keys are available in **Java client 1.3.11 or later
+only**. Java can select an Azure provider from the connection string and
+refresh its tokens in the background:
 
 ```
 wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
