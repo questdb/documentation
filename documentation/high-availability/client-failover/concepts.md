@@ -236,19 +236,31 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is terminal — the client does not retry
-other hosts. The assumption is that auth credentials are configured
-identically across the cluster, so a credential failure against one node is
-a credential failure against all of them. Retrying would spam every peer's
-audit log without recovering.
+A `401` or `403` on the HTTP upgrade ends the current endpoint walk, after
+any eligible one-time token replacement: the client does not retry other
+hosts. This does not necessarily terminate a sender's reconnect loop. The
+assumption is that auth credentials are configured identically across the
+cluster, so a credential failure against one node is a credential failure
+against all of them. Trying every peer would spam their audit logs without
+recovering.
 
-The Java client relaxes this in two cases. With a token provider, a `401`
-first earns one retry of the same host with a new token. A Java sender that
-has connected before also treats a rejected credential like an outage: it
+In Java, a token provider can supply a new token for one same-host retry
+after an eligible `401`. A Java sender that has connected before also
+treats a rejected credential like an outage: it
 keeps retrying with backoff, buffering rows, and reports each failed round to
 its error handler, so ingestion resumes once QuestDB accepts the credential
 again, such as after a token renewal. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, also retry
+HTTP `401` / `403` with capped backoff once a sender has connected, including
+with fixed credentials. They retain unacknowledged rows and report
+`auth_failed` / `AuthFailed` connection events. A caller-awaited initial
+connection still fails on rejected credentials. With a token provider, an
+eligible `401` can first trigger one same-host retry if the token changes;
+a `403` cannot. These authentication exceptions do not extend to
+protocol-version failures, which remain terminal in the native/Python
+clients.
 
 The Node.js client also treats a rejected credential like an outage, for a
 sender that has connected before and uses store-and-forward or was started

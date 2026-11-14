@@ -149,12 +149,20 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;initial_connect_retry=on;reconnect_max_duration_millis=120000;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
+The 2-minute budget bounds the blocking initial **ingestion** connection.
+Once connected, the sender retries transport outages indefinitely. Set
+`initial_connect_retry` explicitly: `reconnect_*` keys alone do not enable
+startup retry for native 7.3.0 and Python 6.1.0 or later pools.
+
+Pools also prewarm readers when `query_pool_min` is nonzero; their initial
+connections do not use this ingestion retry policy. Set `query_pool_min=0`
+to defer reader connections until first use. For background ingestion startup
+instead of blocking retry, use `lazy_connect=true`, which also defaults
+`query_pool_min` to `0` in native/Python pools; do not combine it with an
+explicit blocking initial-connect mode. See
 [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
@@ -182,7 +190,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive durability mode              |
 | Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
-| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
+| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; set `initial_connect_retry` explicitly for portable startup behavior |
 | Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
@@ -721,16 +729,13 @@ architecture is that a producer survives an arbitrarily long outage.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
-  see below.
+  Default: `100`.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
-  Default: `5000` (5 s). Setting this enables
-  `initial_connect_retry=on` implicitly; see below.
+  Default: `5000` (5 s).
 - `reconnect_max_duration_millis` — time budget for the **blocking sync
   initial connect** (`initial_connect_retry=on`): once exceeded, the
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
-  Setting this enables `initial_connect_retry=on` implicitly; see below.
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -740,13 +745,16 @@ architecture is that a producer survives an arbitrarily long outage.
     the background indefinitely, surfacing only genuine terminal failures
     (auth reject, durable-ack mismatch) via the error inbox.
 
-  **Implicit promotion.** Setting any explicit `reconnect_*` key without
-  also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the budget also covers
-  the *first* connect attempt — without the promotion,
-  `reconnect_max_duration_millis` would be inert. To keep fail-fast
-  behaviour on the first connect while still tuning the backoff, set
-  `initial_connect_retry=off` explicitly; the explicit setting wins.
+  **Implicit promotion is client-specific.** Some clients, including Java
+  and standalone native senders, promote the mode to `on` when an explicit
+  `reconnect_*` key is set without an `initial_connect_retry` mode. Pools in
+  C, C++, and Rust 7.3.0 or later, and Python 6.1.0 or later, do **not** apply
+  that promotion: they honor only an explicitly set mode and otherwise fail
+  fast. Set `initial_connect_retry=on` explicitly for blocking ingestion
+  startup retry, or `off` to retain fail-fast behavior while tuning backoff.
+  Neither `on` nor `async` changes reader prewarming: a nonzero
+  `query_pool_min` still creates readers synchronously and can fail pool
+  construction.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered rows to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
@@ -757,20 +765,31 @@ architecture is that a producer survives an arbitrarily long outage.
   entirely: in memory-only mode, un-ACKed batches are lost on every clean
   shutdown; in SF mode they stay in the sender directory for the next sender.
 
-In most clients, rejections of the upgrade request during reconnect
-(authentication rejected, version mismatch, durable-ack mismatch, non-101
-upgrade without a role hint) are immediately terminal: the loop does not
-retry them. The Java client treats a version mismatch like a transport
-failure, to ride out a rolling upgrade, and the other rejections as terminal
-only before the sender first connects. A Java sender that has connected keeps
-retrying all of them, and reports each failed attempt in its connection
-health. It also reports the rejections other than a version mismatch to its
-error handler. A Node.js sender that uses store-and-forward or
-`initial_connect_retry=async` also keeps retrying all of them once it has
-connected, and reports each failed attempt as a connection event. See
-[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
-and, for orphan drainers,
+Upgrade rejections have client- and phase-specific retry policies:
+
+- In C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, a
+  caller-awaited initial connection fails on HTTP `401` / `403`. A sender
+  that has connected keeps retrying those rejections with capped backoff,
+  even with fixed credentials, retaining unacknowledged rows. Each rejection
+  ends the current endpoint walk, not the sender's reconnect loop, and is
+  reported as `auth_failed` / `AuthFailed`. This exception does **not** cover
+  protocol-version failures, which remain terminal in these clients.
+- Java treats a version mismatch like a transport failure to ride out a
+  rolling upgrade. Other rejections (authentication, durable-ack mismatch,
+  non-101 upgrade without a role hint) are terminal only before the sender
+  first connects. Once connected, it retries all of them and reports each
+  failed attempt in its connection health; rejections other than a version
+  mismatch also reach its error handler.
+- A Node.js sender using store-and-forward or `initial_connect_retry=async`
+  also retries these rejections once it has connected, reporting each failed
+  attempt as a connection event.
+
+Do not assume that an authentication exception makes all upgrade failures
+retryable. For the full phase table, browser behavior, and orphan drainers,
+see
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+For Java, see also
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
 
 ### Egress failover {#egress-failover}
 

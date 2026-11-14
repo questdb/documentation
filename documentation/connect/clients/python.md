@@ -189,7 +189,6 @@ from questdb.auth import OidcDeviceAuth
 with OidcDeviceAuth.from_questdb(
     "https://db.example.com:9000",
     issuer="https://idp.example.com/realms/questdb",
-    scope="openid offline_access",
 ) as auth:
     auth.sign_in()
     with questdb.connect(
@@ -201,12 +200,21 @@ with OidcDeviceAuth.from_questdb(
 
 Replace the QuestDB URL and issuer with your deployment's values. Discovery
 reads QuestDB's `/settings`; the issuer pins the IdP and enables discovery of
-its device endpoint if QuestDB does not advertise one. To skip QuestDB
-discovery, construct `OidcDeviceAuth` with keyword arguments `client_id`,
+its device endpoint if QuestDB does not advertise one. Leaving `scope` unset
+preserves the server's configured scopes. To skip QuestDB discovery, construct
+`OidcDeviceAuth` with keyword arguments `client_id`,
 `device_authorization_endpoint`, `token_endpoint`, and `scope`. Match
 `groups_in_token` to the server: `True` selects the ID token, otherwise the
 access token. See
 [Device authorization flow](/docs/security/oidc/#device-authorization-flow).
+
+For private CAs, pass `ca_bundle="/etc/questdb/oidc-ca.pem"` to the auth
+constructor or `from_questdb`. This PEM bundle covers discovery and IdP
+requests; the pool's `tls_roots` does not configure it. The separate OIDC
+`timeout` argument is in seconds (default `30`, maximum `120`). A token lookup
+waiting behind another thread's silent refresh can take up to six times that
+value, independently of sender timeouts. See
+[TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
 
 Only `sign_in()` can prompt or open a browser. It displays a terminal code and
 URL, or a clickable prompt in Jupyter. Browser opening defaults to off in
@@ -216,8 +224,10 @@ custom `renderer=` can own the UI. Use only its vetted `browser_target` for
 links or QR codes, and HTML-escape text when rendering HTML.
 
 Token lookups and reconnects use cached credentials or silent refresh, never
-an interactive prompt. `offline_access` requests a refresh token; renewal
-works only if the IdP issues one. Without a usable refresh token after expiry,
+an interactive prompt. To request a refresh token, include `offline_access`
+in the server's `acl.oidc.scope`, or supply a complete `scope=` override that
+also retains required `profile`, groups, and API scopes. Renewal works only
+if the IdP issues a refresh token. Without a usable refresh token after expiry,
 `OidcInteractionRequired` asks your application to call `sign_in()` again.
 For CI or headlessly executed notebooks, prefer machine credentials below;
 `interactive=False` makes sign-in fail fast when user interaction is needed.
@@ -1176,8 +1186,16 @@ with capped backoff, including with fixed credentials. Unacknowledged rows
 stay queued, and the listener reports `AuthFailed`. A provider that cannot
 supply a token instead reports `CredentialUnavailable`. Even a
 `TokenUnavailableError` with `retryable=False` does not stop background
-reconnects; close the provider or sender from application code, outside its
-callbacks, to stop them.
+reconnects.
+
+To stop a standalone `Sender`, close it. For a pool, release all leases and
+close the `QuestDB` handle (`db.close()`). `PooledSender.close()` only returns
+the lease: its underlying connection can keep delivering and reconnecting.
+Explicitly closing a shared `OidcDeviceAuth` or `RefreshingTokenProvider`
+disables future token acquisition for all attached clients, but an
+application-defined provider must implement its own shutdown policy. Perform
+shutdown from application code, outside callbacks, and normally close clients
+before their provider.
 
 Protocol-version failures and terminal data rejections are not retried. A
 `flush(wait=True)` or `wait()` that times out can retain the underlying

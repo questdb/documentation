@@ -189,7 +189,6 @@ fn main() -> questdb::Result<()> {
     let auth = Arc::new(
         OidcDeviceAuth::from_questdb("https://db.example.com:9000")
             .issuer("https://idp.example.com/realms/questdb")
-            .scope("openid offline_access")
             .build()?,
     );
     auth.sign_in()?; // Only this call may prompt or open a browser.
@@ -210,13 +209,24 @@ fn main() -> questdb::Result<()> {
 }
 ```
 
-The same provider serves every pooled sender and reader. Token lookups never
-prompt: they use the cache or refresh silently if the IdP issued a refresh
-token, usually requested with `offline_access`. Without a usable refresh
-token after expiry, they report `OidcErrorKind::InteractionRequired`; call
-`sign_in()` again on a UI thread. See
+The example preserves the server's configured scopes. To request a refresh
+token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
+complete `.scope(...)` override that also retains required `profile`, groups,
+and API scopes. The same provider serves every pooled sender and reader.
+Token lookups never prompt: they use the cache or refresh silently if the IdP
+issued a refresh token. Without a usable refresh token after expiry, they
+report `OidcErrorKind::InteractionRequired`; call `sign_in()` again on a UI
+thread. See
 [Device authorization flow](/docs/security/oidc/#device-authorization-flow)
 for scope overrides and access-token versus ID-token selection.
+
+For private CAs, set `.ca_bundle("/etc/questdb/oidc-ca.pem")` on the OIDC
+builder. This PEM bundle covers discovery and IdP requests, independently of
+the pool's `tls_roots`. Configure the separate request timeout with
+`.timeout(std::time::Duration::from_secs(10))` (default 30 seconds, maximum
+120). A token lookup waiting behind another thread's silent refresh can take
+up to six times that timeout; sender timeouts do not cap it. See
+[TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
 
 Use `.open_browser(false)` on the builder for a remote terminal; the code and
 verification URL are still printed. A custom `oidc::Renderer` can own the UI.
@@ -1027,8 +1037,15 @@ and is not part of that thread-bound borrow list.
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
 
-Setting an ingress `reconnect_*` key without explicitly setting
-`initial_connect_retry` promotes the initial mode to synchronous retry. See the
+In 7.3.0 and later, pools honor only an explicitly set `initial_connect_retry`:
+setting `reconnect_*` alone does not change the default fail-fast startup.
+Implicit promotion to synchronous retry applies to standalone senders, not
+pools. Use `initial_connect_retry=on` to retry eager ingestion connections
+within `reconnect_max_duration_millis`. Readers prewarmed by `query_pool_min`
+still connect synchronously without that retry policy; set `query_pool_min=0`
+to defer them until first use. For background ingestion startup instead, use
+`lazy_connect=true`, which also defaults `query_pool_min` to `0`; do not
+combine it with an explicit blocking initial-connect mode. See the
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 
@@ -1104,8 +1121,16 @@ a QWP/WebSocket sender has connected, later HTTP 401/403 rejections are retried
 with capped backoff, including with fixed credentials; unacknowledged rows
 stay queued. A `CredentialUnavailable` event means the provider could not
 supply a token, while `AuthFailed` means the server rejected one. A permanent
-foreground token-fetch failure does not by itself stop background reconnects;
-close the provider or sender to stop them. See
+foreground token-fetch failure does not by itself stop background reconnects.
+
+Dropping a standalone sender stops it. Dropping a `BorrowedSender` normally
+returns its connection to the pool, where delivery and reconnects continue.
+To retire that connection, call `sender.drop_on_return()` before dropping the
+borrow; to shut down the pool, release all borrows and call `db.close()`.
+Explicitly closing a shared OIDC or refreshing provider disables future token
+acquisition for all attached clients; an application-defined provider needs
+its own shutdown policy. Shut down from application code, outside callbacks,
+and normally close clients before their provider. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 Protocol-version failures and terminal data rejections are not retried. A

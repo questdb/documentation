@@ -364,7 +364,6 @@ int main()
         auto auth = questdb::oidc::builder::from_questdb(
             "https://db.example.com:9000")
             .issuer("https://idp.example.com/realms/questdb")
-            .scope("openid offline_access")
             .build();
         auth.sign_in();  // Only this call may prompt or open a browser.
 
@@ -395,7 +394,6 @@ int main(void)
 {
     const char* url = "https://db.example.com:9000";
     const char* issuer = "https://idp.example.com/realms/questdb";
-    const char* scope = "openid offline_access";
     const char* conf = "wss::addr=db.example.com:9000;";
     questdb_error* error = NULL;
     questdb_oidc_auth* auth = NULL;
@@ -407,8 +405,6 @@ int main(void)
     if (!builder) goto cleanup;
     if (!questdb_oidc_builder_issuer(
             builder, issuer, strlen(issuer), &error)) goto cleanup;
-    if (!questdb_oidc_builder_scope(
-            builder, scope, strlen(scope), &error)) goto cleanup;
     auth = questdb_oidc_builder_build(builder, &error);
     if (!auth) goto cleanup;
     if (!questdb_oidc_auth_sign_in(auth, &error)) goto cleanup;
@@ -447,10 +443,23 @@ opening with C++ `builder.open_browser(false)` or C
 only the event's vetted `browser_target`, not its display-only verification
 URLs.
 
-`offline_access` requests a refresh token; the IdP must actually issue one
-for silent renewal to work. An expired token without a usable refresh token
-reports `InteractionRequired`. Call `sign_in()` again on your UI thread,
-never from a transport callback. Token lookups and reconnects never prompt.
+The examples preserve the server's configured scopes. To request a refresh
+token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
+complete scope override that also retains required `profile`, groups, and
+API scopes. The IdP must actually issue a refresh token for silent renewal to
+work. An expired token without a usable refresh token reports
+`InteractionRequired`. Call `sign_in()` again on your UI thread, never from
+a transport callback. Token lookups and reconnects never prompt.
+
+For private CAs, use C++ `builder.ca_bundle("/etc/questdb/oidc-ca.pem")` or C
+`questdb_oidc_builder_ca_bundle` before building the auth. This PEM bundle
+covers discovery and IdP requests; the pool's `tls_roots` does not configure
+it. The separate OIDC request timeout uses milliseconds: C++
+`builder.timeout_ms(10000)` or C `questdb_oidc_builder_timeout_ms` (default
+`30000`, maximum `120000`). A token lookup waiting behind another thread's
+silent refresh can take up to six times that timeout, independently of
+sender timeouts. See
+[TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
 
 Credentials stay in memory by default. To opt into persistence, use
 `builder.default_file_token_store()` in C++, or
@@ -615,10 +624,18 @@ A connection event named `credential_unavailable` means acquisition failed;
 `auth_failed` means the server rejected the credential.
 
 Clients retain their own references. Freeing a C auth/provider handle or
-destroying a C++ wrapper releases only that reference. Explicitly closing the
-shared provider permanently disables token acquisition for all attached
-clients, so close clients first. Cancelling sign-in leaves the auth usable;
-clearing credentials does not revoke them at the IdP.
+destroying a C++ wrapper releases only that reference. Explicitly closing an
+OIDC auth object or a refreshing token provider permanently disables token
+acquisition for all attached clients, so close clients first. Cancelling
+sign-in leaves the auth usable; clearing credentials does not revoke them
+at the IdP.
+
+For application-defined providers created with `questdb_token_provider_new`
+or `questdb::token_provider::from`, `questdb_token_provider_close` and C++
+`token_provider::close()` are no-ops. Implement a shared shutdown state in
+your provider if token acquisition must be disabled, or stop all attached
+clients. Do not free callback resources while clients can still invoke them;
+use the release callback or shared ownership.
 
 ## Headers
 
@@ -2018,9 +2035,13 @@ between plain return and drop.
 
 ## Production shape: TLS, token, multi-host, retry
 
-A production-shaped configuration: TLS with OS roots, bearer token, two
-endpoints, a store-and-forward spool, durable acks, and a retry-bounded
-borrow:
+A production-shaped, ingestion-only configuration: TLS with OS roots, bearer
+token, two endpoints, a store-and-forward spool, durable acks, and an explicit
+two-minute initial-connect retry budget. Pool construction eagerly opens the
+sender with `initial_connect_retry=on`; merely setting `reconnect_*` does not
+enable startup retry for native pools. `query_pool_min=0` avoids prewarming
+readers, whose initial connections do not use the ingestion retry policy.
+Later borrows also retry if they need to open a replacement connection:
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -2039,12 +2060,15 @@ int main()
             "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
             "token=YOUR_BEARER_TOKEN;"
             "tls_ca=os_roots;"              // trust the OS store (corporate CAs)
+            "initial_connect_retry=on;"
+            "reconnect_max_duration_millis=120000;"
+            "query_pool_min=0;"             // ingestion only; no reader prewarm
             "sf_dir=/var/spool/questdb;"
             "sender_id=ingest-01;"
             // Enterprise; the connect fails against a server without replication.
             "request_durable_ack=on;"};
 
-        // First borrow opens the connection: give it the failover budget.
+        // Prewarm already connected; retry if a replacement is needed.
         auto sender =
             pool.borrow_sender_with_retry(pool.reconnect_max_duration_ms());
 
@@ -2086,6 +2110,9 @@ int main(void)
         "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
         "token=YOUR_BEARER_TOKEN;"
         "tls_ca=os_roots;"              /* trust the OS store (corporate CAs) */
+        "initial_connect_retry=on;"
+        "reconnect_max_duration_millis=120000;"
+        "query_pool_min=0;"             /* ingestion only; no reader prewarm */
         "sf_dir=/var/spool/questdb;"
         "sender_id=ingest-01;"
         /* Enterprise; the connect fails against a server without replication. */
@@ -2093,7 +2120,7 @@ int main(void)
     db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
-    /* First borrow opens the connection: give it the failover budget. */
+    /* Prewarm already connected; retry if a replacement is needed. */
     sender = questdb_db_borrow_sender_with_retry(
         db, questdb_db_reconnect_max_duration_ms(db), &err);
     if (!sender) goto on_error;

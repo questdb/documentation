@@ -384,16 +384,54 @@ The device-flow helper chooses the token to send based on QuestDB's mode:
   the scope so the IdP issues an ID token.
 
 Silent refresh requires an IdP-issued refresh token. Most providers require
-`offline_access`, for example `scope="openid offline_access"`, and may require
-additional consent or IdP configuration. A scope override replaces the whole
-scope string; retain any groups or API scopes your deployment needs. The
-client does not add `openid` or `offline_access` automatically to an explicit
-scope. Without a refresh token, sign in again after the token expires.
+`offline_access` and may require additional consent or IdP configuration.
+The client examples leave `scope` unset to preserve the scopes discovered
+from `acl.oidc.scope`. Add `offline_access` to that server setting, or pass a
+complete scope override that retains required `openid`, `profile`, groups,
+and API scopes. For example, a deployment using `openid profile` needs
+`scope="openid profile offline_access"`, not just `openid offline_access`.
+An override replaces the whole scope string; the client does not add scopes
+automatically. Without a refresh token, sign in again after the token expires.
 
 A retryable refresh failure uses bounded backoff. If a dispatched refresh
 loses its response, the IdP may already have rotated the refresh token; the
 client can discard that credential and require sign-in rather than risk
 reusing a rotated refresh token.
+
+#### TLS trust and timeouts
+
+The native and Python OIDC helpers use their own HTTPS client for QuestDB
+`/settings` discovery and all IdP requests. Configure its trust separately
+from the pool or sender: a pool's `tls_roots` does not configure the auth
+helper, and the helper's `ca_bundle` does not configure database connections.
+
+For private CAs, supply a PEM bundle before building the authentication
+object. By default, the helper trusts the bundled Mozilla roots together with
+the OS trust store. A supplied bundle replaces both, so include the CAs needed
+for **both** QuestDB discovery and the IdP. Use an expanded absolute path;
+the native builders do not expand `~`.
+
+| Language | OIDC CA bundle | Per-request timeout example |
+| --- | --- | --- |
+| Python | `ca_bundle="/etc/questdb/oidc-ca.pem"` on the constructor or `from_questdb` | `timeout=10` (seconds) |
+| Rust | `.ca_bundle("/etc/questdb/oidc-ca.pem")` on the builder | `.timeout(std::time::Duration::from_secs(10))` |
+| C++ | `builder.ca_bundle("/etc/questdb/oidc-ca.pem")` | `builder.timeout_ms(10000)` |
+| C | `questdb_oidc_builder_ca_bundle` | `questdb_oidc_builder_timeout_ms` (milliseconds) |
+
+The OIDC request timeout defaults to **30 seconds**, must be positive, and
+has a **120-second maximum**. It bounds each discovery or IdP HTTP request,
+not the whole interactive sign-in, which can last until the device code
+expires.
+
+A token lookup uses a valid cached token immediately. Otherwise it can make
+a silent refresh request or wait behind another thread already refreshing
+the shared provider. That wait is bounded by **six times the OIDC timeout**:
+three minutes by default, twelve minutes at the maximum. The sender's
+`request_timeout`, `retry_timeout`, `connect_timeout`, and reconnect budget
+**do not cap this acquisition wait**, which happens before the database
+request. Choose the OIDC timeout to fit the stalls your application can
+accept, and call `sign_in()` before connecting to establish the initial
+credentials. Transport operations never prompt for sign-in.
 
 #### Credential storage and shutdown
 
@@ -700,9 +738,16 @@ do not prevent bearer-token exposure.
   separately from the server rejecting them (`auth_failed`).
 
 Retryability governs foreground retry decisions; it does not by itself stop
-background reconnects. Close the sender or provider if the application wants
-to give up. Closing a provider stops later token pulls but does not delete
-queued disk-backed store-and-forward data, which a later process can replay.
+background reconnects. To give up, close a standalone sender, or release all
+leases and close the pool. Returning a native or Python sender lease
+(including `PooledSender.close()`) does not stop its underlying connection's
+background delivery. Explicitly closing a shared OIDC or refreshing provider
+stops later token pulls for all attached clients; application-defined
+providers must implement their own shutdown policy. In particular, native
+`token_provider::close()` / `questdb_token_provider_close` is a no-op for
+application-defined providers. Shut down outside callbacks, normally closing
+clients before their provider. Provider shutdown does not delete queued
+disk-backed store-and-forward data, which a later process can replay.
 A query has its own failure and replay policy; see
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
@@ -1963,9 +2008,18 @@ try (QuestDB db = QuestDB.connect(
 }
 ```
 
-Other clients take a fixed token: request it with the Azure Identity library
-for the scope `api://<application ID>/.default`, and create a new client with
-a new token before the old one expires.
+[Python 6.1.0 or later](/docs/connect/clients/python/#rotating-bearer-tokens)
+and the [C/C++](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens) and
+[Rust](/docs/connect/clients/rust/#rotating-bearer-tokens) clients from 7.3.0
+can also follow token rotation without recreating clients. Supply an
+application token source that requests the scope
+`api://<application ID>/.default` using Azure Identity or your identity SDK,
+and attach a shared refreshing provider. These clients do not bundle an
+Azure SDK or accept Java's `token_provider=azure` connection-string keys.
+
+For clients or versions without provider support, request a fixed token with
+the Azure Identity library and create a new client with a new token before
+the old one expires.
 
 QuestDB reads the roles from the token, so a role that you assign to or remove
 from a service takes effect when the service presents a new token. Azure
