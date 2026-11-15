@@ -187,8 +187,10 @@ check how these changes affect your users and clients:
   orphan's store-and-forward sender directory aside, and reports data loss, instead of draining
   it. Such a client must switch to a new token before the old one expires,
   or use a
-  [token provider](/docs/connect/clients/java/#token-providers) in the Java
-  client. See [Token validation](/docs/security/oidc/#token-validation).
+  [rotating token provider](/docs/security/oidc/#rotating-bearer-tokens),
+  available in the Java client 1.3.11 or later, the C, C++, and Rust clients
+  7.3.0 or later, and the Python client 6.1.0 or later. See
+  [Token validation](/docs/security/oidc/#token-validation).
 - **OIDC tokens must come from the expected issuer.** With
   `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token whose `iss`
   claim is missing or is not the expected issuer, and refuses to start without

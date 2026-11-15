@@ -125,8 +125,8 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-In client 7.3.0, `QuestDb::connect` opens the warm minimum connections eagerly,
-so authentication, TLS, and connection errors can surface from `connect()`.
+`QuestDb::connect` opens the warm minimum connections eagerly, so
+authentication, TLS, and connection errors can surface from `connect()`.
 Set `lazy_connect=true` to defer connections: ingestion senders queue data
 locally and connect in the background, and readers connect on first borrow.
 
@@ -175,10 +175,12 @@ feature in addition to the default features:
 questdb-rs = { version = "7.3", features = ["oidc"] }
 ```
 
-The IdP application must allow the device grant. The client discovers settings
-from QuestDB's `/settings`; pin the issuer so it can also discover the IdP's
-device endpoint when QuestDB does not advertise one. Replace both URLs below
-with your deployment's values:
+The IdP application named by `acl.oidc.client.id` must allow the device grant;
+see [Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for the IdP settings. The client discovers settings from QuestDB's
+`/settings`; pin the issuer so it can also discover the IdP's device endpoint
+when QuestDB does not advertise one. Replace both URLs below with your
+deployment's values:
 
 ```rust title="Sign in and share OIDC across the pool"
 use std::sync::Arc;
@@ -214,15 +216,62 @@ token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
 complete `.scope(...)` override that also retains required `profile`, groups,
 and API scopes. The same provider serves every pooled sender and reader.
 Token lookups never prompt: they use the cache or refresh silently if the IdP
-issued a refresh token. Without a usable refresh token after expiry, they
-report `OidcErrorKind::InteractionRequired`; call `sign_in()` again on a UI
-thread. See
+issued a refresh token. `sign_in()` itself prompts only when no valid cached,
+persisted, or silently refreshable credential exists, so call it at every
+process start. See
 [Device authorization flow](/docs/security/oidc/#device-authorization-flow)
 for scope overrides and access-token versus ID-token selection.
 
+Without a usable refresh token after expiry, a pool or reader call fails with
+an error whose `oidc_error()` has the kind `OidcErrorKind::InteractionRequired`.
+The error's `code()` describes the failing call, often a retryable
+`SocketError`, so check the OIDC detail first. When `acquisition_busy()` is
+set, another thread is already signing in; retry later instead of starting a
+second sign-in. Otherwise call `sign_in()` again on the application thread,
+never from a callback, and retry once:
+
+```rust title="Sign in again when a query needs it"
+use questdb::{
+    oidc::{OidcDeviceAuth, OidcErrorKind},
+    QuestDb,
+};
+
+fn needs_sign_in(err: &questdb::Error) -> bool {
+    err.oidc_error().is_some_and(|oidc| {
+        oidc.kind() == OidcErrorKind::InteractionRequired
+            && !oidc.acquisition_busy()
+    })
+}
+
+fn count_rows(db: &QuestDb) -> questdb::Result<usize> {
+    let mut reader = db.borrow_reader()?;
+    let mut cursor = reader.execute("SELECT current_user()")?;
+    let mut rows = 0;
+    while let Some(batch) = cursor.next_batch()? {
+        rows += batch.row_count();
+    }
+    Ok(rows)
+}
+
+fn count_rows_with_sign_in(
+    db: &QuestDb,
+    auth: &OidcDeviceAuth,
+) -> questdb::Result<usize> {
+    match count_rows(db) {
+        Err(err) if needs_sign_in(&err) => {
+            auth.sign_in()?; // Prompts on this thread, never in a callback.
+            count_rows(db) // Retry once.
+        }
+        result => result,
+    }
+}
+```
+
 For private CAs, set `.ca_bundle("/etc/questdb/oidc-ca.pem")` on the OIDC
 builder. This PEM bundle covers discovery and IdP requests, independently of
-the pool's `tls_roots`. Configure the separate request timeout with
+the pool's `tls_roots`. These requests connect directly: they ignore
+`HTTPS_PROXY` and `ALL_PROXY`, and there is no proxy setting. Configure the
+separate request timeout with
 `.timeout(std::time::Duration::from_secs(10))` (default 30 seconds, maximum
 120). A token lookup waiting behind another thread's silent refresh can take
 up to six times that timeout; sender timeouts do not cap it. See
@@ -276,6 +325,10 @@ secrets manager. Return `ExpiringToken::new(token, expires_at)` with a
 `SystemTime`, or `ExpiringToken::expires_in(token, lifetime)` with a `Duration`
 computed from the IdP's reported lifetime, not an invented expiry. Return
 `Error::token_unavailable(retryable, retry_after, message)` for failures.
+The classification only decides whether a connect the caller waits for
+retries the failure: the provider keeps retrying the fetch with backoff, and
+background reconnects keep retrying either kind. A source cannot stop the
+attached clients; close the provider to do that.
 
 The source runs serially on a dedicated thread. Bound its network calls and
 do not call into clients attached to the provider. Refresh is scheduled at
@@ -288,7 +341,12 @@ fetch diagnostics without reading credentials.
 If your application already caches tokens, pass a closure returning
 `questdb::Result<String>` directly, or implement `BearerTokenProvider` with
 `token()` and optional `on_rejected()`. Return the raw token, without
-`Bearer `. These callbacks must be fast and thread-safe.
+`Bearer `. These callbacks must be fast and thread-safe. When retrying can
+never succeed, for example after your application retires the credential,
+return `Err(Error::new(ErrorCode::InvalidApiCall, message))` from `token()`:
+every attached client then fails with `ErrorCode::ConfigError` and stops
+reconnecting. Any other error, including a non-retryable
+`Error::token_unavailable`, leaves background reconnects running.
 
 ### Attachment, failures, and shutdown
 
@@ -312,9 +370,53 @@ for each batch. See
 
 Inspect `err.oidc_error()` (with `oidc` enabled) for OIDC details and
 `err.as_token_unavailable()` for a provider's retryability and retry-after
-hint. `CredentialUnavailable` connection events distinguish acquisition
-failures from the server rejecting a credential (`AuthFailed`). `ReaderConfig::upgrade_headers()` now returns
+hint. `ReaderConfig::upgrade_headers()` now returns
 `Result<Vec<_>>`, because acquiring the credential can fail.
+
+Background reconnects report credential problems as connection events, not as
+errors. Register a listener when connecting, with
+`QuestDb::connect_with_handlers_and_token_provider`. The listener runs on a
+dispatcher thread; do not call back into the pool from it. `AuthFailed` means
+the server rejected the credential. `CredentialUnavailable` means the client
+could not obtain one, and its `cause_code` tells whether the sender keeps
+reconnecting (`SocketError`) or has stopped (`AuthError` or `ConfigError`, for
+example after its provider was closed):
+
+```rust title="Log credential events from a pool"
+use std::sync::Arc;
+
+use questdb::{
+    ingress::{ConnectionEvent, ConnectionEventKind},
+    token_provider::BearerTokenProvider,
+    ConnectHandlers, ErrorCode, QuestDb,
+};
+
+fn connect_with_events(
+    conf: &str,
+    tokens: impl BearerTokenProvider + 'static,
+) -> questdb::Result<QuestDb> {
+    let mut handlers = ConnectHandlers::default();
+    handlers.connection_listener = Some(Arc::new(|event: &ConnectionEvent| {
+        match event.kind {
+            ConnectionEventKind::AuthFailed => {
+                eprintln!("credential rejected: {:?}", event.cause_msg);
+            }
+            ConnectionEventKind::CredentialUnavailable => {
+                let stopped = matches!(
+                    event.cause_code,
+                    Some(ErrorCode::AuthError | ErrorCode::ConfigError)
+                );
+                eprintln!(
+                    "no credential (sender stopped: {stopped}): {:?}",
+                    event.cause_msg
+                );
+            }
+            _ => {}
+        }
+    }));
+    QuestDb::connect_with_handlers_and_token_provider(conf, handlers, tokens)
+}
+```
 
 Cloned refreshing providers share one cache. Dropping one clone, or an `Arc`
 reference to OIDC auth, does not close the others. Explicit `close()` disables
@@ -1037,15 +1139,17 @@ and is not part of that thread-bound borrow list.
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
 
-In 7.3.0 and later, pools honor only an explicitly set `initial_connect_retry`:
-setting `reconnect_*` alone does not change the default fail-fast startup.
-Implicit promotion to synchronous retry applies to standalone senders, not
-pools. Use `initial_connect_retry=on` to retry eager ingestion connections
-within `reconnect_max_duration_millis`. Readers prewarmed by `query_pool_min`
-still connect synchronously without that retry policy; set `query_pool_min=0`
-to defer them until first use. For background ingestion startup instead, use
-`lazy_connect=true`, which also defaults `query_pool_min` to `0`; do not
-combine it with an explicit blocking initial-connect mode. See the
+Pools honor only an explicitly set `initial_connect_retry`: setting
+`reconnect_*` alone does not change the default fail-fast startup. Implicit
+promotion to synchronous retry applies to standalone senders, not pools. Use
+`initial_connect_retry=on` to retry eager ingestion connections within
+`reconnect_max_duration_millis`. Readers prewarmed by `query_pool_min` still
+connect synchronously without that retry policy; set `query_pool_min=0` to
+defer them until first use. For background ingestion startup instead, use
+`lazy_connect=true`, which also defaults `query_pool_min` to `0`. With it,
+leave `initial_connect_retry` unset or set it to `async`, and leave
+`query_pool_min` unset or set it to `0`: the pool rejects other values as a
+configuration conflict. See the
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 
@@ -1116,26 +1220,31 @@ ingestion retry budget uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-A caller-awaited initial connection fails on authentication rejection. Once
-a QWP/WebSocket sender has connected, later HTTP 401/403 rejections are retried
-with capped backoff, including with fixed credentials; unacknowledged rows
-stay queued. A `CredentialUnavailable` event means the provider could not
-supply a token, while `AuthFailed` means the server rejected one. A permanent
-foreground token-fetch failure does not by itself stop background reconnects.
+A rejected credential (HTTP 401/403) stops a sender that has not connected
+yet, in every `initial_connect_retry` mode, including pools with
+`lazy_connect=true`. Once a QWP/WebSocket sender has connected, later 401/403
+rejections are retried with capped backoff, including with fixed credentials;
+unacknowledged rows stay queued. A `CredentialUnavailable` event means the
+provider could not supply a token, while `AuthFailed` means the server
+rejected one; see [Attachment, failures, and shutdown](#attachment-failures-and-shutdown)
+for subscribing to these events. A token-fetch failure classified as
+permanent does not by itself stop background reconnects.
 
 Dropping a standalone sender stops it. Dropping a `BorrowedSender` normally
 returns its connection to the pool, where delivery and reconnects continue.
 To retire that connection, call `sender.drop_on_return()` before dropping the
 borrow; to shut down the pool, release all borrows and call `db.close()`.
 Explicitly closing a shared OIDC or refreshing provider disables future token
-acquisition for all attached clients; an application-defined provider needs
-its own shutdown policy. Shut down from application code, outside callbacks,
-and normally close clients before their provider. See
+acquisition for all attached clients. An application-defined provider stops
+its clients by returning an error with `ErrorCode::InvalidApiCall`; see
+[Rotating bearer tokens](#rotating-bearer-tokens). Shut down from application
+code, outside callbacks, and normally close clients before their provider. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
-Protocol-version failures and terminal data rejections are not retried. A
-terminal writer is retired when its borrow is dropped; there is no pooled
-`must_close()` or async-error polling API.
+Durable-ack capability mismatches (`ErrorCode::ProtocolVersionError`) and
+terminal data rejections are not retried. A terminal writer is retired when its
+borrow is dropped; there is no pooled `must_close()` or async-error polling
+API.
 
 Reader failover has a separate policy:
 

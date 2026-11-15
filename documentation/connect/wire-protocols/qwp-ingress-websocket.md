@@ -152,9 +152,10 @@ WebSocket connection is established. No QWP-level auth handshake exists.
 The credential is checked only on the upgrade request: QuestDB never
 authenticates an established connection again, so a connection stays open
 when its token expires. A client with an expiring token must present a valid
-one on its next connect, such as a reconnect or a failover. The
-[Java client](/docs/connect/clients/java/#token-providers) can request and
-renew tokens with a token provider for this.
+one on its next connect, such as a reconnect or a failover. The Java client
+1.3.11 or later, the C, C++, and Rust clients 7.3.0 or later, and the Python
+client 6.1.0 or later can request and renew tokens with a token provider for
+this; see [Rotating bearer tokens](/docs/security/oidc/#rotating-bearer-tokens).
 
 ## Client lifecycle
 
@@ -1221,13 +1222,14 @@ Key behaviors:
   connect string shared with egress clients works unchanged on ingress.
 - **Authentication errors end the endpoint walk** at any host (`401`/`403`):
   after any eligible one-time token replacement, the client does not try the
-  other hosts. Caller-awaited startup fails, but ending the walk does not
-  necessarily stop the reconnect loop. A sender that has connected keeps
-  retrying with backoff in Java, C/C++ and Rust 7.3.0 or later, and Python
-  6.1.0 or later, including with fixed credentials. The native/Python clients
-  retain unacknowledged rows and report `auth_failed` / `AuthFailed`. The
-  Node.js client also retries when it uses store-and-forward or was started
-  with `async`, as does a browser client using `sessionBootstrap` and `async`.
+  other hosts. A sender that has not connected yet stops, whatever its
+  `initial_connect_retry` mode, but ending the walk does not necessarily stop
+  a sender that has connected: it keeps retrying with backoff in Java, C/C++
+  and Rust 7.3.0 or later, and Python 6.1.0 or later, including with fixed
+  credentials. The native/Python clients retain unacknowledged rows and
+  report `auth_failed` / `AuthFailed`. The Node.js client also retries when
+  it uses store-and-forward or was started with `async`, as does a browser
+  client using `sessionBootstrap` and `async`.
   A browser cannot see the status of a failed upgrade, so a credential sent
   with its `auth` option does not end the walk when QuestDB rejects it: it
   looks like an unreachable host, and a sender that has connected keeps
@@ -1238,14 +1240,16 @@ Key behaviors:
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
-- **In the Java reference client, other upgrade errors are transient** and
-  feed into the reconnect loop, including `404`, `426`, `503`, generic
-  4xx/5xx, TCP/TLS failures, mid-stream send/recv errors, and an upgrade
-  response that advertises a QWP version outside the client's supported
-  range (per-endpoint, so a host on a rolling upgrade does not lock the client
-  out of compatible peers). The native/Python authentication-retry exception
-  above does not extend to protocol-version failures: those remain terminal
-  in these clients.
+- **Other upgrade errors are transient** in the Java, C, C++, Rust, and Python
+  clients and feed into the reconnect loop, including `404`, `426`, `503`,
+  generic 4xx/5xx, TCP/TLS failures, mid-stream send/recv errors, and an
+  upgrade response that advertises a QWP version outside the client's
+  supported range (per-endpoint, so a host on a rolling upgrade does not lock
+  the client out of compatible peers). In the C, C++, Rust, and Python
+  clients, a server that does not grant the requested
+  [durable acknowledgement](#durable-acknowledgement) tiers is not transient:
+  when every endpoint refuses them, the connection fails with
+  `ProtocolVersionError`, and a sender stops even after it has connected.
 
 :::note Enterprise
 

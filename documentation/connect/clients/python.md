@@ -91,11 +91,12 @@ db = questdb.connect("ws::addr=localhost:9000;")
 
 `connect()` accepts only `ws`/`wss` configuration strings; ILP schemes such
 as `http::` or `tcp::` belong to the [legacy Sender](#legacy-ilp-clients).
-In client 6.1.0, it opens the warm minimum connections eagerly, so
-connection and authentication errors can surface from `connect()`. Set
-`lazy_connect=True` to defer connections: row senders queue locally and
-connect in the background, and queries connect on first use. Later operations
-reuse pooled connections. Servers without QWP support fail during the
+It opens the warm minimum connections eagerly, so connection and
+authentication errors can surface from `connect()`. Set `lazy_connect=True` to
+defer connections: row senders queue locally and connect in the background,
+and queries connect on first use. To retry a server that is down at startup
+instead, see [Pool settings](#pool-settings). Later operations reuse pooled
+connections. Servers without QWP support fail during the
 WebSocket upgrade; see
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
 
@@ -148,11 +149,14 @@ token = questdb.connect(
 ```
 
 Authentication happens during the WebSocket upgrade, before any data is
-exchanged. Rejected credentials raise `QuestDBErrorCode.AuthError` from
-connection setup or an operation that waits for it. With lazy connection
-setup, a fire-and-forget `flush()` can return before the upgrade fails;
-observe `flush(wait=True)`, `wait()`, and the
-[connection listener](#failover-and-errors). The listener reports server
+exchanged. A rejected credential stops a sender that has not connected yet,
+whatever its startup mode: an eager `connect()` raises
+`QuestDBErrorCode.AuthError`, and with `lazy_connect=True` the sender that
+connects in the background stops. A fire-and-forget `flush()` can return
+before the upgrade fails, so observe `flush(wait=True)`, `wait()`, and the
+[connection listener](#failover-and-errors). Once a sender has connected,
+later rejections are retried instead; see
+[Failover and errors](#failover-and-errors). The listener reports server
 rejections as `AuthFailed` and token-acquisition failures as
 `CredentialUnavailable`.
 
@@ -177,7 +181,10 @@ authentication over `wss` instead.
 Python client **6.1.0 or later** supports browser-based sign-in from scripts,
 terminals, and remote Jupyter notebooks through `questdb.auth.OidcDeviceAuth`.
 OIDC needs no extra Python package. The server must be QuestDB Enterprise
-with OIDC configured, and the IdP application must allow the device grant.
+with OIDC configured, and the IdP application named by `acl.oidc.client.id`
+must allow the device grant; see
+[Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for the IdP settings.
 
 Call `sign_in()` before connecting, then pass the authentication object, not
 a fixed token, to the pool:
@@ -211,16 +218,20 @@ access token. See
 
 For private CAs, pass `ca_bundle="/etc/questdb/oidc-ca.pem"` to the auth
 constructor or `from_questdb`. This PEM bundle covers discovery and IdP
-requests; the pool's `tls_roots` does not configure it. The separate OIDC
-`timeout` argument is in seconds (default `30`, maximum `120`). A token lookup
-waiting behind another thread's silent refresh can take up to six times that
-value, independently of sender timeouts. See
+requests; the pool's `tls_roots` does not configure it. These requests
+connect directly: they ignore `HTTPS_PROXY` and `ALL_PROXY`, and there is no
+proxy setting. The separate OIDC `timeout` argument is in seconds (default
+`30`, maximum `120`). A token lookup waiting behind another thread's silent
+refresh can take up to six times that value, independently of sender
+timeouts. See
 [TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
 
-Only `sign_in()` can prompt or open a browser. It displays a terminal code and
-URL, or a clickable prompt in Jupyter. Browser opening defaults to off in
-Jupyter and on elsewhere; pass `open_browser=False` to the constructor or
-`from_questdb`, as above, to disable it explicitly. `sign_in()` takes no
+Only `sign_in()` can prompt or open a browser, and it prompts only when no
+valid cached, persisted, or silently refreshable credential exists, so call
+it at every start. It displays a terminal code and URL, or a clickable prompt
+in Jupyter. Browser opening defaults to off in Jupyter and on elsewhere; pass
+`open_browser=False` to the constructor or `from_questdb`, as above, to
+disable it explicitly. `sign_in()` takes no
 arguments. Optional `qr=True` needs `qrcode` (`qrcode[pil]` for notebook
 images), and a custom `renderer=` can own the UI. Use only its vetted
 `browser_target` for links or QR codes, and HTML-escape text when rendering HTML.
@@ -1186,11 +1197,37 @@ db.close()
 
 | Key | Default | Guidance |
 | --- | --- | --- |
-| `sender_pool_min` / `query_pool_min` | `1` (`query_pool_min=0` with lazy connection setup) | Warm minimum retained per pool after connections have been opened. Set it near steady concurrent use. |
+| `sender_pool_min` / `query_pool_min` | `1` (`query_pool_min=0` with lazy connection setup) | Warm minimum that `connect()` opens up front and keeps open while idle. Set it near steady concurrent use. |
 | `sender_pool_max` / `query_pool_max` | `4` | Per-pool growth cap. Set it at or above peak concurrent leases. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits for a free slot before failing; `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the pool minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `db.reap_idle()`. |
+| `initial_connect_retry` | `off` | Startup retry for the sender connections that `connect()` opens: `on` retries within `reconnect_max_duration_millis`, `async` connects them in the background. |
+| `lazy_connect` | `off` | `on` makes `connect()` open no connection: senders buffer and connect in the background, and readers connect on first use. |
+
+The pool honors only an explicitly set `initial_connect_retry`. Unlike a
+standalone `Sender`, it does not turn `reconnect_*` keys into startup retry,
+so by default `connect()` fails fast when the server is down. To retry the
+sender connections at startup, set `initial_connect_retry=on`; the budget is
+`reconnect_max_duration_millis`. Readers that `query_pool_min` prewarms still
+connect once and fail fast, so set `query_pool_min=0` to defer them until the
+first query:
+
+```python
+import questdb
+
+db = questdb.connect(
+    "wss::addr=db.example.com:9000;"
+    "initial_connect_retry=on;reconnect_max_duration_millis=120000;"
+    "query_pool_min=0;"
+)
+```
+
+For a startup that never blocks, use `lazy_connect=True` (or
+`lazy_connect=true` in the string) instead. It defaults `query_pool_min` to
+`0`. With it, leave `initial_connect_retry` unset or set it to `async`, and
+leave `query_pool_min` unset or set it to `0`: `connect()` rejects other
+values as a configuration conflict.
 
 The sender and reader pools grow and cap independently, and `dataframe()`
 uses another internal direct pool, so account for all active paths when
@@ -1209,35 +1246,43 @@ db = questdb.connect(
 )
 ```
 
-The background runner reconnects and replays queued rows. The retry budget
-uses these keys:
+The background runner reconnects and replays queued rows. It retries a lost
+connection with capped exponential backoff for as long as the sender is open;
+no budget ends that loop. These keys tune the backoff and the blocking
+startup retry:
 
-| Key | Default |
-| --- | --- |
-| `reconnect_max_duration_millis` | `300000` |
-| `reconnect_initial_backoff_millis` | `100` |
-| `reconnect_max_backoff_millis` | `5000` |
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `reconnect_initial_backoff_millis` | `100` | First wait between reconnect attempts. |
+| `reconnect_max_backoff_millis` | `5000` | Longest wait between reconnect attempts. |
+| `reconnect_max_duration_millis` | `300000` | Budget of the blocking startup retry that `initial_connect_retry=on` enables; see [Pool settings](#pool-settings). |
 
-A caller-awaited initial connection fails on authentication rejection. Once
-a QWP/WebSocket sender has connected, later HTTP 401/403 rejections are retried
-with capped backoff, including with fixed credentials. Unacknowledged rows
-stay queued, and the listener reports `AuthFailed`. A provider that cannot
-supply a token instead reports `CredentialUnavailable`. Even a
-`TokenUnavailableError` with `retryable=False` does not stop background
-reconnects.
+A rejected credential (HTTP 401/403) stops a sender that has not connected
+yet, including with `lazy_connect=True`. Once a QWP/WebSocket sender has
+connected, later 401/403 rejections are retried with capped backoff,
+including with fixed credentials. Unacknowledged rows stay queued, and the
+listener reports `AuthFailed`. A provider that cannot supply a token instead
+reports `CredentialUnavailable`, whose `cause_code` is `SocketError` while the
+sender keeps reconnecting, and `AuthError` or `ConfigError` once it has
+stopped. Even a `TokenUnavailableError` with `retryable=False` does not stop
+background reconnects.
 
 To stop a standalone `Sender`, close it. For a pool, release all leases and
 close the `QuestDB` handle (`db.close()`). `PooledSender.close()` only returns
 the lease: its underlying connection can keep delivering and reconnecting.
 Explicitly closing a shared `OidcDeviceAuth` or `RefreshingTokenProvider`
-disables future token acquisition for all attached clients, but an
-application-defined provider must implement its own shutdown policy. Perform
-shutdown from application code, outside callbacks, and normally close clients
-before their provider.
+disables future token acquisition for all attached clients. An
+application-defined provider stops its clients by raising a plain
+`QuestDBError(QuestDBErrorCode.InvalidApiCall, message)` from `token()` when
+retrying can never succeed: attached clients then fail with `ConfigError` and
+stop reconnecting. A `TokenUnavailableError` never stops them, whatever its
+`retryable` flag. Perform shutdown from application code, outside callbacks,
+and normally close clients before their provider.
 
-Protocol-version failures and terminal data rejections are not retried. A
-`flush(wait=True)` or `wait()` that times out can retain the underlying
-authentication diagnostic; transport-only timeouts report
+Durable-ack capability mismatches (`ProtocolVersionError`) and terminal data
+rejections are not retried. A `flush(wait=True)` or `wait()` that times out
+can retain the underlying authentication diagnostic; transport-only timeouts
+report
 `QuestDBErrorCode.FailoverRetry`. Rows remain queued and background delivery
 continues, so retry the wait rather than flushing the same rows again. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).

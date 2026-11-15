@@ -149,21 +149,20 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;initial_connect_retry=on;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;initial_connect_retry=on;reconnect_max_duration_millis=120000;query_pool_min=0;
 ```
 
 The 2-minute budget bounds the blocking initial **ingestion** connection.
 Once connected, the sender retries transport outages indefinitely. Set
 `initial_connect_retry` explicitly: `reconnect_*` keys alone do not enable
-startup retry for native 7.3.0 and Python 6.1.0 or later pools.
+startup retry for C, C++, Rust, and Python pools.
 
-Pools also prewarm readers when `query_pool_min` is nonzero; their initial
-connections do not use this ingestion retry policy. Set `query_pool_min=0`
-to defer reader connections until first use. For background ingestion startup
-instead of blocking retry, use `lazy_connect=true`, which also defaults
-`query_pool_min` to `0` in native/Python pools; do not combine it with an
-explicit blocking initial-connect mode. See
-[Ingress reconnect](#reconnect-keys).
+`query_pool_min=0` stops a pool from prewarming a reader at startup. A
+reader's first connection does not use the ingestion retry policy, so a
+prewarmed reader fails pool construction while the server is down. Standalone
+senders ignore the pool keys. For ingestion startup that does not block, use
+`lazy_connect=true` instead, within the limits described under
+[Connection pool](#pool-keys). See [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
 
@@ -191,7 +190,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive durability mode              |
 | Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
 | Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; set `initial_connect_retry` explicitly for portable startup behavior |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | prevents implicit promotion in clients that support it; native 7.3.0+/Python 6.1.0+ pools already default to fail-fast |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | prevents implicit promotion in clients that apply it; C, C++, Rust, and Python pools never apply it |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -746,15 +745,15 @@ architecture is that a producer survives an arbitrarily long outage.
     (auth reject, durable-ack mismatch) via the error inbox.
 
   **Implicit promotion is client-specific.** Some clients, including Java
-  and standalone native senders, promote the mode to `on` when an explicit
-  `reconnect_*` key is set without an `initial_connect_retry` mode. Pools in
-  C, C++, and Rust 7.3.0 or later, and Python 6.1.0 or later, do **not** apply
-  that promotion: they honor only an explicitly set mode and otherwise fail
-  fast. Set `initial_connect_retry=on` explicitly for blocking ingestion
+  and standalone C, C++, Rust, and Python senders, promote the mode to `on`
+  when an explicit `reconnect_*` key is set without an
+  `initial_connect_retry` mode. C, C++, Rust, and Python pools do **not**
+  apply that promotion: they honor only an explicitly set mode and otherwise
+  fail fast. Set `initial_connect_retry=on` explicitly for blocking ingestion
   startup retry, or `off` to retain fail-fast behavior while tuning backoff.
-  Neither `on` nor `async` changes reader prewarming: a nonzero
-  `query_pool_min` still creates readers synchronously and can fail pool
-  construction.
+  A pool with `lazy_connect` on accepts only `async` or no mode. Neither `on`
+  nor `async` changes reader prewarming: a nonzero `query_pool_min` still
+  creates readers synchronously and can fail pool construction.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered rows to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
@@ -767,13 +766,17 @@ architecture is that a producer survives an arbitrarily long outage.
 
 Upgrade rejections have client- and phase-specific retry policies:
 
-- In C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, a
-  caller-awaited initial connection fails on HTTP `401` / `403`. A sender
-  that has connected keeps retrying those rejections with capped backoff,
-  even with fixed credentials, retaining unacknowledged rows. Each rejection
-  ends the current endpoint walk, not the sender's reconnect loop, and is
-  reported as `auth_failed` / `AuthFailed`. This exception does **not** cover
-  protocol-version failures, which remain terminal in these clients.
+- In C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, an
+  HTTP `401` / `403` stops a sender that has not connected yet, in every
+  `initial_connect_retry` mode, including `async` and pools with
+  `lazy_connect` on. A sender that has connected keeps retrying those
+  rejections with capped backoff, even with fixed credentials, retaining
+  unacknowledged rows. Each rejection ends the current endpoint walk, not the
+  sender's reconnect loop, and is reported as `auth_failed` / `AuthFailed`.
+  Like Java, these clients treat an upgrade response with an unsupported QWP
+  version as a transport failure of that endpoint. A durable-ack capability
+  mismatch (`ProtocolVersionError`) stays terminal, even for a sender that
+  has connected, once every endpoint refuses the requested tiers.
 - Java treats a version mismatch like a transport failure to ride out a
   rolling upgrade. Other rejections (authentication, durable-ack mismatch,
   non-101 upgrade without a role hint) are terminal only before the sender
@@ -931,7 +934,8 @@ explicit setter always wins over the string.
 - `sender_pool_min` — senders kept open even when idle. `0` lets the pool close
   them all. Default: `1`.
 - `sender_pool_max` — maximum senders the pool opens. Default: `4`.
-- `query_pool_min` — query clients kept open even when idle. Default: `1`.
+- `query_pool_min` — query clients kept open even when idle. Default: `1`,
+  or `0` when `lazy_connect` is on.
 - `query_pool_max` — maximum query clients the pool opens, which also caps
   total in-flight queries. Default: `4`.
 - `acquire_timeout_ms` — how long a borrow waits for a free connection once the
@@ -946,10 +950,17 @@ explicit setter always wins over the string.
   replacements.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
-- `lazy_connect` — when `on`, the pool defers opening its first connection
-  until the first borrow, so construction succeeds against a server that is
-  down. This is the supported way to tolerate a server that starts after your
-  application. Default: `off`.
+- `lazy_connect` — when `on`, building the pool opens no connection, so it
+  succeeds against a server that is down. Depending on the client, senders
+  connect in the background or on first use, and query clients connect on
+  first use. It also defaults `query_pool_min` to `0`. Leave
+  `initial_connect_retry` unset or set it to `async`, and leave
+  `query_pool_min` unset or set it to `0`: the Java, Go, .NET, Node.js, C,
+  C++, Rust, and Python clients reject other values as a configuration
+  conflict. To block until the server is reachable instead, set
+  `initial_connect_retry=on`; see
+  [Tolerate a slow or restarting server at startup](#tolerate-a-slow-or-restarting-server-at-startup).
+  Default: `off`.
 
 ## Error handling {#error-handling}
 
@@ -1059,7 +1070,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`; implicit promotion is client-specific, not applied by native 7.3.0+/Python 6.1.0+ pools | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`; implicit promotion is client-specific and never applies to C, C++, Rust, or Python pools | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |
@@ -1082,7 +1093,7 @@ description and behaviour notes.
 | `poison_min_escalation_window_millis`   | int (ms)                      | `5000`                        | [Error handling](#error-handling)                             |
 | `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
 | `query_pool_max`                        | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
-| `query_pool_min`                        | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
+| `query_pool_min`                        | int                           | `1` (`0` with `lazy_connect`) | [Connection pool](#pool-keys)                                 |
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |

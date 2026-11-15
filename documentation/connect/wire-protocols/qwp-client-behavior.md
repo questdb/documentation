@@ -143,13 +143,15 @@ knob silently turns startup into a multi-minute **blocking** retry. If no
 `reconnect_*` knob is set either, the mode is `OFF`. Always set
 `initial_connect_retry` explicitly to avoid this ([sharp edge #1](#known-sharp-edges)).
 
-**Native/Python pool exception:** C, C++, and Rust 7.3.0 or later, and Python
-6.1.0 or later, apply this implicit promotion only to standalone senders,
-not pools. Their eager pools honor an explicitly set `initial_connect_retry`
-and otherwise fail fast even when `reconnect_*` keys are set. Reader prewarm
-is always synchronous and is not covered by the ingestion retry mode; use
-`query_pool_min=0` to defer it. `lazy_connect=true` selects background
-ingestion and defaults `query_pool_min` to `0` in these pools.
+**Native/Python pool exception:** the C, C++, Rust, and Python clients apply
+this implicit promotion only to standalone senders, not pools. Their eager
+pools honor an explicitly set `initial_connect_retry` and otherwise fail fast
+even when `reconnect_*` keys are set. Reader prewarm is always synchronous
+and is not covered by the ingestion retry mode; use `query_pool_min=0` to
+defer it. `lazy_connect=true` selects background ingestion and defaults
+`query_pool_min` to `0`; these pools reject it together with an explicit
+`initial_connect_retry` other than `async`, or with a nonzero
+`query_pool_min`.
 
 ### Facade prewarm
 
@@ -177,7 +179,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_pool_min` | `1` |
 | `sender_pool_max` | `4` |
-| `query_pool_min` | `1` |
+| `query_pool_min` | `1` (`0` with `lazy_connect`) |
 | `query_pool_max` | `4` |
 | `acquire_timeout_ms` | `5000` |
 | `idle_timeout_ms` | `60000` (`0` ⇒ infinite) |
@@ -372,8 +374,9 @@ reached fails only that call; the sender stays alive and keeps retrying.
 ⚠ The Java client treats an
 authentication rejection or a durable-ack capability mismatch as terminal only
 before the sender first connects, and retries them afterwards. C, C++, and
-Rust 7.3.0 and Python 6.1.0 also retry authentication rejections after the
-sender has connected, including with fixed credentials. A Node.js sender that
+Rust 7.3.0 or later and Python 6.1.0 or later also retry authentication
+rejections after the sender has connected, including with fixed credentials,
+but keep a durable-ack capability mismatch terminal. A Node.js sender that
 uses store-and-forward or `initial_connect_retry=async` retries both kinds
 once it has connected, as do some browser senders: see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
@@ -471,16 +474,21 @@ a sender lease (including Python's `PooledSender.close()`) can leave its
 background delivery running. Release all leases and close the pool to stop
 it, or explicitly retire a borrowed native connection instead of recycling
 it. Closing a shared OIDC or refreshing provider also disables future token
-pulls; an application-defined provider needs its own shutdown policy.
+pulls. In C, C++, Rust, and Python, an application-defined provider stops its
+clients by reporting a failure that retrying can never clear; see
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
 
-The table describes Java 1.3.11 and later. Native clients 7.3.0 and Python
-6.1.0 follow the same sender-phase distinction: a foreground failure does not
-mean an established sender stopped reconnecting. An OIDC provider that needs
-user interaction ends a caller-awaited connection attempt; arrange explicit
-sign-in, never a prompt inside the reconnect loop. Their readers apply their
-own failover limits to recoverable acquisition failures; after an exhausted
-failover, a later query can connect again. A server authentication rejection
-still fails the query after any eligible one-time token replacement.
+The table describes Java 1.3.11 and later. C, C++, and Rust 7.3.0 or later and
+Python 6.1.0 or later follow the same sender-phase distinction: a `401` or
+`403` stops a sender that has not connected yet in every
+`initial_connect_retry` mode, including pools with `lazy_connect=true`, and a
+foreground failure does not mean an established sender stopped reconnecting.
+An OIDC provider that needs user interaction ends a caller-awaited connection
+attempt; arrange explicit sign-in, never a prompt inside the reconnect loop.
+Their readers apply their own failover limits to recoverable acquisition
+failures; after an exhausted failover, a later query can connect again. A
+server authentication rejection still fails the query after any eligible
+one-time token replacement.
 
 The browser client's `auth` option also accepts a function that supplies a
 credential before every connection attempt, and some Node.js and browser

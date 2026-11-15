@@ -188,13 +188,16 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on a caller-awaited initial connection or query | After any eligible one-time token replacement, rejected credentials end the endpoint walk because credentials are cluster-wide. |
-| Protocol-version failure in C, C++, and Rust 7.3.0+, or Python 6.1.0+ | Terminal during initial connection and established sender reconnects; authentication retries do not make version failures retryable. |
+| HTTP `401` / `403` on a query, or before a sender has connected | After any eligible one-time token replacement, rejected credentials end the endpoint walk because credentials are cluster-wide. |
+| Durable-ack capability mismatch in C, C++, Rust, and Python, when every host refuses the requested tiers | Retrying cannot make these servers grant the tiers, so neither an initial connection nor a sender that has connected retries it. |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
 
-An established C, C++, or Rust 7.3.0+ sender, or Python 6.1.0+ sender, instead
-retries HTTP `401` / `403` with capped backoff. The rejection ends the current
-endpoint walk, not the reconnect loop. See
+In the Java, C, C++, Rust, and Python clients, a `401` or `403` stops a sender
+that has not connected yet in every `initial_connect_retry` mode, including
+`async` and pools with `lazy_connect=true`. An established C, C++, or Rust
+7.3.0+ sender, or Python 6.1.0+ sender, instead retries HTTP `401` / `403`
+with capped backoff. The rejection ends the current endpoint walk, not the
+reconnect loop. See
 [Authentication is cluster-wide](#authentication-is-cluster-wide) for the
 phase rules and other clients' behavior.
 
@@ -218,10 +221,9 @@ TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or receive failures,
 are treated as transport failures. The client records `TransportError` and
 walks to the next host.
 
-Java also treats protocol-version mismatches as transport failures so that
-a rolling upgrade does not lock out compatible peers. This is not a shared
-retry rule: protocol-version failures remain terminal in the native/Python
-clients listed above.
+The Java, C, C++, Rust, and Python clients also treat an upgrade response that
+advertises an unsupported QWP version as a transport failure of that host, so
+a rolling upgrade does not lock out compatible peers.
 
 The Go query client doesn't resubmit after a server response it can't read
 that may have ended the statement; see
@@ -267,12 +269,12 @@ again, such as after a token renewal. See
 C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, also retry
 HTTP `401` / `403` with capped backoff once a sender has connected, including
 with fixed credentials. They retain unacknowledged rows and report
-`auth_failed` / `AuthFailed` connection events. A caller-awaited initial
-connection still fails on rejected credentials. With a token provider, an
-eligible `401` can first trigger one same-host retry if the token changes;
-a `403` cannot. These authentication exceptions do not extend to
-protocol-version failures, which remain terminal in the native/Python
-clients.
+`auth_failed` / `AuthFailed` connection events. Before a sender has
+connected for the first time, a rejected credential stops it in every
+`initial_connect_retry` mode, including `async` and pools with
+`lazy_connect=true`. With a token provider, an eligible `401` can first
+trigger one same-host retry if the token changes; a `403` cannot. The retry
+does not extend to a durable-ack capability mismatch, which stays terminal.
 
 The Node.js client also treats a rejected credential like an outage, for a
 sender that has connected before and uses store-and-forward or was started

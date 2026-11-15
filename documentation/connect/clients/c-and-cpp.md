@@ -275,9 +275,9 @@ the schema server-side.
 
 The connect string uses a QWP/WebSocket scheme: `ws` / `wss`. For auth and TLS
 keys, see the
-[connect string reference](/docs/connect/clients/connect-string/). In client
-7.3.0, `questdb_db_connect` (C) and the `questdb::pool` constructor (C++) open
-the warm minimum connections eagerly, so authentication, TLS, and connection
+[connect string reference](/docs/connect/clients/connect-string/).
+`questdb_db_connect` (C) and the `questdb::pool` constructor (C++) open the
+warm minimum connections eagerly, so authentication, TLS, and connection
 errors can surface at construction. Set `lazy_connect=true` to defer
 connections: senders queue locally and connect in the background, and readers
 connect on first borrow.
@@ -338,9 +338,10 @@ bearer tokens over `wss` instead.
 
 Client **7.3.0 or later** can sign a user in through their identity provider's
 browser page without collecting their password. This requires QuestDB
-Enterprise with OIDC configured and an IdP application with the device grant
-enabled. See [Device authorization flow](/docs/security/oidc/#device-authorization-flow)
-for discovery, scopes, and token selection.
+Enterprise with OIDC configured and the device grant enabled on the IdP
+application named by `acl.oidc.client.id`. See
+[Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for the IdP settings, discovery, scopes, and token selection.
 
 Sign in before constructing the pool, then attach the authentication object,
 not a token string. Every pooled sender and reader shares it, so reconnects
@@ -447,14 +448,122 @@ The examples preserve the server's configured scopes. To request a refresh
 token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
 complete scope override that also retains required `profile`, groups, and
 API scopes. The IdP must actually issue a refresh token for silent renewal to
-work. An expired token without a usable refresh token reports
-`InteractionRequired`. Call `sign_in()` again on your UI thread, never from
-a transport callback. Token lookups and reconnects never prompt.
+work.
+
+`sign_in()` prompts only when no valid cached, persisted, or silently
+refreshable credential exists, so call it at every process start. Token
+lookups and reconnects never prompt. When only a new sign-in can help, they
+fail with an interaction-required OIDC error: pool, reader, and direct OIDC
+calls in C++ throw `questdb::oidc::error` with
+`kind() == questdb::oidc::error_kind::interaction_required` (a sender's
+`line_sender_error` keeps it in `oidc_diagnostic()`), and C reports
+`QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` through
+`questdb_error_oidc_get_view`. The error code itself describes the failing
+call, often a retryable `socket_error`, so check the OIDC detail first. When
+`acquisition_busy` is set, another thread is already signing in; retry later
+instead of starting a second sign-in. Otherwise call `sign_in()` again on
+your UI thread, never from a transport callback, and retry once:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp title="Sign in again when a query needs it"
+#include <questdb/egress/qwp_reader.hpp>
+#include <questdb/oidc.hpp>
+#include <cstddef>
+
+using namespace questdb::ingress::literals;
+
+static std::size_t count_rows(questdb::pool& pool)
+{
+    auto reader = pool.borrow_reader();
+    auto cursor = reader.execute("SELECT current_user()"_utf8);
+    std::size_t rows = 0;
+    while (auto batch = cursor.next_batch())
+        rows += batch->row_count();
+    return rows;
+}
+
+std::size_t count_rows_with_sign_in(
+    questdb::pool& pool, const questdb::oidc::device_auth& auth)
+{
+    try
+    {
+        return count_rows(pool);
+    }
+    catch (const questdb::oidc::error& error)
+    {
+        if (error.kind() != questdb::oidc::error_kind::interaction_required ||
+            error.acquisition_busy())
+            throw;
+        auth.sign_in();  // Prompts on this thread, never in a callback.
+        return count_rows(pool);  // Retry once.
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c title="Sign in again when a query needs it"
+#include <questdb/egress/qwp_reader.h>
+#include <questdb/oidc.h>
+#include <string.h>
+
+/* True when only an explicit sign-in can supply a credential. */
+static bool needs_sign_in(const questdb_error* error)
+{
+    questdb_oidc_error_view view;
+    memset(&view, 0, sizeof view);
+    view.struct_size = sizeof view;
+    return questdb_error_oidc_get_view(error, &view) &&
+           view.kind == QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED &&
+           !view.acquisition_busy;
+}
+
+static bool query_current_user(questdb_db* db, questdb_error** error)
+{
+    qwp_reader_cursor* cursor = NULL;
+    bool ok = false;
+    qwp_reader* reader = questdb_db_borrow_reader(db, error);
+    if (!reader) return false;
+    cursor = qwp_reader_execute(
+        reader, QDB_UTF8_LITERAL("SELECT current_user()"), error);
+    if (cursor)
+    {
+        while (qwp_reader_cursor_next_batch(cursor, error) != NULL) {}
+        ok = *error == NULL;
+    }
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(reader);
+    return ok;
+}
+
+/* The caller initializes *error to NULL and frees it after a failure. */
+bool query_with_sign_in(
+    questdb_db* db, const questdb_oidc_auth* auth, questdb_error** error)
+{
+    if (query_current_user(db, error))
+        return true;
+    if (!needs_sign_in(*error))
+        return false;
+    questdb_error_free(*error);
+    *error = NULL;
+    /* Prompts on this thread, never in a callback. Retries the query once. */
+    return questdb_oidc_auth_sign_in(auth, error) &&
+           query_current_user(db, error);
+}
+```
+
+</TabItem>
+</Tabs>
 
 For private CAs, use C++ `builder.ca_bundle("/etc/questdb/oidc-ca.pem")` or C
 `questdb_oidc_builder_ca_bundle` before building the auth. This PEM bundle
 covers discovery and IdP requests; the pool's `tls_roots` does not configure
-it. The separate OIDC request timeout uses milliseconds: C++
+it. These requests connect directly: they ignore `HTTPS_PROXY` and
+`ALL_PROXY`, and there is no proxy setting. The separate OIDC request timeout
+uses milliseconds: C++
 `builder.timeout_ms(10000)` or C `questdb_oidc_builder_timeout_ms` (default
 `30000`, maximum `120000`). A token lookup waiting behind another thread's
 silent refresh can take up to six times that timeout, independently of
@@ -579,6 +688,11 @@ The source is called serially on the refresher thread. Bound its network I/O
 and do not call back into an attached client. In C++, capture source resources
 by value or shared ownership: an in-flight fetch can outlive `close()`.
 
+A failure's classification only decides whether a connect the caller waits
+for retries it. The provider keeps retrying the fetch with backoff, and
+background reconnects keep retrying either kind. A source cannot stop the
+attached clients; close the refreshing provider to do that.
+
 By default, refresh happens around half the token lifetime; tokens with
 60 seconds or less remaining are not handed out, and a caller with no usable
 token waits up to 30 seconds. Adjust `handout_floor` / `cold_wait` in C++
@@ -617,11 +731,63 @@ An eligible HTTP 401 can trigger one retry with a changed token; `403` or an
 
 C errors retain structured details through `questdb_error_oidc_get_view` and
 `questdb_error_token_unavailable_get_view`; initialize each output view's
-`struct_size` before calling. In C++, direct OIDC and reader operations can
-throw `questdb::oidc::error`; sender failures retain `oidc_diagnostic()`.
-Provider failures expose `token_unavailable_diagnostic()` on `questdb::error`.
-A connection event named `credential_unavailable` means acquisition failed;
-`auth_failed` means the server rejected the credential.
+`struct_size` before calling. In C++, pool construction, reader operations,
+and direct OIDC calls throw `questdb::oidc::error` when an OIDC failure caused
+the error; sender failures throw `line_sender_error` and keep the OIDC detail
+in `oidc_diagnostic()`. Both derive from `questdb::error`, whose
+`token_unavailable_diagnostic()` exposes a provider's classification.
+
+Background reconnects report credential problems as connection events, not
+as errors. Register a callback before the pool connects, through the
+`event_callback` field of the `questdb_db_connect_options` passed to
+`questdb_db_connect_ex`. The callback runs on a dispatcher thread; do not
+call back into the pool from it. `questdb_connection_event_auth_failed` means
+the server rejected the credential.
+`questdb_connection_event_credential_unavailable` means the client could not
+obtain one, and its `cause_code` tells whether the sender keeps reconnecting
+(`line_sender_error_socket_error`) or has stopped
+(`line_sender_error_auth_error` or `line_sender_error_config_error`, for
+example after its provider was closed). The C++ `questdb::pool` constructors
+take no event callback; to receive these events from C++, open the pool with
+the C API.
+
+```c title="Log credential events from a pool"
+#include <questdb/client.h>
+#include <stdio.h>
+#include <string.h>
+
+static void on_connection_event(
+    void* user_data, const questdb_connection_event* event)
+{
+    (void)user_data;
+    if (event->kind == questdb_connection_event_auth_failed)
+    {
+        fprintf(stderr, "credential rejected: %.*s\n",
+            (int)event->cause_msg_len, event->cause_msg);
+    }
+    else if (event->kind == questdb_connection_event_credential_unavailable)
+    {
+        const bool stopped =
+            event->cause_code == line_sender_error_auth_error ||
+            event->cause_code == line_sender_error_config_error;
+        fprintf(stderr, "no credential%s: %.*s\n",
+            stopped ? ", sender stopped" : "",
+            (int)event->cause_msg_len, event->cause_msg);
+    }
+}
+
+questdb_db* connect_with_events(
+    const char* conf,
+    const questdb_token_provider* tokens,
+    questdb_error** error)
+{
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.token_provider = tokens;
+    options.event_callback = on_connection_event;
+    return questdb_db_connect_ex(conf, strlen(conf), &options, error);
+}
+```
 
 Clients retain their own references. Freeing a C auth/provider handle or
 destroying a C++ wrapper releases only that reference. Explicitly closing an
@@ -632,10 +798,16 @@ at the IdP.
 
 For application-defined providers created with `questdb_token_provider_new`
 or `questdb::token_provider::from`, `questdb_token_provider_close` and C++
-`token_provider::close()` are no-ops. Implement a shared shutdown state in
-your provider if token acquisition must be disabled, or stop all attached
-clients. Do not free callback resources while clients can still invoke them;
-use the release callback or shared ownership.
+`token_provider::close()` are no-ops. To stop every attached client when
+retrying can never succeed, report a terminal failure: call
+`questdb_token_sink_set_terminal_error(sink, msg, len)` from `get_token` (C),
+or throw `questdb::error{questdb::error_code::invalid_api_call, message}` from
+`token()` (C++). Clients then report `config_error` and stop reconnecting.
+Queued frames are not deleted, and a disk-backed store-and-forward slot stays
+drainable by a later process. Any other failure, including one classified as
+not retryable, leaves background reconnects running. Alternatively, close
+every attached client. Do not free callback resources while clients can still
+invoke them; use the release callback or shared ownership.
 
 ## Headers
 
@@ -1862,9 +2034,9 @@ The pool owns reconnection and connection health so borrowers don't have to:
   fails with `role_mismatch` rather than a connect error.
 - **Retrying borrow.** `questdb_db_borrow_sender_with_retry(db, budget_ms,
   &err)` (C++ `pool::borrow_sender_with_retry(budget_ms)`) retries the connect
-  within `budget_ms` using the pool's reconnect backoff. Authentication and
-  protocol-version errors are terminal; `budget_ms == 0` makes a single
-  attempt.
+  within `budget_ms` using the pool's reconnect backoff. `auth_error` and
+  `protocol_version_error` (a durable-ack capability mismatch) are terminal;
+  `budget_ms == 0` makes a single attempt.
 - **Failover budget.** `questdb_db_reconnect_max_duration_ms(db)` (C++
   `pool::reconnect_max_duration_ms()`, default 300000 ms) is the pool's overall
   reconnect budget. Pass the remaining budget to the `_with_retry` calls when
@@ -1880,10 +2052,14 @@ The pool owns reconnection and connection health so borrowers don't have to:
   `pool_reap=manual`, call `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`)
   yourself; it returns the number of connections it closed.
 
-An established QWP/WebSocket sender retries later HTTP 401/403 rejections
-with capped backoff, even with fixed credentials, and retains unacknowledged
-rows. `auth_failed` therefore does not always mean the sender stopped.
-Initial caller-awaited connection setup still fails on rejection. See
+A rejected credential (HTTP 401/403) stops a sender that has not connected
+yet, in every `initial_connect_retry` mode, including pools with
+`lazy_connect=true`. Once a QWP/WebSocket sender has connected, it retries
+later 401/403 rejections with capped backoff, even with fixed credentials,
+and retains unacknowledged rows, so an `auth_failed` event does not always
+mean the sender stopped. See
+[Attachment, failures, and ownership](#attachment-failures-and-ownership) for
+the connection events, and
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 ### Which errors mean what {#which-errors-mean-what}
@@ -1891,9 +2067,19 @@ Initial caller-awaited connection setup still fails on rejection. See
 Dispatch on `line_sender_error_get_code(err)` (C++
 `e.code()`). What to do with the borrow after each class:
 
+With an OIDC auth or a token provider attached, check the OIDC and
+token-provider detail first: `questdb_error_oidc_get_view` and
+`questdb_error_token_unavailable_get_view` (C++ `questdb::oidc::error`,
+`oidc_diagnostic()`, and `token_unavailable_diagnostic()`). A failed
+credential acquisition keeps that detail while its code describes the
+failing call, often a retryable `socket_error`. An interaction-required OIDC
+error without `acquisition_busy` needs a new [sign-in](#oidc-device-flow),
+not a retry.
+
 | Error code | Meaning | Borrow state | What to do |
 | --- | --- | --- | --- |
-| `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
+| `auth_error` | The server rejected the credential before the sender connected, or the attached OIDC auth or token provider was closed | n/a (borrow failed) | Replace the credential, sign in again, or attach a new provider; retrying with the same one won't help. The retry helpers treat it as terminal. |
+| `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
 | `failover_retry` | Transient transport failure; delivery of queued rows may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved rows replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
