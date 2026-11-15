@@ -189,6 +189,7 @@ from questdb.auth import OidcDeviceAuth
 with OidcDeviceAuth.from_questdb(
     "https://db.example.com:9000",
     issuer="https://idp.example.com/realms/questdb",
+    open_browser=False,
 ) as auth:
     auth.sign_in()
     with questdb.connect(
@@ -218,10 +219,11 @@ value, independently of sender timeouts. See
 
 Only `sign_in()` can prompt or open a browser. It displays a terminal code and
 URL, or a clickable prompt in Jupyter. Browser opening defaults to off in
-Jupyter and on elsewhere; set `open_browser=False` to disable it explicitly.
-Optional `qr=True` needs `qrcode` (`qrcode[pil]` for notebook images), and a
-custom `renderer=` can own the UI. Use only its vetted `browser_target` for
-links or QR codes, and HTML-escape text when rendering HTML.
+Jupyter and on elsewhere; pass `open_browser=False` to the constructor or
+`from_questdb`, as above, to disable it explicitly. `sign_in()` takes no
+arguments. Optional `qr=True` needs `qrcode` (`qrcode[pil]` for notebook
+images), and a custom `renderer=` can own the UI. Use only its vetted
+`browser_target` for links or QR codes, and HTML-escape text when rendering HTML.
 
 Token lookups and reconnects use cached credentials or silent refresh, never
 an interactive prompt. To request a refresh token, include `offline_access`
@@ -321,12 +323,48 @@ on an established WebSocket. An eligible HTTP 401 can trigger one retry with
 a changed token; `403` and `insufficient_scope` do not trigger that retry. See
 [Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
 
-`OidcError` and `TokenUnavailableError` are `QuestDBError` subclasses. Catch
-`OidcInteractionRequired` before a generic retry handler: if
-`acquisition_busy` is true, defer until the other acquisition finishes;
-otherwise arrange explicit `sign_in()` outside callbacks. A background
-reconnect can report acquisition failure through a `CredentialUnavailable`
-connection event rather than a raised exception.
+`OidcError` and `TokenUnavailableError` are `QuestDBError` subclasses. Import
+`OidcInteractionRequired` from `questdb.auth` and catch it before a generic
+retry handler. If `exc.acquisition_busy` is true, defer until the other
+acquisition finishes; otherwise arrange explicit `sign_in()` outside callbacks.
+
+For a query made after sign-in, call this helper on the application's main or
+UI thread, while the `auth` object from the device-flow example is still open.
+It covers errors from eager connection creation and from consuming the query
+result, and retries this read-only query at most once after sign-in:
+
+```python title="Recover a query that needs a new sign-in"
+import questdb
+from questdb.auth import OidcInteractionRequired
+
+
+def query_current_user(auth):
+    for attempt in range(2):
+        try:
+            with questdb.connect(
+                "wss::addr=db.example.com:9000;", oidc_auth=auth
+            ) as db:
+                with db.query("SELECT current_user()") as result:
+                    return list(result.iter_rows())
+        except OidcInteractionRequired as exc:
+            if exc.acquisition_busy or attempt == 1:
+                raise
+            auth.sign_in()
+```
+
+Call `query_current_user(auth)` instead of the unguarded query in the
+sign-in example. A busy acquisition is re-raised so the application can
+reschedule the query after the existing acquisition finishes, keeping the
+shared provider open. Do not start another sign-in or spin in a retry loop
+in that case. Other errors, including sign-in failures and failures of the
+second query attempt, propagate to the caller.
+
+A background reconnect can instead report acquisition failure through a
+`CredentialUnavailable` [connection event](#failover-and-errors). Have the
+listener notify application code rather than call `sign_in()` itself; the
+event alone does not establish that interactive sign-in is needed. See the
+[OIDC error-handling reference](https://github.com/questdb/py-questdb-client/blob/v6.1.0/docs/auth.rst#error-handling)
+for other authentication errors and HTTP ingestion recovery.
 
 `cancel_sign_in()` or Ctrl-C cancels only the current sign-in attempt.
 `clear()` removes local cached and persisted credentials without revoking

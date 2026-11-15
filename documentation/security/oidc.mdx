@@ -405,11 +405,16 @@ The native and Python OIDC helpers use their own HTTPS client for QuestDB
 from the pool or sender: a pool's `tls_roots` does not configure the auth
 helper, and the helper's `ca_bundle` does not configure database connections.
 
+The C/C++ and Python distributions trust the bundled Mozilla roots together
+with the OS trust store by default. Rust follows its enabled Cargo features:
+the default features, including when `oidc` is added, trust only the bundled
+Mozilla roots. Enable `tls-native-certs` as well to include the OS store, for
+example `features = ["oidc", "tls-native-certs"]` with default features enabled.
+
 For private CAs, supply a PEM bundle before building the authentication
-object. By default, the helper trusts the bundled Mozilla roots together with
-the OS trust store. A supplied bundle replaces both, so include the CAs needed
-for **both** QuestDB discovery and the IdP. Use an expanded absolute path;
-the native builders do not expand `~`.
+object. A supplied bundle replaces the default roots, so include the CAs
+needed for **both** QuestDB discovery and the IdP. Use an expanded absolute
+path; the native builders do not expand `~`.
 
 | Language | OIDC CA bundle | Per-request timeout example |
 | --- | --- | --- |

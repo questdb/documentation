@@ -177,8 +177,9 @@ hosts when `zone=` is set.
 
 ## Error classification
 
-Every error the client encounters falls into one of three buckets, which drives
-the loop's response:
+Errors fall into three buckets, which drive the loop's response. The
+classification depends on the client and whether it is making an initial
+connection, reconnecting an established sender, or running a query.
 
 ### Terminal — bypass failover
 
@@ -187,8 +188,15 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are cluster-wide; retrying floods server logs without recovery. |
+| HTTP `401` / `403` on a caller-awaited initial connection or query | After any eligible one-time token replacement, rejected credentials end the endpoint walk because credentials are cluster-wide. |
+| Protocol-version failure in C, C++, and Rust 7.3.0+, or Python 6.1.0+ | Terminal during initial connection and established sender reconnects; authentication retries do not make version failures retryable. |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
+
+An established C, C++, or Rust 7.3.0+ sender, or Python 6.1.0+ sender, instead
+retries HTTP `401` / `403` with capped backoff. The rejection ends the current
+endpoint walk, not the reconnect loop. See
+[Authentication is cluster-wide](#authentication-is-cluster-wide) for the
+phase rules and other clients' behavior.
 
 ### Topology — handled inside the round
 
@@ -205,11 +213,15 @@ fails the current `execute()` call.
 
 ### Transient — enter backoff
 
-Everything else: TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or
-receive failures, `404` / `426` / `503` on upgrade, version mismatches
-(per-endpoint — a rolling upgrade in flight does not lock out compatible
-peers), and generic errors decoding server messages. The client records
-`TransportError` and walks to the next host.
+TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or receive failures,
+`404` / `426` / `503` on upgrade, and retryable errors decoding server messages
+are treated as transport failures. The client records `TransportError` and
+walks to the next host.
+
+Java also treats protocol-version mismatches as transport failures so that
+a rolling upgrade does not lock out compatible peers. This is not a shared
+retry rule: protocol-version failures remain terminal in the native/Python
+clients listed above.
 
 The Go query client doesn't resubmit after a server response it can't read
 that may have ended the statement; see

@@ -191,7 +191,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive durability mode              |
 | Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
 | Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; set `initial_connect_retry` explicitly for portable startup behavior |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | prevents implicit promotion in clients that support it; native 7.3.0+/Python 6.1.0+ pools already default to fail-fast |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -1059,7 +1059,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`; implicit promotion is client-specific, not applied by native 7.3.0+/Python 6.1.0+ pools | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |
