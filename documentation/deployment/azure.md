@@ -367,7 +367,10 @@ For EntraID integration, see the
 [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).
 Applications that run on Azure can authenticate as a managed identity or a
 service principal, without a user. The Java client requests and renews their
-Entra ID tokens with `token_provider=azure`. See
+Entra ID tokens with `token_provider=azure`. The C, C++, Rust, and Python
+clients renew them through a
+[rotating token provider](/docs/security/oidc/#rotating-bearer-tokens) that
+the application attaches in code. See
 [Managed identities and service principals](/docs/security/oidc/#managed-identities-and-service-principals).
 
 See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.

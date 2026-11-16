@@ -16,10 +16,10 @@
       .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
       .action-insert { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #4ade80; }
       .action-replace { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #f59e0b; }
-      .action-skip { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .action-noop { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
       .arrow { stroke: #0cc0df; stroke-width: 2; fill: none; }
-      .arrow-skip { stroke: #555555; stroke-width: 2; fill: none; stroke-dasharray: 4 2; }
-      .skip-x { stroke: #ef4444; stroke-width: 3; stroke-linecap: round; }
+      .arrow-noop { stroke: #555555; stroke-width: 2; fill: none; stroke-dasharray: 4 2; }
+      .noop-x { stroke: #ef4444; stroke-width: 3; stroke-linecap: round; }
       .keys-label { font: 12px "IBM Plex Mono", Menlo, monospace; fill: #e289a4; }
       .legend-box { fill: #32343e; stroke: #51535f; stroke-width: 1; }
     </style>
@@ -128,14 +128,14 @@
     <text class="action-insert" x="315" y="199">INSERT</text>
   </g>
 
-  <!-- Arrow 4: Skip (with X) -->
+  <!-- Arrow 4: No-op for an identical row (with X) -->
   <g opacity="0">
     <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
       values="0;0;0;0;0;0;1;0;0;0"/>
-    <line class="arrow-skip" x1="270" y1="241" x2="330" y2="200" marker-end="url(#arrowhead-dim)"/>
-    <line class="skip-x" x1="320" y1="195" x2="340" y2="215"/>
-    <line class="skip-x" x1="340" y1="195" x2="320" y2="215"/>
-    <text class="action-skip" x="315" y="258">SKIP</text>
+    <line class="arrow-noop" x1="270" y1="241" x2="330" y2="200" marker-end="url(#arrowhead-dim)"/>
+    <line class="noop-x" x1="320" y1="195" x2="340" y2="215"/>
+    <line class="noop-x" x1="340" y1="195" x2="320" y2="215"/>
+    <text class="action-noop" x="315" y="258">NO-OP</text>
     <text class="note" x="315" y="273" text-anchor="middle" font-size="10">(identical)</text>
   </g>
 
@@ -213,8 +213,8 @@
   </g>
   <g transform="translate(470, 340)">
     <rect width="14" height="14" fill="#555555" rx="2"/>
-    <text class="note" x="22" y="12">Identical row skipped</text>
+    <text class="note" x="22" y="12">Identical row, no write</text>
   </g>
 
-  <text class="note" x="350" y="390" text-anchor="middle">Full-row comparison: identical rows skip disk I/O entirely</text>
+  <text class="note" x="350" y="390" text-anchor="middle">Full-row comparison: identical rows change nothing</text>
 </svg>

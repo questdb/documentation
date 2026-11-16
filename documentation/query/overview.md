@@ -274,7 +274,7 @@ This is similar to the `/exp` entry point which returns results as CSV.
 
 </Tabs>
 
-Alternatively, the `/exec` endpoint can be used to create a table and the
+Alternatively, the `/execute` endpoint can be used to create a table and the
 `INSERT` statement can be used to populate it with values:
 
 <Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
@@ -315,7 +315,7 @@ async function createTable() {
     const query = "CREATE TABLE IF NOT EXISTS trades (name VARCHAR, value INT)";
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     );
     const json = await response.json();
 
@@ -330,7 +330,7 @@ async function insertData() {
     const query = "INSERT INTO trades VALUES('abc', 123456)";
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     );
     const json = await response.json();
 
@@ -345,7 +345,7 @@ async function updateData() {
     const query = "UPDATE trades SET value = 9876 WHERE name = 'abc'";
 
     const response = await fetch(
-      `${HOST}/exec?query=${encodeURIComponent(query)}`,
+      `${HOST}/api/v1/sql/execute?query=${encodeURIComponent(query)}`,
     );
     const json = await response.json();
 
@@ -371,7 +371,7 @@ host = 'http://localhost:9000'
 def run_query(sql_query):
   query_params = {'query': sql_query, 'fmt' : 'json'}
   try:
-    response = requests.get(host + '/exec', params=query_params)
+    response = requests.get(host + '/api/v1/sql/execute', params=query_params)
     json_response = json.loads(response.text)
     print(json_response)
   except requests.exceptions.RequestException as e:

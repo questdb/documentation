@@ -417,6 +417,7 @@ table below points at the QuestDB equivalent.
 | `OFFSET n LIMIT m` | `LIMIT lo, hi` (e.g. `LIMIT 10, 30`). |
 | `DISTINCT ON (col)` | For the "latest row per group by timestamp" form (`ORDER BY col, timestamp DESC`), use [`LATEST ON timestamp PARTITION BY col`](/docs/query/sql/latest-on/). For any other ordering, wrap in a CTE with `row_number() OVER (PARTITION BY col ORDER BY ...)` and filter where the row number equals 1. |
 | `INSERT ... ON CONFLICT (...) DO UPDATE` | [`DEDUP UPSERT KEYS(...)`](/docs/concepts/deduplication/) declared at table level. |
+| `INSERT ... ON CONFLICT (...) DO NOTHING` | [`DEDUP SKIP KEYS(...)`](/docs/concepts/deduplication/#upsert-and-skip-modes) declared at table level. The first row written for a key is kept and later duplicates are discarded. |
 | Correlated subqueries in `WHERE`, `EXISTS`, scalar position | [`LATERAL JOIN`](/docs/query/sql/lateral-join/) for the row-correlated cases. Some scalar correlation can be expressed via `ASOF` or window functions. |
 | `generate_series()` in `SELECT` projection | Use [`generate_series()`](/docs/query/functions/row-generator/) in the `FROM` clause. |
 | `FETCH BACKWARD`, scrollable cursors | Forward-only cursors. See [pgwire caveats](#pgwire-specific-caveats). |

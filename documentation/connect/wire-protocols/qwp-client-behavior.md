@@ -143,6 +143,16 @@ knob silently turns startup into a multi-minute **blocking** retry. If no
 `reconnect_*` knob is set either, the mode is `OFF`. Always set
 `initial_connect_retry` explicitly to avoid this ([sharp edge #1](#known-sharp-edges)).
 
+**Native/Python pool exception:** the C, C++, Rust, and Python clients apply
+this implicit promotion only to standalone senders, not pools. Their eager
+pools honor an explicitly set `initial_connect_retry` and otherwise fail fast
+even when `reconnect_*` keys are set. Reader prewarm is always synchronous
+and is not covered by the ingestion retry mode; use `query_pool_min=0` to
+defer it. `lazy_connect=true` selects background ingestion and defaults
+`query_pool_min` to `0`; these pools reject it together with an explicit
+`initial_connect_retry` other than `async`, or with a nonzero
+`query_pool_min`.
+
 ### Facade prewarm
 
 `QuestDBBuilder.build()` validates both configs (without connecting), then
@@ -169,7 +179,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_pool_min` | `1` |
 | `sender_pool_max` | `4` |
-| `query_pool_min` | `1` |
+| `query_pool_min` | `1` (`0` with `lazy_connect`) |
 | `query_pool_max` | `4` |
 | `acquire_timeout_ms` | `5000` |
 | `idle_timeout_ms` | `60000` (`0` ⇒ infinite) |
@@ -182,7 +192,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
-| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
+| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory-only mode) |
 | `sf_durability` | `memory` |
 | `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
@@ -309,16 +319,25 @@ here.
 
 `sf_dir=...` enables SF. There is no separate boolean enable flag.
 
-- The sender owns one slot: `<sf_dir>/<sender_id>/`. Default `sender_id` is
-  `default`.
+A flush sends rows to the server in batches. A batch is one QWP message; the
+protocol specs call it a *frame*, hence names such as `max_frame_rejections`.
+See [Batches](/docs/high-availability/store-and-forward/concepts/#batches).
+
+- The sender owns one sender directory: `<sf_dir>/<sender_id>/`. Default
+  `sender_id` is `default`.
 - Multiple independent senders sharing one `sf_dir` must use distinct
-  `sender_id` values, else the second fails because the slot lock is held.
-- In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
-  pooled senders never collide. The minted name is client-specific: Java uses
-  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
-  `<base>-ingest-0`, `<base>-ingest-1`, ….
+  `sender_id` values, else the second fails because the first holds the
+  directory's lock.
+- In pooled `QuestDB` usage, the pool derives a directory name for each pooled
+  sender from the base so they never collide. The minted name is
+  client-specific: Java uses `<base>-0`, `<base>-1`, …; the pool shared by
+  Rust, C, C++, Python, and Ruby uses `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
-  unacknowledged frames; acknowledged/truncated frames are not replayed.
+  unacknowledged batches. Segments already freed are not replayed, but
+  acknowledged batches in a surviving segment can be, unless the
+  `.ack-watermark` file records them; see
+  [`.ack-watermark`](/docs/high-availability/store-and-forward/concepts/#ack-watermark).
+  Use DEDUP to absorb them.
 
 `flush()` semantics (QWP sender):
 
@@ -326,9 +345,10 @@ here.
 - In SF mode, data is persisted to mmap-backed segment files before `flush()`
   returns.
 - `flush()` does **not** wait for server ACKs unless backpressure requires
-  space. The I/O thread sends frames and trims ACKed frames asynchronously.
+  space. The I/O thread sends batches asynchronously and, as acknowledgements
+  arrive, frees each segment whose batches are all acknowledged.
 - `drain(timeoutMillis)` flushes and waits for the server to ACK all currently
-  published frames, up to the timeout.
+  published batches, up to the timeout.
 - `close()` flushes then waits up to `close_flush_timeout_millis` for ACKs,
   unless that timeout is `<= 0`.
 
@@ -337,24 +357,28 @@ here.
 With `initial_connect_retry=async`:
 
 - `build()` returns without a live socket; `wasEverConnected()` is `false`.
-- Producer calls and `flush()` can run before the server exists; frames
+- Producer calls and `flush()` can run before the server exists; rows
   accumulate in the cursor engine (and on disk with `sf_dir`).
 - The I/O thread retries in the background using the same loop used after wire
   failure, with capped exponential backoff and no wall-clock deadline.
-- When a server appears, buffered frames are sent/replayed and ACK-driven
-  trimming begins.
+- When a server appears, buffered rows are sent or replayed, and acknowledged
+  data starts being freed.
 - Terminal errors go to a configured `SenderErrorHandler`; without one they
   surface on later producer calls or at close-time.
 
 A sender in async mode does not give up because time passed. It ends only on
-a **terminal** condition: an authentication rejection or a durable-ack
-capability mismatch, the poison-frame detector, or the producer hitting
-`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on
-`append()`. ⚠ The Java client treats an authentication rejection or a
-durable-ack capability mismatch as terminal only before the sender first
-connects, and retries them afterwards. A Node.js sender that uses
-store-and-forward or `initial_connect_retry=async` does the same once it has
-connected, as do some browser senders: see
+a **terminal** condition: an authentication rejection, a durable-ack capability
+mismatch, or a batch the server keeps rejecting (`max_frame_rejections`).
+Exhausting `sf_append_deadline_millis` on `append()` with `sf_max_total_bytes`
+reached fails only that call; the sender stays alive and keeps retrying.
+⚠ The Java client treats an
+authentication rejection or a durable-ack capability mismatch as terminal only
+before the sender first connects, and retries them afterwards. C, C++, and
+Rust 7.3.0 or later and Python 6.1.0 or later also retry authentication
+rejections after the sender has connected, including with fixed credentials,
+but keep a durable-ack capability mismatch terminal. A Node.js sender that
+uses store-and-forward or `initial_connect_retry=async` retries both kinds
+once it has connected, as do some browser senders: see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
@@ -369,13 +393,14 @@ the steady-state loop:
 
 1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
    which gives up and throws when the budget expires.
-2. The background drainer's **durable-ack capability-gap budget**, used when an
-   orphan slot repeatedly lands on a node that cannot serve durable acks.
+2. The background drainer's **durable-ack capability-gap budget**, used when
+   the connection that drains an orphan repeatedly lands on a node that cannot
+   serve durable acks.
 
 The practical consequence: what bounds your tolerance of a long outage is
 **buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
-available disk; in memory mode it is the same key against RAM. When the cap is
-reached, `append()` blocks and then throws after
+available disk; in memory-only mode it is the same key against RAM. When the
+cap is reached, `append()` blocks and then throws after
 `sf_append_deadline_millis` — that, not a timer, is the signal that an outage
 has outlasted your configuration.
 
@@ -388,12 +413,13 @@ and apply back-pressure to the producer rather than dropping data.
 
 :::
 
-⚠ In the Java client, a running sender also retries authentication failures.
-So does a Node.js sender that uses store-and-forward or
-`initial_connect_retry=async`, and a browser sender that authenticates with
-`sessionBootstrap` and was started with `initialConnectMode: "async"`, once it
-has connected. A browser sender that authenticates with `auth` cannot see why
-an upgrade failed, so once it has connected it retries a rejected credential
+⚠ In Java, C/C++ and Rust 7.3.0 or later, and Python 6.1.0 or later, a running
+sender also retries authentication failures. So does a Node.js sender that
+uses store-and-forward or `initial_connect_retry=async`, and a browser sender
+that authenticates with `sessionBootstrap` and was started with
+`initialConnectMode: "async"`, once it has connected. A browser sender that
+authenticates with `auth` cannot see why an upgrade failed, so once it has
+connected it retries a rejected credential
 like an outage, whatever its mode, and reports `endpoint-attempt-failed`
 rather than `auth-failed`. Other senders treat authentication failures as
 terminal. See
@@ -402,15 +428,22 @@ terminal. See
 ### Authentication failures and token providers
 
 A client sends its credential only on the WebSocket upgrade request, and never
-authenticates an established connection again. A client with a token provider,
-such as the [Java client](/docs/connect/clients/java/#token-providers), asks
-the provider for the credential at the start of every connect round: the
-initial connect, every reconnect and failover, every orphan-drain connect, and
-every query client connect. When the provider fails, the round ends without
-contacting any endpoint, as a **credential-unavailable** failure, which the
-provider classifies as retryable or permanent. An exception from a provider
-that the application supplies counts as permanent, unless it is a token
-failure marked as retryable.
+authenticates an established connection again. The
+[Java](/docs/connect/clients/java/#token-providers),
+[C/C++](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens),
+[Rust](/docs/connect/clients/rust/#rotating-bearer-tokens), and
+[Python](/docs/connect/clients/python/#rotating-bearer-tokens) clients support
+token providers. They ask the provider for a credential at the start of every
+connect round: the initial connect, every reconnect and failover, every
+orphan-drain connect, and every query client connect. When the provider fails,
+the round ends without contacting any endpoint, as a
+**credential-unavailable** failure, which the provider can classify as
+retryable or permanent.
+
+In Java, an unclassified exception from an application provider counts as
+permanent. In C, C++, Rust, and Python, an unclassified token-source failure
+counts as retryable. Classify failures explicitly when implementing a source.
+A closed provider is terminal regardless of the retry policy.
 
 When an upgrade that presented a token from a provider receives `401`, without
 a Bearer `error` or with `error="invalid_token"`, the client tells the provider
@@ -425,26 +458,47 @@ fails, or the token did not change, the phase decides what happens:
 | Initial connect, `on` / `sync` | retry within `reconnect_max_duration_millis` | fail startup | fail startup |
 | Initial connect, `async` | retry indefinitely | retry indefinitely | terminal, reported to the error handler |
 | Sender that has connected | retry indefinitely | retry indefinitely | retry indefinitely |
-| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the slot aside |
-| Orphan drain, fixed credential | n/a | n/a | set the slot aside |
+| Orphan drain, token provider | retry indefinitely | retry indefinitely | ride out, then set the directory aside |
+| Orphan drain, fixed credential | n/a | n/a | set the directory aside |
 | Query | fail the query | fail the query | fail the query |
 
 *Retry indefinitely* means with capped exponential backoff for as long as the
 sender is open. No setting bounds it, because store-and-forward must not end a
-live producer. The client reports each failed round to the error handler as a
-retriable `SECURITY_ERROR`, and in its connection health, so an application
-that prefers a hard failure can close the sender itself. A query that fails
-names the failure class in its error, and the next query connects again.
+live producer. Java reports each failed round to the error handler as a
+retriable `SECURITY_ERROR`, and in its connection health. C, C++, Rust, and
+Python distinguish `credential_unavailable` / `CredentialUnavailable`
+connection events from server rejection events (`auth_failed` / `AuthFailed`).
+An application that prefers a hard failure can close a standalone sender
+from its own code, outside callbacks. With native or Python pools, returning
+a sender lease (including Python's `PooledSender.close()`) can leave its
+background delivery running. Release all leases and close the pool to stop
+it, or explicitly retire a borrowed native connection instead of recycling
+it. Closing a shared OIDC or refreshing provider also disables future token
+pulls. In C, C++, Rust, and Python, an application-defined provider stops its
+clients by reporting a failure that retrying can never clear; see
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
 
-⚠ This is the behaviour of the Java client 1.3.11 and later. The browser
-client's `auth` option also accepts a function that supplies a credential
-before every connection attempt, and some Node.js and browser senders retry a
-rejected credential once they have connected, as described in
+The table describes Java 1.3.11 and later. C, C++, and Rust 7.3.0 or later and
+Python 6.1.0 or later follow the same sender-phase distinction: a `401` or
+`403` stops a sender that has not connected yet in every
+`initial_connect_retry` mode, including pools with `lazy_connect=true`, and a
+foreground failure does not mean an established sender stopped reconnecting.
+An OIDC provider that needs user interaction ends a caller-awaited connection
+attempt; arrange explicit sign-in, never a prompt inside the reconnect loop.
+Their readers apply their own failover limits to recoverable acquisition
+failures; after an exhausted failover, a later query can connect again. A
+server authentication rejection still fails the query after any eligible
+one-time token replacement.
+
+The browser client's `auth` option also accepts a function that supplies a
+credential before every connection attempt, and some Node.js and browser
+senders retry a rejected credential once they have connected, as described in
 [Reconnect and outage handling](#reconnect-and-outage-handling). A browser
 query session that authenticates with `auth` cannot see the status of a failed
 upgrade, so instead of failing the query it fails over as it would during an
-outage, until its failover limits run out. The other clients send fixed credentials only,
-and treat a `401` or `403` as terminal in every phase.
+outage, until its failover limits run out. Other clients without these
+capabilities send fixed credentials and treat a `401` or `403` as terminal in
+every phase.
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
@@ -469,7 +523,7 @@ unreachable endpoint, and tries the next one.
 
 `QwpQueryClient.connect()` is synchronous. Per endpoint it: opens TCP/TLS,
 performs the WebSocket upgrade to `/read/v1`, reads the initial `SERVER_INFO`
-frame, applies the `target=` role filter, and starts the egress I/O thread on
+message, applies the `target=` role filter, and starts the egress I/O thread on
 the first match. If no endpoint can be used, it throws. There is no async
 initial-connect mode for queries.
 
@@ -540,7 +594,7 @@ reconnect/replay.
 | token provider cannot supply a token | `off` | build throws the provider's exception |
 | token provider cannot supply a token | `on` / `sync` | retryable failure: retried within `reconnect_max_duration_millis`; permanent failure: build throws |
 | token provider cannot supply a token | `async` | build returns; I/O thread retries |
-| server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
+| server appears later, any delay | `initial_connect_retry=async` | buffered rows sent and ACKed — the retry loop has no deadline |
 | server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
 #### Read-replica startup (one bad endpoint, another replica works)
@@ -607,15 +661,16 @@ avoid it.
 
 ### Pooled SF startup recovery nuance
 
-- Live/prewarmed sender slots recover their own unacked data via their
-  `CursorSendEngine`.
-- Non-live managed slots are scanned by the housekeeper startup recovery path,
-  so `build()` does not block on stranded slots.
-- Recovery of non-live stranded slots is best-effort and bounded: a build/drain
-  failure aborts that scan; data stays durable for a later attempt, but the
-  current process does not retry the aborted scan indefinitely.
-- For immediate background drain of all slots, keep enough `sender_pool_min`
-  slots warm or construct direct senders for the slots that must actively retry.
+- Live or prewarmed pooled senders recover the unacked data in their own sender
+  directories via their `CursorSendEngine`.
+- The pool's other sender directories are scanned by the housekeeper startup
+  recovery path, so `build()` does not block on stranded directories.
+- Recovery of those stranded directories is best-effort and bounded: a
+  build/drain failure aborts that scan; data stays durable for a later attempt,
+  but the current process does not retry the aborted scan indefinitely.
+- For immediate background drain of every sender directory, keep enough
+  senders warm with `sender_pool_min`, or construct direct senders for the
+  directories that must actively retry.
 
 ### Reconnect loop (`CursorWebSocketSendLoop`)
 
