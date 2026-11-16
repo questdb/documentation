@@ -673,7 +673,8 @@ application. Report exactly one result per invocation:
   copies the raw token. Expiry is Unix epoch **milliseconds**; pass `0` for
   `refresh_at_ms` when the platform supplies no refresh hint.
 - `questdb_token_sink_set_error(sink, retryable, retry_after_ms, msg, len)`
-  reports failure. Pass `-1` when there is no retry-after hint.
+  reports failure. Pass a negative `retry_after_ms`, such as `-1`, when there
+  is no retry-after hint.
 
 After successful provider creation, `release(user_data)` owns cleanup, even
 if connecting the pool subsequently fails. If provider creation itself

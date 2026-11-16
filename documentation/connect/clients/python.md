@@ -1280,11 +1280,16 @@ stop reconnecting. A `TokenUnavailableError` never stops them, whatever its
 and normally close clients before their provider.
 
 Durable-ack capability mismatches (`ProtocolVersionError`) and terminal data
-rejections are not retried. A `flush(wait=True)` or `wait()` that times out
-can retain the underlying authentication diagnostic; transport-only timeouts
-report
-`QuestDBErrorCode.FailoverRetry`. Rows remain queued and background delivery
-continues, so retry the wait rather than flushing the same rows again. See
+rejections are not retried. Acknowledgement waits have their own no-progress
+timeout, which ends the wait but not reconnecting: 30 seconds for a
+`flush(wait=True)` that publishes rows, or the `timeout_millis` you pass to
+`wait()` (`0` waits indefinitely). When acknowledgements make no progress for
+that long, the call raises `QuestDBErrorCode.FailoverRetry`. If an
+authentication failure is blocking the reconnect, the error keeps that
+diagnostic, so it can be an `OidcInteractionRequired` or
+`TokenUnavailableError` with that code. Rows remain queued and background
+delivery continues, so retry the wait rather than flushing the same rows
+again. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 
 To observe connection state, pass a listener when connecting. It receives
@@ -1396,7 +1401,7 @@ Codes you will most often dispatch on:
 | `AuthError` | Credentials rejected during the WebSocket upgrade, or a non-retryable token-acquisition failure. | Inspect `OidcError` / `TokenUnavailableError` details where present; sign in, repair the source, or replace the credential. |
 | `InvalidApiCall` | Client-side misuse: exhausted pool, a lease's previous result still undrained, a closed handle. | Fix the call pattern, or raise the pool caps. |
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
-| `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
+| `FailoverRetry` | `flush(wait=True)` or `wait()` saw no acknowledgement progress within its no-progress timeout: 30 seconds for `flush(wait=True)`, or `wait()`'s `timeout_millis`. Rows stay queued and background delivery continues. | Retry the wait; do not re-send the rows. |
 | `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` consumer or `polars.DataFrame(result)`. | Discard partial state and rerun the query. |
 | `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |

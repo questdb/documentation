@@ -350,7 +350,9 @@ if the client runs on a remote machine. It requires:
   [`acl.oidc.client.id`](/docs/configuration/oidc/#acloidcclientid), which the
   Web Console also uses. In Microsoft Entra ID, set _Allow public client
   flows_ to _Yes_ under _Authentication_, _Advanced settings_ in its app
-  registration. In PingFederate, add _Device Authorization_ to the client's
+  registration. This also enables ROPC sign-in; see the
+  [Entra ID setup](#set-up-the-client-application-in-entra-id) for
+  safeguards. In PingFederate, add _Device Authorization_ to the client's
   allowed grant types. In Keycloak, enable _OAuth 2.0 Device Authorization
   Grant_ in the client's capability config.
 - Direct network access from the client host to QuestDB and the IdP:
@@ -1781,9 +1783,23 @@ width={600}
 The same _Allow public client flows_ setting also enables the _Device Code
 Flow_, which the C, C++, Rust, and Python clients use for
 [device-flow sign-in](#device-authorization-flow). Turn it on for that flow
-even if you do not use ROPC: QuestDB accepts ROPC logins only when
+even if you do not use ROPC.
+
+:::warning Public client flows
+
+With _Allow public client flows_ enabled, any program that knows this
+application's client ID can sign a user in to it directly with Entra ID,
+through ROPC or the device code flow, and use the resulting tokens with
+QuestDB.
 [`acl.oidc.ropc.flow.enabled`](/docs/configuration/oidc/#acloidcropcflowenabled)
-is set.
+does not prevent this: it only controls whether QuestDB itself accepts a
+username and password and forwards them to Entra ID. Require MFA for this
+application with Conditional Access. ROPC cannot complete MFA, so this blocks
+password-only sign-ins, including ROPC logins through QuestDB. If your tenant
+restricts authentication flows, allow the device code flow only for the users
+or locations that need it.
+
+:::
 
 Our next stop is the _Token configuration_, where the OAuth2/OIDC access and ID
 tokens can be customized.
