@@ -177,8 +177,9 @@ hosts when `zone=` is set.
 
 ## Error classification
 
-Every error the client encounters falls into one of three buckets, which drives
-the loop's response:
+Errors fall into three buckets, which drive the loop's response. The
+classification depends on the client and whether it is making an initial
+connection, reconnecting an established sender, or running a query.
 
 ### Terminal — bypass failover
 
@@ -187,8 +188,18 @@ will not help.
 
 | Condition | Why terminal |
 |---|---|
-| HTTP `401` / `403` on upgrade | Credentials are cluster-wide; retrying floods server logs without recovery. |
+| HTTP `401` / `403` on a query, or before a sender has connected | After any eligible one-time token replacement, rejected credentials end the endpoint walk because credentials are cluster-wide. |
+| Durable-ack capability mismatch in C, C++, Rust, and Python, when every host refuses the requested tiers | Retrying cannot make these servers grant the tiers, so neither an initial connection nor a sender that has connected retries it. |
 | Server-status reject (SF) | Application-layer reject; replay reproduces the same response. |
+
+In the Java, C, C++, Rust, and Python clients, a `401` or `403` stops a sender
+that has not connected yet in every `initial_connect_retry` mode, including
+`async` and pools with `lazy_connect=true`. An established C, C++, or Rust
+7.3.0+ sender, or Python 6.1.0+ sender, instead retries HTTP `401` / `403`
+with capped backoff. The rejection ends the current endpoint walk, not the
+reconnect loop. See
+[Authentication is cluster-wide](#authentication-is-cluster-wide) for the
+phase rules and other clients' behavior.
 
 ### Topology — handled inside the round
 
@@ -205,11 +216,14 @@ fails the current `execute()` call.
 
 ### Transient — enter backoff
 
-Everything else: TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or
-receive failures, `404` / `426` / `503` on upgrade, version mismatches
-(per-endpoint — a rolling upgrade in flight does not lock out compatible
-peers), and generic errors decoding server messages. The client records
-`TransportError` and walks to the next host.
+TCP/TLS errors, `auth_timeout_ms` expiry, mid-stream send or receive failures,
+`404` / `426` / `503` on upgrade, and retryable errors decoding server messages
+are treated as transport failures. The client records `TransportError` and
+walks to the next host.
+
+The Java, C, C++, Rust, and Python clients also treat an upgrade response that
+advertises an unsupported QWP version as a transport failure of that host, so
+a rolling upgrade does not lock out compatible peers.
 
 The Go query client doesn't resubmit after a server response it can't read
 that may have ended the statement; see
@@ -236,19 +250,31 @@ when at least one peer is healthy."
 
 ## Authentication is cluster-wide
 
-A `401` or `403` on the HTTP upgrade is terminal — the client does not retry
-other hosts. The assumption is that auth credentials are configured
-identically across the cluster, so a credential failure against one node is
-a credential failure against all of them. Retrying would spam every peer's
-audit log without recovering.
+A `401` or `403` on the HTTP upgrade ends the current endpoint walk, after
+any eligible one-time token replacement: the client does not retry other
+hosts. This does not necessarily terminate a sender's reconnect loop. The
+assumption is that auth credentials are configured identically across the
+cluster, so a credential failure against one node is a credential failure
+against all of them. Trying every peer would spam their audit logs without
+recovering.
 
-The Java client relaxes this in two cases. With a token provider, a `401`
-first earns one retry of the same host with a new token. A Java sender that
-has connected before also treats a rejected credential like an outage: it
+In Java, a token provider can supply a new token for one same-host retry
+after an eligible `401`. A Java sender that has connected before also
+treats a rejected credential like an outage: it
 keeps retrying with backoff, buffering rows, and reports each failed round to
 its error handler, so ingestion resumes once QuestDB accepts the credential
 again, such as after a token renewal. See
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, also retry
+HTTP `401` / `403` with capped backoff once a sender has connected, including
+with fixed credentials. They retain unacknowledged rows and report
+`auth_failed` / `AuthFailed` connection events. Before a sender has
+connected for the first time, a rejected credential stops it in every
+`initial_connect_retry` mode, including `async` and pools with
+`lazy_connect=true`. With a token provider, an eligible `401` can first
+trigger one same-host retry if the token changes; a `403` cannot. The retry
+does not extend to a durable-ack capability mismatch, which stays terminal.
 
 The Node.js client also treats a rejected credential like an outage, for a
 sender that has connected before and uses store-and-forward or was started
