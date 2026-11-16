@@ -37,6 +37,7 @@ This page tracks significant updates to the QuestDB documentation.
 - Added the `durableEpochSeqTxn`, `recoveryIncarnation`, `localDurableSeqTxn`, and `lastEpochTs` columns to [`wal_tables()`](/docs/query/functions/meta/#wal_tables) and three adaptive commit [metrics](/docs/integrations/other/prometheus/#wal-metrics), and corrected the names of `questdb_wal_apply_seq_txn` and `questdb_wal_apply_writer_txn`
 - [CREATE TABLE](/docs/query/sql/create-table/#deduplication) - `DEDUP { UPSERT | SKIP } KEYS` in the syntax of both creation forms; `CREATE TABLE LIKE` copies the keys and the mode
 - [Standard SQL equivalents](/docs/concepts/deep-dive/sql-extensions/#standard-sql-features-not-supported) - `INSERT ... ON CONFLICT DO NOTHING` maps to `DEDUP SKIP KEYS`
+- Added [`backup.activity.log.interval`](/docs/operations/backup/#configuration-reference), which sets how often QuestDB Enterprise logs a backup step that is still running, such as an object store upload or a partition compression
 
 ### Updated
 
@@ -55,6 +56,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [.NET client transactions](/docs/connect/clients/dotnet/#transactions) - Documented `transaction=on` for QWP, which defers commits until `Commit()`, `CommitAsync()`, or `SendAsync()`
 - [Store-and-forward operations](/docs/high-availability/store-and-forward/operating-and-tuning/#recovery-failures) - Corrected the lock error messages each client prints, and that a sender directory with a gap between segments is set aside rather than stopping the sender. [When to use store-and-forward](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) now says that, with the default `cairo.commit.mode`, an OK acknowledgement doesn't mean the WAL is on the primary's disk
 - [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/#codex-in-non-interactive-mode) - Running Codex non-interactively with `codex exec`: pre-approve the QuestDB server's tools with `default_tools_approval_mode = "approve"`, otherwise every MCP tool call is refused. The pairing permission level still applies
+- [Backup monitoring](/docs/operations/backup/#monitor-and-abort) - `progress_percent` in `backups()` weights each partition by its size, so a backup with one large partition no longer jumps ahead and then stalls. A partition that compresses for longer than the log interval logs its byte progress
 - [AI coding agents](/docs/getting-started/ai-coding-agents/#installation) - Corrected the agent skill install paths: `npx skills add questdb/skills` installs to `~/.agents/skills/questdb/` for both Claude Code and Codex, and a manual Codex install goes to `~/.agents/skills/questdb/` instead of `~/.codex/skills/questdb/`
 
 ## October 2026
