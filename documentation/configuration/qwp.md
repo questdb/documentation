@@ -11,6 +11,10 @@ receiver. WebSocket
 ingestion and egress share the HTTP server's network settings (port, TLS,
 worker threads); see
 [HTTP server configuration](/docs/configuration/http-server/) for those.
+Without HTTP authentication, WebSocket connections also follow
+[`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts).
+A rejected host name returns `403 Forbidden` before the upgrade, for browser
+and non-browser clients alike.
 
 ## Protocol limits
 
@@ -82,6 +86,10 @@ origin, so a page served from QuestDB's own origin that uses `auth` must list
 that origin too. QuestDB ignores session cookies on cross-origin upgrades. List
 only trusted applications: a listed origin can open authenticated connections
 to the server. The setting does not enable CORS on the REST API.
+
+REST and other HTTP endpoints use
+[`http.browser.allowed.origins`](/docs/configuration/http-server/#httpbrowserallowedorigins)
+instead. Adding an origin to either list does not add it to the other.
 
 ### qwp.browser.tls.termination.enabled
 
