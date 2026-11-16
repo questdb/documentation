@@ -50,6 +50,9 @@ integrations:
 - [Databento connector](/docs/connect/connectors/databento/): Stream Live market
   data and run Historical backfills with QuestDB Enterprise. On QuestDB Open
   Source, see [Databento with Python](/docs/integrations/other/databento/).
+- [dbt connector](/docs/connect/connectors/dbt/): Build, test, and document SQL
+  models in QuestDB Enterprise with dbt Core, including views, tables,
+  incremental models, and materialized views.
 
 ## Analytics and Processing
 

@@ -28,6 +28,11 @@ If this is your first time setting up QuestDB, see the
    especially for production instances. See
    [Backup and restore](/docs/operations/backup/) for details.
 
+3. **Plan the way back.** After QuestDB 10.2.0 or QuestDB Enterprise 4.2.0 has
+   run on a database, going back to an earlier release, writing with it, and
+   then starting the later release again is not supported. To go back, follow
+   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
 ## Upgrade steps
 
 ### Docker
@@ -102,6 +107,18 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Database administrator](/docs/security/rbac/#database-administrator).
 
 ### Upgrading to 4.2.0
+
+QuestDB Enterprise 4.2.0 adds
+[adaptive durability mode](/docs/concepts/durability/). The default stays
+`nosync`. Check the following before upgrading:
+
+- A replicating primary in `nosync` or `async` mode now refuses to start when,
+  after a power loss or an operating system crash, its log of a table ends
+  before the last transaction in the object store. Earlier releases started
+  and diverged from the replicas. See
+  [A primary refuses to start after a power loss](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss).
+- Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
+  [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 #### ACL audit log
 
@@ -249,12 +266,14 @@ check how these changes affect your users and clients:
   skew. Earlier versions never checked the expiry, so a token kept working
   after it expired. A client that sends a fixed token, such as
   `token=<ID token>` in a connect string, stops working once that token
-  expires, and an orphan drainer that presents an expired token sets its
-  store-and-forward slot aside, and reports data loss, instead of draining
+  expires, and an orphan drainer that presents an expired token sets the
+  orphan's store-and-forward sender directory aside, and reports data loss, instead of draining
   it. Such a client must switch to a new token before the old one expires,
   or use a
-  [token provider](/docs/connect/clients/java/#token-providers) in the Java
-  client. See [Token validation](/docs/security/oidc/#token-validation).
+  [rotating token provider](/docs/security/oidc/#rotating-bearer-tokens),
+  available in the Java client 1.3.11 or later, the C, C++, and Rust clients
+  7.3.0 or later, and the Python client 6.1.0 or later. See
+  [Token validation](/docs/security/oidc/#token-validation).
 - **OIDC tokens must come from the expected issuer.** With
   `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token whose `iss`
   claim is missing or is not the expected issuer, and refuses to start without

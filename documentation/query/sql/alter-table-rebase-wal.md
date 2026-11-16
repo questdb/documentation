@@ -38,6 +38,9 @@ or a sequencer that has grown too large to manage, `REBASE WAL` rebuilds the
 table instead:
 
 - All data already applied to the table is preserved.
+- The table keeps its settings, including its [TTL](/docs/concepts/ttl/),
+  `FORMAT PARQUET`, per-column Parquet encoding, and
+  [deduplication](/docs/concepts/deduplication/) keys and mode.
 - Every un-applied WAL transaction is discarded, including queued schema changes.
 - The table is recreated under a brand-new sequencer, so its transaction
   numbering restarts from the beginning.

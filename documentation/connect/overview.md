@@ -21,6 +21,7 @@ Pick the path that matches your environment.
 | An AI agent or MCP tooling driving the database                         | [Agents](/docs/connect/agents/)                                  |
 | Kafka, Flink, Redpanda, or Telegraf pipelines                           | [Connectors](/docs/integrations/overview/#data-ingestion-and-streaming) |
 | Databento Live feeds or Historical market data                          | [Databento connector](/docs/connect/connectors/databento/)       |
+| SQL transformations as tested, version-controlled dbt models            | [dbt connector](/docs/connect/connectors/dbt/)                   |
 | HTTP scripts, ad-hoc `curl`, or CSV imports                             | [REST API](#rest-api)                                            |
 | Existing InfluxDB collectors, or anything that already emits ILP        | [Compatibility → ILP](/docs/connect/compatibility/ilp/overview/)             |
 | Postgres-shaped data layer, BI tools, ORMs                              | [Compatibility → PGWire](/docs/connect/compatibility/pgwire/overview/)           |
@@ -62,8 +63,9 @@ client. Reach for it when you want a `curl` one-liner, a shell script, a health
 check, or a bulk file load without pulling in a client library. It is not
 superseded by QWP.
 
-- **[REST API](/docs/connect/compatibility/rest-api/)**: `/exec` runs SQL and
-  returns JSON, `/imp` uploads CSV, `/exp` exports results as CSV or Parquet.
+- **[REST API](/docs/connect/compatibility/rest-api/)**: `/api/v1/sql/execute`
+  runs SQL and returns JSON, `/imp` uploads CSV, `/exp` exports results as CSV
+  or Parquet.
 - **[CSV import](/docs/connect/compatibility/import-csv/)**: bulk loading a CSV
   file, over HTTP or with `COPY`.
 - **[Parquet export](/docs/concepts/parquet/#export)**: writing query results to

@@ -277,20 +277,17 @@ SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
 
 ## Sample calculation
 
-The default time calculation of sampled groups is an absolute value, in other
-words, sampling by one day is a 24 hour range which is not bound to calendar
-dates. To align sampled groups to calendar dates, the `ALIGN TO` keywords can be
-used and are described in the [ALIGN TO CALENDAR](#align-to-calendar) section
-below.
+By default, sampled groups are aligned to calendar dates: sampling by one day
+produces groups that start at midnight UTC, and sampling by one hour produces
+groups that start on the hour. There is no need to write `ALIGN TO CALENDAR`;
+add it only to use its [TIME ZONE](#time-zone) or [WITH OFFSET](#with-offset)
+options. To start groups at the first observed timestamp instead, use
+[ALIGN TO FIRST OBSERVATION](#align-to-first-observation).
 
 :::note
 
-Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you do not specify
-an explicit alignment, `SAMPLE BY` expressions will use `ALIGN TO CALENDAR` behaviour.
-
-The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query.
-
-Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar` option to `false` in `server.conf`.
+If you prefer to align to the first observation by default, set
+`cairo.sql.sampleby.default.alignment.calendar` to `false` in `server.conf`.
 
 :::
 
@@ -558,10 +555,9 @@ SAMPLE BY 1h;
 
 | ts                          | count |
 | --------------------------- | ----- |
-| 2021-05-31T23:45:10.000000Z | 3     |
-| 2021-06-01T00:45:10.000000Z | 1     |
-| 2021-05-31T23:45:10.000000Z | 1     |
-| 2021-06-01T00:45:10.000000Z | 1     |
+| 2021-05-31T23:00:00.000000Z | 1     |
+| 2021-06-01T00:00:00.000000Z | 4     |
+| 2021-06-01T01:00:00.000000Z | 1     |
 
 The following will return the trade volume in 30 minute intervals
 
@@ -571,13 +567,12 @@ FROM trades
 SAMPLE BY 30m;
 ```
 
-| ts                          | sum    |
-| --------------------------- | ------ |
-| 2021-05-31T23:45:10.000000Z | 1000.5 |
-| 2021-06-01T00:15:10.000000Z | 16024  |
-| 2021-06-01T00:45:10.000000Z | 8000   |
-| 2021-06-01T00:15:10.000000Z | 8012   |
-| 2021-06-01T00:45:10.000000Z | 8000   |
+| ts                          | sum      |
+| --------------------------- | -------- |
+| 2021-05-31T23:30:00.000000Z | 1000.5   |
+| 2021-06-01T00:00:00.000000Z | 20530.25 |
+| 2021-06-01T00:30:00.000000Z | 31045    |
+| 2021-06-01T01:00:00.000000Z | 5007.5   |
 
 The following will return the average trade notional (where notional is = q \*
 p) by day:
@@ -588,23 +583,23 @@ FROM trades
 SAMPLE BY 1d;
 ```
 
-| ts                          | avg               |
-| --------------------------- | ----------------- |
-| 2021-05-31T23:45:10.000000Z | 6839.416666666667 |
+| ts                          | avg      |
+| --------------------------- | -------- |
+| 2021-05-31T00:00:00.000000Z | 1000.5   |
+| 2021-06-01T00:00:00.000000Z | 11316.55 |
 
-To make this sample align to calendar dates:
+To start the daily group at the first trade instead of at midnight:
 
-```questdb-sql title="Calendar alignment"
+```questdb-sql title="First observation alignment"
 SELECT ts, avg(quantity*price)
 FROM trades
 SAMPLE BY 1d
-ALIGN TO CALENDAR;
+ALIGN TO FIRST OBSERVATION;
 ```
 
-| ts                          | avg    |
-| --------------------------- | ------ |
-| 2021-05-31T00:00:00.000000Z | 1000.5 |
-| 2021-06-01T00:00:00.000000Z | 8007.2 |
+| ts                          | avg               |
+| --------------------------- | ----------------- |
+| 2021-05-31T23:45:10.000000Z | 9597.208333333334 |
 
 ## Performance optimization
 
@@ -613,7 +608,7 @@ For frequently executed `SAMPLE BY` queries, consider using [materialized views]
 ```questdb-sql
 CREATE MATERIALIZED VIEW hourly_metrics AS
 SELECT 
-    timestamp_floor('h', ts) as hour,
+    ts as hour,
     symbol,
     avg(price) as avg_price,
     sum(volume) as total_volume

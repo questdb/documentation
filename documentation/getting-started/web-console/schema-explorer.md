@@ -31,7 +31,7 @@ All table columns are displayed with their names and data types, each represente
 - **Designated Timestamp**: The designated timestamp column is highlighted with a distinctive green-colored icon
 - **Symbol Columns**: Distinguished by tag icons, these can be further expanded to reveal:
   - **Indexed**: Indicates whether the symbol column has an index for faster filtering
-  - **Symbol Capacity**: The maximum number of distinct symbols that can be stored (e.g., 256)
+  - **Symbol Capacity**: The number of distinct symbols the column holds before its symbol table is resized (e.g., 256). Resizing is automatic.
   - **Cached**: Shows whether symbol values are cached in memory for improved performance
 
 #### Storage details
