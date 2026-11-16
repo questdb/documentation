@@ -365,6 +365,9 @@ minute. Subscribe to those directly when they fit. To aggregate the raw
   per row, such as indicators that accumulate through a trading session.
 
 Both refresh as the connector writes, and both are read like regular tables.
+To define them as tested, version-controlled models, use the
+[dbt connector](/docs/connect/connectors/dbt/), which reads these tables as dbt
+sources.
 
 ### Candles with a materialized view
 

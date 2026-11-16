@@ -176,9 +176,10 @@ If your out-of-order writes may include rows that overwrite existing rows
 with the same key (for example, exchange corrections or third-party data
 re-published with revisions), enable
 [deduplication](/docs/concepts/deduplication/) on the relevant key columns.
-The full-row equality check lets QuestDB skip writes for unchanged rows
-entirely, which reduces write amplification when reloading large datasets
-where only a small portion has changed.
+The full-row equality check of the `UPSERT` mode leaves unchanged rows as
+they are, which reduces write amplification when reloading large datasets
+where only a small portion has changed. To keep the first version of a row
+and discard later ones, use the `SKIP` mode instead.
 
 ### Choice of designated timestamp
 
@@ -214,8 +215,9 @@ QuestDB. Each batch counts as out-of-order against the live data already
 committed.
 
 Enable deduplication on the row key so that re-consumed rows are detected
-as identical to the existing rows and skipped without rewriting. This makes
-replay safe to repeat without inflating write amplification.
+as duplicates of the existing rows and not stored again. This makes replay
+safe to repeat without inflating write amplification. The `SKIP` mode
+discards replayed rows without comparing their other columns.
 
 ### Sensor backfill
 

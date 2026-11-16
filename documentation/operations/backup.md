@@ -121,6 +121,7 @@ specifies a directory for atomic write operations during backup.
 | `backup.compression.threads`     | Threads for compression                                                                                                                          | CPU count          |
 | `backup.enable.partition.hashes` | Compute BLAKE3 hashes during backup                                                                                                              | `false`            |
 | `backup.verify.partition.hashes` | Verify hashes during restore                                                                                                                     | `false`            |
+| `backup.activity.log.interval`   | Interval in milliseconds for logging slow backup operations, see [Monitor and abort](#monitor-and-abort)                                         | `60000`            |
 
 ### Run a backup
 
@@ -167,6 +168,21 @@ Status values:
 | `cleanup in progress` | Old backup data is being removed | Wait for completion          |
 | `cleanup complete`    | Cleanup finished successfully    | None required                |
 | `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column |
+
+`progress_percent` weights each partition by its row count times its column
+count, so a large partition moves the percentage more than a small one. The
+percentage advances as partition data is uploaded, so it can move slowly while
+one large partition compresses. The log shows progress within that partition.
+
+Backup steps that run longer than `backup.activity.log.interval` (default 60
+seconds) log an `INFO` line once per interval until they finish. This covers
+object store uploads, downloads and listings, cleanup, and partition
+compression. Faster steps log nothing. A slow partition compression also logs
+how far it has read through the partition files:
+
+```text
+compressing partition [table=..., partition=..., read_bytes=..., total_bytes=..., percent=..., elapsed=...]
+```
 
 To abort a running backup:
 

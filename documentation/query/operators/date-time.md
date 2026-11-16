@@ -101,7 +101,8 @@ WHERE ts IN interval($1, $2);
 ## `BETWEEN` ... `AND`
 
 The `BETWEEN` operator specifies an inclusive range. Useful when working with
-dynamic bounds from functions.
+dynamic bounds from functions. It takes timestamps (integer columns also work);
+for `DOUBLE`, `FLOAT`, `DECIMAL` or `VARCHAR` ranges, use `>=` and `<=`.
 
 :::tip
 

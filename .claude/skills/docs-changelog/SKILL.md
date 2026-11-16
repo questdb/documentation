@@ -45,21 +45,23 @@ Filter to releases within the period. Format:
 ```markdown
 ### Releases
 
-- [9.3.2](https://questdb.com/release-notes/) - Released January 28, 2026
-- [9.3.1](https://questdb.com/release-notes/) - Released January 14, 2026
+- [9.3.2](https://questdb.com/release-notes/#oss-9.3.2) - Released January 28, 2026
+- [9.3.1](https://questdb.com/release-notes/#oss-9.3.1) - Released January 14, 2026
 ```
 
 Rules:
 - One line per release, descending order (newest first)
 - Link text is the version number
-- All links point to `https://questdb.com/release-notes/`
+- Each link points to that release's anchor on the release notes page:
+  `https://questdb.com/release-notes/#oss-<version>`, where `<version>` is the
+  tag name as returned by the API (e.g. `10.1.0`). Never link to the bare page
 - Date format: "Released Month DD, YYYY"
 - Place "Releases" FIRST in each month (before New, Updated, etc.)
 - Omit if no releases that month
 
 #### Enterprise releases
 
-QuestDB Enterprise ships on its own version track (`3.x`) from a separate,
+QuestDB Enterprise ships on its own version track (`3.x`, `4.x`) from a separate,
 private repository. Fetch its releases the same way:
 
 ```bash
@@ -77,13 +79,15 @@ under their own header, immediately after the OSS `Releases` section:
 ```markdown
 ### QuestDB Enterprise Releases
 
-- [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
-- [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+- [3.3.1](https://questdb.com/release-notes/#enterprise-3.3.1) - Released June 9, 2026
+- [3.3.0](https://questdb.com/release-notes/#enterprise-3.3.0) - Released June 3, 2026
 ```
 
 Rules:
-- Same format and link target as OSS releases (`https://questdb.com/release-notes/`);
-  both editions are listed on that page
+- Same format as OSS releases, but the anchor uses the `enterprise-` prefix:
+  `https://questdb.com/release-notes/#enterprise-<version>` (e.g.
+  `#enterprise-4.0.0`). Both editions are listed on that page, so the prefix is
+  what distinguishes an OSS `4.0.0` from an Enterprise `4.0.0`
 - One line per release, descending order (newest first)
 - Include the section ONLY when there is at least one Enterprise release in the
   period (and the repo was accessible)
@@ -162,11 +166,11 @@ Format as Docusaurus-compatible MDX, one `## Month YYYY` header per month:
 
 ### Releases
 
-- [9.4.0](https://questdb.com/release-notes/) - Released February 15, 2026
+- [9.4.0](https://questdb.com/release-notes/#oss-9.4.0) - Released February 15, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.2.2](https://questdb.com/release-notes/) - Released February 4, 2026
+- [3.2.2](https://questdb.com/release-notes/#enterprise-3.2.2) - Released February 4, 2026
 
 ### New
 

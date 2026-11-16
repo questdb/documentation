@@ -23,7 +23,8 @@ The first two modes accept the same set of optional clauses:
 - [`FORMAT`](#partition-format) - partition storage format (`NATIVE` or `PARQUET`)
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
 - [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
-- [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
+- [`DEDUP`](#deduplication) - deduplication mode (`UPSERT` or `SKIP`) and keys
+  (can also be set later with
   [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
 - [`WITH`](#with-table-parameter) - table parameters
 - [`IN VOLUME`](#table-target-volume) - target volume for storage
@@ -42,7 +43,7 @@ TABLE [IF NOT EXISTS] tableName
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
             [FORMAT { NATIVE | PARQUET }]
             [BYPASS WAL | WAL]]]
-    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [DEDUP { UPSERT | SKIP } KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
     [OWNED BY ownerName];
@@ -64,7 +65,7 @@ TABLE [IF NOT EXISTS] tableName
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
             [FORMAT { NATIVE | PARQUET }]
             [BYPASS WAL | WAL]]]
-    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [DEDUP { UPSERT | SKIP } KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
     [OWNED BY ownerName];
@@ -135,27 +136,13 @@ PARTITION BY DAY
 TTL 1 WEEK;
 ```
 
-Next, we enable data deduplication. This will discard exact duplicates on the
-timestamp and ticker columns:
+Next, we enable deduplication on the timestamp and symbol columns. A new row
+with the same timestamp and symbol as a stored row replaces it:
 
-```questdb-sql title="With deduplication, adding ticker as an upsert key."
+```questdb-sql title="With deduplication on timestamp and symbol"
 CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE
-) TIMESTAMP(timestamp)
-PARTITION BY DAY
-TTL 1 WEEK
-DEDUP UPSERT KEYS (timestamp, symbol);
-```
-
-Finally, we add additional parameters for our SYMBOL type:
-
-```questdb-sql title="Adding parameters for symbol type"
-CREATE TABLE trades (
-  timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 256 NOCACHE,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp)
@@ -352,28 +339,36 @@ To modify a storage policy after table creation, see
 
 ## Deduplication
 
-When [Deduplication](/docs/concepts/deduplication) is enabled, QuestDB only
-inserts rows that do not match the existing data. When you insert a row into a
-table with deduplication enabled, QuestDB searches for existing rows with
-matching values in all the columns specified with `UPSERT KEYS`. It replaces all
-such matching rows with the new row.
+[Deduplication](/docs/concepts/deduplication/) keeps one row for each
+combination of the columns listed in `KEYS`. When a new row matches a stored
+row, or an earlier row of the same commit, on every key column, the mode
+decides which row is kept:
+
+- `UPSERT` replaces every matching stored row with the new row. The latest
+  write wins.
+- `SKIP` keeps the stored row and discards the new row. The first write wins.
 
 Deduplication only works on
 [Write-Ahead Log (WAL)](/docs/concepts/write-ahead-log/) tables.
 
-You can include multiple columns of different types in the `UPSERT KEYS` list.
+You can include multiple columns of different types in the `KEYS` list.
 
 However, there are a few limitations to keep in mind:
 
 - You must include the designated timestamp column
 - You cannot use an [`ARRAY`](/docs/query/datatypes/overview) column
 
+`CREATE TABLE AS SELECT` accepts the same clause, and
+[`CREATE TABLE LIKE`](#create-table-like) copies the keys and the mode of the
+source table.
+
 You can change the deduplication configuration at any time using `ALTER TABLE`:
 
-- Enable deduplication and change `UPSERT KEYS` with
-  [`ALTER TABLE ENABLE`](/docs/query/sql/alter-table-enable-deduplication/)
-- Disable deduplication with using
-  [`ALTER TABLE DISABLE`](/docs/query/sql/alter-table-disable-deduplication/)
+- Enable deduplication, change the keys, or switch between `UPSERT` and `SKIP`
+  with
+  [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/)
+- Disable deduplication with
+  [`ALTER TABLE DEDUP DISABLE`](/docs/query/sql/alter-table-disable-deduplication/)
 
 ### Examples
 
@@ -388,8 +383,23 @@ PARTITION BY DAY
 DEDUP UPSERT KEYS (timestamp, symbol);
 ```
 
+```questdb-sql title="Keeping the first row per timestamp and symbol, discarding later duplicates"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+DEDUP SKIP KEYS (timestamp, symbol);
+```
+
 ```questdb-sql title="Enabling dedup on an existing table, for timestamp and ticker columns"
 ALTER TABLE trades DEDUP ENABLE UPSERT KEYS (timestamp, symbol);
+```
+
+```questdb-sql title="Switching an existing table to SKIP deduplication"
+ALTER TABLE trades DEDUP ENABLE SKIP KEYS (timestamp, symbol);
 ```
 
 ```questdb-sql title="Disabling dedup on the entire table"
@@ -399,6 +409,14 @@ ALTER TABLE trades DEDUP DISABLE;
 ```questdb-sql title="Checking whether a table has dedup enabled"
 SELECT dedup FROM tables() WHERE table_name = '<the table name>';
 ```
+
+```questdb-sql title="Checking the dedup mode and keys of a table"
+SHOW CREATE TABLE trades;
+```
+
+The `dedup` column of `tables()` is `true` in both modes. The output of
+`SHOW CREATE TABLE` includes the `DEDUP UPSERT KEYS(...)` or
+`DEDUP SKIP KEYS(...)` clause.
 
 ```questdb-sql title="Checking whether a column has dedup enabled"
 SELECT `column`, upsertKey FROM table_columns('<the table name>');
@@ -496,18 +514,17 @@ benefits of using this type, see the [symbol](/docs/concepts/symbol/) overview.
 
 #### Symbol capacity
 
-`CAPACITY` is an optional keyword used when defining a symbol type on table
-creation to indicate how many distinct values this column is expected to have.
-When `distinctValueEstimate` is not explicitly specified, a default value of
-`cairo.default.symbol.capacity` is used.
-
-`distinctValueEstimate` - the value used to size data structures for
-[symbols](/docs/concepts/symbol/).
+`CAPACITY` is optional and sets the starting capacity of the column's symbol
+table, `cairo.default.symbol.capacity` (256) by default. Capacity grows
+automatically: after each commit, a column holding more than 80% of its
+capacity is resized, which is cheap. Set `CAPACITY` only when a large number
+of distinct values arrives at once, as in a large
+[`COPY`](/docs/query/sql/copy/), so the column starts at the right size:
 
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 50,
+  account SYMBOL CAPACITY 100000,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp)
@@ -522,7 +539,7 @@ default value is `CACHE` unless otherwise specified.
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 50 NOCACHE,
+  symbol SYMBOL NOCACHE,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp);
@@ -952,7 +969,8 @@ PARTITION BY MONTH;
 
 The `LIKE` keyword clones the table schema of an existing table or materialized
 view without copying the data. Table settings and parameters such as designated
-timestamp and symbol column indexes will be cloned, too.
+timestamp, symbol column indexes, and deduplication keys and mode will be
+cloned, too.
 
 ```questdb-sql title="Create table like"
 CREATE TABLE new_table (LIKE my_table);

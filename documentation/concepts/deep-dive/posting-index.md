@@ -517,7 +517,10 @@ file. Decompression is transparent to the query engine.
   unfiltered `SAMPLE BY`, and unfiltered `GROUP BY` — fall back to a
   regular page-frame scan.
 - `REINDEX` on WAL tables requires dropping and re-adding the index
-  (this applies to all index types, not just posting).
+  (this applies to all index types, not just posting). Parquet partitions
+  are the exception:
+  [`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/)
+  rebuilds their indexes online.
 - `ALTER TABLE … ADD INDEX TYPE POSTING INCLUDE (col, …)` can fail on
   very large partitions when at least one `INCLUDE` column is
   variable-width (`STRING`, `VARCHAR`, `BINARY`) and the seal phase

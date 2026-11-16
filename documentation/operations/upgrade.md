@@ -28,6 +28,11 @@ If this is your first time setting up QuestDB, see the
    especially for production instances. See
    [Backup and restore](/docs/operations/backup/) for details.
 
+3. **Plan the way back.** After QuestDB 10.2.0 or QuestDB Enterprise 4.2.0 has
+   run on a database, going back to an earlier release, writing with it, and
+   then starting the later release again is not supported. To go back, follow
+   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
 ## Upgrade steps
 
 ### Docker
@@ -101,6 +106,41 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
+### Upgrading to 4.2.0
+
+QuestDB Enterprise 4.2.0 adds
+[adaptive durability mode](/docs/concepts/durability/). The default stays
+`nosync`. Check the following before upgrading:
+
+- A replicating primary in `nosync` or `async` mode now refuses to start when,
+  after a power loss or an operating system crash, its log of a table ends
+  before the last transaction in the object store. Earlier releases started
+  and diverged from the replicas. See
+  [A primary refuses to start after a power loss](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss).
+- Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
+  [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
+QuestDB Enterprise 4.2.0 also changes `SHOW CREATE` output and restricts
+administrative operations in views. Check schema-export scripts and stored
+views for the following before upgrading:
+
+- With access control enabled, plain `SHOW CREATE DATABASE` now requires both
+  `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
+  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
+  [database dumps](/docs/query/sql/show/#enterprise-access-control).
+- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
+  Schema-only output does not restore grants. Use the ACL dump for permissions,
+  and review
+  [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
+- With access control enabled, materialized and live views reject
+  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
+  schema-metadata queries to `INCLUDE (SCHEMA)` under the
+  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
+- A regular view's `PIVOT IN` subquery rejects administrative functions and
+  administrative `SHOW` statements. Existing definitions become invalid at
+  their next compilation, including startup. See
+  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
+
 ### Upgrading to 4.1.0
 
 QuestDB Enterprise 4.1.0 hides tables and views from principals that hold no
@@ -164,12 +204,14 @@ check how these changes affect your users and clients:
   skew. Earlier versions never checked the expiry, so a token kept working
   after it expired. A client that sends a fixed token, such as
   `token=<ID token>` in a connect string, stops working once that token
-  expires, and an orphan drainer that presents an expired token sets its
-  store-and-forward slot aside, and reports data loss, instead of draining
+  expires, and an orphan drainer that presents an expired token sets the
+  orphan's store-and-forward sender directory aside, and reports data loss, instead of draining
   it. Such a client must switch to a new token before the old one expires,
   or use a
-  [token provider](/docs/connect/clients/java/#token-providers) in the Java
-  client. See [Token validation](/docs/security/oidc/#token-validation).
+  [rotating token provider](/docs/security/oidc/#rotating-bearer-tokens),
+  available in the Java client 1.3.11 or later, the C, C++, and Rust clients
+  7.3.0 or later, and the Python client 6.1.0 or later. See
+  [Token validation](/docs/security/oidc/#token-validation).
 - **OIDC tokens must come from the expected issuer.** With
   `acl.oidc.groups.encoded.in.token=true`, QuestDB rejects a token whose `iss`
   claim is missing or is not the expected issuer, and refuses to start without
@@ -192,29 +234,6 @@ check how these changes affect your users and clients:
   `acl.oidc.sub.claim`, or with a claim listed in both settings: earlier
   versions started with them, then rejected every OIDC login. See
   [Startup validation](/docs/security/oidc/#startup-validation).
-
-### Upgrading to 4.2.0
-
-QuestDB Enterprise 4.2.0 changes `SHOW CREATE` output and restricts
-administrative operations in views. Check schema-export scripts and stored
-views for the following before upgrading:
-
-- With access control enabled, plain `SHOW CREATE DATABASE` now requires both
-  `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
-  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
-  [database dumps](/docs/query/sql/show/#enterprise-access-control).
-- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
-  Schema-only output does not restore grants. Use the ACL dump for permissions,
-  and review
-  [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
-- With access control enabled, materialized and live views reject
-  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
-  schema-metadata queries to `INCLUDE (SCHEMA)` under the
-  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
-- A regular view's `PIVOT IN` subquery rejects administrative functions and
-  administrative `SHOW` statements. Existing definitions become invalid at
-  their next compilation, including startup. See
-  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
 
 ### QuestDB Enterprise BYOC
 

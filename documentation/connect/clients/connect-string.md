@@ -149,13 +149,20 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;initial_connect_retry=on;reconnect_max_duration_millis=120000;query_pool_min=0;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
-[Ingress reconnect](#reconnect-keys).
+The 2-minute budget bounds the blocking initial **ingestion** connection.
+Once connected, the sender retries transport outages indefinitely. Set
+`initial_connect_retry` explicitly: `reconnect_*` keys alone do not enable
+startup retry for C, C++, Rust, and Python pools.
+
+`query_pool_min=0` stops a pool from prewarming a reader at startup. A
+reader's first connection does not use the ingestion retry policy, so a
+prewarmed reader fails pool construction while the server is down. Standalone
+senders ignore the pool keys. For ingestion startup that does not block, use
+`lazy_connect=true` instead, within the limits described under
+[Connection pool](#pool-keys). See [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
 
@@ -180,9 +187,10 @@ caveats), follow the section links from the [Key index](#key-index).
 | Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_segment_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
-| End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Confirm rows are on the server's disk             | ingress   | `request_durable_ack=local`            | `durable_ack_keepalive_interval_millis`; the server needs adaptive durability mode              |
+| Confirm rows reached replication storage          | ingress   | `request_durable_ack=replicated`       | `on` for QuestDB Enterprise 4.1.0 and earlier; `durable_ack_keepalive_interval_millis`      |
+| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis`; set `initial_connect_retry` explicitly for portable startup behavior |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | prevents implicit promotion in clients that apply it; C, C++, Rust, and Python pools never apply it |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -224,8 +232,8 @@ WebSocket upgrade request.
   overhead of basic auth and is the recommended path for Enterprise
   deployments.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
-  Does not cover TLS handshake or post-upgrade frame reads, which use OS or
-  hard-coded defaults. Default: `15000` (15 s).
+  Does not cover the TLS handshake or reads after the WebSocket upgrade, which
+  use OS or hard-coded defaults. Default: `15000` (15 s).
 - `connect_timeout` — integer milliseconds, must be `> 0`. Applies to ingress
   and egress. Bounds the TCP connect phase for each endpoint, so a black-holed
   host in a multi-host `addr` no longer stalls the
@@ -241,12 +249,33 @@ the TLS handshake is server-authenticated only. `tls_roots` /
 
 ### Token providers {#token-providers}
 
-*Applies to: ingress and egress. Java client 1.3.11 or later only.*
+*Applies to: ingress and egress.*
 
-A fixed `token` stops working when it expires. A token provider requests
-bearer tokens from an identity provider instead, and renews them in the
-background before they expire, so every connection, reconnect, and failover
-presents a valid token:
+A fixed `token` does not follow credential rotation. A token provider supplies
+a current bearer token for each connection, reconnect, and failover without
+rebuilding the client. The C, C++, Rust, and Python clients accept providers
+through their in-code APIs, not this configuration string:
+
+- [C and C++](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens): native
+  client 7.3.0 or later.
+- [Rust](/docs/connect/clients/rust/#rotating-bearer-tokens): `questdb-rs` 7.3.0
+  or later.
+- [Python](/docs/connect/clients/python/#rotating-bearer-tokens): client 6.1.0
+  or later.
+
+These clients also support interactive
+[OIDC device sign-in](/docs/security/oidc/#device-authorization-flow). A
+provider cannot be combined with fixed `token`, `username`, or `password`
+credentials, or with a second provider. The `token_provider`, `azure_resource`,
+`azure_client_id`, and `azure_credential` keys below are rejected by these
+clients on every connection-string scheme. Use `wss` for QWP or `https` for
+ILP so the bearer token is encrypted in transit.
+
+#### Java connection-string providers
+
+The following provider keys are available in **Java client 1.3.11 or later
+only**. Java can select an Azure provider from the connection string and
+refresh its tokens in the background:
 
 ```
 wss::addr=node-a:9000,node-b:9000;token_provider=azure;azure_resource=api://<application ID>;azure_credential=managed_identity;
@@ -300,6 +329,15 @@ Selecting the `wss` schema enables TLS.
 - `tls_roots_password` — password for the `tls_roots` file. Required only for
   a JKS or PKCS#12 trust store; PEM needs no password. Setting it without
   `tls_roots` is an error.
+- `tls_ca` — **Rust, C, C++, Python and Ruby only.** Selects the trust store
+  when `tls_roots` is not set: `webpki_roots` (the bundled Mozilla roots),
+  `os_roots` (the operating-system store), or `webpki_and_os_roots` (both).
+  Default: `webpki_roots`; Python defaults to `webpki_and_os_roots`. In the
+  Rust crate, `os_roots` needs the `tls-native-certs` feature. Setting
+  `tls_roots` selects the file instead, so do not combine the two. Java, Go,
+  .NET and Node.js reject `tls_ca` as an unknown key, and already start from
+  the system or JVM trust store: leave it out of a connect string that other
+  clients share.
 
 :::caution `tls_roots` and `tls_verify=unsafe_off` cannot be combined
 
@@ -360,18 +398,14 @@ act independently: whichever threshold trips first sends the batch.
   When `off`, the application must call `flush()` explicitly to send
   buffered rows.
 - `auto_flush_rows` — flush when the buffered row count reaches this
-  threshold. Set to `off` to disable. Default where supported: `1000`.
+  threshold. Set to `off` to disable.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
   since the first buffered row. The client evaluates the interval on the
   next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
-  disable. Default where supported: `100` (100 ms).
+  disable.
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Accepts
-  [size suffixes](#size-suffixes). **The default differs by client**: Java
-  and Node.js ship it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and
-  Rust, C and C++ reject the key outright. A Java application that assumes an
-  8 MiB byte trigger is active will size batches expecting a flush that never
-  fires.
+  [size suffixes](#size-suffixes).
   When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
   advertised `X-QWP-Max-Batch-Size` at handshake (one-way: the client
@@ -382,6 +416,26 @@ act independently: whichever threshold trips first sends the batch.
   responsibility for not producing oversized batches. Older servers
   that do not advertise the header leave the configured value
   untouched.
+
+**Defaults differ by client.** On `ws::` / `wss::`:
+
+| Client | `auto_flush_rows` | `auto_flush_interval` | `auto_flush_bytes` |
+| --- | --- | --- | --- |
+| Java | `1000` | `100` ms | off (`0`) |
+| Node.js, browser | `1000` | `100` ms | off (`0`) |
+| Go | `1000` | `100` ms | `8m`, clamped as above |
+| .NET | `1000` | `100` ms | `8m`, clamped as above |
+| Python, Ruby: pooled client (`connect()`) | `1000` | `100` ms | 90% of the server-advertised batch size |
+| Python: standalone `Sender` | `600` | `1000` ms | 90% of the server-advertised batch size |
+| Ruby: standalone `Sender` | `600` | `1000` ms | off |
+| Rust, C, C++ | not supported | not supported | not supported |
+
+A Java application that assumes an 8 MiB byte trigger is active will size
+batches expecting a flush that never fires.
+
+On ILP over HTTP (`http::` / `https::`), clients that auto-flush default to
+`75000` rows and `1000` ms. Java and Node.js reject `auto_flush_bytes` there,
+Go rejects a nonzero value, and Python and .NET accept it (default off).
 
 :::note Rust support
 
@@ -510,11 +564,11 @@ Related: [Reconnect and failover](#reconnect-keys),
 :::warning Enable DEDUP on tables ingested through failover
 
 On unplanned failover — when the primary dies before issuing a durable
-ACK — the client replays unacknowledged frames against the new primary.
+ACK — the client replays unacknowledged rows against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
 replays can produce duplicate rows. Tables ingested through a multi-host
-failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
-row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
+failover connect string **must** declare `DEDUP UPSERT KEYS(...)` or
+`DEDUP SKIP KEYS(...)` covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
 for the full at-least-once / exactly-once model.
 
 :::
@@ -526,9 +580,10 @@ for the full at-least-once / exactly-once model.
 Store-and-forward (SF) keeps rows the server hasn't acknowledged yet on disk,
 so they survive a lost connection and a client restart. It is available on
 QWP / WebSocket and is off by default. A flush sends its rows to the server as
-one batch, or as several if they don't fit in one. With SF, the client first
-writes each batch to a segment file on disk, and deletes a segment once the
-server has acknowledged every batch in it. If the connection drops, the client
+one batch. A flush too large for one batch is split into several or rejected,
+depending on the client and the API. With SF, the client first writes each
+batch to a segment file on disk, and deletes a segment once the server has
+acknowledged every batch in it. If the connection drops, the client
 reconnects on its own and replays what is still on disk. After a process
 restart, a new sender with the same `sf_dir` and `sender_id` replays it; see
 [Sender restart and replay](#sender-restart-and-replay).
@@ -626,8 +681,8 @@ original is never coming back — see [Orphan recovery](#orphan-recovery) below.
 accepted if their acknowledgement hadn't reached the previous sender before
 it stopped.
 To prevent duplicate rows in the target table, declare
-[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` covering row
-identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
+[DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` or `SKIP KEYS(...)`
+covering row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
 the full model and recipe.
 
 ### Backpressure
@@ -673,16 +728,13 @@ architecture is that a producer survives an arbitrarily long outage.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
-  see below.
+  Default: `100`.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
-  Default: `5000` (5 s). Setting this enables
-  `initial_connect_retry=on` implicitly; see below.
+  Default: `5000` (5 s).
 - `reconnect_max_duration_millis` — time budget for the **blocking sync
   initial connect** (`initial_connect_retry=on`): once exceeded, the
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
-  Setting this enables `initial_connect_retry=on` implicitly; see below.
 - `initial_connect_retry` — whether the client retries the initial connect
   attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -692,36 +744,55 @@ architecture is that a producer survives an arbitrarily long outage.
     the background indefinitely, surfacing only genuine terminal failures
     (auth reject, durable-ack mismatch) via the error inbox.
 
-  **Implicit promotion.** Setting any explicit `reconnect_*` key without
-  also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the budget also covers
-  the *first* connect attempt — without the promotion,
-  `reconnect_max_duration_millis` would be inert. To keep fail-fast
-  behaviour on the first connect while still tuning the backoff, set
-  `initial_connect_retry=off` explicitly; the explicit setting wins.
+  **Implicit promotion is client-specific.** Some clients, including Java
+  and standalone C, C++, Rust, and Python senders, promote the mode to `on`
+  when an explicit `reconnect_*` key is set without an
+  `initial_connect_retry` mode. C, C++, Rust, and Python pools do **not**
+  apply that promotion: they honor only an explicitly set mode and otherwise
+  fail fast. Set `initial_connect_retry=on` explicitly for blocking ingestion
+  startup retry, or `off` to retain fail-fast behavior while tuning backoff.
+  A pool with `lazy_connect` on accepts only `async` or no mode. Neither `on`
+  nor `async` changes reader prewarming: a nonzero `query_pool_min` still
+  creates readers synchronously and can fail pool construction.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
-  milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
+  milliseconds waiting for buffered rows to drain. Set to `0` or `-1` for
   fast close (skip the drain). **The default differs by client**: `60000`
   (60 s) on Java and .NET, `5000` (5 s) on Rust, C, C++ and Python, which
   share the same Rust core, and `5000` on Node.js.
 
   This is the shutdown data-loss window. Setting it to `0` skips the drain
-  entirely and drops un-ACKed batches on every clean shutdown.
+  entirely: in memory-only mode, un-ACKed batches are lost on every clean
+  shutdown; in SF mode they stay in the sender directory for the next sender.
 
-In most clients, rejections of the upgrade request during reconnect
-(authentication rejected, version mismatch, durable-ack mismatch, non-101
-upgrade without a role hint) are immediately terminal: the loop does not
-retry them. The Java client treats a version mismatch like a transport
-failure, to ride out a rolling upgrade, and the other rejections as terminal
-only before the sender first connects. A Java sender that has connected keeps
-retrying all of them, and reports each failed attempt in its connection
-health. It also reports the rejections other than a version mismatch to its
-error handler. A Node.js sender that uses store-and-forward or
-`initial_connect_retry=async` also keeps retrying all of them once it has
-connected, and reports each failed attempt as a connection event. See
-[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures)
-and, for orphan drainers,
+Upgrade rejections have client- and phase-specific retry policies:
+
+- In C, C++, and Rust **7.3.0 or later**, and Python **6.1.0 or later**, an
+  HTTP `401` / `403` stops a sender that has not connected yet, in every
+  `initial_connect_retry` mode, including `async` and pools with
+  `lazy_connect` on. A sender that has connected keeps retrying those
+  rejections with capped backoff, even with fixed credentials, retaining
+  unacknowledged rows. Each rejection ends the current endpoint walk, not the
+  sender's reconnect loop, and is reported as `auth_failed` / `AuthFailed`.
+  Like Java, these clients treat an upgrade response with an unsupported QWP
+  version as a transport failure of that endpoint. A durable-ack capability
+  mismatch (`ProtocolVersionError`) stays terminal, even for a sender that
+  has connected, once every endpoint refuses the requested tiers.
+- Java treats a version mismatch like a transport failure to ride out a
+  rolling upgrade. Other rejections (authentication, durable-ack mismatch,
+  non-101 upgrade without a role hint) are terminal only before the sender
+  first connects. Once connected, it retries all of them and reports each
+  failed attempt in its connection health; rejections other than a version
+  mismatch also reach its error handler.
+- A Node.js sender using store-and-forward or `initial_connect_retry=async`
+  also retries these rejections once it has connected, reporting each failed
+  attempt as a connection event.
+
+Do not assume that an authentication exception makes all upgrade failures
+retryable. For the full phase table, browser behavior, and orphan drainers,
+see
 [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+For Java, see also
+[How the client handles token failures](/docs/connect/clients/java/#how-the-client-handles-token-failures).
 
 ### Egress failover {#egress-failover}
 
@@ -741,38 +812,53 @@ Requires QuestDB Enterprise (multi-host).
 
 ## Durable ACK {#durable-ack}
 
-*Applies to: ingress.*
+*Applies to: ingress. The values `local`, `replicated`, and `local,replicated`
+need the Java client after 1.3.11, or the C, C++, and Rust clients after
+7.2.1. Other clients accept `on` and `off`.*
+
+By default, a sender releases its copy of each batch once the server's OK
+response confirms the commit. An OK does not by itself mean that the commit is
+on the disk: that depends on the server's
+[commit mode](/docs/concepts/durability/#commit-modes). With `request_durable_ack`, the
+sender keeps each batch until the server confirms that it reached the requested
+durability, and sends it again after a reconnect if the server lost it.
+
+- `local`: the commit is on the server's disk. Needs a server in adaptive commit
+  mode.
+- `replicated`: the commit reached the replication object store. Needs a
+  QuestDB Enterprise primary with replication.
+- `local,replicated`: both. Needs a QuestDB Enterprise primary with replication
+  in adaptive durability mode.
+- `on`: the original name of `replicated`, and the only value QuestDB
+  Enterprise 4.1.0 and earlier accept.
+- `off` (default): no durable confirmation.
+
+What each tier protects against, and what the server needs, is in
+[Durable acknowledgements](/docs/concepts/durability/#durable-acknowledgements).
+
+The server grants every requested tier or none. When it cannot, for example when
+a server that is not in adaptive durability mode is asked for `local`, the
+connection fails at once with a durable-ack mismatch, instead of leaving the
+sender waiting for confirmations that never come. Durable acknowledgements work
+only on WebSocket transports.
 
 :::note QuestDB Enterprise
 
-Durable ACK requires QuestDB Enterprise. OSS is single-node and does not
-ship WALs off-box, so the server-side durability-acknowledgement signal
-that drives this protocol is enterprise-only.
+`replicated`, `local,replicated`, and `on` need QuestDB Enterprise with
+replication. Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 
-Try it with a [free 30-day trial](https://questdb.com/enterprise/trial/).
 :::
 
-QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an
-object store or another file system — typically over the network. After
-durably shipping a WAL, the server emits a `STATUS_DURABLE_ACK` frame to
-the store-and-forward client; the client marks that frame's FSN as durable
-only after this acknowledgement arrives.
+- `durable_ack_keepalive_interval_millis`: how often the sender sends a
+  WebSocket PING while confirmations are pending and it has nothing else to
+  send. The server sends confirmations only while it handles inbound traffic,
+  so the ping keeps them coming. Default: `200` (ms). Set to `0` or a negative
+  value to disable.
 
-The benefit: if the primary dies before shipping a WAL, the client still
-holds the corresponding frames in its SF buffer and replays them against
-the new primary on failover — closing the data-loss window that a
-transport-level OK ACK alone cannot close.
-
-- `request_durable_ack` — when `on`, the client gates trim on
-  `STATUS_DURABLE_ACK` frames from the server, suppressing OK-driven trim.
-  Default: `off`.
-- `durable_ack_keepalive_interval_millis` — interval at which the client
-  emits keepalive PINGs while waiting for durable-ack frames. Required
-  because the server only flushes pending durable acks on inbound recv
-  events. Default: `200` (ms). Set to `0` or a negative value to disable.
-
-See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
-wire protocol for the underlying mechanism.
+See [Durability and commit modes](/docs/concepts/durability/#durable-acknowledgements)
+for what each tier protects, and the
+[QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+for the wire format.
 
 ## Query client keys {#egress-keys}
 
@@ -848,7 +934,8 @@ explicit setter always wins over the string.
 - `sender_pool_min` — senders kept open even when idle. `0` lets the pool close
   them all. Default: `1`.
 - `sender_pool_max` — maximum senders the pool opens. Default: `4`.
-- `query_pool_min` — query clients kept open even when idle. Default: `1`.
+- `query_pool_min` — query clients kept open even when idle. Default: `1`,
+  or `0` when `lazy_connect` is on.
 - `query_pool_max` — maximum query clients the pool opens, which also caps
   total in-flight queries. Default: `4`.
 - `acquire_timeout_ms` — how long a borrow waits for a free connection once the
@@ -863,10 +950,17 @@ explicit setter always wins over the string.
   replacements.
 - `housekeeper_interval_ms` — how often the housekeeper checks for idle and
   over-age connections. Default: `5000`.
-- `lazy_connect` — when `on`, the pool defers opening its first connection
-  until the first borrow, so construction succeeds against a server that is
-  down. This is the supported way to tolerate a server that starts after your
-  application. Default: `off`.
+- `lazy_connect` — when `on`, building the pool opens no connection, so it
+  succeeds against a server that is down. Depending on the client, senders
+  connect in the background or on first use, and query clients connect on
+  first use. It also defaults `query_pool_min` to `0`. Leave
+  `initial_connect_retry` unset or set it to `async`, and leave
+  `query_pool_min` unset or set it to `0`: the Java, Go, .NET, Node.js, C,
+  C++, Rust, and Python clients reject other values as a configuration
+  conflict. To block until the server is reachable instead, set
+  `initial_connect_retry=on`; see
+  [Tolerate a slow or restarting server at startup](#tolerate-a-slow-or-restarting-server-at-startup).
+  Default: `off`.
 
 ## Error handling {#error-handling}
 
@@ -896,11 +990,12 @@ discards data. The client either replays a rejected batch — `retriable`
 recycles the connection and replays from the acknowledged watermark;
 `retriable_other` does the same but rotates to the next endpoint (the node
 cannot serve writes at all) — or halts loudly with the bytes preserved in
-the store-and-forward log (`terminal`). A frame that the server keeps
-rejecting with no ack progress escalates to a terminal via the
-poison-frame detector (`max_frame_rejections`, default `4`).
+the store-and-forward log (`terminal`). If the server keeps rejecting the same
+[batch](#sf-keys) with no ack progress, the sender records a terminal error
+after `max_frame_rejections` rejections (default `4`). The protocol calls a
+batch a *frame*, hence the key's name.
 
-- `on_server_error` — global default for server-reject status frames.
+- `on_server_error` — global default for server rejections.
   Accepts `auto` \| `terminal` \| `retriable` \| `retriable_other`.
   Default: `auto` (applies the built-in per-category defaults listed below).
 - `on_schema_error` — schema-validation errors. Default: `terminal`
@@ -910,11 +1005,17 @@ poison-frame detector (`max_frame_rejections`, default `4`).
 - `on_security_error` — ACL denial on a writable node. Default: `terminal`.
 - `on_write_error` — transient write failures (disk pressure, suspended
   table). Default: `retriable`.
-- `max_frame_rejections` — poison-frame detector threshold: consecutive
-  server rejections (retriable NACK, or non-orderly close after a send) of
-  the same head-of-line frame, with no ack progress in between, before the
-  sender latches a terminal instead of replaying forever. Integer ≥ 1;
-  default `4`.
+- `max_frame_rejections` — number of consecutive server rejections
+  (retriable NACK, or non-orderly close after a send) of the same batch, the
+  oldest one the server hasn't accepted yet, with no OK acknowledgement in
+  between, before the sender records a terminal error instead of replaying
+  forever. Integer ≥ 1; default `4`.
+- `poison_min_escalation_window_millis` — minimum time the same batch must
+  keep being rejected before `max_frame_rejections` makes the error terminal,
+  so a brief outage that rejects a few batches can clear first. An OK
+  acknowledgement for that batch resets the count. `0` escalates as soon as
+  `max_frame_rejections` is reached. Default `5000`. The Go client doesn't
+  accept this key.
 
 **Resolution precedence**, from highest to lowest (as documented on
 `SenderError.Policy`):
@@ -946,9 +1047,9 @@ description and behaviour notes.
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | Java, Node.js `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)           |
-| `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_bytes`                      | size                          | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
+| `auto_flush_interval`                   | int (ms) / `off`              | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
+| `auto_flush_rows`                       | int / `off`                   | varies by client (Rust: rejected) | [Auto-flushing](#auto-flush)                              |
 | `azure_client_id`                       | string                        | unset                         | [Token providers](#token-providers) (Java only)               |
 | `azure_credential`                      | enum (`default` / `managed_identity` / `workload_identity` / `environment`) | `default` | [Token providers](#token-providers) (Java only) |
 | `azure_resource`                        | string                        | unset (required with `token_provider=azure`) | [Token providers](#token-providers) (Java only) |
@@ -969,7 +1070,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`; implicit promotion is client-specific and never applies to C, C++, Rust, or Python pools | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |
@@ -992,23 +1093,24 @@ description and behaviour notes.
 | `poison_min_escalation_window_millis`   | int (ms)                      | `5000`                        | [Error handling](#error-handling)                             |
 | `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
 | `query_pool_max`                        | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
-| `query_pool_min`                        | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
+| `query_pool_min`                        | int                           | `1` (`0` with `lazy_connect`) | [Connection pool](#pool-keys)                                 |
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
 | `replay_exec`                           | enum (`on` / `off`)           | `off` (Go only)               | [Query client keys](#egress-keys)                             |
-| `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
+| `request_durable_ack`                   | enum (`off` / `on` / `local` / `replicated` / `local,replicated`) | `off` | [Durable ACK](#durable-ack) |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
 | `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `server_info_timeout_ms`                | int (ms)                      | `5000` (Go only)              | [Query client keys](#egress-keys)                             |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
-| `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
+| `sf_dir`                                | path                          | unset (memory-only mode)      | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only; Node.js: also `append`) | [Store-and-forward](#sf-keys)       |
 | `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
-| `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
+| `sf_max_total_bytes`                    | size                          | `128 MiB` memory-only / `10 GiB` SF | [Store-and-forward](#sf-keys)                                 |
 | `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
+| `tls_ca`                                | enum (`webpki_roots` / `os_roots` / `webpki_and_os_roots`) | `webpki_roots` (Python: `webpki_and_os_roots`; Java, Go, .NET, Node.js: rejected) | [TLS](#tls) |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
 | `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only; Node.js: rejected) | [TLS](#tls)                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |

@@ -77,8 +77,10 @@ Prior to QuestDB 9.0.0, symbol capacity required manual configuration. You had
 to estimate the number of distinct values upfront and set the capacity
 explicitly. Undersizing caused performance issues; oversizing wasted memory.
 
-From 9.0.0 onwards, symbol capacity is fully automatic. The `CAPACITY` setting
-is now obsolete and can be removed from your table definitions.
+From 9.0.0 onwards, symbol capacity is fully automatic, so `CAPACITY` can be
+removed from most table definitions. It still sets the starting capacity,
+which helps when a large number of distinct values arrives at once, as in a
+large `COPY`.
 
 </details>
 
