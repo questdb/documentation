@@ -158,22 +158,6 @@ must drop or rename that conflicting object; the next ACL statement or
 startup creates the log. This exception applies to the conflicting object,
 not to a valid audit log.
 
-:::warning Rollback limitations
-
-Releases before QuestDB Enterprise 4.2.0 do not enforce the audit log's special
-read or write protections. They treat the log as an ordinary table, so existing
-broad table grants may expose or allow changes to audit evidence. A later
-upgrade reuses a structurally compatible log, including any rows written during
-the rollback.
-
-These releases also cannot compact `sys.acl_permissions` after it gains
-`change_id`. Compaction reports
-`unexpected acl permissions column count, refusing to compact` and is
-disabled until the next restart. Plan rollback around your pre-upgrade backup
-rather than assuming the migrated database behaves as it did before.
-
-:::
-
 ##### Embedded Enterprise Java integrations
 
 Applications that directly implement Enterprise Java APIs must update and
