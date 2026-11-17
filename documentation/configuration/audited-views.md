@@ -19,8 +19,8 @@ None of these settings are reloadable: changing any of them requires a restart.
 The server checks the values at startup, and refuses to start, naming the
 property, when a numeric value is out of range.
 
-For example, to absorb longer bursts of audited reads and keep 90 days of the
-trail:
+For example, to absorb longer bursts of audited reads and delete daily
+partitions using a 90-day partition-age threshold:
 
 ```ini title="server.conf"
 view.audit.queue.capacity=16384
@@ -82,8 +82,10 @@ same log message.
 [Storage policy](/docs/concepts/storage-policy/) that `sys.view_audit` is
 created with. The value is the list of stages written inside
 `SET STORAGE POLICY(...)`, separated by commas, such as
-`TO PARQUET 1d, DROP LOCAL 90d`. The default converts each daily partition to
-Parquet one day after the partition ends, and never deletes a row.
+`TO PARQUET 1d, DROP LOCAL 90d`. The default never deletes rows. It makes
+inactive daily partitions eligible for Parquet conversion when the
+[reference time](/docs/concepts/storage-policy/#ttl-evaluation) is at least one
+day after the partition's start, not its end. Conversion runs asynchronously.
 
 - The setting applies only when the server creates the table. Replicas take the
   table, and its policy, from the primary.
