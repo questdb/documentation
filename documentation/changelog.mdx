@@ -64,6 +64,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [Backup and restore](/docs/operations/backup/#retrying-or-updating-a-restore) - Distinguished fresh restores from same-lineage retries and forward updates, with their procedures and restrictions, and documented [access control recovery](/docs/operations/backup/#restoring-access-control-tables) from backups taken before the ACL audit log was introduced in QuestDB Enterprise 4.2.0
 - [Governance and auditing](/docs/security/governance/#audit-access-control-changes) - Added an ACL audit query covering ordinary grants and revokes as well as service-account assumption assignments and revocations
 - [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected partition-start eligibility across audit retention, TTL migration, Parquet conversion, and Enterprise quick-start guidance, with partition allowances for minimum timestamp-based retention and clearer governance example thresholds
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
+- [Views](/docs/concepts/views/#administrative-operations-in-view-metadata) - Documented QuestDB Enterprise 4.2.0 restrictions on administrative operations in `PIVOT IN` subqueries, schema-only database dumps in materialized and live views, and [upgrade guidance](/docs/operations/upgrade/#upgrading-to-420) for existing scripts and views
 
 ## October 2026
 

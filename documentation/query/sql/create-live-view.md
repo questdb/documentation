@@ -267,13 +267,18 @@ The view query is validated at creation time and must:
   `systimestamp()`, or `rnd_*()`.
 - Not use
   [catalogue functions](/docs/query/sql/create-mat-view/#catalogue-functions)
-  or `SHOW` statements, such as `tables()` in a `WHERE` sub-query, unless the
-  creator holds `SYSTEM ADMIN` (Enterprise). The same rules as for materialized
-  views apply.
+  or catalogue `SHOW` statements, such as schema-only
+  [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views) in a `WHERE`
+  subquery, unless the creator holds `SYSTEM ADMIN` (Enterprise). The same rules
+  as for materialized views apply.
 - Not use Enterprise administrative functions, which check the permissions of
   the calling session: `active_grants()`, `active_permissions()`,
   `backup_instance_name()`, `backup_status()`, `backups()`, `permissions()`,
   `reload_tick_calendars()`, and `reload_tls()`.
+- Not use `SHOW CREATE DATABASE` with any ACL category when access control is
+  enabled (QuestDB Enterprise 4.2.0 and later), even as an administrator. The
+  default statement includes ACL output; use `INCLUDE (SCHEMA)` under the
+  catalogue rules above.
 - Not read another live view.
 
 ## Examples
@@ -476,6 +481,7 @@ the query.
 | `live view select cannot filter on the designated timestamp yet` | The `WHERE` clause filters the designated timestamp |
 | `non-deterministic function cannot be used in live view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
 | `administrative function cannot be used in live view: <function>` | The query calls an Enterprise administrative function, such as `permissions()` or `reload_tls()` |
+| `administrative statement cannot be used in live view: SHOW CREATE DATABASE` | The query includes an ACL dump (Enterprise); use `INCLUDE (SCHEMA)` under the [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions) |
 
 ### Window errors
 

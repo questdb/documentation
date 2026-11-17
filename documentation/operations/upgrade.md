@@ -120,6 +120,27 @@ QuestDB Enterprise 4.2.0 adds
 - Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
+QuestDB Enterprise 4.2.0 also changes `SHOW CREATE` output and restricts
+administrative operations in views. Check schema-export scripts and stored
+views for the following before upgrading:
+
+- With access control enabled, plain `SHOW CREATE DATABASE` now requires both
+  `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
+  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
+  [database dumps](/docs/query/sql/show/#enterprise-access-control).
+- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
+  Schema-only output does not restore grants. Use the ACL dump for permissions,
+  and review
+  [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
+- With access control enabled, materialized and live views reject
+  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
+  schema-metadata queries to `INCLUDE (SCHEMA)` under the
+  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
+- A regular view's `PIVOT IN` subquery rejects administrative functions and
+  administrative `SHOW` statements. Existing definitions become invalid at
+  their next compilation, including startup. See
+  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
+
 #### ACL audit log
 
 QuestDB Enterprise 4.2.0 introduces the
