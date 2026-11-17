@@ -58,7 +58,7 @@ global_sessions AS (
 ),
 totals AS (
   SELECT
-    first(timestamp) as ts,
+    first(timestamp) as timestamp,
     session,
     FIRST(lock_status) as lock_status,
     first(vehicle_id) as vehicle_id
@@ -75,7 +75,7 @@ SELECT
   vehicle_id,
   datediff('s', prev_ts, timestamp) as duration_seconds
 FROM prev_ts
-WHERE lock_status = false AND prev_ts IS NOT NULL;
+WHERE lock_status = true AND prev_ts IS NOT NULL;
 ```
 
 **Results:**
@@ -121,7 +121,7 @@ Combine vehicle_id with ride number to create unique session identifiers across 
 ### 4. Get session start times (`totals`)
 
 ```sql
-SELECT first(timestamp) as ts, ...
+SELECT first(timestamp) as timestamp, ...
 FROM global_sessions
 GROUP BY session
 ```
@@ -139,10 +139,10 @@ Get the timestamp from the previous session (for the same vehicle), then use `da
 ### Filter for rides
 
 ```sql
-WHERE lock_status = false
+WHERE lock_status = true
 ```
 
-Only show sessions where status is `false` (unlocked), which represents completed rides. The duration is from the previous session end (lock) to this session start (unlock).
+Only show sessions that start with a lock, which marks the end of a ride. The duration runs from the previous session start (unlock) to this one (lock).
 
 ## Monthly aggregation
 
@@ -171,7 +171,7 @@ global_sessions AS (
 ),
 totals AS (
   SELECT
-    first(timestamp) as ts,
+    first(timestamp) as timestamp,
     session,
     FIRST(lock_status) as lock_status,
     first(vehicle_id) as vehicle_id
@@ -189,7 +189,7 @@ SELECT
   SUM(datediff('s', prev_ts, timestamp)) as total_ride_duration_seconds,
   COUNT(*) as ride_count
 FROM prev_ts
-WHERE lock_status = false AND prev_ts IS NOT NULL
+WHERE lock_status = true AND prev_ts IS NOT NULL
 GROUP BY month, vehicle_id
 ORDER BY month, vehicle_id;
 ```
@@ -202,11 +202,12 @@ WITH prevEvents AS (
   SELECT *,
     lag(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp) as prev_ts
   FROM page_views
+  WHERE timestamp IN '$today'
 ),
 sessions AS (
   SELECT *,
     SUM(CASE
-      WHEN datediff('h', prev_ts, timestamp) > 1 THEN 1
+      WHEN timestamp > dateadd('h', 1, prev_ts) THEN 1
       ELSE 0
     END) OVER (PARTITION BY user_id ORDER BY timestamp) as session_id
   FROM prevEvents
@@ -222,6 +223,43 @@ FROM sessions
 GROUP BY user_id, session_id;
 ```
 
+The gap test compares timestamps with `dateadd()` rather than `datediff('h', ...) > 1`, because `datediff()` truncates to whole units. A gap of 1h59m returns `1`, so a `datediff()` check would only start a new session after 2 hours.
+
+**Closed sessions only:**
+
+On live data the latest session of each user may still be open. A session is closed once the timeout has passed since its last event, so filter on `session_end`:
+
+```sql
+WITH prevEvents AS (
+  SELECT *,
+    lag(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp) as prev_ts
+  FROM page_views
+  WHERE timestamp IN '$now-1d..$now'
+),
+sessions AS (
+  SELECT *,
+    SUM(CASE
+      WHEN timestamp > dateadd('h', 1, prev_ts) THEN 1
+      ELSE 0
+    END) OVER (PARTITION BY user_id ORDER BY timestamp) as session_id
+  FROM prevEvents
+),
+totals AS (
+  SELECT
+    user_id,
+    session_id,
+    min(timestamp) as session_start,
+    max(timestamp) as session_end,
+    count(*) as page_views
+  FROM sessions
+  GROUP BY user_id, session_id
+)
+SELECT * FROM totals
+WHERE session_end < dateadd('h', -1, now());
+```
+
+Run it periodically to pick up each session as it closes. A session that began before the start of the time filter comes back truncated, so make the lookback longer than the longest session you expect.
+
 **Machine operating cycles:**
 ```sql
 -- When machine changes from 'off' to 'running' to 'off'
@@ -229,6 +267,7 @@ WITH prevStatus AS (
   SELECT *,
     lag(status) OVER (PARTITION BY machine_id ORDER BY timestamp) as prev_status
   FROM machine_status
+  WHERE timestamp IN '$today'
 ),
 cycles AS (
   SELECT *,
