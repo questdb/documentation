@@ -116,6 +116,11 @@ Each operation requires a specific permission:
 | `ENABLE STORAGE POLICY`  | `ENABLE STORAGE POLICY`  |
 | `DISABLE STORAGE POLICY` | `DISABLE STORAGE POLICY` |
 
+On `sys.view_audit`, the audit trail of
+[audited views](/docs/security/audited-views/), only the built-in admin can run
+`SET STORAGE POLICY` and `ENABLE STORAGE POLICY`, whatever is granted: see
+[Retention](/docs/security/audited-views/#retention).
+
 ## Examples
 
 Set a local-only storage policy:
