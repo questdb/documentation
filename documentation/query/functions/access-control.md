@@ -91,7 +91,9 @@ These apply to both `active_grants()` and `active_permissions()`:
   the permissions a user gains by assuming a service account. Use
   [`SHOW GROUPS userName`](/docs/query/sql/show/#show-groups) and
   [`SHOW SERVICE ACCOUNTS userName`](/docs/query/sql/show/#show-service-accounts)
-  to see them.
+  to see them. To export memberships, assignments, and direct grants as
+  replayable SQL, use
+  [`SHOW CREATE DATABASE INCLUDE (PERMISSIONS)`](/docs/query/sql/show/#enterprise-access-control).
 - Access through a view is not shown on the tables the view reads. A view
   reads them with the permissions of its
   [definer](/docs/concepts/views/#definer-security-model-enterprise), so a user
@@ -105,8 +107,11 @@ These apply to both `active_grants()` and `active_permissions()`:
   refresh in the background without a session whose permissions could be
   checked. Creating such a view fails with an error such as
   `administrative function cannot be used in materialized view: active_grants`.
-  A regular view can call them. Unlike the tables it reads, the functions check
-  the permissions of the user who queries the view, not those of its definer.
+  A regular view can call them in its query body, but not in a `PIVOT IN`
+  subquery, including through nested queries or another view. Unlike the tables
+  it reads, the functions check the permissions of the user who queries the
+  view, not those of its definer. See
+  [administrative operations in view metadata](/docs/concepts/views/#administrative-operations-in-view-metadata).
 
 ### Examples
 

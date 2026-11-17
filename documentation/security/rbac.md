@@ -490,6 +490,12 @@ independently of the replicated access lists. It is the break-glass account
 when a `SWITCH ROLE` grant has not yet replicated to the node you need to
 promote.
 
+The built-in admin is also the only principal that can remove rows from the
+audit trail of [audited views](/docs/security/audited-views/), or set its
+storage policy. Before you disable the admin, give the trail a storage policy
+with a `DROP LOCAL` stage, which keeps pruning it without the admin: see
+[Retention](/docs/security/audited-views/#retention).
+
 ## Permission levels
 
 Permissions have different granularities determining where they can be applied:
@@ -529,6 +535,16 @@ GRANT SELECT ON trades TO team_lead WITH GRANT OPTION;
 When a user creates a table, they automatically receive all permissions on it
 with the GRANT option. This ownership does not persist - if revoked, they cannot
 get it back without someone re-granting it.
+
+## Audit access control changes
+
+The [ACL audit log](/docs/security/acl-audit-log/) is available in QuestDB
+Enterprise 4.2.0 and later. It records who changes users, groups, service accounts,
+credentials, and permissions, including both the session principal and any
+assumed service account. Query `sys.acl_audit_log` with `LIST USERS`,
+`USER DETAILS`, and `SELECT` on the table; `SELECT ON ALL TABLES` alone does
+not grant access. Only the built-in admin can change its retention policy or
+remove rows.
 
 ## Object visibility {#object-visibility}
 
@@ -583,6 +599,13 @@ including one holding `DATABASE ADMIN`, they look missing. For recovery,
 and `wait_wal_table()`, and WAL recovery statements such as
 [`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/) reach them
 for principals that hold the permission the statement requires.
+
+The [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
+`sys.acl_audit_log`, is available in QuestDB Enterprise 4.2.0 and later. It is a
+separate exception: it requires both `LIST USERS` and `USER DETAILS` in addition
+to ordinary table permissions. Without both, it looks missing even to a
+principal with a grant `ON ALL TABLES`. Unlike the protected ACL tables, its
+rows can be read by an authorized auditor.
 
 Permissions count from every source the principal is authorized with: its own
 grants and those of its groups or, after
@@ -948,6 +971,13 @@ even to read your own rows.
 
 :::
 
+To export identities, group memberships, service account assignments, and direct
+grants as replayable SQL, use
+[`SHOW CREATE DATABASE INCLUDE (ACL)`](/docs/query/sql/show/#enterprise-access-control).
+It requires both `LIST USERS` and `USER DETAILS`, as does plain
+`SHOW CREATE DATABASE`. For structure only, use `INCLUDE (SCHEMA)`, which
+requires neither permission and includes only visible objects.
+
 ## Memory limits {#memory-limits}
 
 QuestDB Enterprise can limit the native memory tracked for a single query,
@@ -1175,14 +1205,21 @@ SELECT * FROM all_permissions();
 | ADD INDEX                 | Database &#124; Table &#124; Column | Add index on symbol columns             |
 | ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
+| ALTER SYMBOL CAPACITY     | Database &#124; Table &#124; Column | Change symbol column capacity           |
+| ALTER VIEW                | Database &#124; Table               | Change view definitions                 |
 | ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
 | AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
+| BACKUP TABLE              | Database &#124; Table               | Grantable, but no statement requires it |
 | CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
+| COMPILE VIEW              | Database &#124; Table               | Compile views                           |
+| CONVERT PARTITION TO NATIVE | Database &#124; Table             | Convert Parquet partitions to native format |
+| CONVERT PARTITION TO PARQUET | Database &#124; Table            | Convert partitions to Parquet           |
 | CREATE TABLE              | Database                            | Create tables                           |
+| CREATE VIEW               | Database                            | Create views                            |
 | CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
-| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication                    |
+| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
 | DEDUP DISABLE             | Database &#124; Table               | Disable deduplication                   |
 | DETACH PARTITION          | Database &#124; Table               | Detach partitions                       |
 | DISABLE STORAGE POLICY    | Database &#124; Table               | Disable storage policies                |
@@ -1190,6 +1227,7 @@ SELECT * FROM all_permissions();
 | DROP INDEX                | Database &#124; Table &#124; Column | Drop indexes                            |
 | DROP PARTITION            | Database &#124; Table               | Drop partitions                         |
 | DROP TABLE                | Database &#124; Table               | Drop tables                             |
+| DROP VIEW                 | Database &#124; Table               | Drop views                              |
 | DROP MATERIALIZED VIEW    | Database &#124; Table               | Drop materialized views                 |
 | DROP LIVE VIEW            | Database &#124; Table               | Drop live views                         |
 | ENABLE STORAGE POLICY     | Database &#124; Table               | Enable storage policies                 |
@@ -1202,7 +1240,11 @@ SELECT * FROM all_permissions();
 | RESOURCE GROUP ADMIN      | Database                            | Manage and map resource groups, read `resource_groups()` |
 | RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
 | SELECT                    | Database &#124; Table &#124; Column | Read data                               |
+| SET PARQUET SETTINGS      | Database &#124; Table               | Set column Parquet encoding and compression |
+| SET REFRESH LIMIT         | Database &#124; Table               | Set materialized view refresh limits    |
+| SET REFRESH TYPE          | Database &#124; Table               | Change materialized view refresh strategy |
 | SET STORAGE POLICY        | Database &#124; Table               | Set storage policies                    |
+| SET TABLE FORMAT          | Database &#124; Table               | Change the partition storage format     |
 | SET TABLE PARAM           | Database &#124; Table               | Set table parameters                    |
 | SET TABLE TYPE            | Database &#124; Table               | Change table type                       |
 | SETTINGS                  | Database                            | Change instance settings in Web Console |

@@ -78,12 +78,19 @@ A policy can be attached when creating the table with the `STORAGE POLICY`
 clause on [`CREATE TABLE`](/docs/query/sql/create-table/#storage-policy), or set
 later with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
-For example, convert a partition to Parquet one hour after it stops being the
-active partition:
+For example, make an inactive partition eligible when the
+[reference time](/docs/concepts/storage-policy/#ttl-evaluation) is at least one
+hour after the partition's start:
 
-```questdb-sql title="Convert to Parquet after 1 hour (Enterprise)"
+```questdb-sql title="Set a one-hour Parquet conversion threshold"
 ALTER TABLE market_data SET STORAGE POLICY(TO PARQUET 1h);
 ```
+
+For hourly partitions, this threshold can be met as soon as the next partition
+becomes active; there is no extra one-hour wait. The active partition never
+converts, and eligible conversions run asynchronously. By default, the reference
+time is the earlier of the latest table timestamp and the wall clock, so a quiet
+table can delay conversion.
 
 The TTL unit cannot be finer than the table's partition size (`market_data` is
 partitioned by hour). See the [Storage Policy](/docs/concepts/storage-policy/)
@@ -241,6 +248,14 @@ Parquet-related settings.
 * While a partition is being converted, writes to that partition are briefly
   blocked.
 * Some parallel queries are not yet optimized for Parquet.
+
+### Rebuilding indexes
+
+To rebuild the indexes of Parquet partitions without taking the table offline,
+use
+[`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/),
+available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.0. Run it after upgrading from QuestDB 9.3.4 through 10.0.1, which could leave
+stale column metadata on Parquet partitions that received out-of-order rows.
 
 ## Export
 

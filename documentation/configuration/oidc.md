@@ -141,6 +141,13 @@ location where it was loaded from (`window.location.href`).
 The OIDC server asks consent for the scopes listed in this property. The
 scope `openid` is mandatory and must always be included.
 
+QuestDB advertises the scopes in `/settings`. Besides the Web Console, client
+libraries that sign users in with the
+[device authorization flow](/docs/security/oidc/#device-authorization-flow)
+request them, unless the application overrides the scope. Include
+`offline_access` when those clients should receive a refresh token and renew
+their credentials without a new sign-in.
+
 ## Authentication flows
 
 ### acl.oidc.pg.token.as.password.enabled
@@ -177,6 +184,23 @@ enabled, this flow must also be configured in the OIDC Provider.
 
 OIDC Authorization Endpoint. The default value should work for the Ping
 Identity Platform.
+
+### acl.oidc.device.authorization.endpoint
+
+- **Default**: none
+- **Reloadable**: no
+
+OAuth 2.0 device authorization endpoint of the OIDC provider, available in
+QuestDB Enterprise 3.3.3 and later. QuestDB does not call it: it advertises
+the endpoint in `/settings` for client libraries that sign users in with the
+[device authorization flow](/docs/security/oidc/#device-authorization-flow).
+Like the other endpoint settings, it is a path on
+[`acl.oidc.host`](#acloidchost) and applies only when
+[`acl.oidc.configuration.url`](#acloidcconfigurationurl) is not set. With a
+configuration URL, QuestDB advertises the `device_authorization_endpoint`
+that the discovery document lists, if any. When QuestDB advertises no
+endpoint, a client must pin the issuer of the IdP to discover the endpoint
+itself.
 
 ### acl.oidc.public.keys.endpoint
 

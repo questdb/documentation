@@ -16,7 +16,7 @@ Add the client:
 
 ```text title="Cargo.toml"
 [dependencies]
-questdb-rs = "7"
+questdb-rs = "7.3"
 ```
 
 The default features enable both directions: `sync-sender` for pooled
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-An `Ok` ACK confirms that QuestDB accepted the frame, but the row becomes
+An `Ok` ACK confirms that QuestDB accepted the row, but the row becomes
 visible only after the WAL is applied to the table. This happens asynchronously.
 The bounded poll uses a unique value and a bind parameter, so it cannot
 accidentally report an older row. In production, poll for the application
@@ -125,20 +125,21 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-`QuestDb::connect` parses the connect string and doesn't normally perform any
-blocking network I/O. The exception to that happens when store-and-forward
-durability is in use, and the client detects unsent data left over from a
-previously crashed client. The pool may reopen the dirty slots at construction
-and start replaying them in the background.
+`QuestDb::connect` opens the warm minimum connections eagerly, so
+authentication, TLS, and connection errors can surface from `connect()`.
+Set `lazy_connect=true` to defer connections: ingestion senders queue data
+locally and connect in the background, and readers connect on first borrow.
 
-The ingestion sender creates its local producer on first borrow and connects its
-delivery runner in the background, so it can queue data while the server is
-temporarily unavailable. Reader errors and direct Arrow/Polars transport errors
-surface from the borrow or during operation rather than from `connect()`.
+With disk-backed store-and-forward, the pool may also reopen sender directories
+holding unsent data from a previous process and replay them in the background.
+Later borrows and operations can still fail when opening or reconnecting a
+connection.
 
 ## Authentication and TLS
 
-Put the credentials and TLS settings in the connect string:
+Put fixed credentials and TLS settings in the connect string. For interactive
+sign-in or expiring credentials, attach an [OIDC helper](#oidc-device-flow) or
+[rotating token provider](#rotating-bearer-tokens) instead:
 
 ```rust
 use questdb::QuestDb;
@@ -162,6 +163,267 @@ choices have feature requirements:
 | `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
 | `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
 | `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
+
+### OIDC device flow
+
+Client **7.3.0 or later** provides `OidcDeviceAuth` for interactive sign-in to
+QuestDB Enterprise through an identity provider. Enable the optional `oidc`
+feature in addition to the default features:
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7.3", features = ["oidc"] }
+```
+
+The IdP application named by `acl.oidc.client.id` must allow the device grant;
+see [Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for the IdP settings. The client discovers settings from QuestDB's
+`/settings`; pin the issuer so it can also discover the IdP's device endpoint
+when QuestDB does not advertise one. Replace both URLs below with your
+deployment's values:
+
+```rust title="Sign in and share OIDC across the pool"
+use std::sync::Arc;
+
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://db.example.com:9000")
+            .issuer("https://idp.example.com/realms/questdb")
+            .build()?,
+    );
+    auth.sign_in()?; // Only this call may prompt or open a browser.
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=db.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    let mut reader = db.borrow_reader()?;
+    let mut cursor = reader.execute("SELECT current_user()")?;
+    while let Some(batch) = cursor.next_batch()? {
+        println!("{} row(s)", batch.row_count());
+    }
+    Ok(())
+}
+```
+
+The example preserves the server's configured scopes. To request a refresh
+token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
+complete `.scope(...)` override that also retains required `profile`, groups,
+and API scopes. The same provider serves every pooled sender and reader.
+Token lookups never prompt: they use the cache or refresh silently if the IdP
+issued a refresh token. `sign_in()` itself prompts only when no valid cached,
+persisted, or silently refreshable credential exists, so call it at every
+process start. See
+[Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for scope overrides and access-token versus ID-token selection.
+
+Without a usable refresh token after expiry, a pool or reader call fails with
+an error whose `oidc_error()` has the kind `OidcErrorKind::InteractionRequired`.
+The error's `code()` describes the failing call, often a retryable
+`SocketError`, so check the OIDC detail first. When `acquisition_busy()` is
+set, another thread is already signing in; retry later instead of starting a
+second sign-in. Otherwise call `sign_in()` again on the application thread,
+never from a callback, and retry once:
+
+```rust title="Sign in again when a query needs it"
+use questdb::{
+    oidc::{OidcDeviceAuth, OidcErrorKind},
+    QuestDb,
+};
+
+fn needs_sign_in(err: &questdb::Error) -> bool {
+    err.oidc_error().is_some_and(|oidc| {
+        oidc.kind() == OidcErrorKind::InteractionRequired
+            && !oidc.acquisition_busy()
+    })
+}
+
+fn count_rows(db: &QuestDb) -> questdb::Result<usize> {
+    let mut reader = db.borrow_reader()?;
+    let mut cursor = reader.execute("SELECT current_user()")?;
+    let mut rows = 0;
+    while let Some(batch) = cursor.next_batch()? {
+        rows += batch.row_count();
+    }
+    Ok(rows)
+}
+
+fn count_rows_with_sign_in(
+    db: &QuestDb,
+    auth: &OidcDeviceAuth,
+) -> questdb::Result<usize> {
+    match count_rows(db) {
+        Err(err) if needs_sign_in(&err) => {
+            auth.sign_in()?; // Prompts on this thread, never in a callback.
+            count_rows(db) // Retry once.
+        }
+        result => result,
+    }
+}
+```
+
+For private CAs, set `.ca_bundle("/etc/questdb/oidc-ca.pem")` on the OIDC
+builder. This PEM bundle covers discovery and IdP requests, independently of
+the pool's `tls_roots`. These requests connect directly: they ignore
+`HTTPS_PROXY` and `ALL_PROXY`, and there is no proxy setting. Configure the
+separate request timeout with
+`.timeout(std::time::Duration::from_secs(10))` (default 30 seconds, maximum
+120). A token lookup waiting behind another thread's silent refresh can take
+up to six times that timeout; sender timeouts do not cap it. See
+[TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
+
+Use `.open_browser(false)` on the builder for a remote terminal; the code and
+verification URL are still printed. A custom `oidc::Renderer` can own the UI.
+Credentials stay in memory unless the builder receives
+`.token_store(FileTokenStore::at_default_location()?)`, with
+`FileTokenStore` imported from `questdb::oidc`. That opt-in writes plaintext
+credentials and currently supports mutations only on Unix. For encrypted
+storage, implement `oidc::TokenStore`. See
+[Credential storage and shutdown](/docs/security/oidc/#credential-storage-and-shutdown).
+
+### Rotating bearer tokens
+
+For machine credentials, `RefreshingTokenProvider` wraps an application-defined
+`TokenSource` with a shared cache and proactive background refresh. No `oidc`
+feature is required for this API, and no identity SDK is bundled. A source can
+be a closure returning `questdb::Result<ExpiringToken>` or a type implementing
+`TokenSource`:
+
+```rust title="Attach an application token source"
+use questdb::{
+    token_provider::{RefreshingTokenProvider, TokenSource},
+    QuestDb,
+};
+
+fn query_with_tokens(
+    source: impl TokenSource + 'static,
+) -> questdb::Result<()> {
+    let tokens = RefreshingTokenProvider::builder(source)
+        .name("market-data-service")
+        .build()?;
+    {
+        let db = QuestDb::connect_with_token_provider(
+            "wss::addr=db.example.com:9000;",
+            tokens.clone(),
+        )?;
+        let mut reader = db.borrow_reader()?;
+        let mut cursor = reader.execute("SELECT current_user()")?;
+        while cursor.next_batch()?.is_some() {}
+    } // Close clients before their provider.
+    tokens.close();
+    Ok(())
+}
+```
+
+Your source obtains credentials through an identity SDK, OAuth2 flow, or
+secrets manager. Return `ExpiringToken::new(token, expires_at)` with a
+`SystemTime`, or `ExpiringToken::expires_in(token, lifetime)` with a `Duration`
+computed from the IdP's reported lifetime, not an invented expiry. Return
+`Error::token_unavailable(retryable, retry_after, message)` for failures.
+The classification only decides whether a connect the caller waits for
+retries the failure: the provider keeps retrying the fetch with backoff, and
+background reconnects keep retrying either kind. A source cannot stop the
+attached clients; close the provider to do that.
+
+The source runs serially on a dedicated thread. Bound its network calls and
+do not call into clients attached to the provider. Refresh is scheduled at
+roughly half the token lifetime, with jitter and failure backoff. Defaults
+include a 60-second `handout_floor` and a 30-second `cold_wait`; reduce the
+floor through the builder if your IdP issues tokens that live for 60 seconds
+or less. Use `await_ready(Duration)` to gate startup and `status()` to inspect
+fetch diagnostics without reading credentials.
+
+If your application already caches tokens, pass a closure returning
+`questdb::Result<String>` directly, or implement `BearerTokenProvider` with
+`token()` and optional `on_rejected()`. Return the raw token, without
+`Bearer `. These callbacks must be fast and thread-safe. When retrying can
+never succeed, for example after your application retires the credential,
+return `Err(Error::new(ErrorCode::InvalidApiCall, message))` from `token()`:
+every attached client then fails with `ErrorCode::ConfigError` and stops
+reconnecting. Any other error, including a non-retryable
+`Error::token_unavailable`, leaves background reconnects running.
+
+### Attachment, failures, and shutdown
+
+For standalone clients, attach a provider with:
+
+- `SenderBuilder::http_token_provider` for ILP/HTTP.
+- `SenderBuilder::qwp_ws_token_provider` for QWP/WebSocket ingestion.
+- `ReaderConfig::token_provider` for QWP/WebSocket queries.
+
+Use `https::` or `wss::`. Providers are not supported over TCP or UDP, and
+cannot be combined with fixed `token`, `username`, or `password` credentials.
+The `token_provider` and `azure_*` connection-string keys are rejected; attach
+providers through the Rust API.
+
+Tokens are resolved per WebSocket connect/reconnect round and normally once
+per ILP/HTTP flush. An eligible HTTP 401 triggers one retry only if the
+provider supplies a different token; `403` and `insufficient_scope` do not
+trigger that refresh retry. An established WebSocket is not reauthenticated
+for each batch. See
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
+
+Inspect `err.oidc_error()` (with `oidc` enabled) for OIDC details and
+`err.as_token_unavailable()` for a provider's retryability and retry-after
+hint. `ReaderConfig::upgrade_headers()` now returns
+`Result<Vec<_>>`, because acquiring the credential can fail.
+
+Background reconnects report credential problems as connection events, not as
+errors. Register a listener when connecting, with
+`QuestDb::connect_with_handlers_and_token_provider`. The listener runs on a
+dispatcher thread; do not call back into the pool from it. `AuthFailed` means
+the server rejected the credential. `CredentialUnavailable` means the client
+could not obtain one, and its `cause_code` tells whether the sender keeps
+reconnecting (`SocketError`) or has stopped (`AuthError` or `ConfigError`, for
+example after its provider was closed):
+
+```rust title="Log credential events from a pool"
+use std::sync::Arc;
+
+use questdb::{
+    ingress::{ConnectionEvent, ConnectionEventKind},
+    token_provider::BearerTokenProvider,
+    ConnectHandlers, ErrorCode, QuestDb,
+};
+
+fn connect_with_events(
+    conf: &str,
+    tokens: impl BearerTokenProvider + 'static,
+) -> questdb::Result<QuestDb> {
+    let mut handlers = ConnectHandlers::default();
+    handlers.connection_listener = Some(Arc::new(|event: &ConnectionEvent| {
+        match event.kind {
+            ConnectionEventKind::AuthFailed => {
+                eprintln!("credential rejected: {:?}", event.cause_msg);
+            }
+            ConnectionEventKind::CredentialUnavailable => {
+                let stopped = matches!(
+                    event.cause_code,
+                    Some(ErrorCode::AuthError | ErrorCode::ConfigError)
+                );
+                eprintln!(
+                    "no credential (sender stopped: {stopped}): {:?}",
+                    event.cause_msg
+                );
+            }
+            _ => {}
+        }
+    }));
+    QuestDb::connect_with_handlers_and_token_provider(conf, handlers, tokens)
+}
+```
+
+Cloned refreshing providers share one cache. Dropping one clone, or an `Arc`
+reference to OIDC auth, does not close the others. Explicit `close()` disables
+the shared provider permanently, so close clients first. It does not cancel
+an in-flight source fetch; that fetch finishes before its source is dropped,
+and its result is discarded. Do not carry providers or clients across
+`fork()`; create them in fresh worker processes.
 
 ## The pool
 
@@ -227,12 +489,13 @@ successful local publication and retains its allocated capacity. Use
 `flush_buffer_and_keep()` only when you need to retain the rows for another
 destination or operation.
 
-A buffer is published as one frame and is never split, so it must stay under
-the frame cap: the smallest of `max_buf_size` (default 100 MiB), the batch size
-the server advertises, and the `sf_max_segment_bytes` segment payload capacity
-(just under 4 MiB by default). `buffer.len()` is at least the size of the frame
-a flush encodes, so a buffer flushed before its length reaches the cap fits in
-one frame. A buffer over the cap fails with `ErrorCode::BatchTooLarge`,
+A buffer flush always publishes exactly one batch and is never split. The
+protocol calls a batch a *frame* and numbers batches with frame sequence
+numbers (FSNs). A buffer must therefore stay under the batch size limit: the smallest of `max_buf_size` (default 100 MiB), the batch size the
+server advertises, and the `sf_max_segment_bytes` segment payload capacity
+(just under 4 MiB by default). `buffer.len()` is at least the size of the batch
+a flush encodes, so a buffer flushed before its length reaches the limit fits
+in one batch. A buffer over the limit fails with `ErrorCode::BatchTooLarge`,
 publishes nothing, and keeps its rows.
 
 ### Buffer column setters
@@ -331,19 +594,20 @@ The `at_*` setters take raw epoch `i64` values.
 `TimestampNanos::now().as_i64()` supplies the current time for `at_nanos`, and
 `TimestampMicros` has the same `as_i64()` accessor for `at_micros`.
 
-Use one `Chunk` per batch. Create the chunk after creating the batch's backing
-buffers, append the columns, and flush it before leaving that scope.
+Use one `Chunk` for each set of rows you flush. Create the chunk after
+creating the backing buffers for those rows, append the columns, and flush it
+before leaving that scope.
 
-A chunk too large for one frame is split across several, each published on its
-own. The client targets about 2 MiB per frame — half of `sf_max_segment_bytes` (default
-4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. That matters
-because a flush failing partway through leaves the earlier frames queued and
-never accepts the rest, which is why chunk recovery differs from buffer
+A chunk too large for one batch is split across several, each published on its
+own. The client targets about 2 MiB per batch — half of `sf_max_segment_bytes`
+(default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. That
+matters because a flush failing partway through leaves the earlier batches
+queued and never accepts the rest, which is why chunk recovery differs from buffer
 recovery; see [Recovering from a failed flush](#recovering-from-a-failed-flush).
 
-The client halves the row range until each frame fits, stopping at 8 rows:
-validity bitmaps and boolean columns pack one bit per row, so a frame must
-start on a byte boundary. An 8-row frame is checked against the full 4 MiB
+The client halves the row range until each batch fits, stopping at 8 rows:
+validity bitmaps and boolean columns pack one bit per row, so a batch must
+start on a byte boundary. An 8-row batch is checked against the full 4 MiB
 rather than the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very
 large string, binary, or array values — the flush fails instead of splitting.
 
@@ -452,8 +716,10 @@ db.flush_arrow_batch(
 ```
 
 Pass `Some(ColumnName)` instead of `None` to source the designated timestamp
-from an Arrow timestamp column. Passing `None` for the ACK level selects
-`Durable` when `request_durable_ack=on`, otherwise `Ok`.
+from an Arrow timestamp column. Passing `None` for the ACK level waits for the
+level the connect string requests: `LocalDurable` for
+`request_durable_ack=local`, `Durable` for `on`, `replicated`, or
+`local,replicated`, and `Ok` otherwise.
 
 For Polars, configure ingestion with `PolarsIngestOptions`:
 
@@ -482,11 +748,11 @@ Pass `&[]` for `overrides` when no column needs one. `max_rows(0)` uses the
 default batch size. Omitting `timestamp_column` asks the server to assign
 timestamps. Omitting `ack_level` uses the pool default.
 
-`flush_polars_dataframe` checkpoints the frame and automatically retries the
-uncommitted tail after a transient failover. `flush_arrow_batch` returns a
-transient error for the caller to retry because the caller still owns the
-batch. Polars replay is at-least-once, and retrying an Arrow batch after an
-uncertain failure can also duplicate rows. Use
+`flush_polars_dataframe` checkpoints its progress through the DataFrame and
+automatically retries the uncommitted tail after a transient failover.
+`flush_arrow_batch` returns a transient error for the caller to retry because
+the caller still owns the Arrow batch. Polars replay is at-least-once, and
+retrying an Arrow batch after an uncertain failure can also duplicate rows. Use
 [deduplication](/docs/concepts/deduplication/) when duplicates would be
 harmful.
 
@@ -713,21 +979,23 @@ If you disable default features, also enable `sync-reader-zstd`.
 ## Delivery and durability
 
 The ingestion sender pool always uses store-and-forward. Without `sf_dir`, the
-queue is in memory. With `sf_dir`, each borrowed sender uses a disk slot:
+queue is in memory. With `sf_dir`, each borrowed sender uses its own sender
+directory:
 
 ```text
 <sf_dir>/<sender_id>-ingest-<index>/
 ```
 
 Give each pool that shares an `sf_dir` a distinct `sender_id`. On restart, the
-pool reopens managed dirty slots and replays their unacknowledged frames.
+pool reopens its sender directories that still hold data and replays their
+unacknowledged rows.
 
 The default `sf_durability=memory` does not call `fsync`. It is page-cache
 durable, which protects against a client-process crash but does not guarantee
 survival of a host crash or power loss.
 
 Set `sf_durability=periodic` to survive host loss. It requires `sf_dir` and
-checkpoints published frames in the background every `sf_sync_interval_millis`
+forces the queued data to disk in the background every `sf_sync_interval_millis`
 (default `5000`). `flush` and `append` are reserved: they parse but are
 rejected at build time.
 
@@ -740,10 +1008,22 @@ rejected at build time.
 | Per-call deadline | Publish, then `wait(level, timeout)` | Wait with an explicit no-progress timeout. |
 | Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
-`AckLevel::Ok` means the server accepted all frames through the boundary.
-`AckLevel::Durable` requires `request_durable_ack=on` and Enterprise server
-support. Requesting `Durable` without opting in is rejected before the buffer
-or chunk is changed.
+`AckLevel::Ok` means the server accepted all batches up to and including the
+boundary.
+`AckLevel::LocalDurable` waits until the server flushed them to its own disk. It
+needs `request_durable_ack=local` and a server running
+[`cairo.commit.mode=adaptive`](/docs/concepts/durability/).
+`AckLevel::Durable` waits until they reached replication storage. It needs
+QuestDB Enterprise and `request_durable_ack=on`, `replicated`, or
+`local,replicated`. The tier names `local`, `replicated`, and
+`local,replicated` need a client release after 7.2.1; `on` is the only one
+QuestDB Enterprise 4.1.0 and earlier accept (see
+[Durable ACK](/docs/connect/clients/connect-string/#durable-ack)). If the server
+does not grant every requested tier, the connect fails with
+`WebSocket upgrade failed: server did not enable durable ACK [...]`.
+`LocalDurable` is accepted only with `request_durable_ack=local`, and `Durable`
+only with a set that includes `replicated` (or `on`). Any other wait is rejected
+before the buffer or chunk is changed.
 
 A `wait` timeout is a no-progress timeout. The data remains queued and its
 background delivery continues. Retry `wait()` or keep observing `acked_fsn()`;
@@ -755,7 +1035,7 @@ portable receipts that can be checked through an arbitrary later borrow.
 A successful FSN-returning flush of a non-empty buffer or chunk always returns
 `Some(fsn)`; `Ok(None)` only means there was nothing to publish. Similarly,
 `published_fsn()` and `acked_fsn()` return `Ok(None)` until this borrow
-publishes or completes its first frame, so treat `None` from `acked_fsn()` as
+publishes or completes its first batch, so treat `None` from `acked_fsn()` as
 "nothing acked yet", not as a failure. A saved boundary is covered once
 `acked_fsn()` returns a value at or above it.
 
@@ -768,8 +1048,9 @@ For these low-level APIs, the flag describes only the failed operation's
 input. The DataFrame-level aggregation described above applies specifically to
 `flush_polars_dataframe`.
 
-When `in_doubt()` is `false`, the flush failed before the queue took the frame,
-so the rows never entered the send path and your input is intact: re-flush it.
+When `in_doubt()` is `false`, the flush failed before the queue accepted
+anything, so the rows never entered the send path and your input is intact:
+re-flush it.
 When `in_doubt()` is `true`, delivery is
 uncertain — do not blindly replay, because the queue may already hold the rows.
 Waiting never duplicates, so `wait()` (or observe `acked_fsn()`) for whatever
@@ -783,13 +1064,13 @@ retryable code before re-sending.
 
 How much waiting recovers depends on the API:
 
-- A `Buffer` publishes as one indivisible frame, and every publication failure
+- A `Buffer` publishes as one indivisible batch, and every publication failure
   is provably-not-delivered. So an in-doubt buffer failure means the ACK wait
   failed with every row already queued, and `wait()` recovers it.
-- A `Chunk` may be [split](#sending-data-column-major) across frames. A failure
-  partway through queues the earlier frames and never accepts the rest, so
-  waiting delivers only part of the batch. Recovering the remainder means
-  resending the chunk, which is safe only under dedup keys.
+- A `Chunk` may be [split](#sending-data-column-major) into several batches. A
+  failure partway through queues the earlier batches and never accepts the
+  rest, so waiting delivers only part of the chunk. Recovering the remainder
+  means resending the chunk, which is safe only under dedup keys.
 
 Buffer and chunk state is not a substitute for this flag. An in-doubt chunk is
 cleared after a failed ACK wait but populated when a split remainder fails, so
@@ -808,7 +1089,7 @@ publication can wait for ACK-driven space and then return an error:
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a sender or pool closes. |
 
 Size the queue for the largest expected outage and ingest rate. If an in-memory
-queue cannot drain before close timeout, its remaining tail is lost. Disk mode
+queue cannot drain before close timeout, its remaining tail is lost. SF mode
 keeps the tail for restart replay, subject to the page-cache durability limit.
 
 ## Concurrency and sizing
@@ -851,15 +1132,24 @@ and is not part of that thread-bound borrow list.
 | --- | --- | --- |
 | `sender_pool_min` | `1` | Warm minimum of ingestion connections retained once they have been opened. Set it near steady concurrent use. |
 | `sender_pool_max` | `4` | Ingestion pool growth cap. Set it at or above peak concurrent sender borrows. |
-| `query_pool_min` | `1` | Warm minimum of reader connections retained once they have been opened. |
+| `query_pool_min` | `1` (`0` with `lazy_connect=true`) | Warm minimum of reader connections retained once they have been opened. |
 | `query_pool_max` | `4` | Reader pool growth cap. Set it at or above peak concurrent reader borrows. |
 | `acquire_timeout_ms` | `5000` | How long a borrow waits for a returned connection once its pool is at its cap. `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the warm minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
 
-Setting an ingress `reconnect_*` key without explicitly setting
-`initial_connect_retry` promotes the initial mode to synchronous retry. See the
+Pools honor only an explicitly set `initial_connect_retry`: setting
+`reconnect_*` alone does not change the default fail-fast startup. Implicit
+promotion to synchronous retry applies to standalone senders, not pools. Use
+`initial_connect_retry=on` to retry eager ingestion connections within
+`reconnect_max_duration_millis`. Readers prewarmed by `query_pool_min` still
+connect synchronously without that retry policy; set `query_pool_min=0` to
+defer them until first use. For background ingestion startup instead, use
+`lazy_connect=true`, which also defaults `query_pool_min` to `0`. With it,
+leave `initial_connect_retry` unset or set it to `async`, and leave
+`query_pool_min` unset or set it to `0`: the pool rejects other values as a
+configuration conflict. See the
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 
@@ -872,9 +1162,9 @@ A borrow at the pool's cap waits up to `acquire_timeout_ms` for another thread
 to return a connection, then fails with `ErrorCode::InvalidApiCall`. Set
 `acquire_timeout_ms=0` to fail fast instead. In disk-backed store-and-forward
 mode, an ingestion borrow may first wait up to `close_flush_timeout_millis` for
-a closing slot to release its disk lock.
+a closing sender to release the lock on its sender directory.
 
-Keep borrows short. A borrow occupies its slot until `Drop`, even while the
+Keep borrows short. A borrow holds its place in the pool until `Drop`, even while the
 application is idle.
 
 ## Failover and errors
@@ -921,7 +1211,7 @@ visible within the deadline I chose". `questdb::Error` implements
 `Box<dyn Error>`, an `anyhow::Error`, or a `thiserror` enum with `?`, and a
 worker thread can return client and application failures through one type.
 
-The writer background runner reconnects and replays queued frames. The
+The writer background runner reconnects and replays queued rows. The
 ingestion retry budget uses these keys:
 
 | Key | Default |
@@ -930,9 +1220,31 @@ ingestion retry budget uses these keys:
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
 
-Authentication failures, protocol-version failures, and terminal data
-rejections are not retried. A terminal writer is retired when its borrow is
-dropped; there is no pooled `must_close()` or async-error polling API.
+A rejected credential (HTTP 401/403) stops a sender that has not connected
+yet, in every `initial_connect_retry` mode, including pools with
+`lazy_connect=true`. Once a QWP/WebSocket sender has connected, later 401/403
+rejections are retried with capped backoff, including with fixed credentials;
+unacknowledged rows stay queued. A `CredentialUnavailable` event means the
+provider could not supply a token, while `AuthFailed` means the server
+rejected one; see [Attachment, failures, and shutdown](#attachment-failures-and-shutdown)
+for subscribing to these events. A token-fetch failure classified as
+permanent does not by itself stop background reconnects.
+
+Dropping a standalone sender stops it. Dropping a `BorrowedSender` normally
+returns its connection to the pool, where delivery and reconnects continue.
+To retire that connection, call `sender.drop_on_return()` before dropping the
+borrow; to shut down the pool, release all borrows and call `db.close()`.
+Explicitly closing a shared OIDC or refreshing provider disables future token
+acquisition for all attached clients. An application-defined provider stops
+its clients by returning an error with `ErrorCode::InvalidApiCall`; see
+[Rotating bearer tokens](#rotating-bearer-tokens). Shut down from application
+code, outside callbacks, and normally close clients before their provider. See
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
+Durable-ack capability mismatches (`ErrorCode::ProtocolVersionError`) and
+terminal data rejections are not retried. A terminal writer is retired when its
+borrow is dropped; there is no pooled `must_close()` or async-error polling
+API.
 
 Reader failover has a separate policy:
 
@@ -978,9 +1290,10 @@ Closing drains store-and-forward queues on a best-effort basis for
 `close_flush_timeout_millis`, which defaults to five seconds. Before shutdown:
 
 - Call `wait(AckLevel::Ok, timeout)` when accepted delivery is required.
-- Call `wait(AckLevel::Durable, timeout)` when durable ACKs are configured and
+- Call `wait(AckLevel::LocalDurable, timeout)` or
+  `wait(AckLevel::Durable, timeout)` when durable ACKs are configured and
   required.
-- Configure `sf_dir` when undelivered frames must replay after a process
+- Configure `sf_dir` when undelivered rows must replay after a process
   restart.
 
 Under `pool_reap=manual`, call `reap_idle()` periodically if the pool should
@@ -999,6 +1312,7 @@ integrations only when your application uses them:
 | `ring-crypto` | Yes | The default TLS cryptography backend. Do not combine it with `aws-lc-crypto`. |
 | `arrow-ingress` / `arrow-egress` | No | Arrow ingestion / Arrow query results. The `arrow` feature enables both. |
 | `polars-ingress` / `polars-egress` | No | Polars ingestion / Polars query results. The `polars` feature enables both. |
+| `oidc` | No | OIDC device-flow sign-in and silent refresh with `OidcDeviceAuth`. Rotating application token providers do not need this feature. |
 | `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
 | `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
 | `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
@@ -1007,8 +1321,8 @@ integrations only when your application uses them:
 | `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |
 
 `almost-all-features` is intended for client development and CI. It extends
-the defaults with QWP/UDP, both TLS root sources, `insecure-skip-verify`, JSON
-test helpers, timestamp and array integrations, and both decimal crates. It
+the defaults with QWP/UDP, OIDC, both TLS root sources, `insecure-skip-verify`,
+JSON test helpers, timestamp and array integrations, and both decimal crates. It
 selects `ring-crypto`, omits the mutually exclusive `aws-lc-crypto`, and
 excludes `arrow` and `polars`. Prefer the specific features your application
 uses.
@@ -1031,11 +1345,12 @@ These are the supported pool entry points:
 | Method | Feature | Purpose |
 | --- | --- | --- |
 | `QuestDb::connect(conf: &str)` | `sync-sender-qwp-ws` | Parse the connect string and create the pool. |
+| `QuestDb::connect_with_token_provider(conf, provider)` | `sync-sender-qwp-ws` | Share one rotating bearer-token provider across ingestion and query connections. |
 | `new_buffer()` | `sync-sender-qwp-ws` | Create a caller-owned QWP/WebSocket `Buffer` using the pool's name limit. |
 | `borrow_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedSender` for buffers, chunks, or Arrow batches. |
 | `borrow_reader()` | `sync-sender-qwp-ws` + `sync-reader-qwp-ws` | Borrow a `BorrowedReader`. |
 | `flush_arrow_batch(table, batch, timestamp_column, overrides, ack_level)` | `arrow-ingress` | Ingest one Arrow batch through an internally borrowed direct sender. |
-| `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars frame with checkpointed failover replay. |
+| `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars DataFrame with checkpointed failover replay. |
 | `reap_idle()` | `sync-sender-qwp-ws` | Close expired idle connections above the warm minimum and return the number closed. |
 | `close(self)` | `sync-sender-qwp-ws` | Consume and close the pool. Dropping it has the same effect. |
 
@@ -1054,11 +1369,11 @@ borrowed-slice `Chunk` values:
 | `flush_buffer(&mut Buffer)` | Publish a buffer locally and clear it on success. |
 | `flush_buffer_and_wait(&mut Buffer, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
 | `flush_buffer_and_keep(&Buffer)` | Publish without clearing the buffer. |
-| `flush_buffer_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final frame sequence number. |
+| `flush_buffer_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final FSN. |
 | `flush_buffer_and_keep_and_get_fsn(&Buffer)` | Publish without clearing and return the final FSN. |
 | `flush(&mut Chunk)` | Publish a chunk locally and clear it on success. |
 | `flush_and_wait(&mut Chunk, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
-| `flush_and_get_fsn(&mut Chunk)` | Publish and return the final frame sequence number. |
+| `flush_and_get_fsn(&mut Chunk)` | Publish and return the final FSN. |
 | `published_fsn()` | Read the highest locally published FSN. |
 | `acked_fsn()` | Read the highest completed FSN. |
 | `wait(AckLevel, Duration)` | Wait for everything published on this borrow, using an explicit no-progress timeout. |

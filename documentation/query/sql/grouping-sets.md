@@ -90,6 +90,12 @@ as in `GROUPING SETS ((symbol), (symbol))`, returns its rows twice.
 `ROLLUP` generates hierarchical subtotals, progressively dropping columns from
 right to left. With N columns, `ROLLUP` produces N+1 grouping sets.
 
+Because columns are only dropped from the right, column order decides which
+subtotals you get. `ROLLUP(symbol, side)` returns a total per symbol but never a
+total per side. For totals per side as well, use [`CUBE`](#cube), or list the
+sets you need with `GROUPING SETS`, as shown in
+[Choosing between them](#choosing-between-rollup-cube-and-grouping-sets).
+
 ```questdb-sql title="Trade volume breakdown with ROLLUP" demo
 SELECT symbol, side,
        SUM(price * amount) AS volume,
@@ -166,6 +172,38 @@ Ordering by `GROUPING_ID` groups the output by aggregation level:
 by `cairo.sql.max.grouping.sets`, which defaults to 4096. With the default,
 `CUBE` accepts at most 12 columns (2^12 = 4,096 sets). Using 13 to 15 columns
 requires raising that property.
+
+## Choosing between ROLLUP, CUBE, and GROUPING SETS
+
+For the same two columns, each form returns different levels of totals:
+
+| Levels                      | `ROLLUP(symbol, side)` | `CUBE(symbol, side)` | `GROUPING SETS ((symbol), (side), ())` |
+| --------------------------- | ---------------------- | -------------------- | -------------------------------------- |
+| Detail, per symbol and side | Yes                    | Yes                  | No                                     |
+| Total per symbol            | Yes                    | Yes                  | Yes                                    |
+| Total per side              | No                     | Yes                  | Yes                                    |
+| Grand total                 | Yes                    | Yes                  | Yes                                    |
+
+- Use `ROLLUP` for a hierarchy, such as symbol, then side within each symbol.
+  Put the outermost level first.
+- Use `CUBE` for totals in every direction, such as a cross-tab with row and
+  column totals.
+- Use `GROUPING SETS` when you need only some levels, for example the totals
+  without the detail rows:
+
+```questdb-sql title="Totals per symbol, per side, and overall, without detail rows" demo
+SELECT symbol, side,
+       SUM(amount) AS total_amount,
+       GROUPING_ID(symbol, side) AS grp
+FROM trades
+WHERE timestamp IN '$now-1m..$now'
+  AND symbol IN ('BTC-USDT', 'ETH-USDT')
+GROUP BY GROUPING SETS ((symbol), (side), ())
+ORDER BY grp, symbol, side;
+```
+
+The same choice applies with `SAMPLE BY`, where each time bucket gets the
+levels of the chosen form.
 
 ## Composite syntax
 
@@ -503,3 +541,4 @@ matters.
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions
+- [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe with labelled totals, `CUBE`, and `SAMPLE BY`

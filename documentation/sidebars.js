@@ -120,6 +120,7 @@ module.exports = {
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
             "connect/connectors/databento",
+            "connect/connectors/dbt",
           ],
         },
         {
@@ -355,6 +356,7 @@ module.exports = {
                     "query/sql/alter-table-detach-partition", // DETACH PARTITION
                     "query/sql/alter-table-drop-column", // DROP COLUMN
                     "query/sql/alter-table-drop-partition", // DROP PARTITION
+                    "query/sql/alter-table-force-reindex-parquet", // FORCE REINDEX PARQUET
                     "query/sql/alter-table-rebase-wal", // REBASE WAL
                     "query/sql/alter-table-rename-column", // RENAME COLUMN
                     "query/sql/alter-table-resume-wal", // RESUME WAL
@@ -713,6 +715,7 @@ module.exports = {
               label: "Resource Groups",
             },
             "concepts/write-ahead-log",
+            "concepts/durability",
           ],
         },
         {
@@ -810,6 +813,11 @@ module.exports = {
           id: "security/oidc",
           type: "doc",
           label: "OpenID Connect (OIDC)",
+        },
+        {
+          id: "security/acl-audit-log",
+          type: "doc",
+          label: "ACL audit log",
         },
         {
           id: "security/audited-views",
@@ -1212,6 +1220,7 @@ module.exports = {
                     "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
+                    "cookbook/sql/advanced/subtotals-and-grand-totals",
                     "cookbook/sql/advanced/unpivot-table",
                     "cookbook/sql/advanced/sankey-funnel",
                     "cookbook/sql/advanced/conditional-aggregates",

@@ -710,6 +710,24 @@ in `src/theme/MDXComponents.js`). Store screenshots as `.webp` in
 cwebp -lossless -z 9 -m 6 -mt input.png -o output.webp
 ```
 
+Commit only the WebP. The repo's lint-staged hook quantizes staged PNG and
+JPEG files lossily (pngquant, mozjpeg), and leaves WebP alone.
+
+#### Capture at 2x
+
+A screenshot shown at `width={800}` needs to be at least 1600 px wide to stay
+sharp on a retina screen, captured as PNG and kept lossless until the WebP.
+Screenshots from the Claude in Chrome `screenshot` action are downscaled 1x
+JPEGs and look blurry; so does a wide window shrunk into the column. Capture
+Web Console and other UI screenshots with headless Chrome at
+`deviceScaleFactor: 2` instead. Read
+[references/ui-screenshots/README.md](references/ui-screenshots/README.md)
+before taking any: it covers loading notebooks from the user's browser into a
+throwaway profile, running every cell, cleaning the frame, showing "MCP
+connected" without opening the user's browser, and the encode check. The
+driver script `references/ui-screenshots/cdp-shot.mjs` needs only Node 22 and
+Chrome.
+
 ## SQL parser sync check
 
 When documenting new SQL features, check whether the `questdb/sql-parser`

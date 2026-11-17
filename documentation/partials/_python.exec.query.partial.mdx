@@ -8,7 +8,7 @@ sql_query = "select * from long_sequence(10)"
 
 try:
     response = requests.get(
-        host + '/exec',
+        host + '/api/v1/sql/execute',
         params={'query': sql_query}).json()
     for row in response['dataset']:
         print(row[0])
