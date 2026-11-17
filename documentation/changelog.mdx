@@ -68,6 +68,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
 - [Views](/docs/concepts/views/#administrative-operations-in-view-metadata) - Documented QuestDB Enterprise 4.2.0 restrictions on administrative operations in `PIVOT IN` subqueries, schema-only database dumps in materialized and live views, and [upgrade guidance](/docs/operations/upgrade/#upgrading-to-420) for existing scripts and views
 - [Session windows](/docs/cookbook/sql/time-series/session-windows/) - Fixed the ride duration queries, which failed on a renamed column and returned locked time instead of ride time, and the website session gap check, which `datediff()` truncated to whole hours. Added a closed sessions query that returns only sessions whose timeout has passed
+- [S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores) - From QuestDB Enterprise 4.2.0, an S3-compatible store used for replication or [backups](/docs/operations/backup/#supported-storage-backends) must support or ignore `If-Match` and `If-None-Match` on `PutObject`. On a store that rejects them, a primary cannot start or be promoted, and every backup fails
 
 ## October 2026
 
