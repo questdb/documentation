@@ -49,6 +49,11 @@ For a store fronted by a private, internal, or self-signed CA, the string also
 accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See
 [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
+From QuestDB Enterprise 4.2.0, an S3-compatible store must support or ignore
+the `If-Match` and `If-None-Match` headers on `PutObject`, or a primary cannot
+start or be promoted. See
+[S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores).
+
 ### replication.role
 
 - **Default**: `none`

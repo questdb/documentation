@@ -53,6 +53,19 @@ Backup supports the following storage backends:
 - **Filesystem** - Local or network-attached storage (NFS, etc.). Backup is not
   sensitive to the underlying filesystem type.
 
+:::warning S3-compatible storage
+
+From QuestDB Enterprise 4.2.0, an S3-compatible store must support or ignore
+`If-Match` and `If-None-Match` on `PutObject`, or every backup to it fails.
+Backups send these conditional requests when they write their index,
+`backup/<backup_instance_name>/index.msgpack`: `If-None-Match` to create it,
+`If-Match` to replace it. AWS S3, Azure Blob Storage, and Google Cloud Storage
+support conditional writes, and backups to a filesystem backend write the index
+without them. To check a store, see
+[S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores).
+
+:::
+
 See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
 for connection string formats. For a private, on-prem, or self-signed store,
 see [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
