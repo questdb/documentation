@@ -58,6 +58,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/#codex-in-non-interactive-mode) - Running Codex non-interactively with `codex exec`: pre-approve the QuestDB server's tools with `default_tools_approval_mode = "approve"`, otherwise every MCP tool call is refused. The pairing permission level still applies
 - [Backup monitoring](/docs/operations/backup/#monitor-and-abort) - `progress_percent` in `backups()` weights each partition by its size, so a backup with one large partition no longer jumps ahead and then stalls. A partition that compresses for longer than the log interval logs its byte progress
 - [AI coding agents](/docs/getting-started/ai-coding-agents/#installation) - Corrected the agent skill install paths: `npx skills add questdb/skills` installs to `~/.agents/skills/questdb/` for both Claude Code and Codex, and a manual Codex install goes to `~/.agents/skills/questdb/` instead of `~/.codex/skills/questdb/`
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
+- [Views](/docs/concepts/views/#administrative-operations-in-view-metadata) - Documented QuestDB Enterprise 4.2.0 restrictions on administrative operations in `PIVOT IN` subqueries, schema-only database dumps in materialized and live views, and [upgrade guidance](/docs/operations/upgrade/#upgrading-to-420) for existing scripts and views
 
 ## October 2026
 

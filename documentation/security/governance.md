@@ -128,17 +128,20 @@ functions have
 [limitations](/docs/query/functions/access-control/#limitations): the built-in
 admin and OIDC users are not listed, for example.
 
-For a point-in-time snapshot of the whole access control layer,
-[`SHOW CREATE DATABASE`](/docs/query/sql/show/#enterprise-access-control)
-dumps every user, group, service account, membership, and grant as replayable
-SQL, without credentials:
+For a replayable export of stored identities, memberships, and direct grants,
+use [`SHOW CREATE DATABASE`](/docs/query/sql/show/#enterprise-access-control).
+Every ACL category requires both `LIST USERS` and `USER DETAILS`:
 
-```questdb-sql title="Snapshot of identities, memberships, and grants"
+```questdb-sql title="Export identities, memberships, and direct grants"
 SHOW CREATE DATABASE INCLUDE (ACL);
 ```
 
 Storing that output on a schedule gives you a history of entitlements that you
-can diff between two reviews.
+can diff between two reviews. It is best-effort, not a transactionally
+consistent snapshot across principals and memberships. The export omits the
+built-in admin, external users, credentials, memory limits, and resource groups
+and their mappings. For a group's external aliases, it preserves only the one
+reported by `SHOW GROUPS`. See [Replay limits](/docs/query/sql/show/#replay-limits).
 
 ## Audit data access
 
@@ -195,8 +198,9 @@ FROM materialized_views();
 ```
 
 [`SHOW CREATE`](/docs/query/sql/show/) returns the full DDL of a single table or
-view, and `SHOW CREATE DATABASE` returns every object in dependency order, so
-each view appears after the objects it reads from. Running it on a schedule and
+view, and `SHOW CREATE DATABASE INCLUDE (SCHEMA)` returns visible schema
+objects in dependency order, so each view appears after the objects it reads
+from when those dependencies are included. Running it on a schedule and
 keeping the output records how the schema changed over time.
 
 ## Retain and protect data
