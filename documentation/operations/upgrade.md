@@ -28,9 +28,10 @@ If this is your first time setting up QuestDB, see the
    especially for production instances. See
    [Backup and restore](/docs/operations/backup/) for details.
 
-3. **Plan the way back.** After QuestDB 10.2.0 or QuestDB Enterprise 4.2.0 has
-   run on a database, going back to an earlier release, writing with it, and
-   then starting the later release again is not supported. To go back, follow
+3. **Plan the way back.** QuestDB 10.2.1 and QuestDB Enterprise 4.2.1 lock
+   every table they write against earlier releases. Before going back to an
+   earlier release, restart once with `cairo.commit.mode=nosync` and
+   `cairo.commit.mode.adaptive.downgrade=true` to unlock the database. See
    [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 ## Upgrade steps
@@ -106,9 +107,9 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
-### Upgrading to 4.2.0
+### Upgrading to 4.2.1 {#upgrading-to-420}
 
-QuestDB Enterprise 4.2.0 adds
+QuestDB Enterprise 4.2.1 adds
 [adaptive durability mode](/docs/concepts/durability/). The default stays
 `nosync`. Check the following before upgrading:
 
@@ -117,10 +118,12 @@ QuestDB Enterprise 4.2.0 adds
   before the last transaction in the object store. Earlier releases started
   and diverged from the replicas. See
   [A primary refuses to start after a power loss](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss).
-- Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
+- 4.1.0 and earlier refuse to open tables that 4.2.1 has written. To go back,
+  first restart 4.2.1 once with `cairo.commit.mode=nosync` and
+  `cairo.commit.mode.adaptive.downgrade=true`, see
   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
-QuestDB Enterprise 4.2.0 also changes `SHOW CREATE` output and restricts
+QuestDB Enterprise 4.2.1 also changes `SHOW CREATE` output and restricts
 administrative operations in views. Check schema-export scripts and stored
 views for the following before upgrading:
 
@@ -141,7 +144,7 @@ views for the following before upgrading:
   their next compilation, including startup. See
   [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
 
-QuestDB Enterprise 4.2.0 reserves to the
+QuestDB Enterprise 4.2.1 reserves to the
 [built-in admin](/docs/security/rbac/#built-in-admin) the statements that remove
 rows from `sys.view_audit`, the audit trail of
 [audited views](/docs/security/audited-views/), or set it up to remove them. In
@@ -201,7 +204,7 @@ restart, since the setting is not reloadable. See
 
 #### ACL audit log
 
-QuestDB Enterprise 4.2.0 introduces the
+QuestDB Enterprise 4.2.1 introduces the
 [ACL audit log](/docs/security/acl-audit-log/). When upgrading from an earlier
 release, the server creates `sys.acl_audit_log` and adds `change_id` columns to
 ACL and credential tables.
@@ -253,9 +256,9 @@ rebuild:
 
 #### Service account creation
 
-In QuestDB Enterprise 4.2.0 and later,
+In QuestDB Enterprise 4.2.1 and later,
 [`CREATE SERVICE ACCOUNT IF NOT EXISTS`](/docs/query/sql/acl/create-service-account/)
-leaves an existing account unchanged. Before 4.2.0, the statement could assign
+leaves an existing account unchanged. Before 4.2.1, the statement could assign
 an existing account to the statement's owner with grant option. Ownership is
 now assigned only when the statement creates the account. An invalid owner is
 rejected before any changes, even when the account already exists.

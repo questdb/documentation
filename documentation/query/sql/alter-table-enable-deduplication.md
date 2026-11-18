@@ -78,7 +78,7 @@ The output includes the `DEDUP` clause, here
 
 :::caution
 
-QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.1
 deduplicate a `SKIP` table as `UPSERT`, and suspend a table when they meet a
 logged `ALTER TABLE ... DEDUP ENABLE SKIP`. Upgrade every node of a replicated
 cluster, replicas first, before you use `SKIP`. See

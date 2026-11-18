@@ -55,7 +55,7 @@ Backup supports the following storage backends:
 
 :::warning S3-compatible storage
 
-From QuestDB Enterprise 4.2.0, an S3-compatible store must support or ignore
+From QuestDB Enterprise 4.2.1, an S3-compatible store must support or ignore
 `If-Match` and `If-None-Match` on `PutObject`, or every backup to it fails.
 Backups send these conditional requests when they write their index,
 `backup/<backup_instance_name>/index.msgpack`: `If-None-Match` to create it,
@@ -615,7 +615,7 @@ the existing recovery copy.
 #### Restoring access control tables
 
 The [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`, is
-available in QuestDB Enterprise 4.2.0 and later. A backup includes it if it
+available in QuestDB Enterprise 4.2.1 and later. A backup includes it if it
 exists on the source. Its rows replicate, unlike those of `sys.view_audit`, so
 a primary backup includes the replicated ACL change history.
 
@@ -633,12 +633,12 @@ column to link their rows to audit entries:
 
 Only these system tables need this column; do not add it to user-created tables.
 
-When QuestDB Enterprise 4.2.0 or later restores a backup taken on a release
-before 4.2.0, startup leaves these restored system tables unchanged: it neither
+When QuestDB Enterprise 4.2.1 or later restores a backup taken on a release
+before 4.2.1, startup leaves these restored system tables unchanged: it neither
 adds their `change_id` columns nor creates the missing audit log.
 This allows [forward restore updates](#retrying-or-updating-a-restore) while the
 source still runs the older version. The log and columns arrive with the first
-restored backup taken after the source is upgraded to 4.2.0 or later.
+restored backup taken after the source is upgraded to 4.2.1 or later.
 
 Do not run ACL-changing statements on a node that must keep accepting restore
 updates. Such a statement changes the restored tables, and the next update
