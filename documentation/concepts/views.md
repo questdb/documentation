@@ -490,7 +490,7 @@ allowed.
 
 :::warning Existing views
 
-Starting with QuestDB Enterprise 4.2.0, creating, altering, or replacing a view
+Starting with QuestDB Enterprise 4.2.1, creating, altering, or replacing a view
 with a prohibited operation fails. Previously accepted views become invalid at
 their next compilation after upgrading, including at startup. Inspect
 `view_status` and `invalidation_reason` in

@@ -60,7 +60,7 @@ QuestDB will automatically use the instance's IAM role for authentication.
 
 ### S3-compatible stores
 
-From QuestDB Enterprise 4.2.0, replication and backups need an S3-compatible
+From QuestDB Enterprise 4.2.1, replication and backups need an S3-compatible
 store, such as MinIO, to support or ignore `If-Match` and `If-None-Match` on
 `PutObject`. The primary sends these conditional requests when it writes the
 replication index, `index.msgpack`: `If-None-Match` to create it in an empty
@@ -78,7 +78,7 @@ writes the index without them. On an S3-compatible store that rejects them:
 
 No setting turns these requests off. Before you upgrade, check the store's
 documentation for conditional writes, or test the store: from a new instance on
-QuestDB Enterprise 4.2.0 or later,
+QuestDB Enterprise 4.2.1 or later,
 [run a first backup](/docs/operations/backup/#quick-start) to it. That backup
 creates its index and then replaces it, so if `backups()` reports
 `backup complete`, the store supports or ignores both headers.

@@ -100,7 +100,7 @@ a comma-separated string.
 
 `SHOW CREATE DATABASE` returns a logical, data-free dump as replayable SQL:
 one statement per row for tables, views, materialized views, and live views.
-In QuestDB Enterprise 4.2.0 and later, the dump also includes users, groups,
+In QuestDB Enterprise 4.2.1 and later, the dump also includes users, groups,
 service accounts, memberships, and grants by default. Use it to copy a database's
 structure and access control to an empty instance. It is not a data backup; see
 [Replay limits](#replay-limits).
@@ -206,7 +206,7 @@ it does not return a partial schema-only result.
 
 :::warning Breaking change
 
-Starting with QuestDB Enterprise 4.2.0, plain `SHOW CREATE DATABASE` includes
+Starting with QuestDB Enterprise 4.2.1, plain `SHOW CREATE DATABASE` includes
 ACL output and requires both permissions. For callers that only need the visible
 schema, change it to `SHOW CREATE DATABASE INCLUDE (SCHEMA)` rather than granting
 administrative permissions.
@@ -293,7 +293,7 @@ while exporting for replay, and verify the target's grants afterwards with
 
 #### Use in views
 
-In QuestDB Enterprise 4.2.0 and later, when access control is enabled:
+In QuestDB Enterprise 4.2.1 and later, when access control is enabled:
 
 - A regular view may read an ACL dump in its query body. The dump checks the
   reader's `LIST USERS` and `USER DETAILS`, not the view definer's permissions.
@@ -443,7 +443,7 @@ deduplication is enabled.
 
 #### Enterprise variant
 
-In [QuestDB Enterprise](/enterprise/) 4.2.0 and later, `SHOW CREATE TABLE`,
+In [QuestDB Enterprise](/enterprise/) 4.2.1 and later, `SHOW CREATE TABLE`,
 `SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, and `SHOW CREATE LIVE VIEW`
 return structure, not permissions. Unlike earlier releases, they do not append
 an `OWNED BY` clause naming the caller. QuestDB stores no owner for an object;

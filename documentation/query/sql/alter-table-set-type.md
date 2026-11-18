@@ -39,7 +39,7 @@ TTL keeps dropping partitions that are past the TTL after the conversion.
 
 :::note
 
-QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.1
 dropped the TTL, `FORMAT PARQUET`, and per-column Parquet encoding of a table
 they converted to WAL. Check the TTL of a table before you convert it, because
 it stays in effect after the conversion.
@@ -59,7 +59,7 @@ overrides all previous ones.
 If the target type of the conversion is the same as the current type of the
 table, the conversion request is ignored.
 
-Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, a conversion to non-WAL
+Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.1, a conversion to non-WAL
 loses no committed transaction: the restart first applies every transaction
 still waiting in the WAL and flushes the table, then converts it. If that
 cannot finish, because the table is suspended or a transaction fails to apply,

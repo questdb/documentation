@@ -182,6 +182,23 @@ When commits are flushed to the disk, for the whole instance:
 Any other value stops the start. See
 [Durability and commit modes](/docs/concepts/durability/).
 
+### cairo.commit.mode.adaptive.downgrade
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Prepares the database for an earlier release. QuestDB 10.2.1 and QuestDB
+Enterprise 4.2.1 lock every table they write, and QuestDB 10.1.0, QuestDB
+Enterprise 4.1.0, and earlier releases refuse to open a locked table. With
+`true`, the start removes the checksums and the lock from every table, and the
+server stores neither while it runs. Restart once with it, stop the server, and
+install the earlier release.
+
+It works only with `cairo.commit.mode=nosync`. In any other mode, the server
+does not start. Remove it after upgrading again, or the server keeps running
+without checksums. See
+[Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
 ### cairo.max.uncommitted.rows
 
 - **Default**: `500000`
