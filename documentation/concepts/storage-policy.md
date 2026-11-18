@@ -90,18 +90,22 @@ late-arrival, replay, and correction window for the table. See
 
 ### TTL evaluation
 
-Storage policy TTLs follow the same evaluation rules as
-[TTL](/docs/concepts/ttl/). A partition becomes eligible for a lifecycle action
-when its **entire time range** falls outside the TTL window:
+Storage policy TTLs measure age from the partition's start. This differs from
+[table TTL](/docs/concepts/ttl/), which measures from the end of the partition
+and waits until its entire time range is outside the retention window. For
+hour-, day-, and week-based durations, a partition becomes eligible when:
 
 ```text
-eligible when: partition_end_time < reference_time - TTL
+reference_time - partition_start_time >= TTL
 ```
 
-**This rule is applied independently for each stage's TTL.** A partition can
-be eligible for `TO PARQUET` long before it is eligible for `TO REMOTE`,
-`DROP LOCAL`, or `DROP REMOTE`. Each stage uses its own `TTL` in the formula
-above; the stages share only the reference time and the
+Month- and year-based durations compare elapsed calendar months from the same
+partition-start boundary.
+
+Every stage uses this boundary, including `DROP LOCAL` and `DROP REMOTE`, but
+each evaluates its own TTL independently. A partition can be eligible for
+`TO PARQUET` long before it is eligible for `TO REMOTE`, `DROP LOCAL`, or
+`DROP REMOTE`. The stages share the reference time and the
 [ordering constraints](#ordering-constraint).
 
 The reference time is `min(wall_clock_time, latest_timestamp)` by default —
@@ -113,7 +117,19 @@ the wall-clock cap for both TTL and storage policy evaluation. See
 and the data-loss hazard of disabling the cap.
 
 QuestDB checks storage policies periodically (every 5 minutes by default) and
-processes eligible partitions automatically.
+processes eligible partitions automatically. A quiet table may retain partitions
+longer because its latest timestamp, and therefore the reference time, stops
+advancing.
+
+:::warning Minimum row retention
+
+A stage's TTL is not a minimum age for every row in the partition. With daily
+partitions, `DROP LOCAL 365d` can delete a row near the end of a partition almost
+a day before that row is 365 days old. For a minimum 365-day timestamp-based
+retention window, use `DROP LOCAL 366d` to include a one-day partition allowance.
+This window is based on the designated timestamp, not the time since ingestion.
+
+:::
 
 ## Storage policy vs TTL
 
@@ -130,15 +146,19 @@ you are already familiar with TTL, this comparison is the fastest way in:
 In QuestDB Enterprise, use storage policies instead of TTL. On a regular table,
 `ALTER TABLE SET TTL` with a non-zero value is rejected, while
 `CREATE TABLE ... TTL` is accepted only for backward compatibility and is
-translated into a `STORAGE POLICY(DROP LOCAL ...)`:
+translated into a `STORAGE POLICY(DROP LOCAL ...)`.
 
-```questdb-sql
--- Instead of:
--- ALTER TABLE trades SET TTL 30 DAYS;
+For a daily-partitioned `trades` table, preserving the minimum 30-day
+timestamp-based retention window of `TTL 30 DAYS` requires a one-day
+[partition allowance](#ttl-evaluation):
 
--- Use:
-ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
+```questdb-sql title="Preserve 30-day retention with daily partitions"
+ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 31d);
 ```
+
+For other partition intervals or calendar-month/year durations, calculate the
+threshold from the [partition-start rule](#ttl-evaluation) rather than copying
+the old TTL value.
 
 :::note
 

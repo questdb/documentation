@@ -28,9 +28,10 @@ If this is your first time setting up QuestDB, see the
    especially for production instances. See
    [Backup and restore](/docs/operations/backup/) for details.
 
-3. **Plan the way back.** After QuestDB 10.2.0 or QuestDB Enterprise 4.2.0 has
-   run on a database, going back to an earlier release, writing with it, and
-   then starting the later release again is not supported. To go back, follow
+3. **Plan the way back.** QuestDB 10.2.1 and QuestDB Enterprise 4.2.1 lock
+   every table they write against earlier releases. Before going back to an
+   earlier release, restart once with `cairo.commit.mode=nosync` and
+   `cairo.commit.mode.adaptive.downgrade=true` to unlock the database. See
    [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
 ## HTTP security changes
@@ -158,9 +159,9 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
 
-### Upgrading to 4.2.0
+### Upgrading to 4.2.1 {#upgrading-to-420}
 
-QuestDB Enterprise 4.2.0 adds
+QuestDB Enterprise 4.2.1 adds
 [adaptive durability mode](/docs/concepts/durability/). The default stays
 `nosync`. Check the following before upgrading:
 
@@ -169,8 +170,156 @@ QuestDB Enterprise 4.2.0 adds
   before the last transaction in the object store. Earlier releases started
   and diverged from the replicas. See
   [A primary refuses to start after a power loss](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss).
-- Going back to 4.1.0 or earlier after 4.2.0 has run is limited, see
+- 4.1.0 and earlier refuse to open tables that 4.2.1 has written. To go back,
+  first restart 4.2.1 once with `cairo.commit.mode=nosync` and
+  `cairo.commit.mode.adaptive.downgrade=true`, see
   [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
+QuestDB Enterprise 4.2.1 also changes `SHOW CREATE` output and restricts
+administrative operations in views. Check schema-export scripts and stored
+views for the following before upgrading:
+
+- With access control enabled, plain `SHOW CREATE DATABASE` now requires both
+  `LIST USERS` and `USER DETAILS`. Schema-only scripts should use
+  `INCLUDE (SCHEMA)` instead of acquiring more permissions. See
+  [database dumps](/docs/query/sql/show/#enterprise-access-control).
+- Per-object `SHOW CREATE` and database dumps no longer append `OWNED BY`.
+  Schema-only output does not restore grants. Use the ACL dump for permissions,
+  and review
+  [creator permissions on replay](/docs/query/sql/show/#enterprise-variant).
+- With access control enabled, materialized and live views reject
+  `SHOW CREATE DATABASE` with any ACL category, including the default. Change
+  schema-metadata queries to `INCLUDE (SCHEMA)` under the
+  [catalogue rules](/docs/query/sql/create-mat-view/#catalogue-functions).
+- A regular view's `PIVOT IN` subquery rejects administrative functions and
+  administrative `SHOW` statements. Existing definitions become invalid at
+  their next compilation, including startup. See
+  [view migration guidance](/docs/concepts/views/#administrative-operations-in-view-metadata).
+
+QuestDB Enterprise 4.2.1 reserves to the
+[built-in admin](/docs/security/rbac/#built-in-admin) the statements that remove
+rows from `sys.view_audit`, the audit trail of
+[audited views](/docs/security/audited-views/), or set it up to remove them. In
+4.1.0, a principal granted the permission a statement needs, on the table or
+`ON ALL TABLES`, could run it. After the upgrade, every other principal is
+refused them, whatever it holds, with
+`only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
+
+- `TRUNCATE TABLE`
+- `ALTER TABLE DROP PARTITION`, `SQUASH PARTITIONS`, and `DETACH PARTITION`
+- `ALTER TABLE SET TTL` and `SET PARAM`
+- `ALTER TABLE SET STORAGE POLICY`, with any policy, and
+  `ENABLE STORAGE POLICY`
+
+A storage policy already set on the trail keeps running, and `SELECT`,
+`DISABLE STORAGE POLICY`, and `DROP STORAGE POLICY` stay grantable. Before you
+upgrade, find the principals that can run these statements on the trail, and
+move the scripts and jobs that run them to the built-in admin, or replace them
+with a storage policy:
+
+```questdb-sql title="On 4.1.0: who can remove rows from the trail"
+SELECT entity_name, entity_type, permission, table_name
+FROM active_permissions()
+WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'DETACH PARTITION',
+    'SET TABLE PARAM', 'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
+  AND (table_name IS NULL OR table_name = 'sys.view_audit');
+```
+
+If the built-in admin is disabled,
+[`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
+no principal can run these statements after the upgrade, not even the
+administrators that replace the admin. A storage policy with a `DROP LOCAL`
+stage keeps pruning the trail without any principal, so set one before you
+upgrade, on the primary, as a principal that holds `SET STORAGE POLICY` on the
+trail. The policy replicates, and keeps pruning the trail of every node:
+
+```questdb-sql title="On 4.1.0: keep 90 days of trail on every node"
+ALTER TABLE 'sys.view_audit'
+    SET STORAGE POLICY(TO PARQUET 1d, DROP LOCAL 90d);
+```
+
+A TTL on the trail blocks the policy: clear it first with
+`ALTER TABLE 'sys.view_audit' SET TTL 0 HOURS`. When upgrading from a release
+before 4.1.0, which has no trail yet, set
+[`view.audit.storage.policy`](/docs/configuration/audited-views/#viewauditstoragepolicy)
+on every node instead, for example to `TO PARQUET 1d, DROP LOCAL 90d`: the
+server creates the trail with it on the first start. Its default,
+`TO PARQUET 1d`, never deletes a row.
+
+After the upgrade, a principal that holds `DISABLE STORAGE POLICY` or
+`REMOVE STORAGE POLICY` can still pause or remove the policy, but only the
+built-in admin can enable it again or set another. To do that, to remove rows
+by hand, or to repair the trail with `FORCE DROP PARTITION`, enable the admin:
+set `acl.admin.user.enabled=true`, with a strong `acl.admin.password`, and
+restart, since the setting is not reloadable. See
+[Tamper protection](/docs/security/audited-views/#protection).
+
+#### ACL audit log
+
+QuestDB Enterprise 4.2.1 introduces the
+[ACL audit log](/docs/security/acl-audit-log/). When upgrading from an earlier
+release, the server creates `sys.acl_audit_log` and adds `change_id` columns to
+ACL and credential tables.
+Existing rows keep a `NULL` `change_id`; past changes are not reconstructed.
+Review the following before upgrading:
+
+- **Configure retention before the first start.** Set
+  [`acl.audit.storage.policy`](/docs/configuration/iam/#aclauditstoragepolicy)
+  on every node. Its default, `TO PARQUET 1d`, never deletes rows. Once the
+  log exists, only the built-in admin can change its policy, so set retention
+  before disabling that account. Verify it with
+  `SHOW CREATE TABLE 'sys.acl_audit_log'` after startup and promotion.
+- **Grant auditors the required permissions.** Reading the log takes
+  `LIST USERS`, `USER DETAILS`, and `SELECT` on the table. A principal with
+  only `SELECT ON ALL TABLES` cannot read it. Other table grants do not let a
+  principal modify the log.
+- **Check for a name collision.** An existing `sys.acl_audit_log` is reused,
+  with its rows, only if it is a WAL table with the expected columns and types
+  and `change_id` as its designated timestamp. Any other object with that
+  name fails startup before the ACL migrations. Rename or drop the conflicting
+  object using the previous release, then retry the upgrade. Do not disable
+  ACL to get past this check: doing so can mark migrations as complete without
+  applying them.
+- **Check deferred migrations.** Tables with suspended WAL apply do not get
+  `change_id` until a later startup after they are resumed. Databases restored
+  from older backups have separate compatibility rules; see
+  [Restoring access control tables](/docs/operations/backup/#restoring-access-control-tables).
+
+A replica promoted before receiving the log creates it with its own retention
+setting. If an older primary replicated a conflicting object with the log's
+name, promotion itself does not fail, but ACL changes do. The built-in admin
+must drop or rename that conflicting object; the next ACL statement or
+startup creates the log. This exception applies to the conflicting object,
+not to a valid audit log.
+
+##### Embedded Enterprise Java integrations
+
+Applications that directly implement Enterprise Java APIs must update and
+rebuild:
+
+- ACL write methods on `AccessListWriter`, and credential write methods on
+  `PasswordStore`, `JwkStore`, and `PersistentRestTokenStore`, now take an
+  `AclChange` as their first argument. Production callers use these methods,
+  not the older overloads retained for tests.
+- `EntSecurityContext` implementations must implement
+  `isSessionPrincipalExternal()`. It describes the authenticated identity
+  and must not change when the session assumes a service account. Forwarding
+  contexts must forward this method too.
+
+#### Service account creation
+
+In QuestDB Enterprise 4.2.1 and later,
+[`CREATE SERVICE ACCOUNT IF NOT EXISTS`](/docs/query/sql/acl/create-service-account/)
+leaves an existing account unchanged. Before 4.2.1, the statement could assign
+an existing account to the statement's owner with grant option. Ownership is
+now assigned only when the statement creates the account. An invalid owner is
+rejected before any changes, even when the account already exists.
+
+Update provisioning scripts that relied on `IF NOT EXISTS ... OWNED BY` to
+assign an existing account. Use
+[`GRANT ASSUME SERVICE ACCOUNT ... WITH GRANT OPTION`](/docs/query/sql/acl/grant-assume-service-account/)
+explicitly, from a principal authorized to grant it. Review existing
+assignments with `SHOW SERVICE ACCOUNTS` for each user or group.
 
 ### Upgrading to 4.1.0
 

@@ -26,7 +26,7 @@ durability mode, troubleshoot it, and run it on QuestDB Enterprise.
 :::note Availability
 
 Adaptive durability mode and the `local` durable acknowledgement are available
-since QuestDB 10.2.0 and QuestDB Enterprise 4.2.0.
+since QuestDB 10.2.0 and QuestDB Enterprise 4.2.1.
 
 :::
 
@@ -329,21 +329,53 @@ any number of times.
 ## Downgrade to an earlier release {#downgrade}
 
 QuestDB 10.1.0, QuestDB Enterprise 4.1.0, and earlier releases do not maintain
-the checksums and save points that later releases rely on. Going back to one of
-them, writing with it, and then starting a later release on the same database
-again is not supported, in any commit mode.
+the checksums and save points that later releases store, in every commit mode.
+So that an earlier release cannot damage them, QuestDB 10.2.1 and QuestDB
+Enterprise 4.2.1 lock every table they write against earlier releases. An
+earlier release refuses to open a locked table, for reading and for writing,
+with this error:
 
-To go back to one of these releases:
+```text
+metadata version does not match runtime version
+```
 
-1. If the instance ran in adaptive durability mode, set
-   `cairo.commit.mode=nosync` and restart the current release once. Let the
-   start finish: it flushes every table that ran in adaptive durability mode and
-   removes its save point files.
-2. Stop QuestDB cleanly.
-3. Install the earlier release.
+When a locked table is a system table, the earlier release does not start.
 
-After the earlier release has written to the database, do not start a later
-release on it again.
+To go back to an earlier release, unlock the database first. The unlock works
+only in `nosync` mode:
+
+1. Set both properties in `server.conf` and restart the current release once:
+
+   ```ini title="server.conf"
+   cairo.commit.mode=nosync
+   cairo.commit.mode.adaptive.downgrade=true
+   ```
+
+   In any other commit mode, the server refuses to start with
+   `cairo.commit.mode.adaptive.downgrade=true`.
+
+2. Let the start finish. It flushes every table that ran in adaptive durability
+   mode and removes its save point files, then removes the checksums from every
+   table and unlocks it, logging
+   `table unlocked for downgrade, its _cv checksums are removed [table=...]`.
+   You do not need to write anything.
+3. Stop QuestDB cleanly.
+4. Install the earlier release.
+
+After these steps, the earlier release can write to the database, and you can
+upgrade again later. When you do, remove
+`cairo.commit.mode.adaptive.downgrade` from `server.conf`: while it is `true`,
+the server stores no checksums, locks no table, and runs only in `nosync` mode.
+
+If you install the earlier release without these steps, it refuses the locked
+tables but does not damage them. Install the later release again and follow
+the steps.
+
+:::warning QuestDB 10.2.0
+QuestDB 10.2.0 stores the checksums but does not lock tables, so an earlier
+release can write over them. Before going back from 10.2.0, upgrade to 10.2.1
+and follow the steps above.
+:::
 
 ## Monitor adaptive durability mode {#monitor-adaptive-mode}
 
