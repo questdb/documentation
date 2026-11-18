@@ -36,7 +36,11 @@ Create an S3 bucket following
 
 **Recommendations:**
 - Select a region close to your primary node
-- Disable blob versioning
+- Disable blob versioning. QuestDB continuously writes and deletes
+  replication objects, so versioning only accumulates noncurrent versions you
+  pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-prefix)
+  are different: enable versioning there, in a separate bucket
 
 **Connection string:**
 
@@ -91,7 +95,12 @@ then create a Blob Container.
 
 **Recommendations:**
 - Select a region close to your primary node
-- Disable blob versioning
+- Disable blob versioning. QuestDB continuously writes and deletes
+  replication objects, so versioning only accumulates noncurrent versions you
+  pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-prefix)
+  are different: enable versioning there, in a separate storage account,
+  because Azure enables versioning for a whole account
 
 **Connection string:**
 

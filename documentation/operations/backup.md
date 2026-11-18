@@ -109,6 +109,27 @@ Control how many backups to keep before automatic cleanup removes older ones:
 backup.cleanup.keep.latest.n=7
 ```
 
+#### Object store versioning
+
+Enable object versioning on the backup bucket or container: versioning on AWS
+S3, blob versioning on Azure Blob Storage, and Object Versioning or soft delete
+on Google Cloud Storage. Apart from a small index that each backup replaces,
+backup data is written once and only deleted by
+[retention cleanup](#backup-retention), so versioning costs little, and it lets
+you recover a backup that was deleted by mistake, by a misconfigured retention
+setting, or by a compromised credential.
+
+Pair it with a lifecycle rule that expires **noncurrent** versions after the
+recovery window you want, for example 30 days. Without one, every backup that
+cleanup removes is kept as a noncurrent version and billed indefinitely. Do not
+add a rule that expires or archives current versions: QuestDB manages backup
+retention itself through `backup.cleanup.keep.latest.n`.
+
+Versioning applies to the whole S3 or GCS bucket and to the whole Azure storage
+account, so keep backups apart from
+[replication](/docs/high-availability/setup/#1-configure-object-storage)
+storage, which should not be versioned.
+
 #### Filesystem backups
 
 For local testing or air-gapped environments, you can back up to a local
