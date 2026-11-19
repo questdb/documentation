@@ -354,8 +354,8 @@ retries fail.
 - **Default**: CPU count
 - **Reloadable**: no
 
-The number of async (network) I/O threads used for replication and cold
-storage. The default should be appropriate for most use cases.
+The number of async (network) I/O threads used for replication. The default
+should be appropriate for most use cases.
 
 ### native.max.blocking.threads
 

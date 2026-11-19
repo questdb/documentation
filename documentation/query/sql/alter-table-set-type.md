@@ -57,7 +57,20 @@ If the command is issued more than once before the restart, the last command
 overrides all previous ones.
 
 If the target type of the conversion is the same as the current type of the
-table, the conversion request is ignored.
+table, the statement cancels a pending conversion, if any.
+
+In QuestDB Enterprise with [cold storage](/docs/concepts/cold-storage/) enabled,
+`SET TYPE` is refused:
+
+- on a table that cold storage tracks, that has a cold storage manifest, or whose storage policy has a `TO REMOTE` stage, and on every table of an instance that is not the cold storage manager until its first catalog sync, with `cannot change table type, table is tracked by cold storage or its catalog is not synced yet`
+- on every table while the instance changes cold storage role, with `cannot change table type, cold storage state is not known yet, retry`
+- on a table that holds partitions with [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), with `cannot change table type, table has a delta-active partition or delta data`
+
+The conversion restarts the table's WAL transaction numbers, which cold storage
+uses to match partitions with their objects. On startup, QuestDB cancels a
+pending conversion of a table with cold storage or late-row state. A pending
+conversion also blocks `TO REMOTE`, see
+[SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/#constraints).
 
 Since QuestDB 10.2.0 and QuestDB Enterprise 4.2.1, a conversion to non-WAL
 loses no committed transaction: the restart first applies every transaction

@@ -452,6 +452,11 @@ Watch rates and ratios rather than raw totals. Sustained
 investigating. See
 [Operating cold storage](/docs/operations/cold-storage/#cold-read-metrics).
 
+There are no metrics for
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) waiting
+for compaction; see
+[Detect cold storage maintenance problems](/docs/operations/monitoring-alerting/#detect-cold-storage-maintenance-problems).
+
 ### Replication metrics
 
 _Enterprise only._

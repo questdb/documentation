@@ -9,8 +9,7 @@ by using the SQL
 [ALTER TABLE DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/)
 statement.
 
-This feature is part of the manual S3/cold storage solution, allowing restoring
-data manually.
+This feature is part of manual archiving to S3 or another volume, allowing restoring data manually. It is separate from QuestDB Enterprise [cold storage](/docs/concepts/cold-storage/), which moves partitions to an object store automatically. On a table that cold storage tracks, or whose storage policy has a `TO REMOTE` stage, `ATTACH PARTITION` is refused with `cannot attach partition, table is tracked by cold storage`.
 
 ## Syntax
 
@@ -65,25 +64,27 @@ runtime if their volumes have a slower disk.
 Partitions attached via the symbolic link approach are **read-only** for the
 following operations:
 
-- [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/) and
-  [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/): Once the
-  partition folders are unlinked, the symbolic links are removed, but the
-  content remains. Detaching a partition that was attached via symbolic link
-  does not create a copy `<partition_name>.detached`.
+- [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/): refused
+  with `cannot detach partition, partition is read-only`.
+- [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/): the
+  symbolic link is removed, but the content of its target remains.
 - [`UPDATE`](/docs/query/sql/update/): Attempts to update the read-only
   partitions result in an error.
 - [`INSERT`](/docs/query/sql/insert/): Attempts to insert data into a
   read-only partition result in a critical-level log message being logged by the
   server, and the insertion is a no-op. If
   [Prometheus monitoring](/docs/integrations/other/prometheus/) is configured, an
-  alert will be triggered.
+  alert will be triggered. On a WAL table with
+  [deduplication](/docs/concepts/deduplication/#rows-for-read-only-partitions),
+  the transaction fails instead, and the table is suspended.
 
 For read-only partitions, the following operations are supported:
 
 - [`ADD COLUMN`](/docs/query/sql/alter-table-add-column/)
 - [`DROP COLUMN`](/docs/query/sql/alter-table-drop-column/)
 - [`RENAME COLUMN`](/docs/query/sql/alter-table-rename-column/)
-- [`ADD INDEX`](/docs/query/sql/alter-table-alter-column-add-index/)
+- [`ADD INDEX`](/docs/query/sql/alter-table-alter-column-add-index/), except
+  on QuestDB Enterprise tables with partitions in cold storage
 - [`DROP INDEX`](/docs/query/sql/alter-table-alter-column-drop-index/)
 
 ## Example

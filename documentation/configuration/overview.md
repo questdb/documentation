@@ -164,13 +164,14 @@ The following properties support the `_FILE` suffix:
 The following additional properties are available in
 [QuestDB Enterprise](/enterprise/):
 
-| Property                         | Environment variable                      |
-| -------------------------------- | ----------------------------------------- |
-| `acl.admin.password`             | `QDB_ACL_ADMIN_PASSWORD_FILE`             |
-| `acl.oidc.tls.keystore.password` | `QDB_ACL_OIDC_TLS_KEYSTORE_PASSWORD_FILE` |
-| `replication.object.store`       | `QDB_REPLICATION_OBJECT_STORE_FILE`       |
-| `cold.storage.object.store`      | `QDB_COLD_STORAGE_OBJECT_STORE_FILE`      |
-| `backup.object.store.*`          | `QDB_BACKUP_OBJECT_STORE_*_FILE`          |
+| Property                            | Environment variable                         |
+| ----------------------------------- | -------------------------------------------- |
+| `acl.admin.password`                | `QDB_ACL_ADMIN_PASSWORD_FILE`                |
+| `acl.oidc.tls.keystore.password`    | `QDB_ACL_OIDC_TLS_KEYSTORE_PASSWORD_FILE`    |
+| `replication.object.store`          | `QDB_REPLICATION_OBJECT_STORE_FILE`          |
+| `cold.storage.object.store`         | `QDB_COLD_STORAGE_OBJECT_STORE_FILE`         |
+| `cold.storage.linked.object.stores` | `QDB_COLD_STORAGE_LINKED_OBJECT_STORES_FILE` |
+| `backup.object.store.*`             | `QDB_BACKUP_OBJECT_STORE_*_FILE`             |
 
 For Kubernetes-specific examples, see the
 [Kubernetes deployment guide](/docs/deployment/kubernetes/#using-kubernetes-secrets).
@@ -505,6 +506,17 @@ database to fail its startup.
 - **Reloadable**: no
 
 When enabled, startup fails if there are configuration errors.
+
+With strict validation, a boolean setting whose value is not `true` or `false`,
+in any letter case, also fails startup, whether it is set in `server.conf` or
+in an environment variable:
+
+```text
+invalid configuration value [key=<setting>, value=<value>, expected true or false]
+```
+
+Without strict validation, such a value still reads as `false`, so a typo such
+as `cold.storage.enabled=tru` starts the server with the feature disabled.
 
 _We recommend enabling strict validation._
 

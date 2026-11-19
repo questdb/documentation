@@ -69,6 +69,7 @@ an error:
   returns `REBASE WAL requires cairo.wal.apply.suspended.write.denied=true so
   that suspension blocks writes`.
 - The instance is not read-only.
+- In QuestDB Enterprise, the table is not tracked by [cold storage](/docs/concepts/cold-storage/). Otherwise the operation returns `cannot rebase WAL, table is tracked by cold storage`, or, for a table with [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), `cannot rebase WAL, table has a delta-active partition or delta data`. The rebase restarts the table's WAL transaction numbers, which cold storage uses to match partitions with their objects.
 
 ## Permissions
 

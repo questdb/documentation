@@ -76,6 +76,12 @@ A provider-level `root` on `QuestDBObjectStore` does **not** add a base prefix;
 the per-use backup, replication, or cold-storage root overrides it. Scope cloud
 permissions to the effective per-use prefixes.
 
+On the cold-storage root, QuestDB pods that take backups also need `GET`, `PUT`
+and `DELETE` on `<cold root>/_retention/*`, and `GET` on the table manifests,
+`<cold root>/<table>/_manifest.msgpack`: backups pin the cold objects they need
+there, and backups of cold partitions fail without these permissions. See
+[Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
+
 ## Backup and HA
 
 Backups run inside QuestDB Enterprise on the primary. Enabling backup requires
@@ -182,6 +188,24 @@ garbage-collects the prefix. Assign policies with
 and `objectStoreRef` is immutable: changing the store or root would re-point
 live cold data. `manager` must not exceed `instances`, so lower `instances`
 only after moving the manager to a remaining serial.
+
+### Upgrade QuestDB with cold storage
+
+QuestDB Enterprise ENTERPRISE_VERSION_TBD changes the cold-storage root
+one-way: once a manager of that release writes to it, instances on an earlier
+release pause cold storage and cannot read the partitions uploaded since, until
+they are upgraded too. Upgrade the instance that holds the cold-storage manager
+last. See
+[Upgrading to ENTERPRISE_VERSION_TBD](/docs/operations/upgrade/#upgrading-to-enterprise_version_tbd).
+
+An image rollout recreates replicas before the primary, so before changing
+`spec.image` to such a release,
+[move `spec.coldStorage.manager`](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager)
+to the primary's serial and wait for `ManagerReady`. Run no `Planned` promotion
+during the rollout, since it requires the manager off the departing primary.
+Once every instance runs the new release, move the manager back to a replica.
+Enable late rows in cold storage, `cold.storage.delta.enabled`, only after the
+rollout completes.
 
 ## Storage
 

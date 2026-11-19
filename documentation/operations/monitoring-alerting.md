@@ -205,6 +205,35 @@ If the role is correct, check credentials, network reachability, and quota again
 
 See [Operating cold storage](/docs/operations/cold-storage/#troubleshooting) for the full symptom table.
 
+### Detect cold storage maintenance problems
+
+_Enterprise only._
+
+With [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) enabled, background maintenance merges late rows and moves them into new Parquet objects. There are no metrics for the late rows waiting for it, so watch these signals instead.
+
+**Failed compactions:**
+
+```questdb-sql
+SELECT table_name, partition_name, kind, origin, since, error
+FROM cold_storage_compactions()
+WHERE status = 'failed';
+```
+
+`cold_storage_compactions()` reports this instance only, so run it on every instance. It requires `SYSTEM ADMIN`.
+
+**WAL apply paused on run pressure:** a partition that holds too many runs of late rows stops WAL apply for its table, without suspending it, until background merging reclaims enough of them; see [Batch your writes](/docs/concepts/cold-storage-late-rows/#batch-your-writes) for the thresholds. Alert on these log lines, and on WAL lag for a table that is not suspended (see [Detect transaction lag and pending rows](#detect-transaction-lag-and-pending-rows)):
+
+```text
+Delta WAL apply stopped on Run pressure [tableDirName=..., partition=..., retainedRuns=..., oldestSnapshot=...]
+Delta WAL apply stopped, reclaim failed [...]
+```
+
+**Refused promotions:** a non-null `last_refusal` in [`SWITCH STATUS`](/docs/query/sql/switch-role/) on a replica, such as [`ER011`](/docs/troubleshooting/error-codes/#er011), means it cannot take over as primary yet.
+
+**Backups that cannot pin cold objects:** a failed backup on a database with cold partitions often means missing `_retention/*` permissions. See [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
+
+**Resolution:** fix the cause the `error` column or the log names. For run pressure, send fewer, larger transactions, see [Detect small transactions](#detect-small-transactions).
+
 ### Detect memory pressure
 
 Memory pressure indicates the system is running low on memory for out-of-order
@@ -268,6 +297,10 @@ WHERE walEnabled
 - For custom ILP clients, configure auto-flush by row count or time interval
   rather than flushing after each row
 - For HTTP/PostgreSQL ingestion, send multiple rows per request
+- On QuestDB Enterprise tables with
+  [late rows in cold storage](/docs/concepts/cold-storage-late-rows/#batch-your-writes),
+  every transaction into a cold partition adds a run of late rows, and many
+  small transactions can pause WAL apply
 
 ### Detect high write amplification
 

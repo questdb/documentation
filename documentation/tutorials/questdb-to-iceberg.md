@@ -22,18 +22,21 @@ Iceberg registers files that already live in an object store (S3, GCS, Azure
 Blob, MinIO, and so on). How the Parquet gets there, and whether it arrives laid
 out one folder per partition, depends on your edition:
 
-- **QuestDB Enterprise** tiers partitions to object storage automatically through [cold storage](/docs/concepts/cold-storage/), configured with the `TO REMOTE` stage of a [storage policy](/docs/concepts/storage-policy/). The data lands as Hive-style partitioned Parquet, one folder per partition, for example:
+- **QuestDB Enterprise** tiers partitions to object storage through [cold storage](/docs/concepts/cold-storage/), configured with the `TO REMOTE` stage of a [storage policy](/docs/concepts/storage-policy/). Cold storage lays out its objects for QuestDB, not for Iceberg: each version of a partition is a separate `data.parquet` under a key of its own, such as `fx_trades~3/1770706800000000-5120-4/data.parquet`, and is not organized by partition folders. A partition can get a new object over time, for example when [late rows](/docs/concepts/cold-storage-late-rows/) are compacted, and the replaced object is deleted after a grace period. Late rows not yet compacted are in no object.
 
-  ```text
-  fx_trades/year=2026/month=02/day=10/hour=08/data.parquet
-  fx_trades/year=2026/month=02/day=10/hour=09/data.parquet
+  To register cold storage objects, take each partition's current object key from the `partition_path` column of [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions), and register again when a partition's `partition_path` changes, dropping the replaced file from the Iceberg table. Keep only the `active` rows: a `pending` object is not durable yet, and a `deleting` one is about to be reclaimed.
+
+  ```questdb-sql title="Current object of each cold partition"
+  SELECT timestamp, partition_path
+  FROM table_cold_partitions('fx_trades')
+  WHERE state = 'active';
   ```
 
-  so only the Iceberg registration is left to do.
+  `partition_path` is relative to the cold storage root: with `cold.storage.object.store=s3::bucket=my-bucket;root=cold;`, the object above is `s3://my-bucket/cold/fx_trades~3/1770706800000000-5120-4/data.parquet`.
 
   :::warning
 
-  QuestDB must remain the only writer to that prefix. Registering the files with Iceberg is safe because it only writes metadata, but nothing outside QuestDB may rewrite, replace, or expire a `data.parquet` object once cold storage owns it. Write Iceberg metadata to a separate prefix, and do not point object store lifecycle rules at the QuestDB root.
+  QuestDB must remain the only writer to that root. Registering the files with Iceberg is safe because it only writes metadata, but nothing outside QuestDB may rewrite, replace, or expire a `data.parquet` object once cold storage owns it. Write Iceberg metadata to a separate prefix, and do not point object store lifecycle rules at the QuestDB root.
 
   :::
 
@@ -42,9 +45,15 @@ out one folder per partition, depends on your edition:
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`), or by creating the table in
   Parquet format with [`CREATE TABLE`](/docs/query/sql/create-table/). QuestDB
   writes those files locally in its own partition layout, so you then move them to
-  your object store and arrange the partition folders yourself. The Hive-style
-  layout shown above works well and matches what Enterprise produces. Only after
-  that do you register them with Iceberg.
+  your object store and arrange the partition folders yourself. A Hive-style
+  layout, one folder per partition, works well:
+
+  ```text
+  fx_trades/year=2026/month=02/day=10/hour=08/data.parquet
+  fx_trades/year=2026/month=02/day=10/hour=09/data.parquet
+  ```
+
+  Only after that do you register them with Iceberg.
 
 ## How Iceberg registration works
 

@@ -33,7 +33,9 @@ transactions from the replication object store.
 - A target host with an empty `db/` directory, such as a fresh installation.
 - Connection strings for both object stores: the backup store, and the
   **source** replication store the original primary uploaded to.
-- If the database uses cold storage, a copy of the cold prefix. See
+- If the database uses cold storage: a new, empty cold storage root for the
+  recovered database, read access to the source root, and a backup taken after
+  the upgrade to a release that pins cold objects. See
   [Cold storage](#cold-storage), and act within the garbage collection grace
   period after a drop.
 
@@ -98,12 +100,18 @@ server log is the reliable source.
    procedure: with a replication store configured, the node catches up to
    the latest state during this boot and there is nothing left to bound.
 
-4. **Restore the backup**, following
+4. **Cold storage, if the database uses it**: before this boot, set
+   `cold.storage.object.store` to a new, empty root, and add the
+   `cold.storage.linked.object.stores` entries the source root needs. The boot
+   that restores the backup prepares the new root; the recovery boot in step 2
+   does not. See [Cold storage](#cold-storage).
+
+5. **Restore the backup**, following
    [Restore](/docs/operations/backup/#restore): write `_backup_restore` in
    the install root, with `backup.restore.timestamp` set at or before the
    target unless the latest backup already qualifies.
 
-5. **Start the node, verify the base landed, and stop it.** The restored
+6. **Start the node, verify the base landed, and stop it.** The restored
    tables are present and `_backup_restore` has been removed.
 
 ### Step 2: roll forward to the target
@@ -120,12 +128,7 @@ server log is the reliable source.
    `replication.object.store` is the source store the original primary
    uploaded to.
 
-2. **Cold storage, if the database uses it**: point
-   `cold.storage.object.store` at the copied prefix and leave
-   `cold.storage.role` at its default (`refresher`). See
-   [Cold storage](#cold-storage).
-
-3. **Start the node.** On success the log shows the lines below and the
+2. **Start the node.** On success the log shows the lines below and the
    trigger file is removed. With no replication role configured, the node
    comes up standalone and cannot write to the live replication store.
 
@@ -134,7 +137,7 @@ server log is the reliable source.
    generated fresh DataID after PITR: <data id>
    ```
 
-4. **Verify the recovered data.** This step is not optional.
+3. **Verify the recovered data.** This step is not optional.
 
    :::danger
 
@@ -148,7 +151,7 @@ server log is the reliable source.
 
    :::
 
-5. **Promote to primary as a separate, deliberate step.** Set
+4. **Promote to primary as a separate, deliberate step.** Set
    `replication.role=primary` and point `replication.object.store` at a
    **new, empty** bucket or prefix. A recovered node that starts as primary
    against a non-empty store fails with
@@ -191,38 +194,43 @@ those objects still exist, so do this before anything else: run
 on the cold storage manager. That halts garbage collection immediately and
 needs no restart.
 
-### Copy the cold prefix
+### Give the recovered database its own root
 
-If the original database was already using cold storage, this part is not
-optional. A cold storage prefix belongs to exactly one cluster, and a
-recovered node is a second cluster. Copy the cold prefix and point the
-recovered node at the copy.
+If the original database was already using cold storage, this part is not optional. A point-in-time recovery starts a new database, with a new DataID, and a cold storage root belongs to one database. The recovered database writes to a new, empty root of its own, and keeps reading the cold partitions it inherited from the source root, where they are.
 
-Pointing the recovered node at the live prefix is acceptable only for a
-short, read-only verification run: with the default `refresher` role it
-cannot write to or delete from the prefix. As a lasting state it is wrong,
-because two clusters on one prefix means whichever holds the manager role
-eventually garbage-collects objects the other still references. Never
-configure a second `manager` against a prefix that already has one.
+Configure the recovering node before the boot that restores the backup, in [step 1](#step-1-restore-the-backup):
 
-Once the recovery is verified, the next move depends on what happens to the
-original cluster. If it stays in service, promote its demoted manager again
-so garbage collection resumes. If you retire it, or rebuild its instances as
-replicas of the recovered node, promote a manager for the copied prefix on
-the recovered cluster instead.
+```ini title="server.conf on the recovering node"
+cold.storage.enabled=true
+cold.storage.object.store=s3::bucket=<new-bucket>;root=<new-root>;region=<region>;
+cold.storage.linked.object.stores=<source root_id>=s3::bucket=<source-bucket>;root=<source-root>;region=<region>;
+```
+
+- `cold.storage.object.store` is a new, empty root, or the root this same recovery started to write and did not finish. The restore refuses any other root before it changes the database: a root with a catalog, a root another restore wrote to, or a root that holds cold tables but no catalog.
+- [`cold.storage.linked.object.stores`](/docs/configuration/cold-storage/#coldstoragelinkedobjectstores) tells the node how to open the source root. Every instance of the source database logs the root's `root_id` when it loads the root's catalog, as `rootId` in `loaded the cold storage root's identity [role=..., instance=..., rootId=<root_id>, dataId=...]`. Without an entry, the node opens the source root at its recorded location with its ambient credentials, which works only for S3 or GCS without a custom `endpoint`. Every instance of the recovered database needs the same entries.
+- Every instance of the recovered database needs read access to the source root's catalog, manifests and objects, and `GET` and `PUT` on its `_retention/*`, plus `DELETE` so that a failed restore can remove the pins it wrote. See [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
+
+The restore pins the inherited bases in the source root, so the source root's garbage collection keeps them. When the recovered database later drops or replaces such a partition, its manager unpins the base instead of deleting it. Keep the source root readable for as long as the recovered database pins bases there: on the source root's manager, [`cold_storage_pin_owners()`](/docs/query/functions/meta/#cold_storage_pin_owners) lists the recovered database as an owner of kind `root`.
+
+A point-in-time recovery needs a backup taken after the upgrade to a release that pins cold objects. When the backup was taken earlier and holds cold partitions, the recovery refuses to start, since the recovered database could read them from no root. A plain [restore](/docs/operations/backup/#restore) of such a backup still works.
+
+Once the recovery is verified, the next move depends on what happens to the original database. If it stays in service, promote its demoted manager again so garbage collection resumes. On the recovered database, promote a cold storage manager for its new root.
 
 ## Troubleshooting
 
 Startup errors, verbatim, with cause and fix:
 
-| Error                                                                                                      | Cause                                                                | Fix                                                                                                                   |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `The _recover_point_in_time file must contain the replication.object.store setting`                         | The source store key is missing                                      | Add the source store connection string to the file                                                                    |
-| `The _recover_point_in_time file must contain the replication.recovery.timestamp setting`                   | The target instant key is missing                                    | Add `replication.recovery.timestamp` to the file                                                                      |
-| `The _recover_point_in_time file contains unexpected settings: ...`                                         | The file contains a key other than the two accepted ones             | Remove the extra keys; the file accepts exactly two                                                                   |
-| ``The _recover_point_in_time file can't be used if the instance has the setting `replication.role=replica`.`` | The node is configured as a replica                                  | Remove or comment `replication.role` in `server.conf`; recovery runs with the role unset or set to `primary`          |
-| `The _migrate_primary file can't be used in conjunction with _recover_point_in_time file.`                  | Both trigger files exist in the install root                         | Remove [`_migrate_primary`](/docs/high-availability/disaster-recovery/#emergency-primary-migration); on its own it replays to the latest state, not to a bounded instant |
-| `ER001 - Attempted to start a primary instance over a non-empty object store after a point in time recovery.` | The recovered node started as primary against a non-empty store      | Point `replication.object.store` at a new, empty bucket or prefix; see [ER001](/docs/troubleshooting/error-codes/#er001) |
+| Error                                                                                                                                   | Cause                                                                                                 | Fix                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `The _recover_point_in_time file must contain the replication.object.store setting`                                                     | The source store key is missing                                                                       | Add the source store connection string to the file                                                                                                                                         |
+| `The _recover_point_in_time file must contain the replication.recovery.timestamp setting`                                               | The target instant key is missing                                                                     | Add `replication.recovery.timestamp` to the file                                                                                                                                           |
+| `The _recover_point_in_time file contains unexpected settings: ...`                                                                     | The file contains a key other than the two accepted ones                                              | Remove the extra keys; the file accepts exactly two                                                                                                                                        |
+| ``The _recover_point_in_time file can't be used if the instance has the setting `replication.role=replica`.``                           | The node is configured as a replica                                                                   | Remove or comment `replication.role` in `server.conf`; recovery runs with the role unset or set to `primary`                                                                               |
+| `The _migrate_primary file can't be used in conjunction with _recover_point_in_time file.`                                              | Both trigger files exist in the install root                                                          | Remove [`_migrate_primary`](/docs/high-availability/disaster-recovery/#emergency-primary-migration); on its own it replays to the latest state, not to a bounded instant                   |
+| `ER001 - Attempted to start a primary instance over a non-empty object store after a point in time recovery.`                           | The recovered node started as primary against a non-empty store                                       | Point `replication.object.store` at a new, empty bucket or prefix; see [ER001](/docs/troubleshooting/error-codes/#er001)                                                                   |
+| `recover from a backup taken after the upgrade`                                                                                         | The backup holds cold partitions and was taken before the upgrade to a release that pins cold objects | Recover from a backup taken after the upgrade. The trigger file stays in place, and nothing was replayed                                                                                   |
+| `configure the new empty cold storage root, and cold.storage.linked.object.stores, before the boot that restores the backup`            | The database has cold partitions, and no restore prepared the configured root                         | Start again from step 1 on a fresh data root, with the new root configured before the restore boot. The trigger file stays in place                                                        |
+| `the linked cold storage root has no entry in cold.storage.linked.object.stores, and its location needs one [rootId=..., location=...]` | The node cannot open the source root without an entry                                                 | Add an entry for the `rootId` in the error to [`cold.storage.linked.object.stores`](/docs/configuration/cold-storage/#coldstoragelinkedobjectstores) on every instance, then restore again |
 
 A recovery that comes up healthy with data missing did not necessarily fail:
 confirm that step 1 restored a backup base and that the target instant is
@@ -237,6 +245,6 @@ repeat the procedure on a fresh data root.
   recovered node and re-seeding replicas
 - [WAL cleanup](/docs/high-availability/wal-cleanup/) for how far back a
   recovery can reach
-- [Operating cold storage](/docs/operations/cold-storage/) for prefix
-  ownership and the manager role
+- [Operating cold storage](/docs/operations/cold-storage/) for root
+  ownership, pins and the manager role
 - [Error codes](/docs/troubleshooting/error-codes/) for ER001 and ER007
