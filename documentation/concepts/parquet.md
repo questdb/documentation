@@ -165,7 +165,8 @@ attached from a soft link or sealed by QuestDB Enterprise
 `cannot convert parquet partition to native, partition is read-only`, or, for a
 partition in cold storage,
 `cannot convert parquet partition to native, partition is in cold storage and read-only`.
-Earlier releases accepted the statement and suspended the table when it
+Releases before QuestDB QUESTDB_VERSION_TBD and QuestDB Enterprise
+ENTERPRISE_VERSION_TBD accepted the statement and suspended the table when it
 applied. Query such a partition in place, or copy its rows into another table.
 
 In QuestDB Enterprise, neither conversion applies to a partition that keeps

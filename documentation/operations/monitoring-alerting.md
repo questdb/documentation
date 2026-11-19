@@ -221,7 +221,7 @@ WHERE status = 'failed';
 
 `cold_storage_compactions()` reports this instance only, so run it on every instance. It requires `SYSTEM ADMIN`.
 
-**WAL apply paused on run pressure:** a partition that holds 16,384 runs of late rows stops WAL apply for its table, without suspending it, until it is back to 8,192. Alert on these log lines, and on WAL lag for a table that is not suspended (see [Detect transaction lag and pending rows](#detect-transaction-lag-and-pending-rows)):
+**WAL apply paused on run pressure:** a partition that holds too many runs of late rows stops WAL apply for its table, without suspending it, until background merging reclaims enough of them; see [Batch your writes](/docs/concepts/cold-storage-late-rows/#batch-your-writes) for the thresholds. Alert on these log lines, and on WAL lag for a table that is not suspended (see [Detect transaction lag and pending rows](#detect-transaction-lag-and-pending-rows)):
 
 ```text
 Delta WAL apply stopped on Run pressure [tableDirName=..., partition=..., retainedRuns=..., oldestSnapshot=...]

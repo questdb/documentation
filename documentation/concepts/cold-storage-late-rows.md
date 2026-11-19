@@ -2,11 +2,11 @@
 title: Late rows in cold storage
 sidebar_label: Late rows
 description:
-  Keep rows that arrive after a partition's DROP LOCAL boundary, and keep
-  serving that partition from the object store.
+  Keep late and out-of-order rows that arrive after DROP LOCAL in QuestDB
+  Enterprise cold storage partitions, and compact them into new Parquet objects.
 ---
 
-Available since QuestDB Enterprise ENTERPRISE_VERSION_TBD, this opt-in setting lets a [cold storage](/docs/concepts/cold-storage/) partition keep the rows that arrive after its `DROP LOCAL` boundary. Without it, `DROP LOCAL` seals the partition and later rows for it are dropped. With it, the partition keeps accepting late rows, queries return them, and the partition still moves to the object store. Tables whose data keeps arriving late can therefore use cold storage without a `DROP LOCAL` sized for the longest delay.
+Available since QuestDB Enterprise ENTERPRISE_VERSION_TBD, the opt-in `cold.storage.delta.enabled` setting lets a [cold storage](/docs/concepts/cold-storage/) partition keep the rows that arrive after its `DROP LOCAL` boundary. Without it, `DROP LOCAL` seals the partition and later rows for it are dropped. With it, the partition keeps accepting late rows, queries return them, and the partition still moves to the object store. Tables whose data keeps arriving late can therefore use cold storage without a `DROP LOCAL` sized for the longest delay.
 
 :::note
 
@@ -25,7 +25,7 @@ It does not apply to every table:
 
 ## How it works
 
-A table takes late rows when cold storage is enabled, the table is a [WAL table](/docs/concepts/write-ahead-log/) without deduplication, and its [storage policy](/docs/concepts/storage-policy/) has a `TO REMOTE` stage.
+A table takes late rows when `cold.storage.enabled` and `cold.storage.delta.enabled` are `true` on the primary, the table is a [WAL table](/docs/concepts/write-ahead-log/) without deduplication, and its [storage policy](/docs/concepts/storage-policy/) has a `TO REMOTE` stage.
 
 When such a partition reaches `DROP LOCAL`, the primary writes a replicated event to the table's WAL that switches the partition to accept late rows, instead of the seal that makes it read-only. Every instance applies the event at the same point in the WAL, so all instances agree on which rows came before the switch.
 
@@ -56,25 +56,6 @@ This compaction is a cold storage mechanism, separate from the partition compact
 
 :::
 
-### Partitions sealed before late rows were enabled
-
-When you enable the setting, the primary also switches the partitions that are already sealed to Delta partitions, on the first storage policy pass. These partitions then accept late rows too, and the table immediately refuses the operations listed under [Restrictions](#restrictions), such as `UPDATE`. Three kinds of partition stay sealed:
-
-- **Soft-linked partitions**, attached from a symbolic link.
-- **The table's last partition**, which the storage policy never visits. A sealed last partition switches once a newer partition exists.
-- **A cold partition that has a split sibling.** Only a local `FORCE DROP PARTITION`, `SET FORMAT PARQUET` and a new row can leave a cold partition in that shape. Late rows for its time range are still dropped and logged with `o3 ignoring write on read-only partition`. To switch such a day, run on the primary, when no late rows arrive for that day:
-
-  ```questdb-sql title="Switch a sealed day with a split sibling"
-  CREATE TABLE tmp AS (SELECT * FROM trades WHERE timestamp IN '2026-02-10');
-  ALTER TABLE trades DROP PARTITION LIST '2026-02-10';
-  INSERT INTO trades SELECT * FROM tmp;
-  DROP TABLE tmp;
-  ```
-
-  The day reads empty between the `DROP PARTITION` and the `INSERT`, and `tmp` needs local disk for the day's rows.
-
-A sealed local Parquet partition whose `_pm` file is missing or corrupt suspends the table when its switch applies. Restore the file, or run `FORCE DROP PARTITION` on every instance, since it bypasses the WAL, then [`RESUME WAL`](/docs/query/sql/alter-table-resume-wal/).
-
 ## Enable or disable
 
 Set the same value in `server.conf` on every instance, then restart:
@@ -93,6 +74,31 @@ Enable late rows only once every instance in the cluster, and every instance tha
 :::
 
 Setting it back to `false` stops new switches. Existing Delta partitions stay in that mode: they keep accepting late rows and the table keeps its [restrictions](#restrictions) until those partitions are dropped.
+
+:::warning
+
+Disabling cold storage itself, with `cold.storage.enabled=false`, keeps the Delta partitions that the object store serves, but `DROP LOCAL` then deletes the Delta partitions whose base is still on local disk, with their late rows, including those not yet in a base in the object store. See [Disabling cold storage](/docs/operations/cold-storage/#disabling-cold-storage).
+
+:::
+
+### Partitions sealed before late rows were enabled
+
+When you enable the setting, the primary also switches the partitions that are already sealed to Delta partitions, on the first storage policy pass. These partitions then accept late rows too, and the table immediately refuses the operations listed under [Restrictions](#restrictions), such as `UPDATE`. Three kinds of partition stay sealed:
+
+- **Soft-linked partitions**, attached from a symbolic link.
+- **The table's last partition**, which the storage policy never visits. A sealed last partition switches once a newer partition exists.
+- **A cold partition that has a split sibling.** Only a local `FORCE DROP PARTITION`, `SET FORMAT PARQUET` and a new row can leave a cold partition in that shape. Late rows for its time range are still dropped and logged with `o3 ignoring write on read-only partition`. To switch such a day, run on the primary, when no late rows arrive for that day:
+
+  ```questdb-sql title="Switch a sealed day with a split sibling"
+  CREATE TABLE tmp AS (SELECT * FROM trades WHERE timestamp IN '2026-02-10');
+  ALTER TABLE trades DROP PARTITION LIST '2026-02-10';
+  INSERT INTO trades SELECT * FROM tmp;
+  DROP TABLE tmp;
+  ```
+
+  The day reads empty between the `DROP PARTITION` and the `INSERT`, and `tmp` needs local disk for the day's rows.
+
+A sealed local Parquet partition whose `_pm` file is missing or corrupt suspends the table when its switch applies. Restore the file, or run `FORCE DROP PARTITION` on every instance, since it bypasses the WAL, then [`RESUME WAL`](/docs/query/sql/alter-table-resume-wal/).
 
 ## Batch your writes
 
@@ -143,12 +149,15 @@ Once a table holds a Delta partition, it refuses:
 SELECT * FROM cold_storage_compactions();
 ```
 
-```questdb-sql title="Which partitions are Delta partitions, and where they are served from"
+`cold_storage_compactions()` reports this instance only, and requires the `SYSTEM ADMIN` permission.
+
+```questdb-sql title="Remotely served partitions that keep late rows"
 SELECT name, readOnly, isRemotelyServed
-FROM table_partitions('trades');
+FROM table_partitions('trades')
+WHERE isRemotelyServed AND readOnly = false;
 ```
 
-A Delta partition reports `readOnly` as `false`, also once it is remotely served. A sealed cold partition reports `readOnly` as `true`.
+A Delta partition reports `readOnly` as `false`, also once it is remotely served, and a sealed cold partition reports `readOnly` as `true`. No column marks a Delta partition whose base is still on local disk, for example in the minutes after `DROP LOCAL` or while [`storage.policy.drop.local.override`](/docs/configuration/storage-policy/#storagepolicydroplocaloverride) keeps it: it reports the same values as a writable local partition.
 
 Also watch for the run-pressure log lines above, and for WAL lag on a table whose [`wal_tables()`](/docs/query/functions/meta/#wal_tables) row shows `suspended` as `false`.
 
@@ -159,8 +168,6 @@ Also watch for the run-pressure log lines above, and for WAL lag on a table whos
 QuestDB Enterprise releases before ENTERPRISE_VERSION_TBD refuse to open a table that holds Delta partitions. With `cairo.commit.mode=adaptive` they refuse to start. Turning the setting off does not convert Delta partitions back.
 
 To roll back after enabling late rows, restore a [backup](/docs/operations/backup/) taken before you enabled them.
-
-If you later disable cold storage, `DROP LOCAL` deletes local Delta partitions like any local partition, including late rows not yet in a base in the object store.
 
 :::
 

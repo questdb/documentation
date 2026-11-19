@@ -20,10 +20,12 @@ Background maintenance compacts Delta partitions on its own. Use `COMPACT` to mo
 
 ## Syntax
 
-```questdb-sql
+```questdb-sql title="Compact partitions"
 ALTER TABLE tableName COMPACT [BASE | RESIDUAL] PARTITION
     { LIST 'partitionName' [, 'partitionName' ...] | WHERE timestampCondition };
+```
 
+```questdb-sql title="Cancel requested compactions"
 ALTER TABLE tableName COMPACT CANCEL;
 ```
 
@@ -60,7 +62,7 @@ A `BASE` or default-mode request fails, with the reason in `cold_storage_compact
 
 ## Permissions
 
-`COMPACT` and `COMPACT CANCEL` require the `VACUUM TABLE` permission on the table. See [RBAC](/docs/security/rbac/).
+`COMPACT` and `COMPACT CANCEL` require the `VACUUM TABLE` permission on the table. Following a request in [`cold_storage_compactions()`](/docs/query/functions/meta/#cold_storage_compactions), including why it failed, requires the `SYSTEM ADMIN` permission. See [RBAC](/docs/security/rbac/).
 
 ## Errors
 

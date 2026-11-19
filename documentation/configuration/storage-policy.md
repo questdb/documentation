@@ -29,15 +29,6 @@ How often QuestDB scans for partitions to process. This is a backstop full
 sweep: lifecycle transitions such as an applied partition seal or a manifest
 flush also trigger a recheck, so convergence is not bound to this interval.
 
-## storage.policy.recheck.drain.interval
-
-- **Default**: `1s`
-- **Reloadable**: no
-
-How often coalesced recheck requests are drained, off the worker hot loop.
-Requests coalesce per table, so a burst affecting one table costs a single
-recheck. This paces convergence latency rather than `storage.policy.check.interval`.
-
 ## storage.policy.drop.local.override
 
 - **Default**: none
@@ -71,6 +62,15 @@ This setting is obsolete and has no effect. With
 [`config.validation.strict=true`](/docs/configuration/overview/#config-validation),
 it stops startup; otherwise startup logs it as obsolete. Remove it from
 `server.conf`.
+
+## storage.policy.recheck.drain.interval
+
+- **Default**: `1s`
+- **Reloadable**: no
+
+How often coalesced recheck requests are drained, off the worker hot loop.
+Requests coalesce per table, so a burst affecting one table costs a single
+recheck. This paces convergence latency rather than `storage.policy.check.interval`.
 
 ## storage.policy.retry.interval
 

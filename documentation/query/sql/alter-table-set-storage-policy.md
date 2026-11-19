@@ -64,7 +64,7 @@ The two remote stages drive [cold storage](/docs/concepts/cold-storage/) and req
 
 :::warning
 
-`DROP LOCAL` without `TO REMOTE` permanently deletes the partition's local data. With `TO REMOTE` it seals the partition as read-only for good: later rows for it are dropped, or suspend a table with deduplication, and there is no way to unseal it. With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, tables without deduplication keep accepting rows for it instead.
+`DROP LOCAL` without `TO REMOTE` permanently deletes the partition's local data. With `TO REMOTE` it seals the partition as read-only: later rows for it are dropped, or suspend a table with deduplication, and disabling or removing the policy does not unseal it. With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, tables without deduplication keep accepting rows for it instead, and enabling late rows later switches most partitions already sealed to accept rows again, see [Partitions sealed before late rows were enabled](/docs/concepts/cold-storage-late-rows/#partitions-sealed-before-late-rows-were-enabled).
 
 `DROP REMOTE` is the only stage that physically deletes data with no local copy left behind.
 

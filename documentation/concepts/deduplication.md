@@ -245,7 +245,7 @@ WHERE table_name = 'prices';
 
 ## Rows for read-only partitions
 
-A partition is read-only when it was [attached from a soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links), or, in QuestDB Enterprise, when a storage policy's `DROP LOCAL` stage sealed it for [cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows). Deduplication could have to replace a stored row in such a partition, so on a WAL table with deduplication, a transaction with rows for a read-only partition fails with `cannot insert into read-only partition` and the table is suspended. Earlier releases dropped those rows, logged `o3 ignoring write on read-only partition`, and applied the rest of the transaction. Tables without deduplication still drop such rows.
+A partition is read-only when it was [attached from a soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links), or, in QuestDB Enterprise, when a storage policy's `DROP LOCAL` stage sealed it for [cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows). Deduplication could have to replace a stored row in such a partition, so on a WAL table with deduplication, a transaction with rows for a read-only partition fails with `cannot insert into read-only partition` and the table is suspended. Releases before QuestDB QUESTDB_VERSION_TBD and QuestDB Enterprise ENTERPRISE_VERSION_TBD dropped those rows, logged `o3 ignoring write on read-only partition`, and applied the rest of the transaction. Tables without deduplication still drop such rows.
 
 QuestDB Enterprise never keeps [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) for a table with deduplication, whether the setting is on or off.
 

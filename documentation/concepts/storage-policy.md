@@ -414,8 +414,9 @@ ALTER TABLE trades DROP STORAGE POLICY;
 - Start with `TO PARQUET` to reduce local disk usage while keeping data
   queryable in Parquet format
 - Use `DROP LOCAL` with care. Without `TO REMOTE` it permanently removes the
-  local data; with `TO REMOTE` it seals the partition as read-only for good,
-  unless [late rows](/docs/concepts/cold-storage-late-rows/) are enabled
+  local data; with `TO REMOTE` it seals the partition as read-only, unless
+  [late rows](/docs/concepts/cold-storage-late-rows/) are enabled, and
+  removing the policy does not unseal it
 - Add `DROP REMOTE` only once remote retention is a deliberate decision: it is
   the only stage that physically deletes data with no local copy left
 - TTL values should be significantly larger than the partition interval

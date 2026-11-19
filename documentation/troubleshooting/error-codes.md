@@ -214,7 +214,7 @@ To resolve:
 - If the replica is still catching up, wait until its tables have applied the replicated WAL, then promote it again.
 - If it cannot catch up, because the transactions it misses are lost, restore the database from a backup onto a new cold storage root.
 
-A table whose WAL transaction numbers restarted on QuestDB Enterprise 4.0 or 4.1, through `ALTER TABLE ... REBASE WAL` or a `SET TYPE` round trip, can keep the root ahead of the replica and block promotion in the same way.
+A table whose WAL transaction numbers restarted on a release before QuestDB Enterprise ENTERPRISE_VERSION_TBD, through `ALTER TABLE ... REBASE WAL` or a `SET TYPE` round trip, can keep the root ahead of the replica and block promotion in the same way. Catching up with the primary is not enough here: promotion goes ahead once the table's `sequencerTxn` in [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reaches the `coldStorageSeqTxn` in the message, which takes new transactions on the table. If you cannot wait for that, restore the database from a backup onto a new cold storage root.
 
 ## Operating system error codes
 

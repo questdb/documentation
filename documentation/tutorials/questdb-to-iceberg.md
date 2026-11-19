@@ -24,7 +24,15 @@ out one folder per partition, depends on your edition:
 
 - **QuestDB Enterprise** tiers partitions to object storage through [cold storage](/docs/concepts/cold-storage/), configured with the `TO REMOTE` stage of a [storage policy](/docs/concepts/storage-policy/). Cold storage lays out its objects for QuestDB, not for Iceberg: each version of a partition is a separate `data.parquet` under a key of its own, such as `fx_trades~3/1770706800000000-5120-4/data.parquet`, and is not organized by partition folders. A partition can get a new object over time, for example when [late rows](/docs/concepts/cold-storage-late-rows/) are compacted, and the replaced object is deleted after a grace period. Late rows not yet compacted are in no object.
 
-  To register cold storage objects, take each partition's current object key from the `partition_path` column of [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions), and register again when a partition's `partition_path` changes, dropping the replaced file from the Iceberg table.
+  To register cold storage objects, take each partition's current object key from the `partition_path` column of [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions), and register again when a partition's `partition_path` changes, dropping the replaced file from the Iceberg table. Keep only the `active` rows: a `pending` object is not durable yet, and a `deleting` one is about to be reclaimed.
+
+  ```questdb-sql title="Current object of each cold partition"
+  SELECT timestamp, partition_path
+  FROM table_cold_partitions('fx_trades')
+  WHERE state = 'active';
+  ```
+
+  `partition_path` is relative to the cold storage root: with `cold.storage.object.store=s3::bucket=my-bucket;root=cold;`, the object above is `s3://my-bucket/cold/fx_trades~3/1770706800000000-5120-4/data.parquet`.
 
   :::warning
 

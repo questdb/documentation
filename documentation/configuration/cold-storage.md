@@ -2,7 +2,8 @@
 title: Cold storage
 description:
   Configuration settings for QuestDB Enterprise cold storage, covering the
-  object store connection, roles, upload, read path, and garbage collection.
+  object store connection, roles, upload, read path, garbage collection, and
+  late rows with their compaction.
 ---
 
 :::note
@@ -74,7 +75,7 @@ Connection strings for the roots a database inherited cold partitions from in a 
 cold.storage.linked.object.stores=<root_id>=s3::bucket=old-bucket;root=cold;region=eu-west-1;
 ```
 
-The restore, and the manager of each root, log the `root_id` to use. Without an entry, an instance opens a source root at the location the restore recorded, with its ambient credentials, and only for an S3 or GCS location without `endpoint`. Set an entry on every instance of the recovered database for a root on Azure or `fs`, behind a custom endpoint, a private CA (`ca_cert_file`) or an assumed role (`role_arn`), and whenever the instance's ambient credentials cannot reach the root. Without an entry for a location that needs one, the restore fails with `the linked cold storage root has no entry in cold.storage.linked.object.stores, and its location needs one`.
+Every instance that uses a root logs its `root_id` when it loads the root's catalog, as `rootId` in `loaded the cold storage root's identity [role=..., instance=..., rootId=<root_id>, dataId=...]`, and a restore that lacks an entry names it in its error. Without an entry, an instance opens a source root at the location the restore recorded, with its ambient credentials, and only for an S3 or GCS location without `endpoint`. Set an entry on every instance of the recovered database for a root on Azure or `fs`, behind a custom endpoint, a private CA (`ca_cert_file`) or an assumed role (`role_arn`), and whenever the instance's ambient credentials cannot reach the root. Without an entry for a location that needs one, the restore fails with `the linked cold storage root has no entry in cold.storage.linked.object.stores, and its location needs one`.
 
 The value is sensitive, like `cold.storage.object.store`, and can be loaded from a file with `QDB_COLD_STORAGE_LINKED_OBJECT_STORES_FILE`. An entry that does not parse fails startup; the error names it by position or `root_id`, never by its connection string.
 
@@ -148,10 +149,10 @@ The upload bandwidth must exceed this value multiplied by `cold.storage.object.s
 
 ### cold.storage.multipart.part.size
 
-- **Default**: `64 MiB`
+- **Default**: `67108864` (64 MiB)
 - **Reloadable**: no
 
-Multipart upload part size. Must be between 5 MiB and 5 GiB.
+Multipart upload part size, in bytes. Must be between 5 MiB and 5 GiB.
 
 ### cold.storage.policy.cold.switch.lease.interval
 
@@ -256,10 +257,10 @@ Largest byte gap that may be bridged when merging two chunk reads into one range
 
 ### cold.storage.read.coalesce.max.span
 
-- **Default**: `64 MiB`
+- **Default**: `67108864` (64 MiB)
 - **Reloadable**: no
 
-Upper bound on the span of a single coalesced range request. A lone chunk larger than this is never split. `0` disables coalescing, producing one request per chunk.
+Upper bound, in bytes, on the span of a single coalesced range request. A lone chunk larger than this is never split. `0` disables coalescing, producing one request per chunk.
 
 ### cold.storage.read.max.in.flight
 

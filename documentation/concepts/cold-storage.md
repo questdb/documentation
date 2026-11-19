@@ -1,6 +1,6 @@
 ---
 title: Cold storage
-sidebar_label: Cold storage
+sidebar_label: Overview
 description:
   Move historical partitions to S3, Google Cloud Storage, Azure Blob Storage or
   a filesystem store as Parquet, and keep querying them with normal SQL.
@@ -37,7 +37,7 @@ Cold storage runs on top of a [storage policy](/docs/concepts/storage-policy/), 
 - `cold.storage.enabled=true` on every instance
 - A [WAL-enabled](/docs/concepts/write-ahead-log/) table, since remote stages are rejected on non-WAL tables
 - A policy carrying a `TO REMOTE` stage
-- A cold storage root that every instance can read and exactly one instance can write. The **root** is the object store location set by `cold.storage.object.store`, such as a bucket and prefix, and it belongs to one database
+- A cold storage root that every instance can read. Only the cold storage manager writes its data, catalog and manifests; instances that take backups, and databases recovered from it, also write [pins](/docs/operations/cold-storage/#pins) under `_retention/`. The **root** is the object store location set by `cold.storage.object.store`, such as a bucket and prefix, and it belongs to one database. See [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root) for the access each instance needs
 
 The active partition is never eligible.
 
@@ -124,9 +124,9 @@ Each version of a partition that QuestDB uploads is a **base**: a standard Parqu
 
 A base's key is `<table directory>/<partition timestamp>-<seqTxn>-<metadata version>/`, where the partition timestamp is a number in the table's timestamp unit, `seqTxn` is the table transaction the base reflects, and the metadata version is the table's schema version. A partition can have several bases over time: a new upload, or a [compaction](/docs/concepts/cold-storage-late-rows/#compaction) of late rows, writes a new base, and garbage collection deletes the replaced one after the grace period.
 
-Bases uploaded by QuestDB Enterprise 4.0 and 4.1 stay at their earlier paths, such as `trades~5/year=2026/month=02/day=10/data.parquet`, and are still read.
+Bases uploaded by releases before QuestDB Enterprise ENTERPRISE_VERSION_TBD stay at their earlier paths, such as `trades~5/year=2026/month=02/day=10/data.parquet`, and are still read.
 
-`data.parquet` is standard Parquet, so external tools can read it. They must not assume one object per partition, and must take the current object of each partition from [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions). Late rows are not in any object until they are compacted into a new base. Every underscore-prefixed object, whatever file extension it carries, is QuestDB control data and must not be edited: `_tables.msgpack` is the catalog of the root's tables, `_manifest.msgpack` lists a table's bases, and `_retention/` holds the [pins](/docs/operations/cold-storage/#pins) that keep bases a backup needs.
+`data.parquet` is standard Parquet, so external tools can read it. They must not assume one object per partition, and must take the current object of each partition from [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions). Late rows are not in any object until they are compacted into a new base. To catalog the objects in a data lake, see [Register QuestDB Parquet as Apache Iceberg tables](/docs/tutorials/questdb-to-iceberg/). Every underscore-prefixed object, whatever file extension it carries, is QuestDB control data and must not be edited: `_tables.msgpack` is the catalog of the root's tables, `_manifest.msgpack` lists a table's bases, and `_retention/` holds the [pins](/docs/operations/cold-storage/#pins) that keep bases a backup needs.
 
 :::danger
 

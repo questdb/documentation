@@ -88,9 +88,9 @@ demote releases that ownership.
    SWITCH STATUS;
    ```
 
-   | current_role | switch_in_flight | captured_at                 |
-   | ------------ | ---------------- | --------------------------- |
-   | REPLICA      | false            | 2026-08-28T10:15:02.114233Z |
+   | current_role | switch_in_flight | captured_at                 | last_refusal |
+   | ------------ | ---------------- | --------------------------- | ------------ |
+   | REPLICA      | false            | 2026-08-28T10:15:02.114233Z | null         |
 
    If `current_role` is `UNKNOWN`, stop here and follow
    [Refusals and the torn state](#refusals-and-the-torn-state).

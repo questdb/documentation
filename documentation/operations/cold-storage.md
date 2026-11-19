@@ -3,7 +3,8 @@ title: Operating cold storage
 sidebar_label: Cold storage
 description:
   Set up, monitor, and operate QuestDB Enterprise cold storage, including object
-  store preparation, manager handoff, garbage collection, and troubleshooting.
+  store preparation, manager handoff, compaction, garbage collection, pins, and
+  troubleshooting.
 ---
 
 This page covers running [cold storage](/docs/concepts/cold-storage/) in production: preparing the object store root, configuring the cluster, moving the manager role between instances, and diagnosing partitions that are not progressing. Read the [concept page](/docs/concepts/cold-storage/) first for the partition lifecycle and the read path.
@@ -159,26 +160,19 @@ WHERE timestamp IN '2026-02-10';
 
 ## Compaction and maintenance
 
-With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, background maintenance runs on every instance:
+With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, background maintenance runs on every instance, as described under [Compaction](/docs/concepts/cold-storage-late-rows/#compaction):
 
 - **Every instance merges runs**, the sorted batches of late rows that each transaction adds to a partition, on its own local disk. This work appears in `cold_storage_compactions()` with kind `residual` and origin `background`.
-- **The manager writes new bases.** Once a partition's late rows reach `cold.storage.maintenance.base.min.delta.bytes` (128 MiB) and `cold.storage.maintenance.base.delta.ratio` (25%) of its base, the manager folds them into a new Parquet base, at most once an hour per partition, and uploads it. A refused or failed step is retried after `cold.storage.maintenance.retry.delay` (30 s).
+- **The manager writes new bases.** Once a partition's late rows pass the `cold.storage.maintenance.base.min.delta.bytes` and `cold.storage.maintenance.base.delta.ratio` thresholds, the manager folds them into a new Parquet base and uploads it. A refused or failed step is retried after `cold.storage.maintenance.retry.delay`. See [Maintenance](/docs/configuration/cold-storage/#maintenance) for the defaults. This work appears in `cold_storage_compactions()` with kind `base` and origin `background`.
 - **Every instance switches to the new base** once no query, checkpoint or save point reads the old one. Garbage collection deletes the old base after its grace period, unless it is [pinned](#pins).
 
 To compact on demand, use [`ALTER TABLE COMPACT (cold storage)`](/docs/query/sql/alter-table-compact/). It needs the `VACUUM TABLE` permission, and `BASE` and the default mode run only on the manager.
 
 ### WAL apply pauses on many small transactions
 
-When a partition holds 16,384 runs that are not yet reclaimed, WAL apply stops for its table, without suspending it, and resumes once the partition is back to 8,192 runs. While it is stopped, the rows of waiting transactions are not visible, and `DROP PARTITION` or `TRUNCATE` queued behind it wait. The instance logs:
+A partition that holds too many runs of late rows stops WAL apply for its table, without suspending it, until background merging reclaims enough of them. While it is stopped, the rows of waiting transactions are not visible, and `DROP PARTITION` or `TRUNCATE` queued behind it wait. The instance logs `Delta WAL apply stopped on Run pressure` when the stop starts, and `Delta WAL apply resumed` when it ends. See [Batch your writes](/docs/concepts/cold-storage-late-rows/#batch-your-writes) for the thresholds and the full log lines.
 
-```text
-Delta WAL apply stopped on Run pressure [tableDirName=<dir>, partition=<partition>, retainedRuns=<runs>, oldestSnapshot=Some(<seqTxn>)]
-Delta WAL apply resumed [tableDirName=<dir>, stoppedMicros=<micros>]
-```
-
-`oldestSnapshot` is the oldest open snapshot, as `Some(<seqTxn>)`, or `None`.
-
-Long-running queries and checkpoints keep the runs they read, so they can extend a stop. The cure is fewer, larger transactions: see [Batch your writes](/docs/concepts/cold-storage-late-rows/#batch-your-writes) and [Detect small transactions](/docs/operations/monitoring-alerting/#detect-small-transactions).
+Long-running queries and checkpoints keep the runs they read, so they can extend a stop. The cure is fewer, larger transactions: see [Detect small transactions](/docs/operations/monitoring-alerting/#detect-small-transactions).
 
 ## Manager handoff
 
@@ -356,7 +350,7 @@ Worth testing before relying on cold storage for retention:
 Setting `cold.storage.enabled=false` on an instance that holds cold partitions keeps them in their tables:
 
 - A partition that only the object store holds stays in the table. A query that reads it fails with `partition <partition> of table <table> is in cold storage, which is disabled on this instance`, instead of returning the other partitions only. Enable cold storage again to read it. Only `DROP PARTITION` removes such a partition while cold storage is disabled.
-- `DROP LOCAL` keeps removing partitions held locally, including those already uploaded, and Delta partitions with their late rows, also the late rows not yet in a base.
+- `DROP LOCAL` keeps removing partitions held locally, including those already uploaded, and Delta partitions whose base is still on local disk, with their late rows, also those not yet in a base. A Delta partition whose base the object store serves stays, like any partition that only the object store holds.
 
 ## Troubleshooting
 
@@ -372,7 +366,7 @@ Setting `cold.storage.enabled=false` on an instance that holds cold partitions k
 | A cold query is slow or hits backpressure                                             | Broad scan, wide projection, object store cold start, or saturated read limits                           | Narrow the time range and columns, reduce concurrency, then inspect the metrics above before tuning                                                                       |
 | Late rows are missing                                                                 | Late rows are disabled, so their partition was sealed                                                    | Check `o3 ignoring write on read-only partition` in the logs. Enable [late rows](/docs/concepts/cold-storage-late-rows/) to keep later ones; dropped rows must be re-sent |
 | A table with deduplication is suspended with `cannot insert into read-only partition` | A transaction holds rows for a sealed partition                                                          | Skip the transaction and re-insert its other rows, see [Deduplication](/docs/concepts/deduplication/)                                                                     |
-| WAL apply lags but the table is not suspended                                         | A partition holds 16,384 runs of late rows                                                               | Check for `Delta WAL apply stopped on Run pressure` in the logs, and batch writes into larger transactions                                                                |
+| WAL apply lags but the table is not suspended                                         | A partition holds too many runs of late rows                                                             | Check for `Delta WAL apply stopped on Run pressure` in the logs, and batch writes into larger transactions                                                                |
 | A compaction fails                                                                    | See the `error` column of `cold_storage_compactions()`                                                   | Fix the cause, then run [`COMPACT`](/docs/query/sql/alter-table-compact/) again or wait for the background retry                                                          |
 | A backup fails to pin a base                                                          | Missing `GET`, `PUT` or `DELETE` on `_retention/*`, or `GET` on the manifests                            | Grant the [permissions](#1-prepare-the-object-store-root)                                                                                                                 |
 | Cold storage promotion or cold reads fail with `ER010`                                | The root belongs to another database                                                                     | Point the instance at its own database's root. See [`ER010`](/docs/troubleshooting/error-codes/#er010)                                                                    |

@@ -708,6 +708,10 @@ module.exports = {
             {
               type: "category",
               label: "Cold Storage",
+              link: {
+                type: "doc",
+                id: "concepts/cold-storage",
+              },
               items: [
                 {
                   id: "concepts/cold-storage",

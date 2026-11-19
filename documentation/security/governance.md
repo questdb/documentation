@@ -260,12 +260,14 @@ partition interval when choosing the deletion thresholds.
 
 Once `DROP LOCAL` runs, a partition is
 [sealed](/docs/concepts/cold-storage/#what-happens-to-late-rows): later
-inserts and updates that target it are not applied, and removing the policy does
-not unseal it. With
-[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) enabled, a
-table without deduplication keeps accepting inserts for the partition instead,
-but still refuses `UPDATE`. Partitions in cold storage remain queryable with
-normal SQL.
+inserts that target it are dropped, or suspend a table with deduplication, a
+WAL `UPDATE` that touches it is skipped, and removing the policy does not
+unseal it.
+[Late rows in cold storage](/docs/concepts/cold-storage-late-rows/) change
+this for tables without deduplication: with the setting enabled, the partition
+keeps accepting inserts instead, though the table refuses `UPDATE`, and
+enabling the setting later switches most partitions already sealed to accept
+inserts again. Partitions in cold storage remain queryable with normal SQL.
 
 To check that retention is applied,
 [`storage_policies`](/docs/query/functions/meta/#storage_policies) lists the
