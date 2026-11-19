@@ -980,14 +980,14 @@ accepted and `"1.005"` is rejected.
 
 ### Auto-flush
 
-A sender publishes its batch when it completes a row that crosses any of these
-thresholds:
+A sender flushes its buffered rows when it completes a row that crosses any of
+these thresholds:
 
 | Trigger                       | Default | Option                |
 | ----------------------------- | ------- | --------------------- |
-| Rows in the batch             | `1000`  | `autoFlushRows`       |
+| Buffered rows                 | `1000`  | `autoFlushRows`       |
 | Milliseconds since last flush | `100`   | `autoFlushIntervalMs` |
-| Estimated batch bytes         | off     | `autoFlushBytes`      |
+| Estimated buffered bytes      | off     | `autoFlushBytes`      |
 
 `0` disables one trigger, and `autoFlush: false` disables all three. The checks
 run when a row completes. No timer runs, so rows below the thresholds wait for
@@ -995,16 +995,22 @@ the next row, `flush()`, or `close()`.
 
 ### Waiting for acknowledgements
 
-`flush()` publishes the batch to an in-memory replay queue and returns. A
-background task sends queued data in order, and QuestDB acknowledges it once it
-is committed to the [write-ahead log](/docs/concepts/write-ahead-log/).
+`flush()` publishes the buffered rows to an in-memory replay queue and
+returns. A background task sends queued data in order, and QuestDB
+acknowledges it once it is committed to the
+[write-ahead log](/docs/concepts/write-ahead-log/).
 
-| Call                                | Resolves when                                       | Result                                                                   |
-| ----------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `flush()`                           | The batch is in the replay queue                    | `true` if it published anything                                          |
-| `flushAndWait(timeoutMs?)`          | QuestDB acknowledged everything published so far    | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s) |
-| `flushAndGetSequence()`             | The batch is in the replay queue                    | Highest frame sequence this call published, or `-1n` if it published none |
-| `waitForAck(sequence, timeoutMs?)`  | The acknowledged sequence reaches `sequence`        | `true`, or `false` when acknowledgements stalled for `timeoutMs`        |
+A flush sends its rows to the server as one batch, or as several if they don't
+fit in one. Every batch gets a sequence number. The protocol calls a batch a
+*frame* and its sequence number a frame sequence number (FSN), hence the
+`fromFsn` and `toFsn` fields of a [server rejection](#server-rejections).
+
+| Call                               | Resolves when                                    | Result                                                                               |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `flush()`                          | The rows are in the replay queue                 | `true` if it published anything                                                      |
+| `flushAndWait(timeoutMs?)`         | QuestDB acknowledged everything published so far | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s)              |
+| `flushAndGetSequence()`            | The rows are in the replay queue                 | Sequence number of the last batch this call published, or `-1n` if it published none |
+| `waitForAck(sequence, timeoutMs?)` | The acknowledged sequence reaches `sequence`     | `true`, or `false` when acknowledgements stalled for `timeoutMs`                     |
 
 Waiting is optional: a sender that never waits still delivers every row in
 order while the page is open. But the queue lives in the page's memory. Rows
@@ -1155,7 +1161,7 @@ try {
   [pooled leases](#the-pooled-client).
 - A positive `initialCredit` limits how far the server streams ahead of your
   code, which matters in browsers: the browser buffers incoming WebSocket
-  frames before JavaScript reads them. It also lets a cancellation or timeout
+  data before JavaScript reads it. It also lets a cancellation or timeout
   stop a streaming query, as
   [Cancellation, timeouts, and failover](#cancellation-timeouts-and-failover)
   explains. The default, `0`, is unlimited.
@@ -1639,7 +1645,7 @@ const sender = await connectQwpBrowserSender({
   url,
   onSenderError: (error) => {
     console.error(
-      `QuestDB rejected frames ${error.fromFsn}..${error.toFsn}: ` +
+      `QuestDB rejected batches ${error.fromFsn}..${error.toFsn}: ` +
         `${error.category} (${error.appliedPolicy}) ` +
         `${error.tableName ?? ""} ${error.serverMessage ?? ""}`,
     );
@@ -1663,8 +1669,8 @@ try {
 | `appliedPolicy`    | `string` | `terminal`, `retriable`, or `retriable-other`                                                            |
 | `serverStatusByte` | `number` | The QWP status code, such as `3` for a schema mismatch                                                   |
 | `serverMessage`    | `string` | The server's explanation, when it sent one                                                               |
-| `fromFsn`, `toFsn` | `bigint` | The inclusive range of rejected frame sequences, comparable with `flushAndGetSequence()` results        |
-| `messageSequence`  | `bigint` | The sequence of the server response                                                                      |
+| `fromFsn`, `toFsn` | `bigint` | Sequence numbers of the first and last rejected batch, comparable with `flushAndGetSequence()` results   |
+| `messageSequence`  | `bigint` | The server's sequence number for the rejected batch on this connection; it resets on reconnect           |
 | `tableName`        | `string` | The table, when the rejection concerns one                                                               |
 | `detectedAtMs`     | `number` | Client time of the rejection                                                                             |
 
@@ -1683,8 +1689,9 @@ Dispatch on `category`, not on the message. Messages are English text written
 by the server, may change between versions, and can quote table names, column
 names, and the rejected values, so sanitize them before showing them in your
 user interface or sending them to an external error tracker. QuestDB returns
-no request ID: correlate with server logs through the frame range and
-`detectedAtMs`.
+no request ID: correlate with server logs through `messageSequence` and
+`detectedAtMs`. `fromFsn` and `toFsn` are client-side and match your
+`flushAndGetSequence()` results instead.
 
 ### Query errors
 

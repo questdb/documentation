@@ -84,6 +84,19 @@ The server reads these environment variables:
 | `LOG_PATH` | `/tmp/questdb-mcp-bridge/…` | Log file location. |
 | `LOG_LEVEL` | `INFO` | `DEBUG` adds heartbeats and full tool payloads. |
 
+### Codex in non-interactive mode
+
+`codex exec` runs with nobody present to approve a tool call, so it refuses any MCP tool call that needs approval, with `MCP tool call requires approval, but approval policy is never`. Pre-approve the QuestDB server's tools in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.questdb]
+command = "npx"
+args = ["-y", "@questdb/mcp-server-questdb@<expected-version>"]
+default_tools_approval_mode = "approve"
+```
+
+This does not widen what the agent can do in the database: the [permission level](#permission-levels) you grant when pairing still applies, and the Web Console enforces it.
+
 ## Pairing
 
 Before any tool works, your browser has to pair with the MCP server. The agent drives the flow, and you do not need the Web Console open beforehand: when the agent needs to pair, the server opens a pairing link in your default browser, and the Web Console shows a consent prompt where you review the connection, pick a permission level, and connect.

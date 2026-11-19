@@ -266,7 +266,7 @@ To get the table going again:
 
 :::caution
 
-QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0, including replicas that still run such a version, do not recognize the `SKIP` mode:
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.1, including replicas that still run such a version, do not recognize the `SKIP` mode:
 
 - They deduplicate a `SKIP` table as `UPSERT`, without an error. After a downgrade, later duplicates replace the stored rows.
 - They cannot apply a logged `ALTER TABLE ... DEDUP ENABLE SKIP` and suspend the table. A logged `DEDUP ENABLE UPSERT` stays readable by them.

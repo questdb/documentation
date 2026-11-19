@@ -12,16 +12,23 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [10.2.0](https://questdb.com/release-notes/) - Released November 10, 2026
+- [10.2.0](https://questdb.com/release-notes/#oss-10.2.0) - Released November 10, 2026
+
+### QuestDB Enterprise Releases
+
+- [4.2.0](https://questdb.com/release-notes/#enterprise-4.2.0) - Released November 16, 2026
 
 ### New
 
+- [ACL audit log](/docs/security/acl-audit-log/) - Documented the access control audit log introduced in QuestDB Enterprise 4.2.0, including principal attribution, read permissions, redaction, delivery guarantees, WAL availability troubleshooting, change-ID recovery limits, replication, and retention
+- [OIDC device flow](/docs/security/oidc/#device-authorization-flow) and [rotating bearer tokens](/docs/security/oidc/#rotating-bearer-tokens) - Sign in interactively or use expiring application credentials with the C, C++, and Rust 7.3.0+ clients and Python 6.1.0+. Covers discovery, TLS trust, token storage, refresh, recovery, and the [Python PGWire adapters](/docs/connect/clients/python/#pgwire-adapters)
 - [Passthrough materialized views](/docs/concepts/materialized-views/#passthrough-views) - A materialized view no longer has to aggregate: a query without `SAMPLE BY` copies base rows one-for-one, so the view is a live copy of some columns or rows of one table. Covers what it inherits from the base table (designated timestamp, partitioning, symbol indexes), why its columns are fixed at creation, [which queries qualify](/docs/concepts/materialized-views/#which-queries-are-passthrough), and that `REFRESH PERIOD` is rejected
+- [dbt connector](/docs/connect/connectors/dbt/) - New page for the QuestDB Enterprise dbt adapter, which builds, tests, and documents SQL models over QWP. Covers installation from the release archive, a TLS profile for the bundled trades project, SQL transformations from staging to joined and aggregated models, views, tables, incremental upserts, materialized views with timer and period refresh, snapshots, reading ingested tables such as the Databento connector's as dbt sources, connection and model settings, and limitations
 - [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - Keep only some rows in a materialized view. Set it when you create the view (see [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)) or add it later. Queries hide expired rows right away, and a background job frees their disk space for the policies where that is safe.
 - [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute detail rows, subtotals, and a grand total in a single scan, with `GROUP BY` or `SAMPLE BY`. Covers composite syntax, `GROUPING()` and `GROUPING_ID()`, `FILL` support, parallel execution, when a `UNION ALL` of plain `GROUP BY` queries is faster, and the limitations, plus the [`cairo.sql.max.grouping.sets`](/docs/configuration/cairo-engine/#cairosqlmaxgroupingsets) setting
 - [Reports with subtotals and grand totals](/docs/cookbook/sql/advanced/subtotals-and-grand-totals/) - Cookbook recipe for a desk volume report with per-ECN subtotals and a grand total from `ROLLUP`, labelled with `GROUPING()`, plus totals in both directions with `CUBE` and hourly totals with `SAMPLE BY`
 - [adbcBridge](/docs/integrations/other/adbcbridge/) - New page for the third-party ADBC drivers that read QuestDB into Apache Arrow from C#, Java, Go, TypeScript, and C: a native QWP driver for QuestDB 10.0 and newer, and an ODBC bridge over PGWire for older servers
-- [Durability and commit modes](/docs/concepts/durability/) - New page on what a commit survives in each commit mode, and on adaptive commit mode, which keeps commits to WAL tables safe from power loss without flushing every table file on each commit. Covers how it works, the group-commit window, durable acknowledgements, guarantees and limits, costs, changing the mode and downgrading, monitoring, and troubleshooting
+- [Durability and commit modes](/docs/concepts/durability/) - New page on what a commit survives in each commit mode, and on adaptive durability mode, which keeps commits to WAL tables safe from power loss without flushing every table file on each commit. Covers how it works, the group-commit window, durable acknowledgements, guarantees and limits, costs, changing the mode and downgrading, monitoring, and troubleshooting
 - [UPSERT and SKIP modes](/docs/concepts/deduplication/#upsert-and-skip-modes) - The new `SKIP` deduplication mode in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0 keeps the first row written for a key and discards later duplicates, the counterpart of `UPSERT`, which keeps the latest. Covers which row wins within a commit and across connections, choosing a mode, switching modes with [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/), reading the mode from [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause), and how earlier versions handle such tables
 - [Late rows in cold storage](/docs/concepts/cold-storage-late-rows/) - New page for the opt-in `cold.storage.delta.enabled` setting of QuestDB Enterprise ENTERPRISE_VERSION_TBD: cold partitions of tables without deduplication keep the rows that arrive after `DROP LOCAL`, queries return them, and background maintenance moves them into new Parquet objects, so these tables can keep using the object store when rows arrive late. Covers Delta partitions, compaction, partitions sealed before the setting was enabled, batching writes, restrictions, limits, monitoring and downgrade. The release that adds late rows costs about 15 ns more for each table a query opens, and about 2.5 KB more memory per table, whether or not the setting is on
 - [ALTER TABLE COMPACT (cold storage)](/docs/query/sql/alter-table-compact/) - Compact the late rows of cold partitions on demand, or cancel requested compactions
@@ -32,6 +39,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- Added [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint), which QuestDB Enterprise 3.3.3 and later advertise to clients that sign users in with the [device authorization flow](/docs/security/oidc/#device-authorization-flow), and noted that those clients also use [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope)
 - Added the [cold storage settings](/docs/configuration/cold-storage/) `cold.storage.delta.enabled`, `cold.storage.linked.object.stores`, `cold.storage.maintenance.*`, `delta.maintenance.*` and the advanced `delta.*` settings, and corrected the default of [`cold.storage.max.concurrent.uploads`](/docs/configuration/cold-storage/#coldstoragemaxconcurrentuploads) to `10`
 - Added [`storage.policy.drop.local.override`](/docs/configuration/storage-policy/#storagepolicydroplocaloverride), and marked `storage.policy.max.reschedule.count` as obsolete
 - [`SWITCH STATUS`](/docs/query/sql/switch-role/) - Added the `last_refusal` column
@@ -39,14 +47,18 @@ This page tracks significant updates to the QuestDB documentation.
 - [`config.validation.strict`](/docs/configuration/overview/#configvalidationstrict) - Strict validation rejects a boolean value other than `true` or `false`
 - Added [`qwp.min.idle.ms.before.writer.release`](/docs/configuration/qwp/#qwpminidlemsbeforewriterrelease), which sets how long an idle QWP WebSocket ingestion connection holds its table writers before QuestDB releases them
 - [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired) - Corrected the PKCE setting name. The page listed `acl.oidc.pkce.enabled`, which the server rejects as unrecognized, leaving PKCE at its default of `true`
-- Added the `adaptive` value of [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) and the [adaptive commit settings](/docs/configuration/cairo-engine/#commit-and-write-behavior) `cairo.adaptive.commit.group.window`, `cairo.adaptive.epoch.interval`, `cairo.adaptive.epoch.max.rows`, `cairo.adaptive.epoch.flush.on.close`, `cairo.adaptive.epoch.column.sync.batched`, and `cairo.wal.commit.writeback.drain`
+- [IAM configuration](/docs/configuration/iam/#aclauditstoragepolicy) - Documented `acl.audit.storage.policy`, introduced in QuestDB Enterprise 4.2.0, including its creation-only behavior, partition-start-based conversion and deletion eligibility, supported stages, and built-in-admin requirements for changing an existing log's policy
+- Added the `adaptive` value of [`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) and the [adaptive durability settings](/docs/configuration/cairo-engine/#commit-and-write-behavior) `cairo.adaptive.commit.group.window`, `cairo.adaptive.epoch.interval`, `cairo.adaptive.epoch.max.rows`, `cairo.adaptive.epoch.flush.on.close`, `cairo.adaptive.epoch.column.sync.batched`, and `cairo.wal.commit.writeback.drain`
 - [Durable ACK](/docs/connect/clients/connect-string/#durable-ack) - `request_durable_ack` accepts the `local`, `replicated`, and `local,replicated` tiers in the Java, C, C++, and Rust clients, and the [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement) documents tier negotiation and `STATUS_LOCAL_DURABLE_ACK`
 - Added the `durableEpochSeqTxn`, `recoveryIncarnation`, `localDurableSeqTxn`, and `lastEpochTs` columns to [`wal_tables()`](/docs/query/functions/meta/#wal_tables) and three adaptive commit [metrics](/docs/integrations/other/prometheus/#wal-metrics), and corrected the names of `questdb_wal_apply_seq_txn` and `questdb_wal_apply_writer_txn`
 - [CREATE TABLE](/docs/query/sql/create-table/#deduplication) - `DEDUP { UPSERT | SKIP } KEYS` in the syntax of both creation forms; `CREATE TABLE LIKE` copies the keys and the mode
 - [Standard SQL equivalents](/docs/concepts/deep-dive/sql-extensions/#standard-sql-features-not-supported) - `INSERT ... ON CONFLICT DO NOTHING` maps to `DEDUP SKIP KEYS`
+- Added [`backup.activity.log.interval`](/docs/operations/backup/#configuration-reference), which sets how often QuestDB Enterprise logs a backup step that is still running, such as an object store upload or a partition compression
 
 ### Updated
 
+- [Audited views](/docs/security/audited-views/#protection) - From QuestDB Enterprise 4.2.0, only the built-in admin can remove rows from `sys.view_audit`, or set its storage policy or TTL. `TRUNCATE TABLE`, partition drops and detaches, `SET TTL`, `SET PARAM`, `SET STORAGE POLICY`, and `ENABLE STORAGE POLICY` on the trail are refused to every other principal, whatever it holds. Documented how to keep the trail pruned with the built-in admin disabled, and the [upgrade steps](/docs/operations/upgrade/#upgrading-to-420)
+- [Native and Python client startup](/docs/connect/clients/connect-string/#reconnect-keys) and [authentication failures](/docs/high-availability/client-failover/concepts/#authentication-is-cluster-wide) - Corrected how C, C++, Rust, and Python pools start: they connect eagerly, prewarm readers, and honor only an explicit `initial_connect_retry`, so `reconnect_*` keys alone do not retry a server that is down. Documents that native 7.3.0+ and Python 6.1.0+ senders keep retrying a rejected credential once they have connected, but stop on one before, and that pools reject conflicting settings with `lazy_connect`. Pages that described token providers as Java-only now also cover the C, C++, Rust, and Python providers
 - [Cold storage](/docs/concepts/cold-storage/) and [Operating cold storage](/docs/operations/cold-storage/) - Breaking changes in QuestDB Enterprise ENTERPRISE_VERSION_TBD: the cold storage root is upgraded one-way to manifests 2.0 with a new object key layout, so upgrade the instance running the manager last; a root belongs to one database (`ER010`); backups of cold partitions need `GET`, `PUT` and `DELETE` on `_retention/*`; `DROP LOCAL` no longer removes partitions only cold storage holds. Also documents the object store's conditional-request requirement, rehydration after a lengthened `DROP LOCAL`, and the cold read wait after a restart
 - [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) - Breaking change in QuestDB Enterprise ENTERPRISE_VERSION_TBD: the `live` and `sealed` states are replaced by `active`
 - [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables) - Breaking change in QuestDB Enterprise ENTERPRISE_VERSION_TBD: `ATTACH PARTITION`, `DETACH PARTITION`, `REBASE WAL`, `SET TYPE` and `ADD INDEX` are refused on cold storage tables, `DETACH PARTITION` refuses read-only partitions on every table, and `CONVERT PARTITION TO NATIVE` refuses read-only partitions instead of suspending the table
@@ -59,21 +71,37 @@ This page tracks significant updates to the QuestDB documentation.
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#limit-and-window-function-restrictions) - Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0: the part of a materialized view's query that reads its base table (this includes a subquery on the base table) can no longer use `LIMIT`, or a window function nested inside an expression, such as `row_number() OVER (ORDER BY timestamp) + 1`. A window function that makes up a whole column was already rejected. A `LIMIT` in a subquery over a *different* table is still allowed
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) - A conversion to non-WAL applies the WAL first, and is refused while it cannot
 - [ALTER TABLE SET TYPE](/docs/query/sql/alter-table-set-type/) and [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - The table keeps its TTL, `FORMAT PARQUET`, per-column Parquet encoding, and deduplication keys and mode; a table converted to WAL keeps dropping partitions past its TTL
-- [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/) - In adaptive commit mode, `RESUME WAL` may first take a save point and need the table's writer, so it can fail with `table busy` or leave the table suspended until you retry
+- [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/) - In adaptive durability mode, `RESUME WAL` may first take a save point and need the table's writer, so it can fail with `table busy` or leave the table suspended until you retry
 - [Disaster recovery](/docs/high-availability/disaster-recovery/#a-primary-refuses-to-start-after-a-power-loss) - A QuestDB Enterprise primary refuses to start when its log of a table ends before the object store, and how to recover
 - [Upgrade QuestDB](/docs/operations/upgrade/#upgrading-to-420) - What to check before upgrading to QuestDB Enterprise 4.2.0, and the limits on going back to an earlier release
-- [Monitoring and alerting](/docs/operations/monitoring-alerting/#detect-adaptive-commit-problems) - What to alert on in adaptive commit mode
+- [Monitoring and alerting](/docs/operations/monitoring-alerting/#detect-adaptive-commit-problems) - What to alert on in adaptive durability mode
 - [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) - The example output matches what the server returns, without symbol capacities or a `WITH` clause
+- [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) and client pages - Switched to the same plain terms throughout: *memory-only mode*, previously *memory mode*, for running without `sf_dir`, distinct from `sf_durability=memory`; *sender directory*, previously *slot*, and *journal* on the [Node.js](/docs/connect/clients/nodejs/#store-and-forward) page, for `<sf_dir>/<sender_id>/`; and *batch* for what a flush sends, which the protocol calls a frame. The [storage keys](/docs/high-availability/store-and-forward/configuration/#storage-keys) of the store-and-forward configuration page now say what each key does to flushes and sender directories, and which flushes are split into several batches or rejected
+- [Store-and-forward error responses](/docs/high-availability/store-and-forward/concepts/#error-responses) and the [.NET client](/docs/connect/clients/dotnet/#how-errors-surface) - Corrected the server-rejection policies: a rejected batch is retried or stops the sender, and is never dropped, and a schema mismatch stops the sender. Documented `max_frame_rejections` and `poison_min_escalation_window_millis` on the [store-and-forward configuration](/docs/high-availability/store-and-forward/configuration/#error-handling-keys) page
+- [.NET client transactions](/docs/connect/clients/dotnet/#transactions) - Documented `transaction=on` for QWP, which defers commits until `Commit()`, `CommitAsync()`, or `SendAsync()`
+- [Store-and-forward operations](/docs/high-availability/store-and-forward/operating-and-tuning/#recovery-failures) - Corrected the lock error messages each client prints, and that a sender directory with a gap between segments is set aside rather than stopping the sender. [When to use store-and-forward](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) now says that, with the default `cairo.commit.mode`, an OK acknowledgement doesn't mean the WAL is on the primary's disk
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/#codex-in-non-interactive-mode) - Running Codex non-interactively with `codex exec`: pre-approve the QuestDB server's tools with `default_tools_approval_mode = "approve"`, otherwise every MCP tool call is refused. The pairing permission level still applies
+- [Backup monitoring](/docs/operations/backup/#monitor-and-abort) - `progress_percent` in `backups()` weights each partition by its size, so a backup with one large partition no longer jumps ahead and then stalls. A partition that compresses for longer than the log interval logs its byte progress
+- [AI coding agents](/docs/getting-started/ai-coding-agents/#installation) - Corrected the agent skill install paths: `npx skills add questdb/skills` installs to `~/.agents/skills/questdb/` for both Claude Code and Codex, and a manual Codex install goes to `~/.agents/skills/questdb/` instead of `~/.codex/skills/questdb/`
+- [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/) - Documented the QuestDB Enterprise 4.2.0 change that leaves an existing account unchanged under `IF NOT EXISTS`, with explicit assignment through `GRANT ASSUME SERVICE ACCOUNT` and [upgrade guidance](/docs/operations/upgrade/#service-account-creation)
+- [Backup and restore](/docs/operations/backup/#retrying-or-updating-a-restore) - Distinguished fresh restores from same-lineage retries and forward updates, with their procedures and restrictions, and documented [access control recovery](/docs/operations/backup/#restoring-access-control-tables) from backups taken before the ACL audit log was introduced in QuestDB Enterprise 4.2.0
+- [Governance and auditing](/docs/security/governance/#audit-access-control-changes) - Added an ACL audit query covering ordinary grants and revokes as well as service-account assumption assignments and revocations
+- [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected partition-start eligibility across audit retention, TTL migration, Parquet conversion, and Enterprise quick-start guidance, with partition allowances for minimum timestamp-based retention and clearer governance example thresholds
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
+- [Views](/docs/concepts/views/#administrative-operations-in-view-metadata) - Documented QuestDB Enterprise 4.2.0 restrictions on administrative operations in `PIVOT IN` subqueries, schema-only database dumps in materialized and live views, and [upgrade guidance](/docs/operations/upgrade/#upgrading-to-420) for existing scripts and views
+- [Session windows](/docs/cookbook/sql/time-series/session-windows/) - Fixed the ride duration queries, which failed on a renamed column and returned locked time instead of ride time, and the website session gap check, which `datediff()` truncated to whole hours. Added a closed sessions query that returns only sessions whose timeout has passed
+- [S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores) - From QuestDB Enterprise 4.2.0, an S3-compatible store used for replication or [backups](/docs/operations/backup/#supported-storage-backends) must support or ignore `If-Match` and `If-None-Match` on `PutObject`. On a store that rejects them, a primary cannot start or be promoted, and every backup fails
+- [REST API](/docs/connect/compatibility/rest-api/#execute) - Examples across the connect, query, failover, durability, and OIDC pages and the Python and Node.js query snippets now call `/api/v1/sql/execute` instead of the deprecated `/exec`. Both paths serve the same handler, as [`http.context.execute`](/docs/configuration/http-server/#httpcontextexecute) now shows
 
 ## October 2026
 
 ### Releases
 
-- [10.1.0](https://questdb.com/release-notes/) - Released October 22, 2026
+- [10.1.0](https://questdb.com/release-notes/#oss-10.1.0) - Released October 22, 2026
 
 ### QuestDB Enterprise Releases
 
-- [4.1.0](https://questdb.com/release-notes/) - Released October 22, 2026
+- [4.1.0](https://questdb.com/release-notes/#enterprise-4.1.0) - Released October 22, 2026
 
 ### New
 
@@ -146,7 +174,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [Kubernetes operator database operations](/docs/enterprise-kubernetes-operator/operations/database/#check-database-health) - On QuestDB Enterprise 4.1.0, the `wal_tables()` observations behind `WriteHealthy`, replica lag, and `caughtUpNow` do not cover your tables
 - [SWITCH COLD STORAGE ROLE](/docs/query/sql/switch-cold-storage-role/) and [RBAC](/docs/security/rbac/#permissions) - Corrected that `REBASE WAL` and the cold storage role switch require the grantable `SYSTEM ADMIN` permission
 - [SHOW](/docs/query/sql/show/), [Views](/docs/concepts/views/), [Row-level security](/docs/cookbook/sql/advanced/row-level-security/), [Copy a schema to another instance](/docs/cookbook/operations/copy-schema-between-instances/), and the DROP TABLE, ALTER VIEW, COMPILE VIEW, DROP VIEW, DROP MATERIALIZED VIEW, and DROP LIVE VIEW references - Updated examples and error tables for objects hidden from the caller
-- [Go client](/docs/connect/clients/go/) - Documented [shutting down](/docs/connect/clients/go/#shutting-down) the `QuestDB` handle and the cleanup errors `Close` can return, how to retry after `ErrBackpressureTimeout` or `ErrSfDurability` without sending rows twice, that a borrowed sender's `Close` can drop rows, the symbol value limits, [quarantined store-and-forward slots](/docs/connect/clients/go/#quarantined-slots), what survives a crash on each platform, the filesystem `sf_dir` needs, NULL versus empty arrays, that callbacks must not close the client or write through it, [which query failures are never replayed](/docs/connect/clients/go/#query-failover), and what a statement sent through the wrong method has already done. Corrected the drainer listener option name to `WithQuestDBBackgroundDrainerListener`, that a query session must not be closed from another goroutine while its results are being read, that the buffer keys require `sf_dir`, and when a batch the server keeps rejecting turns terminal
+- [Go client](/docs/connect/clients/go/) - Documented [shutting down](/docs/connect/clients/go/#shutting-down) the `QuestDB` handle and the cleanup errors `Close` can return, how to retry after `ErrBackpressureTimeout` or `ErrSfDurability` without sending rows twice, that a borrowed sender's `Close` can drop rows, the symbol value limits, [quarantined sender directories](/docs/connect/clients/go/#quarantined-sender-directories), what survives a crash on each platform, the filesystem `sf_dir` needs, NULL versus empty arrays, that callbacks must not close the client or write through it, [which query failures are never replayed](/docs/connect/clients/go/#query-failover), and what a statement sent through the wrong method has already done. Corrected the drainer listener option name to `WithQuestDBBackgroundDrainerListener`, that a query session must not be closed from another goroutine while its results are being read, that the buffer keys require `sf_dir`, and when a batch the server keeps rejecting turns terminal
 - [Databento with Python](/docs/integrations/other/databento/) - Updated the QuestDB Open Source guide to ingest an `EQUS.MINI` subscription over QWP with the QuestDB Python client, with `ts_recv` as the designated timestamp as in the connector. Added an example query, a materialized view, and charts on a live Web Console notebook dashboard, with Grafana as an alternative
 - [C and C++](/docs/connect/clients/c-and-cpp/#binary-columns-uuid-long256-and-opaque-bytes) and [Rust](/docs/connect/clients/rust/#binary-columns-uuid-long256-and-opaque-bytes) clients - Documented the 7.1.0 canonical RFC 4122 UUID byte order at the API boundary, UUID and LONG256 claims for binary Arrow columns through field metadata or per-column overrides, and the silent behavior change for code written against 7.0.0.
 - [C and C++](/docs/connect/clients/c-and-cpp/#which-errors-mean-what) and [Rust](/docs/connect/clients/rust/#buffer-ingestion) clients - Documented for 7.2.0 the frame cap a QWP/WebSocket buffer flush must fit, that the buffer size reported by `line_sender_buffer_size` and `Buffer::len()` is at least the encoded frame size, and the `batch_too_large` error an oversized buffer or unsplittable chunk frame returns. The C and C++ FetchContent example now pins the 7.2.0 tag
@@ -178,7 +206,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### QuestDB Enterprise Releases
 
-- [4.0.1](https://questdb.com/release-notes/) - Released September 1, 2026
+- [4.0.1](https://questdb.com/release-notes/#enterprise-4.0.1) - Released September 1, 2026
 
 ### New
 
@@ -229,12 +257,12 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [10.0.1](https://questdb.com/release-notes/) - Released August 24, 2026
-- [10.0.0](https://questdb.com/release-notes/) - Released August 6, 2026
+- [10.0.1](https://questdb.com/release-notes/#oss-10.0.1) - Released August 24, 2026
+- [10.0.0](https://questdb.com/release-notes/#oss-10.0.0) - Released August 6, 2026
 
 ### QuestDB Enterprise Releases
 
-- [4.0.0](https://questdb.com/release-notes/) - Released August 25, 2026
+- [4.0.0](https://questdb.com/release-notes/#enterprise-4.0.0) - Released August 25, 2026
 
 ### New
 
@@ -330,8 +358,8 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### QuestDB Enterprise Releases
 
-- [3.3.4](https://questdb.com/release-notes/) - Released July 31, 2026
-- [3.3.3](https://questdb.com/release-notes/) - Released July 1, 2026
+- [3.3.4](https://questdb.com/release-notes/#enterprise-3.3.4) - Released July 31, 2026
+- [3.3.3](https://questdb.com/release-notes/#enterprise-3.3.3) - Released July 1, 2026
 
 ### Updated
 
@@ -342,15 +370,15 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.4.3](https://questdb.com/release-notes/) - Released June 15, 2026
-- [9.4.2](https://questdb.com/release-notes/) - Released June 9, 2026
-- [9.4.1](https://questdb.com/release-notes/) - Released June 3, 2026
+- [9.4.3](https://questdb.com/release-notes/#oss-9.4.3) - Released June 15, 2026
+- [9.4.2](https://questdb.com/release-notes/#oss-9.4.2) - Released June 9, 2026
+- [9.4.1](https://questdb.com/release-notes/#oss-9.4.1) - Released June 3, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.3.2](https://questdb.com/release-notes/) - Released June 23, 2026
-- [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
-- [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+- [3.3.2](https://questdb.com/release-notes/#enterprise-3.3.2) - Released June 23, 2026
+- [3.3.1](https://questdb.com/release-notes/#enterprise-3.3.1) - Released June 9, 2026
+- [3.3.0](https://questdb.com/release-notes/#enterprise-3.3.0) - Released June 3, 2026
 
 ### New
 
@@ -374,7 +402,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.4.0](https://questdb.com/release-notes/) - Released May 18, 2026
+- [9.4.0](https://questdb.com/release-notes/#oss-9.4.0) - Released May 18, 2026
 
 ### New
 
@@ -419,11 +447,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.3.5](https://questdb.com/release-notes/) - Released April 13, 2026
+- [9.3.5](https://questdb.com/release-notes/#oss-9.3.5) - Released April 13, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.2.5](https://questdb.com/release-notes/) - Released April 13, 2026
+- [3.2.5](https://questdb.com/release-notes/#enterprise-3.2.5) - Released April 13, 2026
 
 ### New
 
@@ -457,12 +485,12 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.3.4](https://questdb.com/release-notes/) - Released March 26, 2026
+- [9.3.4](https://questdb.com/release-notes/#oss-9.3.4) - Released March 26, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.2.4](https://questdb.com/release-notes/) - Released March 26, 2026
-- [3.2.3](https://questdb.com/release-notes/) - Released March 3, 2026
+- [3.2.4](https://questdb.com/release-notes/#enterprise-3.2.4) - Released March 26, 2026
+- [3.2.3](https://questdb.com/release-notes/#enterprise-3.2.3) - Released March 3, 2026
 
 ### New
 
@@ -488,11 +516,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.3.3](https://questdb.com/release-notes/) - Released February 25, 2026
+- [9.3.3](https://questdb.com/release-notes/#oss-9.3.3) - Released February 25, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.2.2](https://questdb.com/release-notes/) - Released February 4, 2026
+- [3.2.2](https://questdb.com/release-notes/#enterprise-3.2.2) - Released February 4, 2026
 
 ### New
 
@@ -524,14 +552,14 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.3.2](https://questdb.com/release-notes/) - Released January 28, 2026
-- [9.3.1](https://questdb.com/release-notes/) - Released January 14, 2026
-- [9.3.0](https://questdb.com/release-notes/) - Released January 9, 2026
+- [9.3.2](https://questdb.com/release-notes/#oss-9.3.2) - Released January 28, 2026
+- [9.3.1](https://questdb.com/release-notes/#oss-9.3.1) - Released January 14, 2026
+- [9.3.0](https://questdb.com/release-notes/#oss-9.3.0) - Released January 9, 2026
 
 ### QuestDB Enterprise Releases
 
-- [3.2.1](https://questdb.com/release-notes/) - Released January 29, 2026
-- [3.2.0](https://questdb.com/release-notes/) - Released January 19, 2026
+- [3.2.1](https://questdb.com/release-notes/#enterprise-3.2.1) - Released January 29, 2026
+- [3.2.0](https://questdb.com/release-notes/#enterprise-3.2.0) - Released January 19, 2026
 
 ### New
 
@@ -561,13 +589,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.2.3](https://questdb.com/release-notes/) - Released December 18, 2025
-- [9.2.2](https://questdb.com/release-notes/) - Released December 1, 2025
+- [9.2.3](https://questdb.com/release-notes/#oss-9.2.3) - Released December 18, 2025
+- [9.2.2](https://questdb.com/release-notes/#oss-9.2.2) - Released December 1, 2025
 
 ### QuestDB Enterprise Releases
 
-- [3.1.2](https://questdb.com/release-notes/) - Released December 18, 2025
-- [3.1.1](https://questdb.com/release-notes/) - Released December 1, 2025
+- [3.1.2](https://questdb.com/release-notes/#enterprise-3.1.2) - Released December 18, 2025
+- [3.1.1](https://questdb.com/release-notes/#enterprise-3.1.1) - Released December 1, 2025
 
 ### New
 
@@ -588,14 +616,14 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.2.1](https://questdb.com/release-notes/) - Released November 25, 2025
-- [9.2.0](https://questdb.com/release-notes/) - Released November 13, 2025
-- [9.1.1](https://questdb.com/release-notes/) - Released November 3, 2025
+- [9.2.1](https://questdb.com/release-notes/#oss-9.2.1) - Released November 25, 2025
+- [9.2.0](https://questdb.com/release-notes/#oss-9.2.0) - Released November 13, 2025
+- [9.1.1](https://questdb.com/release-notes/#oss-9.1.1) - Released November 3, 2025
 
 ### QuestDB Enterprise Releases
 
-- [3.1.0](https://questdb.com/release-notes/) - Released November 25, 2025
-- [3.0.5](https://questdb.com/release-notes/) - Released November 7, 2025
+- [3.1.0](https://questdb.com/release-notes/#enterprise-3.1.0) - Released November 25, 2025
+- [3.0.5](https://questdb.com/release-notes/#enterprise-3.0.5) - Released November 7, 2025
 
 ### New
 
@@ -618,11 +646,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.1.0](https://questdb.com/release-notes/) - Released October 3, 2025
+- [9.1.0](https://questdb.com/release-notes/#oss-9.1.0) - Released October 3, 2025
 
 ### QuestDB Enterprise Releases
 
-- [3.0.4](https://questdb.com/release-notes/) - Released October 27, 2025
+- [3.0.4](https://questdb.com/release-notes/#enterprise-3.0.4) - Released October 27, 2025
 
 ### New
 
@@ -643,7 +671,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### QuestDB Enterprise Releases
 
-- [3.0.3](https://questdb.com/release-notes/) - Released September 15, 2025
+- [3.0.3](https://questdb.com/release-notes/#enterprise-3.0.3) - Released September 15, 2025
 
 ### Updated
 
@@ -654,13 +682,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.0.3](https://questdb.com/release-notes/) - Released August 29, 2025
-- [9.0.2](https://questdb.com/release-notes/) - Released August 15, 2025
+- [9.0.3](https://questdb.com/release-notes/#oss-9.0.3) - Released August 29, 2025
+- [9.0.2](https://questdb.com/release-notes/#oss-9.0.2) - Released August 15, 2025
 
 ### QuestDB Enterprise Releases
 
-- [3.0.2](https://questdb.com/release-notes/) - Released August 29, 2025
-- [3.0.1](https://questdb.com/release-notes/) - Released August 15, 2025
+- [3.0.2](https://questdb.com/release-notes/#enterprise-3.0.2) - Released August 29, 2025
+- [3.0.1](https://questdb.com/release-notes/#enterprise-3.0.1) - Released August 15, 2025
 
 ### New
 
@@ -675,12 +703,12 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
-- [9.0.1](https://questdb.com/release-notes/) - Released July 23, 2025
-- [9.0.0](https://questdb.com/release-notes/) - Released July 11, 2025
+- [9.0.1](https://questdb.com/release-notes/#oss-9.0.1) - Released July 23, 2025
+- [9.0.0](https://questdb.com/release-notes/#oss-9.0.0) - Released July 11, 2025
 
 ### QuestDB Enterprise Releases
 
-- [3.0.0](https://questdb.com/release-notes/) - Released July 23, 2025
+- [3.0.0](https://questdb.com/release-notes/#enterprise-3.0.0) - Released July 23, 2025
 
 ### New
 

@@ -120,6 +120,7 @@ module.exports = {
             "connect/message-brokers/redpanda",
             "connect/message-brokers/flink",
             "connect/connectors/databento",
+            "connect/connectors/dbt",
           ],
         },
         {
@@ -824,6 +825,11 @@ module.exports = {
           id: "security/oidc",
           type: "doc",
           label: "OpenID Connect (OIDC)",
+        },
+        {
+          id: "security/acl-audit-log",
+          type: "doc",
+          label: "ACL audit log",
         },
         {
           id: "security/audited-views",

@@ -29,8 +29,6 @@ to understand how replication works.
 Choose your object storage provider and build the connection string for
 `replication.object.store` in `server.conf`.
 
-The primary writes the replication index, `index.msgpack`, with conditional requests: `If-None-Match` to create it in an empty location, and `If-Match` to replace it only while the store still holds the version the primary last wrote or read. AWS S3, Azure Blob Storage and Google Cloud Storage support them. An S3-compatible store must support or ignore both on `PutObject`; a store that rejects them fails the index writes, so replication stalls, or the first start on an empty location fails. No setting turns them off. An `fs` store writes the index without them. On Google Cloud Storage each index write is a resumable upload, two requests per write.
-
 ### AWS S3
 
 Create an S3 bucket following
@@ -38,7 +36,11 @@ Create an S3 bucket following
 
 **Recommendations:**
 - Select a region close to your primary node
-- Disable blob versioning
+- Disable blob versioning. QuestDB continuously writes and deletes
+  replication objects, so versioning only accumulates noncurrent versions you
+  pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-root)
+  are different: enable versioning there, in a separate bucket
 
 **Connection string:**
 
@@ -60,6 +62,31 @@ replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};regi
 QuestDB will automatically use the instance's IAM role for authentication.
 :::
 
+### S3-compatible stores
+
+From QuestDB Enterprise 4.2.1, replication and backups need an S3-compatible
+store, such as MinIO, to support or ignore `If-Match` and `If-None-Match` on
+`PutObject`. The primary sends these conditional requests when it writes the
+replication index, `index.msgpack`: `If-None-Match` to create it in an empty
+location, `If-Match` to replace it. AWS S3, Azure Blob Storage, and Google Cloud
+Storage support conditional writes, and on an NFS (`fs`) store the primary
+writes the index without them. On an S3-compatible store that rejects them:
+
+- A primary cannot start: QuestDB exits during startup.
+- A replica cannot be promoted: `SWITCH ROLE TO PRIMARY` is accepted, then
+  fails while it runs and leaves the node in the `UNKNOWN` state, see
+  [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
+  Retrying fails the same way until the store stops rejecting the headers.
+- Every [backup](/docs/operations/backup/) to the store fails, because backups
+  write their own index the same way.
+
+No setting turns these requests off. Before you upgrade, check the store's
+documentation for conditional writes, or test the store: from a new instance on
+QuestDB Enterprise 4.2.1 or later,
+[run a first backup](/docs/operations/backup/#quick-start) to it. That backup
+creates its index and then replaces it, so if `backups()` reports
+`backup complete`, the store supports or ignores both headers.
+
 ### Azure Blob Storage
 
 Create a Storage Account following
@@ -68,7 +95,12 @@ then create a Blob Container.
 
 **Recommendations:**
 - Select a region close to your primary node
-- Disable blob versioning
+- Disable blob versioning. QuestDB continuously writes and deletes
+  replication objects, so versioning only accumulates noncurrent versions you
+  pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-root)
+  are different: enable versioning there, in a separate storage account,
+  because Azure enables versioning for a whole account
 
 **Connection string:**
 
@@ -96,6 +128,8 @@ equivalent) permissions. Download the JSON key and encode it as Base64:
 ```bash
 cat <key>.json | base64
 ```
+
+Each write of the replication index, `index.msgpack`, is a resumable upload, two requests per write.
 
 **Connection string:**
 

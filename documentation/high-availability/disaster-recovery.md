@@ -43,7 +43,7 @@ uploads transactions to the object store before they are flushed to its own
 disk. After a power loss or an operating system crash, its local transaction
 log of a table can end before the last transaction in the object store. New
 commits would then reuse transaction numbers that the replicas already hold
-with other content, so since QuestDB Enterprise 4.2.0 the primary refuses to
+with other content, so since QuestDB Enterprise 4.2.1 the primary refuses to
 start. The log line that names the table begins with (wrapped here):
 
 ```text

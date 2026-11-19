@@ -1179,8 +1179,8 @@ Returns a `table` with the following columns:
 - `indexBlockCapacity` - how many row IDs to store in a single storage block on
   disk (bitmap indexes only)
 - `symbolCached` - whether this `symbol` column is cached
-- `symbolCapacity` - how many distinct values this column of `symbol` type is
-  expected to have
+- `symbolCapacity` - how many distinct values this `symbol` column holds before
+  its symbol table is resized. It grows automatically
 - `symbolTableSize` - current number of distinct values stored in this `symbol`
   column's table
 - `designated` - if this is set as the designated timestamp column for this
@@ -1888,8 +1888,8 @@ Returns a `table` including the following information:
   `1` when parallelism is reduced, `2` when the writer backs off between
   attempts (equivalent to `table_memory_pressure_level` in `tables()`)
 - `durableEpochSeqTxn` - the sequencer transaction of the table's current save
-  point in [adaptive commit mode](/docs/concepts/durability/). After a crash,
-  the WAL is replayed from here
+  point in [adaptive durability mode](/docs/concepts/durability/). After a
+  crash, the WAL is replayed from here
 - `recoveryIncarnation` - how many times this process put the table's files
   back to its save point at a start; stays `0` after a clean shutdown, and
   often after a power loss, when the files are already at the save point

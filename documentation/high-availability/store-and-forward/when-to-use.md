@@ -2,7 +2,7 @@
 title: When to use store-and-forward
 sidebar_label: When to use
 description:
-  Decision guide for choosing between memory mode and disk-backed
+  Decision guide for choosing between memory-only mode and disk-backed
   store-and-forward, when to opt into durable-ack trim, and when to enable
   orphan adoption.
 ---
@@ -15,17 +15,18 @@ decision guide.
 If you are new to SF, start with
 [Concepts](/docs/high-availability/store-and-forward/concepts/).
 
-## Memory mode vs SF mode
+## Memory-only mode vs SF mode
 
 The single switch that decides this is whether you set `sf_dir` in the
 connect string.
 
-### Memory mode — `sf_dir` unset
+### Memory-only mode: `sf_dir` unset {#memory-only-mode}
 
-Unacked frames live in a malloc'd ring in process memory. Default cap is
-`128 MiB`.
+Unacked rows live in a buffer in process memory. Default cap is
+`128 MiB`. This is not the same as `sf_durability=memory`, which still writes
+to the sender directory and only skips forcing each write to disk.
 
-**Choose memory mode when:**
+**Choose memory-only mode when:**
 
 - The producer process is short-lived or ephemeral (a CLI job, a CI
   worker, a serverless function).
@@ -36,10 +37,10 @@ Unacked frames live in a malloc'd ring in process memory. Default cap is
 - Your data volume comfortably fits in RAM during the longest outage you
   care about.
 
-### SF mode — `sf_dir=/path/to/slot-root`
+### SF mode: `sf_dir=/path/to/dir` {#sf-mode}
 
-Unacked frames are written to mmap'd files under
-`<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
+Unacked rows are written to memory-mapped files in the sender's **sender
+directory**, `<sf_dir>/<sender_id>/`. Default cap is `10 GiB`.
 
 **Choose SF mode when:**
 
@@ -61,7 +62,7 @@ string.
 
 ## Comparison at a glance
 
-| Aspect | Memory mode | SF mode |
+| Aspect | Memory-only mode | SF mode |
 |---|---|---|
 | Buffered data location | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
 | Default capacity | `128 MiB` | `10 GiB` |
@@ -73,29 +74,33 @@ string.
 
 ## Durable-ack: when to opt in
 
-By default the substrate trims unacked data on OK ack from the server.
-That means the substrate releases a frame once the server has acknowledged
-it into the WAL. Whether the frame is on the **primary's** disk at that point
-depends on the server's [commit mode](/docs/concepts/durability/#commit-modes): in the
-default `nosync` mode, a power loss of the server can still lose it. Whether
-it has been replicated to the object store or to replicas is a separate
-matter.
+The client keeps every
+[batch](/docs/high-availability/store-and-forward/concepts/#batches) until the
+server acknowledges it, then trims it: it frees the space a whole segment at a
+time, once every batch in the segment is acknowledged. By default the server
+acknowledges a batch once it is committed to the WAL on the **primary**. With
+the server's default
+[`cairo.commit.mode`](/docs/configuration/cairo-engine/#cairocommitmode) of
+`nosync`, that commit doesn't wait for the disk, so a crash of the primary's
+host can still lose it. Whether the batch has been replicated to the object
+store or to replicas is a separate matter.
 
 When the connect string sets
 [`request_durable_ack`](/docs/connect/clients/connect-string/#durable-ack),
-trim is held back until a separate durable-ack frame confirms more:
+the client keeps the batch until a separate durable-ack message confirms
+more:
 
 - `local`: the commit is on the server's own disk. The server must run in
-  adaptive commit mode.
+  adaptive durability mode.
 - `replicated`, or its original name `on`: the WAL has been uploaded to the
   **configured object store** (S3, Azure Blob, GCS, or NFS). QuestDB
   Enterprise only.
-- `local,replicated`: both. Trim waits for the object store.
+- `local,replicated`: both. The client waits for the object store.
 
 ### Choose durable-ack when
 
 - A power loss of the server must not lose in-flight data, and the server
-  runs in adaptive commit mode with a group-commit window above `0`
+  runs in adaptive durability mode with a group-commit window above `0`
   (`local`).
 - You require object-store durability before considering a write
   acknowledged — e.g. compliance requirements, end-to-end exactly-once
@@ -110,11 +115,11 @@ trim is held back until a separate durable-ack frame confirms more:
 
 - Losing the last commits in a power loss of the primary is acceptable, or
   the primary already flushes every commit before it acknowledges it (`sync`
-  mode, or adaptive mode with a group-commit window of `0`).
+  mode, or adaptive durability mode with a group-commit window of `0`).
 - You want minimum steady-state disk usage.
 - The server cannot provide the tier you need: QuestDB open source has no
-  `replicated` tier, and only a server in adaptive mode has the `local`
-  tier. (The handshake fails loudly if you opt in but the server cannot
+  `replicated` tier, and only a server in adaptive durability mode has the
+  `local` tier. (The handshake fails loudly if you opt in but the server cannot
   deliver — see below.)
 
 ### Caveats
@@ -123,12 +128,12 @@ trim is held back until a separate durable-ack frame confirms more:
   `X-QWP-Request-Durable-Ack` on the upgrade (`true` for `on`). The server
   must confirm all of them in `X-QWP-Durable-Ack` (`enabled` for `on`). If
   it does not, the connect **fails loudly**, by design: for example a server
-  not in adaptive mode asked for `local`, an OSS build asked for
+  not in adaptive durability mode asked for `local`, an OSS build asked for
   `replicated`, an uninitialised primary, a missing registry, or a replica.
-  Silently waiting for ack frames that never arrive would let the SF disk
-  fill up.
-- **Idle keepalive.** The server only flushes pending durable-ack
-  frames during inbound recv events. The client sends a WebSocket PING
+  Silently waiting for acknowledgements that never arrive would let the SF
+  disk fill up.
+- **Idle keepalive.** The server only sends pending durable
+  acknowledgements during inbound recv events. The client sends a WebSocket PING
   every `durable_ack_keepalive_interval_millis` (default 200 ms) when
   there are pending confirmations and the producer is idle.
 - **Disk pressure.** Steady-state SF disk usage is roughly
@@ -139,7 +144,7 @@ trim is held back until a separate durable-ack frame confirms more:
 
 ## Orphan adoption: when to enable
 
-A sender that exits without draining its slot leaves unacked data on
+A sender that exits without draining its sender directory leaves unacked data on
 disk. If another process restarts under the same `sender_id` and same
 `sf_dir`, it picks up the orphan automatically as part of normal
 recovery. But if no process ever uses that `sender_id` again, the data
@@ -158,13 +163,13 @@ spawn background drainers to clear them.
   process instance), so dead instances leave permanent orphans that no
   natural restart will adopt.
 - You prefer "automatic eventual delivery" over "operator manually
-  reattaches the slot."
+  reattaches the sender directory."
 
 ### Leave it off when
 
 - Each `sender_id` is statically pinned to a specific process — there
   are no orphans by construction; a restart of the same process
-  recovers its own slot.
+  recovers its own sender directory.
 - You want explicit operator control over data movement in a shared
   `sf_dir`.
 - You run a single producer per host.
@@ -175,7 +180,7 @@ path but not the WebSocket.
 
 `drain_orphans=on` does not interfere with regular recovery: the
 foreground sender still recovers its own `sender_id` first, then
-drainers spawn for sibling slots.
+drainers spawn for other sender directories.
 
 ## Migrating from HTTP/TCP ILP
 
@@ -185,9 +190,9 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 |---|---|---|---|
 | Non-blocking producer | No (request waits) | No (TCP backpressure) | Yes (buffer absorbs publishes) |
 | No data loss on a sender crash | No | No | Yes (SF mode) |
-| Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
+| Server outage tolerance | Best-effort retry | None | Reconnect loop that retries indefinitely, bounded by `sf_max_total_bytes` |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
-| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive commit mode](/docs/concepts/durability/)) |
+| Ack once the data is on the server's disk | Only in `sync` mode, or adaptive durability mode with a group-commit window of `0` | No | Yes (`request_durable_ack=local`, [adaptive durability mode](/docs/concepts/durability/)) |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
 | Cluster-wide ordering | Best-effort | Best-effort | FSN order within each sender stream, not across senders |
 
@@ -219,14 +224,14 @@ graph TD
     Q3L{Must a server power loss not lose acknowledged data?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 
-    Q1 -->|"No (ephemeral job)"| Memory[Memory mode — leave sf_dir unset]
+    Q1 -->|"No (ephemeral job)"| Memory[Memory-only mode — leave sf_dir unset]
     Q1 -->|"Yes (long-running service)"| Q2
     Q2 -->|No| Memory
     Q2 -->|Yes| SF[SF mode — set sf_dir]
     SF --> Q3
     Q3 -->|Yes| Durable[Add request_durable_ack=on]
     Q3 -->|No| Q3L
-    Q3L -->|"Yes, server in adaptive commit mode"| Local[Add request_durable_ack=local]
+    Q3L -->|"Yes, server in adaptive durability mode"| Local[Add request_durable_ack=local]
     Q3L -->|No| Q4
     Local --> Q4
     Durable --> Q4
@@ -240,4 +245,4 @@ graph TD
 - [Configuration](/docs/high-availability/store-and-forward/configuration/) —
   the connect-string keys.
 - [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/) —
-  slot layout, sizing, observability.
+  sender directory layout, sizing, observability.

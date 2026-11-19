@@ -102,9 +102,9 @@ window function on base table is not supported for materialized views: trades
 A `LIMIT` fails the same way, with
 `LIMIT on base table is not supported for materialized views: trades`.
 
-:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0
+:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.1
 
-Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, the base-table query could
+Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.1, the base-table query could
 contain a `LIMIT`, or a window function nested inside an expression. A window
 function that makes up a whole column was rejected in earlier versions too.
 
@@ -447,14 +447,19 @@ See [meta functions](/docs/query/functions/meta/) for all available columns.
 
 Materialized view queries must:
 
-- Use `SAMPLE BY` or `GROUP BY` with designated timestamp
+- Either aggregate with `SAMPLE BY` or `GROUP BY` on the designated timestamp,
+  or be a [passthrough](/docs/concepts/materialized-views/#passthrough-views)
+  query over a single table
+- Not use `LIMIT` or window functions on the base table (see
+  [LIMIT and window function restrictions](#limit-and-window-function-restrictions))
 - Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Not use `GROUPING SETS`, `ROLLUP`, or `CUBE`
 - Not use non-deterministic functions (`now()`, `rnd_*`)
 - Not read [catalogue functions](#catalogue-functions) through a regular view,
   and in QuestDB Enterprise call them only with `SYSTEM ADMIN`
 - Not use Enterprise administrative functions, such as `permissions()` or
-  `backups()`
+  `backups()`, or `SHOW CREATE DATABASE` with any ACL category. Use
+  `INCLUDE (SCHEMA)` for schema metadata, subject to the catalogue rules below
 
 See [query constraints](/docs/concepts/materialized-views/#query-constraints)
 for the full list.
@@ -475,7 +480,16 @@ metadata:
   `files()`, and `glob()`
 - `SHOW TABLES`, `SHOW COLUMNS`, `SHOW PARTITIONS`, `SHOW CREATE TABLE`,
   `SHOW CREATE VIEW`, `SHOW CREATE MATERIALIZED VIEW`, `SHOW CREATE LIVE VIEW`,
-  and `SHOW CREATE DATABASE`
+  and schema-only
+  [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views), such as
+  `SHOW CREATE DATABASE INCLUDE (SCHEMA)`
+
+In QuestDB Enterprise 4.2.1 and later, with access control enabled, a database
+dump that includes any ACL category is administrative, not just a catalogue
+query. Materialized and live views reject it for every principal, even one
+holding `SYSTEM ADMIN` or `DATABASE ADMIN`. This includes plain
+`SHOW CREATE DATABASE`, since its default is `INCLUDE ALL`. The check applies at
+creation and refresh.
 
 A materialized view refreshes under a context that sees every object, and every
 reader of the view reads what the refresh stored. To keep a view from
@@ -568,6 +582,7 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `catalogue function from view <view> cannot be used in materialized view: <function>` | A regular view the query reads calls a [catalogue function](#catalogue-functions). A `SHOW` statement reports `catalogue statement from view` |
 | `catalogue function cannot be used in materialized view without SYSTEM ADMIN: <function>` | The query calls a catalogue function and the creator lacks `SYSTEM ADMIN` (Enterprise). A `SHOW` statement reports `catalogue statement` |
 | `administrative function cannot be used in materialized view: <function>` | The query calls an Enterprise administrative function, such as `active_permissions()` or `backups()` |
+| `administrative statement cannot be used in materialized view: SHOW CREATE DATABASE` | The query includes an ACL dump (Enterprise); use `INCLUDE (SCHEMA)` under the [catalogue rules](#catalogue-functions) |
 | `permission denied` | Missing required permission (Enterprise) |
 
 ## See also

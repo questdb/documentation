@@ -16,8 +16,9 @@ TypeScript applications ingest data and run SQL queries over
 Protocol: a columnar binary protocol carried over WebSocket. One
 `ws::` or `wss::` connect string configures both directions. Ingestion batches
 rows in the background, tracks server acknowledgements, and replays
-unacknowledged data after a reconnect or failover, optionally from an on-disk
-journal that also survives a process restart. Queries stream typed result
+unacknowledged data after a reconnect or failover, optionally from a
+[sender directory](#store-and-forward) on disk that also survives a process
+restart. Queries stream typed result
 batches with bind parameters, timeouts, and flow control.
 
 Key capabilities:
@@ -199,7 +200,7 @@ Pick the entry point by what the service does:
   remaining rows and rejects when they do not arrive in time. A borrowed
   sender's `close()` returns without waiting, and `db.close()` logs a warning
   instead of rejecting when acknowledgements are missing. With
-  [store-and-forward](#store-and-forward), a standalone sender's journal is
+  [store-and-forward](#store-and-forward), a standalone sender's directory is
   `<sf_dir>/<sender_id>`, while each pooled sender has its own
   `<sf_dir>/<sender_id>-<index>`. The
   [production example](#production-example-tls-token-and-multiple-hosts) is
@@ -430,7 +431,7 @@ try {
   it resolves, and rejects with `QwpPoolResourceError` when it cannot. A borrow
   that has to open a connection rejects the same way. The error's `cause` holds
   the original failure, such as a `QwpUpgradeError` for rejected credentials or
-  a `QwpReplayStoreLockedError` for a locked journal.
+  a `QwpReplayStoreLockedError` for a locked sender directory.
   `createQwpNodeClient()` returns without connecting.
 - A lease used after `close()` throws `QwpClientClosedError`.
 
@@ -948,45 +949,51 @@ values are rescaled to it when that is exact. See
 
 ### Auto-flush
 
-A sender publishes its batch when it completes a row that crosses any of these
-thresholds:
+A sender flushes its buffered rows when it completes a row that crosses any of
+these thresholds:
 
 | Trigger                       | Default | Connect-string key    | Option                |
 | ----------------------------- | ------- | --------------------- | --------------------- |
-| Rows in the batch             | `1000`  | `auto_flush_rows`     | `autoFlushRows`       |
+| Buffered rows                 | `1000`  | `auto_flush_rows`     | `autoFlushRows`       |
 | Milliseconds since last flush | `100`   | `auto_flush_interval` | `autoFlushIntervalMs` |
-| Estimated batch bytes         | off     | `auto_flush_bytes`    | `autoFlushBytes`      |
+| Estimated buffered bytes      | off     | `auto_flush_bytes`    | `autoFlushBytes`      |
 
 `0` disables one row or time trigger: this client rejects `off` for
 `auto_flush_rows` and `auto_flush_interval`, and accepts it for
 `auto_flush_bytes`. `auto_flush=off` (`autoFlush: false`) disables all three.
 The checks run when a row completes. No timer runs, so rows below the
 thresholds wait for the next row, `flush()`, or `close()`. A byte threshold is
-capped at 90% of the batch size the server advertises, and a batch above the
-server limit is split automatically.
+capped at 90% of the batch size limit the server advertises, and a flush whose
+rows exceed that limit is sent as several batches.
 
 ### Waiting for acknowledgements
 
-`flush()` publishes the batch to a local replay queue, in memory or in the
-[store-and-forward](#store-and-forward) journal, and returns. A background task
-sends queued data in order, and QuestDB acknowledges it once it is committed
-to the [write-ahead log](/docs/concepts/write-ahead-log/).
+`flush()` publishes the buffered rows to a local replay queue, in memory or,
+with [store-and-forward](#store-and-forward), in the sender directory, and
+returns. A background task sends queued data in order, and QuestDB
+acknowledges it once it is committed to the
+[write-ahead log](/docs/concepts/write-ahead-log/).
 
-| Call                                | Resolves when                                            | Result                                                                    |
-| ----------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `flush()`                           | The batch is in the replay queue                         | `true` if it published anything                                           |
-| `flushAndWait(timeoutMs?)`          | QuestDB acknowledged everything published so far         | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s)  |
-| `flushAndGetSequence()`             | The batch is in the replay queue                         | Highest frame sequence this call published, or `-1n` if it published none |
-| `waitForAck(sequence, timeoutMs?)`  | The acknowledged sequence reaches `sequence`             | `true`, or `false` when acknowledgements stalled for `timeoutMs`         |
+A flush sends its rows to the server as one batch, or as several if they don't
+fit in one. Every batch gets a sequence number. The protocol calls a batch a
+*frame* and its sequence number a frame sequence number (FSN), hence names
+such as `fromFsn` and `pendingReplayFrames`.
+
+| Call                               | Resolves when                                    | Result                                                                               |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `flush()`                          | The rows are in the replay queue                 | `true` if it published anything                                                      |
+| `flushAndWait(timeoutMs?)`         | QuestDB acknowledged everything published so far | `true`, or `false` when acknowledgements stalled for `timeoutMs` (15 s)              |
+| `flushAndGetSequence()`            | The rows are in the replay queue                 | Sequence number of the last batch this call published, or `-1n` if it published none |
+| `waitForAck(sequence, timeoutMs?)` | The acknowledged sequence reaches `sequence`     | `true`, or `false` when acknowledgements stalled for `timeoutMs`                     |
 
 Sequences are `bigint` values. `publishedSequence` and `ackedSequence` report
 the two watermarks without waiting. `flushAndWait()` and `waitForAck()`
 correspond to `drain()` and `awaitAckedFsn()` in the Java client.
 
 With [store-and-forward](#store-and-forward), a new sender continues the
-sequence of the unacknowledged frames it recovers from its journal, so the
-watermarks also count frames that an earlier process journalled. When there is
-nothing to recover, the sequence starts again from `0`.
+sequence of the unacknowledged batches it recovers from its sender directory,
+so the watermarks also count batches that an earlier process wrote. When there
+is nothing to recover, the sequence starts again from `0`.
 
 To wait for everything written so far, flush, then wait for the published
 watermark. `flushAndWait()` does the same in one call:
@@ -1005,7 +1012,7 @@ Do not pass the result of `flushAndGetSequence()` to `waitForAck()` unchecked.
 It is `-1n` when that call published nothing, for example because auto-flush
 had already sent every row, and `waitForAck(-1n)` resolves `true` at once,
 before QuestDB acknowledges anything. Use `flushAndGetSequence()` to learn
-which frames a flush produced, for example to match them with the `fromFsn`
+which batches a flush produced, for example to match them with the `fromFsn`
 and `toFsn` of a [server rejection](#server-rejections).
 
 Waiting is optional. A sender that never waits still delivers every row in
@@ -1115,45 +1122,52 @@ These fields describe the memory queue only. With
 [store-and-forward](#store-and-forward), `waitingMemoryReplayAppends` stays
 `0` and `memoryReplayUsedBytes` is `undefined`, even during an outage. To watch
 the backlog in either mode, read `pendingReplayFrames` and
-`pendingReplayBytes`, the frames and bytes that QuestDB has not acknowledged
+`pendingReplayBytes`, the batches and bytes that QuestDB has not acknowledged
 yet.
 
 ## Store-and-forward
 
-Setting `sf_dir` journals every batch to disk before it is sent. `flush()` then
-resolves once the batch is in the journal, and unacknowledged data survives a
+Setting `sf_dir` writes every batch to disk before it is sent. `flush()` then
+resolves once the batch is written to the sender directory, and
+unacknowledged data survives a
 process crash or restart: a new sender with the same `sf_dir` and `sender_id`
 replays it. After a crash in a container, the new sender may first need a
-[manual step](#recovering-a-journal-after-a-crash).
+[manual step](#recovering-a-sender-directory-after-a-crash).
 
 ```text
 ws::addr=localhost:9000;sf_dir=/var/lib/trade-feed/qdb-sf;sender_id=feed-1;
 ```
 
-- The journal of a standalone sender is `<sf_dir>/<sender_id>`, and `sender_id`
-  defaults to `default`. Each pooled sender uses `<sf_dir>/<sender_id>-<index>`.
-- One live sender owns a journal. A second process that opens it fails with
-  `QwpReplayStoreLockedError`, which the pooled client reports as the `cause`
-  of a `QwpPoolResourceError`, so give concurrent senders distinct `sender_id`
-  values. `sender_id` allows letters, digits, `_`, and `-`. The same error
-  after a crash means that the crashed process's lock was not released: see
-  [Recovering a journal after a crash](#recovering-a-journal-after-a-crash).
+- Each sender keeps its data in its own **sender directory**:
+  `<sf_dir>/<sender_id>` for a standalone sender, where `sender_id` defaults to
+  `default`, and `<sf_dir>/<sender_id>-<index>` for each pooled sender. Error
+  names call it a replay store, as in `QwpReplayStoreLockedError`, and error
+  messages and the client README call it the store-and-forward journal, as in
+  `QWP store-and-forward journal is full`.
+- One live sender owns a sender directory. A second process that opens it
+  fails with `QwpReplayStoreLockedError`, which the pooled client reports as
+  the `cause` of a `QwpPoolResourceError`, so give concurrent senders distinct
+  `sender_id` values. `sender_id` allows letters, digits, `_`, and `-`. The
+  same error after a crash means that the crashed process's lock was not
+  released: see
+  [Recovering a sender directory after a crash](#recovering-a-sender-directory-after-a-crash).
 - With `initial_connect_retry=async`, a sender starts while QuestDB is
-  unreachable, and rows wait in the journal until it connects.
+  unreachable, and rows wait in the sender directory until it connects.
 - A batch that QuestDB rejects, such as one with a string for a `DOUBLE`
-  column, stays in the journal and stops delivery from it until you fix the
-  cause or move the journal aside. See [Errors from calls](#errors-from-calls).
+  column, stays in the sender directory and stops delivery from it until you
+  fix the cause or move the directory aside. See
+  [Errors from calls](#errors-from-calls).
 - Store-and-forward is Node.js only. The browser client replays from memory.
 
 | Key                         | Default  | Purpose                                                                                                     |
 | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `sf_durability`             | `memory` | `memory` relies on the OS page cache, `periodic` checkpoints in the background, `append` syncs every frame |
+| `sf_durability`             | `memory` | `memory` relies on the OS page cache, `periodic` checkpoints in the background, `append` syncs every batch  |
 | `sf_sync_interval_millis`   | `5000`   | Checkpoint interval for `periodic`                                                                          |
-| `sf_max_total_bytes`        | `10g`    | Journal size limit                                                                                          |
+| `sf_max_total_bytes`        | `10g`    | Size limit of the sender directory                                                                          |
 | `sf_max_segment_bytes`      | `4m`     | Segment file size, which also caps one batch                                                                |
-| `sf_append_deadline_millis` | `30000`  | How long a flush waits for space in a full journal                                                         |
-| `drain_orphans`             | `off`    | Adopt and replay journals that crashed producers left in `sf_dir`                                          |
-| `max_background_drainers`   | `4`      | Journals drained concurrently                                                                               |
+| `sf_append_deadline_millis` | `30000`  | How long a flush waits for space in a full sender directory                                                 |
+| `drain_orphans`             | `off`    | Adopt and replay sender directories that crashed producers left in `sf_dir`                                 |
+| `max_background_drainers`   | `4`      | Sender directories drained concurrently                                                                     |
 
 `memory` durability survives a process crash but not a power loss or host
 crash. `periodic` can lose the last checkpoint interval on power loss.
@@ -1163,22 +1177,25 @@ throughput. `flush` is reserved, and the client rejects it.
 Without `sf_dir`, the client rejects `sf_durability`,
 `sf_sync_interval_millis`, `drain_orphans`, and `max_background_drainers`.
 
-When the journal is full, a flush waits up to `sf_append_deadline_millis` for
-acknowledgements to free space, then rejects with
-`QwpReplayStoreAppendTimeoutError`. With the typed option
+When the sender directory is full, a flush waits up to
+`sf_append_deadline_millis` for acknowledgements to free space, then rejects
+with `QwpReplayStoreAppendTimeoutError`. With the typed option
 `storeAndForward.backpressurePolicy: "error"`, it rejects at once with
 `QwpReplayStoreFullError`.
 
-`drain_orphans=on` scans the other journals in `sf_dir` at startup and every
-30 seconds, and replays any that no live process holds. Use it only on a
-directory dedicated to this producer group. A journal that cannot be replayed
-is marked `.failed` and left on disk. After inspecting it, call
-`retryQwpNodeOrphanSlot(directory)` to make it eligible again.
+`drain_orphans=on` scans the other sender directories in `sf_dir` at startup
+and every 30 seconds, and replays any that no live process holds. Such a
+directory is called an orphan. Use it only on an `sf_dir` dedicated to this
+producer group. A sender directory that cannot be replayed is marked `.failed`
+and left on disk. After inspecting it, pass its path to
+`retryQwpNodeOrphanSlot(directory)` to make it eligible again; the function's
+name calls a sender directory a slot.
 
-:::caution Do not share a journal directory with a running Java client
+:::caution Do not share an `sf_dir` with a running Java client
 
-The journal format is shared with the Java, Rust, and Python clients, so one
-runtime can recover a directory another runtime wrote after it has closed.
+The format of a sender directory is shared with the Java, Rust, and Python
+clients, so one runtime can recover a directory another runtime wrote after it
+has closed.
 Their locks do not interoperate, though: a Node.js process and a Java process
 must never open the same `sf_dir` at the same time.
 
@@ -1189,12 +1206,12 @@ must never open the same `sf_dir` at the same time.
 See [store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/)
 for the delivery model.
 
-### Recovering a journal after a crash
+### Recovering a sender directory after a crash
 
-`close()` releases the journal's lock. After a crash, such as an out-of-memory
-kill, the lock stays on disk, and a new sender takes it over only when it names
-a process on the same host that no longer exists. In containers that is often
-not the case:
+`close()` releases the sender directory's lock. After a crash, such as an
+out-of-memory kill, the lock stays on disk, and a new sender takes it over only
+when it names a process on the same host that no longer exists. In containers
+that is often not the case:
 
 - A restarted container usually gives the application the same process ID as
   before, often `1`, so the lock seems to belong to a live process.
@@ -1202,9 +1219,9 @@ not the case:
 
 The new sender then fails with `QwpReplayStoreLockedError`, and
 `connectQwpNodeClient()` with a `QwpPoolResourceError` whose `cause` is that
-error. The journal stays on disk unsent. To recover, make sure that no other
-process uses the journal, delete its `.lock.owner` directory, and start the
-sender again. It replays the journal:
+error. The rows stay on disk unsent. To recover, make sure that no other
+process uses the sender directory, delete its `.lock.owner` directory, and
+start the sender again. It replays the rows:
 
 ```shell
 # sf_dir=/var/lib/trade-feed/qdb-sf, sender_id=feed-1
@@ -1213,8 +1230,8 @@ rm -r /var/lib/trade-feed/qdb-sf/feed-1/.lock.owner
 
 A pooled sender's lock is `<sf_dir>/<sender_id>-<index>/.lock.owner`. A
 container can run this step at startup only if no other container mounts the
-volume that holds `sf_dir`: deleting the lock of a journal that another process
-still uses lets both processes write to it and corrupt it.
+volume that holds `sf_dir`: deleting the lock of a sender directory that
+another process still uses lets both processes write to it and corrupt it.
 
 ## Querying
 
@@ -1614,9 +1631,9 @@ tasks:
   concurrent query, up to `query_pool_max`.
 - **Create clients inside each worker thread.** Client objects cannot be
   passed between `worker_threads`.
-- **Give each store-and-forward sender its own journal.** Senders sharing an
-  `sf_dir` need distinct `sender_id` values. The pool does this for its own
-  senders.
+- **Give each store-and-forward sender its own sender directory.** Senders
+  sharing an `sf_dir` need distinct `sender_id` values. The pool does this for
+  its own senders.
 
 The `QwpClient` handle itself is safe to share across tasks.
 
@@ -1789,8 +1806,8 @@ await sender.close();
 | `all-endpoints-unreachable` | A sweep tries every endpoint without success                |
 | `auth-failed`               | The server rejects the credentials with HTTP 401 or 403     |
 | `durable-ack-unavailable`   | A store-and-forward sender waits for an endpoint with durable acknowledgement |
-| `durable-ack-persistent-failure` | An orphan journal drain stopped waiting for durable acknowledgement |
-| `primary-unavailable`       | Every endpoint rejects an orphan journal drain with HTTP 421, so no primary is available. Senders report `all-endpoints-unreachable` instead |
+| `durable-ack-persistent-failure` | An orphan drain stopped waiting for durable acknowledgement |
+| `primary-unavailable`       | Every endpoint rejects an orphan drain with HTTP 421, so no primary is available. Senders report `all-endpoints-unreachable` instead |
 
 Each event has `kind`, `attempt`, `timestampMs`, `endpoint`,
 `previousEndpoint`, and `cause`. When a query session reconnects, the active
@@ -1831,17 +1848,18 @@ batch flushed after it, even though those `flush()` calls resolved, and the
 rows still staged. Wait for acknowledgements before you treat rows as stored,
 or use store-and-forward.
 
-With store-and-forward, the journal keeps a batch that QuestDB rejected, so a
-new sender with the same `sf_dir` and `sender_id` sends it again and fails the
-same way. Delivery from that journal stops until you act, so alert on terminal
-failures, for example on an `onError` event with `terminal` set. Then either:
+With store-and-forward, the sender directory keeps a batch that QuestDB
+rejected, so a new sender with the same `sf_dir` and `sender_id` sends it again
+and fails the same way. Delivery from that directory stops until you act, so
+alert on terminal failures, for example on an `onError` event with `terminal`
+set. Then either:
 
 - Fix the cause, for example the column type, so that QuestDB accepts the
   batch, and start a new sender. It delivers the rejected batch and every
-  batch journalled after it.
-- Move the journal directory, `<sf_dir>/<sender_id>`, out of `sf_dir`, and
-  start a new sender with an empty journal. QuestDB never receives the batches
-  in the moved journal, including those journalled after the rejected one.
+  batch written after it.
+- Move the sender directory, `<sf_dir>/<sender_id>`, out of `sf_dir`, and
+  start a new sender with an empty one. QuestDB never receives the batches in
+  the moved directory, including those written after the rejected one.
 
 Validate rows before you write them to avoid most terminal rejections: QuestDB
 rejects a value of the wrong type for an existing column, and a designated
@@ -1861,7 +1879,7 @@ const sender = await Sender.fromConfig("ws::addr=localhost:9000;", {
     webSocket: {
       onSenderError: (error) => {
         console.error(
-          `QuestDB rejected frames ${error.fromFsn}..${error.toFsn}: ` +
+          `QuestDB rejected batches ${error.fromFsn}..${error.toFsn}: ` +
             `${error.category} (${error.appliedPolicy}) ` +
             `${error.tableName ?? ""} ${error.serverMessage ?? ""}`,
         );
@@ -1887,8 +1905,8 @@ try {
 | `appliedPolicy`    | `string` | `terminal`, `retriable`, `retriable-other`, or `abandoned`                                               |
 | `serverStatusByte` | `number` | The QWP status code, such as `3` for a schema mismatch                                                   |
 | `serverMessage`    | `string` | The server's explanation, when it sent one                                                               |
-| `fromFsn`, `toFsn` | `bigint` | The inclusive range of rejected frame sequences, comparable with `flushAndGetSequence()` results        |
-| `messageSequence`  | `bigint` | The sequence of the server response                                                                      |
+| `fromFsn`, `toFsn` | `bigint` | Sequence numbers of the first and last rejected batch, comparable with `flushAndGetSequence()` results   |
+| `messageSequence`  | `bigint` | The server's sequence number for the rejected batch on this connection; it resets on reconnect           |
 | `tableName`        | `string` | The table, when the rejection concerns one                                                               |
 | `detectedAtMs`     | `number` | Client time of the rejection                                                                             |
 | `quarantinedPath`  | `string` | For `data-loss`: where store-and-forward kept the bytes it could not replay                              |
@@ -1897,7 +1915,7 @@ try {
   succeed on replay. The sender stops, and later calls reject with
   `QwpReplayRejectedError`. Without store-and-forward, every batch QuestDB has
   not acknowledged is lost. With store-and-forward, the rejected batch stays
-  in the journal. See [Errors from calls](#errors-from-calls).
+  in the sender directory. See [Errors from calls](#errors-from-calls).
 - **`retriable`** and **`retriable-other`**: the client reconnects, to another
   endpoint for `retriable-other`, and replays from the last acknowledgement.
 - **`abandoned`**: store-and-forward recovery could not replay data, which is
@@ -1913,7 +1931,9 @@ Dispatch on `category`, not on the message. Messages are English text written
 by the server, may change between versions, and can quote table names, column
 names, and the rejected values, so sanitize them before showing them to end
 users or sending them to an external error tracker. QuestDB returns no request
-ID: correlate with server logs through the frame range and `detectedAtMs`.
+ID: correlate with server logs through `messageSequence` and `detectedAtMs`.
+`fromFsn` and `toFsn` are client-side and match your `flushAndGetSequence()`
+results instead.
 
 ### Query errors
 
@@ -1973,9 +1993,9 @@ server fault.
 | `QwpBatchTooLargeError`             | One row is larger than the server's batch limit                                  |
 | `QwpWriterRowError`                 | A compiled writer rejected a row                                                 |
 | `QwpMemoryReplayAppendTimeoutError` | The memory queue stayed full past its deadline                                   |
-| `QwpReplayStoreAppendTimeoutError`  | The store-and-forward journal stayed full past its deadline                      |
-| `QwpReplayStoreFullError`           | The journal is full and `backpressurePolicy` is `"error"`                        |
-| `QwpReplayStoreLockedError`         | Another process owns the journal, or a crashed one left its lock                 |
+| `QwpReplayStoreAppendTimeoutError`  | The store-and-forward sender directory stayed full past its deadline             |
+| `QwpReplayStoreFullError`           | The sender directory is full and `backpressurePolicy` is `"error"`               |
+| `QwpReplayStoreLockedError`         | Another process owns the sender directory, or a crashed one left its lock        |
 | `QwpSenderCloseTimeoutError`        | `close()` timed out waiting for acknowledgements                                 |
 | `QwpEgressQueryError`               | The server reported a query error. `status` gives the code                       |
 | `QwpEgressQueryTimeoutError`        | A query ran past its timeout and was cancelled                                   |
@@ -1996,8 +2016,8 @@ Close every sender, session, and lease in a `finally` block:
 - **`Sender.close()` and `QwpSender.close()`** publish completed rows, then wait
   up to `close_flush_timeout_millis` (5 seconds) for QuestDB to acknowledge
   everything. If it does not, `close()` rejects with
-  `QwpSenderCloseTimeoutError`: in memory mode the unacknowledged data is lost,
-  and with store-and-forward it stays on disk for the next sender. If
+  `QwpSenderCloseTimeoutError`: in memory-only mode the unacknowledged data is
+  lost, and with store-and-forward it stays on disk for the next sender. If
   publishing the remaining rows fails first, for example because the replay
   queue is full, `close()` rejects with that error instead and logs the
   timeout. `0` skips the wait. An unfinished row is discarded with a warning,
@@ -2056,15 +2076,16 @@ server must enable the UDP receiver with
 
 ## Production example: TLS, token, and multiple hosts
 
-A long-running ingestion service with TLS, a bearer token, two endpoints, a
-disk journal, error and connection callbacks, and a clean shutdown. It consumes
-trades in batches from an upstream queue, such as a Kafka topic, and commits
-each batch upstream once the batch is on disk in the store-and-forward journal.
+A long-running ingestion service with TLS, a bearer token, two endpoints,
+store-and-forward on disk, error and connection callbacks, and a clean
+shutdown. It consumes trades from an upstream queue, such as a Kafka topic, in
+upstream batches, and commits each upstream batch once its rows are on disk in
+the sender directory.
 
 The service has one producer and runs no queries, so it uses a standalone
 `Sender` rather than the pooled client, as [Choose an API](#choose-an-api)
-recommends. Its journal is `<sf_dir>/feed-1`, and its `close()` rejects when
-acknowledgements are missing instead of logging a warning.
+recommends. Its sender directory is `<sf_dir>/feed-1`, and its `close()`
+rejects when acknowledgements are missing instead of logging a warning.
 
 Create `trades` before the first start. Replay after a reconnect or a restart
 is at least once, so the table deduplicates on the identity of a trade: the
@@ -2087,8 +2108,8 @@ For an existing table, add the column with
 `ALTER TABLE trades ADD COLUMN trade_id LONG`, then enable deduplication with
 [`ALTER TABLE trades DEDUP ENABLE UPSERT KEYS(timestamp, symbol, trade_id)`](/docs/query/sql/alter-table-enable-deduplication/).
 
-`ingest()` writes every batch its feed yields, flushes it, commits it upstream,
-and drains when the feed ends:
+`ingest()` writes the rows of every upstream batch its feed yields, flushes
+them, commits the upstream batch, and drains when the feed ends:
 
 ```typescript
 import { Sender } from "@questdb/nodejs-client";
@@ -2121,7 +2142,7 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
         webSocket: {
           onSenderError: (error) =>
             console.error(
-              `QuestDB rejected frames ${error.fromFsn}..${error.toFsn}:`,
+              `QuestDB rejected batches ${error.fromFsn}..${error.toFsn}:`,
               error.category,
               error.appliedPolicy,
               error.serverMessage,
@@ -2141,8 +2162,8 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
   await sender.connect(); // returns at once: initial_connect_retry=async
 
   try {
-    for await (const batch of feed) {
-      for (const trade of batch.trades) {
+    for await (const tradeBatch of feed) {
+      for (const trade of tradeBatch.trades) {
         await sender
           .table("trades")
           .symbol("symbol", trade.symbol)
@@ -2153,12 +2174,12 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
           .at(trade.timestamp, "ms");
       }
       // Auto-flush runs only when a row completes, so flush the end of each
-      // batch. Otherwise its last rows wait for the next trade.
+      // upstream batch. Otherwise its last rows wait for the next trade.
       await sender.flush();
-      // The batch is on disk in the journal, so the commit cannot lose it.
-      await batch.commit();
+      // The rows are on disk, so the upstream commit cannot lose them.
+      await tradeBatch.commit();
     }
-    // Rows still unacknowledged stay in the journal for the next start.
+    // Unacknowledged rows stay in the sender directory for the next start.
     await sender.flushAndWait(10_000);
   } finally {
     await sender.close();
@@ -2166,22 +2187,23 @@ export async function ingest(feed: AsyncIterable<TradeBatch>): Promise<void> {
 }
 ```
 
-With `sf_durability=append`, `flush()` resolves only after the batch is synced
-to disk, so a batch committed upstream survives a power loss as well as a
-process crash. With the default `memory` durability, a host crash can lose
-batches in the journal: commit upstream after `flushAndWait()` instead.
+With `sf_durability=append`, `flush()` resolves only after the rows are synced
+to disk, so an upstream batch committed after it survives a power loss as well
+as a process crash. With the default `memory` durability, a host crash can
+lose rows in the sender directory: commit upstream after `flushAndWait()`
+instead.
 
 A terminal rejection, such as a schema mismatch, makes the next `at()` or
-`flush()` reject and ends `ingest()`. The rejected batch stays in the journal,
-so a restart sends it again and fails the same way until you
-[fix the cause or move the journal aside](#errors-from-calls).
+`flush()` reject and ends `ingest()`. The rejected rows stay in the sender
+directory, so a restart sends them again and fails the same way until you
+[fix the cause or move the directory aside](#errors-from-calls).
 
 End the feed on `SIGTERM` so that `ingest()` drains and closes the sender. The
-journal under `sf_dir` keeps every unacknowledged batch, so a restart with the
+sender directory keeps every unacknowledged row, so a restart with the
 same `sender_id` delivers what this process did not, and the deduplication
 keys discard rows that QuestDB had already stored. After a crash, a restarted
 container may first need the
-[lock recovery step](#recovering-a-journal-after-a-crash).
+[lock recovery step](#recovering-a-sender-directory-after-a-crash).
 
 ## Migrating from ILP
 

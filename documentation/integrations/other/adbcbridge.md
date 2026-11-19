@@ -114,9 +114,8 @@ has the full table and the ingest mapping.
 
 Two things to know: QuestDB has no transactions over QWP, so switching
 autocommit off returns `NOT_IMPLEMENTED`, as ADBC allows; and `DECIMAL`
-columns with precision 9 or less are refused by the server's QWP egress on
-10.1.0 (a fix is proposed in
-[questdb/questdb#8111](https://github.com/questdb/questdb/pull/8111)).
+columns with precision 9 or less need QuestDB 10.2 or later over QWP (10.1.0
+refuses them).
 
 ## QuestDB 9 and older: the ODBC bridge
 

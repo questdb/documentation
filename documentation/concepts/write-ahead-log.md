@@ -112,9 +112,9 @@ by default and grow within a memory budget.
 
 Whether an acknowledged transaction survives an operating system crash or a
 power loss depends on the commit mode. In the default `nosync` mode, nothing is
-flushed to the disk. In adaptive commit mode, which is unrelated to the adaptive
-apply blocks above, each commit flushes its WAL files, and the table files are
-flushed at periodic save points. See
+flushed to the disk. In adaptive durability mode, which is unrelated to the
+adaptive apply blocks above, each commit flushes its WAL files, and the table
+files are flushed at periodic save points. See
 [Durability and commit modes](/docs/concepts/durability/).
 
 <Screenshot

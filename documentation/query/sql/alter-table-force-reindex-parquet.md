@@ -20,7 +20,7 @@ the indexes from the Parquet file. It also rebuilds an index that is damaged
 for any other reason, such as a missing index file.
 
 `FORCE REINDEX PARQUET` is available from QuestDB 10.2.0 and QuestDB
-Enterprise 4.2.0.
+Enterprise 4.2.1.
 
 ## Syntax
 

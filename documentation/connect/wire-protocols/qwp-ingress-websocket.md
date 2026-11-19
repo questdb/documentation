@@ -152,9 +152,10 @@ WebSocket connection is established. No QWP-level auth handshake exists.
 The credential is checked only on the upgrade request: QuestDB never
 authenticates an established connection again, so a connection stays open
 when its token expires. A client with an expiring token must present a valid
-one on its next connect, such as a reconnect or a failover. The
-[Java client](/docs/connect/clients/java/#token-providers) can request and
-renew tokens with a token provider for this.
+one on its next connect, such as a reconnect or a failover. The Java client
+1.3.11 or later, the C, C++, and Rust clients 7.3.0 or later, and the Python
+client 6.1.0 or later can request and renew tokens with a token provider for
+this; see [Rotating bearer tokens](/docs/security/oidc/#rotating-bearer-tokens).
 
 ## Client lifecycle
 
@@ -305,8 +306,8 @@ def zigzag_decode(n):
 
 #### `FLAG_DEFER_COMMIT`
 
-This flag is how a client sends one logical batch that does not fit in a single
-frame. The server appends the frame's rows to WAL writers but does **not**
+This flag is how a client sends rows that do not fit in a single frame but must
+commit together. The server appends the frame's rows to WAL writers but does **not**
 commit them; they commit when a later frame arrives with the flag clear. The
 reference client sets the flag on every frame of a split except the last.
 
@@ -315,8 +316,9 @@ Four consequences an implementer must handle:
 - **An OK on a deferred frame is not durability.** While deferred rows are
   uncommitted, the server withholds advancement of the cumulative OK
   watermark. Do not treat the ack as a commit.
-- **Deferred rows are rolled back on disconnect.** A store-and-forward slot
-  whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
+- **Deferred rows are rolled back on disconnect.** A store-and-forward
+  [sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout)
+  (`<sf_dir>/<sender_id>/`) whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
   frame is an aborted group. The reference client detects and skips it during
   recovery.
 - **An empty message with the flag clear forces a commit** without sending any
@@ -1038,9 +1040,9 @@ Which tiers a server grants:
 
 | Tier | Granted by |
 | --- | --- |
-| `local` | a server in [adaptive commit mode](/docs/concepts/durability/) (on QuestDB Enterprise, the primary) |
+| `local` | a server in [adaptive durability mode](/docs/concepts/durability/) (on QuestDB Enterprise, the primary) |
 | `replicated`, `true` | a QuestDB Enterprise primary with replication |
-| `local,replicated` | a QuestDB Enterprise primary with replication, in adaptive commit mode |
+| `local,replicated` | a QuestDB Enterprise primary with replication, in adaptive durability mode |
 
 QuestDB Enterprise 4.1.0 and earlier understand only `true`. QuestDB 10.1.0
 and earlier grant no durable acknowledgement.
@@ -1153,8 +1155,8 @@ want larger batches must raise `http.recv.buffer.size` on the server (e.g.,
 `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom); the next
 handshake will advertise the new ceiling automatically.
 
-A logical batch that exceeds the cap does not have to be split into separate
-transactions. Send it as several frames, setting
+Rows that exceed the cap do not have to be split into separate transactions.
+Send them as several frames, setting
 [`FLAG_DEFER_COMMIT`](#flag_defer_commit) on all but the last, and the server
 commits the whole group when the final frame arrives with the flag clear.
 
@@ -1192,11 +1194,14 @@ differ only in where unacknowledged data lives:
 
 - **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
   `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
-  the next sender bound to the same slot.
-- **`sf_dir` unset** (memory mode): segments are allocated in process memory.
-  Unacknowledged data is lost if the sender process dies. The reconnect loop
-  still spans transient server outages such as rolling upgrades, but the RAM
-  buffer caps how much data can accumulate during the outage.
+  the next sender that uses the same
+  [sender directory](/docs/high-availability/store-and-forward/operating-and-tuning/#sender-directory-layout),
+  `<sf_dir>/<sender_id>/`.
+- **`sf_dir` unset** (memory-only mode): segments are allocated in process
+  memory. Unacknowledged data is lost if the sender process dies. The
+  reconnect loop still spans transient server outages such as rolling
+  upgrades, but the RAM buffer caps how much data can accumulate during the
+  outage.
 
 Connect-string keys that control ingress failover are documented in the
 [reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)
@@ -1216,26 +1221,35 @@ Key behaviors:
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
 - **Authentication errors end the endpoint walk** at any host (`401`/`403`):
-  the client does not try the other hosts. Startup fails. In most clients,
-  the reconnect loop does not continue past them either. A sender that has
-  connected keeps retrying instead in the Java client, in the Node.js client
-  when it uses store-and-forward or was started with `async`, and in the
-  browser client when it authenticates with `sessionBootstrap` and was started
-  with `async`. A browser cannot see the status of a failed upgrade, so a
-  credential sent with the browser client's `auth` option does not end the
-  walk when QuestDB rejects it: it looks like an unreachable host, and a
-  sender that has connected keeps retrying it whatever its mode. A Java client
-  with a token provider first retries the same host once after a `401`, with
-  a new token.
+  after any eligible one-time token replacement, the client does not try the
+  other hosts. A sender that has not connected yet stops, whatever its
+  `initial_connect_retry` mode, but ending the walk does not necessarily stop
+  a sender that has connected: it keeps retrying with backoff in Java, C/C++
+  and Rust 7.3.0 or later, and Python 6.1.0 or later, including with fixed
+  credentials. The native/Python clients retain unacknowledged rows and
+  report `auth_failed` / `AuthFailed`. The Node.js client also retries when
+  it uses store-and-forward or was started with `async`, as does a browser
+  client using `sessionBootstrap` and `async`.
+  A browser cannot see the status of a failed upgrade, so a credential sent
+  with its `auth` option does not end the walk when QuestDB rejects it: it
+  looks like an unreachable host, and a sender that has connected keeps
+  retrying it whatever its mode. Java and native/Python clients with token
+  providers can first retry the same host once after an eligible `401` if
+  the provider supplies a different token; `403` does not trigger that retry.
   See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
   `PRIMARY_CATCHUP`, topology-level otherwise.
-- **All other upgrade errors are transient** and feed into the reconnect loop,
-  including `404`, `426`, `503`, generic 4xx/5xx, TCP/TLS failures,
-  mid-stream send/recv errors, and an upgrade response that advertises a QWP
-  version outside the client's supported range (per-endpoint, so a host on a
-  rolling upgrade does not lock the client out of compatible peers).
+- **Other upgrade errors are transient** in the Java, C, C++, Rust, and Python
+  clients and feed into the reconnect loop, including `404`, `426`, `503`,
+  generic 4xx/5xx, TCP/TLS failures, mid-stream send/recv errors, and an
+  upgrade response that advertises a QWP version outside the client's
+  supported range (per-endpoint, so a host on a rolling upgrade does not lock
+  the client out of compatible peers). In the C, C++, Rust, and Python
+  clients, a server that does not grant the requested
+  [durable acknowledgement](#durable-acknowledgement) tiers is not transient:
+  when every endpoint refuses them, the connection fails with
+  `ProtocolVersionError`, and a sender stops even after it has connected.
 
 :::note Enterprise
 
