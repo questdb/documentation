@@ -98,12 +98,14 @@ a comma-separated string.
 
 ### SHOW CREATE DATABASE
 
-`SHOW CREATE DATABASE` returns a logical, data-free dump as replayable SQL:
-one statement per row for tables, views, materialized views, and live views.
-In QuestDB Enterprise 4.2.1 and later, the dump also includes users, groups,
-service accounts, memberships, and grants by default. Use it to copy a database's
-structure and access control to an empty instance. It is not a data backup; see
-[Replay limits](#replay-limits).
+`SHOW CREATE DATABASE` returns the SQL that recreates your tables, views,
+materialized views, and live views, one statement per row. In QuestDB Enterprise
+4.2.1 and later, it also includes users, groups, service accounts, memberships,
+and grants by default.
+
+To copy the structure and access control, save the SQL returned by the source
+instance and run it on an empty target instance. Copy table data separately.
+See [Replay limits](#replay-limits) for settings to reapply on the target.
 
 ```questdb-sql title="SHOW CREATE DATABASE syntax"
 SHOW CREATE DATABASE
@@ -272,10 +274,13 @@ before opening it to users:
 - Passwords and tokens. Recreated users and service accounts have no
   credentials until you set them.
 - Per-user, group, and service account
-  [memory limits](/docs/security/rbac/#memory-limits),
-  [resource groups](/docs/concepts/resource-groups/), and resource group
-  mappings. Recreated principals have no per-principal memory override and use
-  the default resource group until you configure them.
+  [memory limits](/docs/security/rbac/#memory-limits).
+- [Resource group](/docs/concepts/resource-groups/) definitions, assignments,
+  and grants on individual groups. Recreate custom groups and reapply any
+  settings you changed on `DEFAULT`. Then restore which group each account uses
+  by default and rerun the `GRANT USE ON RESOURCE GROUP` statements. The
+  `PERMISSIONS` category includes database-wide `GRANT USE RESOURCE GROUP`
+  statements.
 - Older external aliases that may still be active for a group. Only the alias
   reported by `SHOW GROUPS` is restored. Review identity-provider mappings
   separately if more than one alias has been assigned to a group.

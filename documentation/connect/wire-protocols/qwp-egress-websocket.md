@@ -131,6 +131,16 @@ identical to ingress. See the
 [ingress authentication section](/docs/connect/wire-protocols/qwp-ingress-websocket/#authentication)
 for supported methods.
 
+### Resource group selection
+
+On QuestDB Enterprise 4.2.2 and later, send
+[`SET RESOURCE GROUP groupName`](/docs/query/sql/acl/set-resource-group/) as a
+`QUERY_REQUEST`. A successful request returns `EXEC_DONE`. Later managed queries
+on that WebSocket use the selected group and check permission to use it when
+they start. Send `RESET RESOURCE GROUP` in a separate request to return to the
+principal's mapped group. A new WebSocket starts in the mapped group, including
+after reconnect or failover.
+
 ### Batch body compression
 
 `X-QWP-Accept-Encoding` is a comma-separated list of tokens. First match wins.

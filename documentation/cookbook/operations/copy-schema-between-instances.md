@@ -141,11 +141,11 @@ service account assignments, and grants. Replay on an empty target as its
 built-in admin to avoid adding another principal's creator grants. Schema-only
 and per-object dumps contain neither grants nor `OWNED BY`.
 
-Before opening the target to users, set credentials and reapply memory limits,
-resource groups, and resource group mappings: none are dumped. Only the external
-alias shown by `SHOW GROUPS` is restored for each group. Avoid concurrent schema
-and ACL changes during the export; the dump is best-effort, not a consistent
-snapshot. See [Replay limits](/docs/query/sql/show/#replay-limits).
+Before opening the target to users, set credentials and reapply memory limits.
+Recreate custom resource groups, then restore the assignments and grants on
+individual groups. Only the external alias shown by `SHOW GROUPS` is restored
+for each group. The export reads schema and access control separately, so avoid
+changing either while it runs. See [Replay limits](/docs/query/sql/show/#replay-limits).
 
 ## Manual alternative: copy from the Web Console
 

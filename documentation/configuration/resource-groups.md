@@ -14,8 +14,8 @@ Resource groups are [Enterprise](/enterprise/) only.
 
 [Resource groups](/docs/concepts/resource-groups/) isolate competing query
 workloads inside one instance. These settings are instance-wide. The per-group
-policy that decides admission, CPU share and memory budgets is set in SQL, not
-here. See [Configure and use resource groups](/docs/operations/resource-groups/)
+policy that decides admission, CPU share, CPU limit, scheduling policy and
+memory budgets is set in SQL, not here. See [Configure and use resource groups](/docs/operations/resource-groups/)
 for those statements.
 
 None of these settings are reloadable: changing any of them requires a restart.

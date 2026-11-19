@@ -57,8 +57,16 @@ Recreating a group with the same name produces a new group with fresh counters.
 Queries still running under the dropped group do not move to it. Map principals
 to the new group to place their subsequent queries under it.
 
+The drop also removes every `USE RESOURCE GROUP` grant on the group, so a group
+recreated under the same name starts with none. A session that chose the group
+with [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), or an HTTP
+client that sends its name in the `resource_group` parameter, fails its next
+managed query until it chooses another group. Once a group exists again under
+that name it is used instead, subject to the usual permission check.
+
 Dropping the last group other than `DEFAULT` disengages CPU scheduling for the
-instance once those queries finish. See
+instance once those queries finish, unless `DEFAULT` has a CPU limit or the
+`fair` policy. See
 [when scheduling engages](/docs/concepts/resource-groups/#when-scheduling-engages).
 
 ## Examples

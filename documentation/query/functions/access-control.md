@@ -47,7 +47,10 @@ groups, use [`active_permissions()`](#active_permissions).
 - `table_name` (`STRING`): table the permission is granted on. `null` for a
   permission granted at database level: a database permission such as
   `CREATE TABLE`, or a grant on all tables such as
-  `GRANT SELECT ON ALL TABLES`.
+  `GRANT SELECT ON ALL TABLES`. For `USE RESOURCE GROUP` granted on one group
+  with
+  [`GRANT USE ON RESOURCE GROUP`](/docs/query/sql/acl/grant/#grant-use-of-resource-groups),
+  the group's current name.
 - `column_name` (`STRING`): column the permission is granted on. `null` for a
   permission granted on a whole table or at database level.
 - `grant_option` (`BOOLEAN`): `true` if the entity can grant the permission at
