@@ -254,7 +254,7 @@ Parquet-related settings.
 To rebuild the indexes of Parquet partitions without taking the table offline,
 use
 [`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/),
-available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.0. Run it after upgrading from QuestDB 9.3.4 through 10.0.1, which could leave
+available from QuestDB 10.2.0 and QuestDB Enterprise 4.2.1. Run it after upgrading from QuestDB 9.3.4 through 10.0.1, which could leave
 stale column metadata on Parquet partitions that received out-of-order rows.
 
 ## Export

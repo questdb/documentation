@@ -3,10 +3,10 @@ title: ACL audit log
 sidebar_label: ACL audit log
 description:
   Track access control changes with the ACL audit log in QuestDB Enterprise
-  4.2.0 and later, including principal attribution and configurable retention.
+  4.2.1 and later, including principal attribution and configurable retention.
 ---
 
-In [QuestDB Enterprise](/enterprise/) 4.2.0 and later, the ACL audit log records
+In [QuestDB Enterprise](/enterprise/) 4.2.1 and later, the ACL audit log records
 changes to access control in `sys.acl_audit_log`, so you can investigate who
 granted access, changed credentials, or modified a principal. Each row identifies
 the authenticated principal, the principal it acted as, and the statement that
@@ -303,13 +303,13 @@ receiving the log creates its own, using its local `acl.audit.storage.policy`
 setting. An ACL statement that finds the log missing during promotion creates it
 with the same policy.
 
-When upgrading from a release before QuestDB Enterprise 4.2.0, the server
+When upgrading from a release before QuestDB Enterprise 4.2.1, the server
 creates the log and adds `change_id` to existing ACL and credential tables.
 It does not reconstruct past changes. Tables with suspended WAL apply get the
 column at a later startup after they are resumed. Until the permissions history
 table has the column, compaction archives rows without their change IDs.
 
-A backup taken on a release before QuestDB Enterprise 4.2.0 is handled
+A backup taken on a release before QuestDB Enterprise 4.2.1 is handled
 differently: startup neither creates the missing log nor adds `change_id` to
 restored tables. This allows continued restore updates from an older source. See
 [Restoring access control tables](/docs/operations/backup/#restoring-access-control-tables)
@@ -317,5 +317,5 @@ for when the log and columns appear, and what to do after the final restore.
 
 Before upgrading or rolling back, review the
 [ACL audit log upgrade considerations](/docs/operations/upgrade/#acl-audit-log).
-Releases before 4.2.0 do not enforce the log's protections and cannot compact
+Releases before 4.2.1 do not enforce the log's protections and cannot compact
 the permissions table after it gains `change_id`.

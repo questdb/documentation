@@ -276,7 +276,7 @@ The view query is validated at creation time and must:
   `backup_instance_name()`, `backup_status()`, `backups()`, `permissions()`,
   `reload_tick_calendars()`, and `reload_tls()`.
 - Not use `SHOW CREATE DATABASE` with any ACL category when access control is
-  enabled (QuestDB Enterprise 4.2.0 and later), even as an administrator. The
+  enabled (QuestDB Enterprise 4.2.1 and later), even as an administrator. The
   default statement includes ACL output; use `INCLUDE (SCHEMA)` under the
   catalogue rules above.
 - Not read another live view.

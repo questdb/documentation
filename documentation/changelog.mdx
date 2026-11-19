@@ -14,6 +14,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [10.2.0](https://questdb.com/release-notes/#oss-10.2.0) - Released November 10, 2026
 
+### QuestDB Enterprise Releases
+
+- [4.2.0](https://questdb.com/release-notes/#enterprise-4.2.0) - Released November 16, 2026
+
 ### New
 
 - [ACL audit log](/docs/security/acl-audit-log/) - Documented the access control audit log introduced in QuestDB Enterprise 4.2.0, including principal attribution, read permissions, redaction, delivery guarantees, WAL availability troubleshooting, change-ID recovery limits, replication, and retention
@@ -67,6 +71,9 @@ This page tracks significant updates to the QuestDB documentation.
 - [Storage policy](/docs/concepts/storage-policy/#ttl-evaluation) - Corrected partition-start eligibility across audit retention, TTL migration, Parquet conversion, and Enterprise quick-start guidance, with partition allowances for minimum timestamp-based retention and clearer governance example thresholds
 - [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented QuestDB Enterprise 4.2.0 ACL output, principal/schema/grant ordering, the requirement for both `LIST USERS` and `USER DETAILS`, active storage policies, and replay limits. Documented the removal of `OWNED BY` from all `SHOW CREATE` output in 4.2.0, and updated the schema-copy recipe, RBAC, and governance guidance
 - [Views](/docs/concepts/views/#administrative-operations-in-view-metadata) - Documented QuestDB Enterprise 4.2.0 restrictions on administrative operations in `PIVOT IN` subqueries, schema-only database dumps in materialized and live views, and [upgrade guidance](/docs/operations/upgrade/#upgrading-to-420) for existing scripts and views
+- [Session windows](/docs/cookbook/sql/time-series/session-windows/) - Fixed the ride duration queries, which failed on a renamed column and returned locked time instead of ride time, and the website session gap check, which `datediff()` truncated to whole hours. Added a closed sessions query that returns only sessions whose timeout has passed
+- [S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores) - From QuestDB Enterprise 4.2.0, an S3-compatible store used for replication or [backups](/docs/operations/backup/#supported-storage-backends) must support or ignore `If-Match` and `If-None-Match` on `PutObject`. On a store that rejects them, a primary cannot start or be promoted, and every backup fails
+- [REST API](/docs/connect/compatibility/rest-api/#execute) - Examples across the connect, query, failover, durability, and OIDC pages and the Python and Node.js query snippets now call `/api/v1/sql/execute` instead of the deprecated `/exec`. Both paths serve the same handler, as [`http.context.execute`](/docs/configuration/http-server/#httpcontextexecute) now shows
 
 ## October 2026
 

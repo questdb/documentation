@@ -53,6 +53,19 @@ Backup supports the following storage backends:
 - **Filesystem** - Local or network-attached storage (NFS, etc.). Backup is not
   sensitive to the underlying filesystem type.
 
+:::warning S3-compatible storage
+
+From QuestDB Enterprise 4.2.1, an S3-compatible store must support or ignore
+`If-Match` and `If-None-Match` on `PutObject`, or every backup to it fails.
+Backups send these conditional requests when they write their index,
+`backup/<backup_instance_name>/index.msgpack`: `If-None-Match` to create it,
+`If-Match` to replace it. AWS S3, Azure Blob Storage, and Google Cloud Storage
+support conditional writes, and backups to a filesystem backend write the index
+without them. To check a store, see
+[S3-compatible stores](/docs/high-availability/setup/#s3-compatible-stores).
+
+:::
+
 See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
 for connection string formats. For a private, on-prem, or self-signed store,
 see [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
@@ -95,6 +108,27 @@ Control how many backups to keep before automatic cleanup removes older ones:
 ```conf
 backup.cleanup.keep.latest.n=7
 ```
+
+#### Object store versioning
+
+Enable object versioning on the backup bucket or container: versioning on AWS
+S3, blob versioning on Azure Blob Storage, and Object Versioning or soft delete
+on Google Cloud Storage. Apart from a small index that each backup replaces,
+backup data is written once and only deleted by
+[retention cleanup](#backup-retention), so versioning costs little, and it lets
+you recover a backup that was deleted by mistake, by a misconfigured retention
+setting, or by a compromised credential.
+
+Pair it with a lifecycle rule that expires **noncurrent** versions after the
+recovery window you want, for example 30 days. Without one, every backup that
+cleanup removes is kept as a noncurrent version and billed indefinitely. Do not
+add a rule that expires or archives current versions: QuestDB manages backup
+retention itself through `backup.cleanup.keep.latest.n`.
+
+Versioning applies to the whole S3 or GCS bucket and to the whole Azure storage
+account, so keep backups apart from
+[replication](/docs/high-availability/setup/#1-configure-object-storage)
+storage, which should not be versioned.
 
 #### Filesystem backups
 
@@ -602,7 +636,7 @@ the existing recovery copy.
 #### Restoring access control tables
 
 The [ACL audit log](/docs/security/acl-audit-log/), `sys.acl_audit_log`, is
-available in QuestDB Enterprise 4.2.0 and later. A backup includes it if it
+available in QuestDB Enterprise 4.2.1 and later. A backup includes it if it
 exists on the source. Its rows replicate, unlike those of `sys.view_audit`, so
 a primary backup includes the replicated ACL change history.
 
@@ -620,12 +654,12 @@ column to link their rows to audit entries:
 
 Only these system tables need this column; do not add it to user-created tables.
 
-When QuestDB Enterprise 4.2.0 or later restores a backup taken on a release
-before 4.2.0, startup leaves these restored system tables unchanged: it neither
+When QuestDB Enterprise 4.2.1 or later restores a backup taken on a release
+before 4.2.1, startup leaves these restored system tables unchanged: it neither
 adds their `change_id` columns nor creates the missing audit log.
 This allows [forward restore updates](#retrying-or-updating-a-restore) while the
 source still runs the older version. The log and columns arrive with the first
-restored backup taken after the source is upgraded to 4.2.0 or later.
+restored backup taken after the source is upgraded to 4.2.1 or later.
 
 Do not run ACL-changing statements on a node that must keep accepting restore
 updates. Such a statement changes the restored tables, and the next update

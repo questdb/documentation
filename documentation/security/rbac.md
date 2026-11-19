@@ -539,7 +539,7 @@ get it back without someone re-granting it.
 ## Audit access control changes
 
 The [ACL audit log](/docs/security/acl-audit-log/) is available in QuestDB
-Enterprise 4.2.0 and later. It records who changes users, groups, service accounts,
+Enterprise 4.2.1 and later. It records who changes users, groups, service accounts,
 credentials, and permissions, including both the session principal and any
 assumed service account. Query `sys.acl_audit_log` with `LIST USERS`,
 `USER DETAILS`, and `SELECT` on the table; `SELECT ON ALL TABLES` alone does
@@ -601,7 +601,7 @@ and `wait_wal_table()`, and WAL recovery statements such as
 for principals that hold the permission the statement requires.
 
 The [ACL audit log](/docs/security/acl-audit-log/#read-the-log),
-`sys.acl_audit_log`, is available in QuestDB Enterprise 4.2.0 and later. It is a
+`sys.acl_audit_log`, is available in QuestDB Enterprise 4.2.1 and later. It is a
 separate exception: it requires both `LIST USERS` and `USER DETAILS` in addition
 to ordinary table permissions. Without both, it looks missing even to a
 principal with a grant `ON ALL TABLES`. Unlike the protected ACL tables, its

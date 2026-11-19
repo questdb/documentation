@@ -102,9 +102,9 @@ window function on base table is not supported for materialized views: trades
 A `LIMIT` fails the same way, with
 `LIMIT on base table is not supported for materialized views: trades`.
 
-:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.0
+:::warning Breaking change in QuestDB 10.2.0 and QuestDB Enterprise 4.2.1
 
-Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.0, the base-table query could
+Before QuestDB 10.2.0 and QuestDB Enterprise 4.2.1, the base-table query could
 contain a `LIMIT`, or a window function nested inside an expression. A window
 function that makes up a whole column was rejected in earlier versions too.
 
@@ -484,7 +484,7 @@ metadata:
   [`SHOW CREATE DATABASE`](/docs/query/sql/show/#use-in-views), such as
   `SHOW CREATE DATABASE INCLUDE (SCHEMA)`
 
-In QuestDB Enterprise 4.2.0 and later, with access control enabled, a database
+In QuestDB Enterprise 4.2.1 and later, with access control enabled, a database
 dump that includes any ACL category is administrative, not just a catalogue
 query. Materialized and live views reject it for every principal, even one
 holding `SYSTEM ADMIN` or `DATABASE ADMIN`. This includes plain

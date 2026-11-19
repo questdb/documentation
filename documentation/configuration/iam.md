@@ -101,7 +101,7 @@ enabled to enforce write protections on system-managed tables, including the
 - **Default**: `TO PARQUET 1d`
 - **Reloadable**: no
 
-Available in QuestDB Enterprise 4.2.0 and later.
+Available in QuestDB Enterprise 4.2.1 and later.
 
 [Storage policy](/docs/concepts/storage-policy/) used when the server creates
 `sys.acl_audit_log`. The value is a comma-separated list of stages, without
