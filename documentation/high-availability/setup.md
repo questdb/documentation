@@ -29,6 +29,8 @@ to understand how replication works.
 Choose your object storage provider and build the connection string for
 `replication.object.store` in `server.conf`.
 
+The primary writes the replication index, `index.msgpack`, with conditional requests: `If-None-Match` to create it in an empty location, and `If-Match` to replace it only while the store still holds the version the primary last wrote or read. AWS S3, Azure Blob Storage and Google Cloud Storage support them. An S3-compatible store must support or ignore both on `PutObject`; a store that rejects them fails the index writes, so replication stalls, or the first start on an empty location fails. No setting turns them off. An `fs` store writes the index without them. On Google Cloud Storage each index write is a resumable upload, two requests per write.
+
 ### AWS S3
 
 Create an S3 bucket following

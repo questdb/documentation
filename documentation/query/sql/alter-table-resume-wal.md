@@ -61,6 +61,12 @@ or [`ALTER LIVE VIEW RESUME WAL`](/docs/query/sql/alter-live-view-resume-wal/).
 
 :::
 
+:::note QuestDB Enterprise cold storage
+
+`RESUME WAL FROM TRANSACTION` that skips the transaction in which a storage policy's `DROP LOCAL` sealed a partition for [cold storage](/docs/concepts/cold-storage/) can leave that partition on local disk on the other instances.
+
+:::
+
 ## Examples
 
 Using the [`wal_tables()`](/docs/query/functions/meta/#wal_tables) function

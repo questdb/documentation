@@ -26,6 +26,14 @@ Adding an [index](/docs/concepts/deep-dive/indexes/) is an atomic, non-blocking,
 non-waiting operation. Once complete, the SQL optimizer will start using the new
 index for SQL executions.
 
+:::note QuestDB Enterprise cold storage
+
+`ADD INDEX` fails with `cannot create index, table has a delta-active or remotely served partition` while any partition of the table is served from [cold storage](/docs/concepts/cold-storage/), or keeps [late rows in cold storage](/docs/concepts/cold-storage-late-rows/). Create indexes before a table's partitions go cold.
+
+The check runs on the instance that receives the statement. Another instance that serves a partition from cold storage, for example because of `storage.policy.drop.local.override`, skips the replicated `ADD INDEX`, logs `index not created on this instance`, and has no index on that column, also after a failover. Its rows are the same; only queries on that column are slower there.
+
+:::
+
 ## Examples
 
 ### Adding a bitmap index (default)

@@ -424,9 +424,9 @@ with the grid layout and auto-refresh.
 
 _Enterprise only._
 
-When [cold storage](/docs/concepts/cold-storage/) is enabled, the endpoint
-exposes fifteen additional metrics under the `questdb_cold_chunk_` prefix,
-covering the chunk cache and the range reads that serve remote partitions:
+When [cold storage](/docs/concepts/cold-storage/) is enabled, the endpoint exposes fifteen additional metrics under the `questdb_cold_chunk_` prefix, covering the chunk cache and the range reads that serve remote partitions. There are no metrics for [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) waiting for compaction; see [Detect cold storage maintenance problems](/docs/operations/monitoring-alerting/#detect-cold-storage-maintenance-problems).
+
+
 
 | Metric                                         | Type    | Description                                                                  |
 | ---------------------------------------------- | ------- | ---------------------------------------------------------------------------- |

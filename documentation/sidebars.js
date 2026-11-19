@@ -350,6 +350,7 @@ module.exports = {
                     // Ordered by the label the sidebar renders, not the doc id
                     "query/sql/alter-table-attach-partition", // ATTACH PARTITION
                     "query/sql/alter-table-change-column-type", // COLUMN TYPE
+                    "query/sql/alter-table-compact", // COMPACT
                     "query/sql/alter-table-disable-deduplication", // DEDUP DISABLE
                     "query/sql/alter-table-enable-deduplication", // DEDUP ENABLE
                     "query/sql/alter-table-detach-partition", // DETACH PARTITION
@@ -704,9 +705,20 @@ module.exports = {
             "concepts/expire-rows",
             "concepts/storage-policy",
             {
-              id: "concepts/cold-storage",
-              type: "doc",
+              type: "category",
               label: "Cold Storage",
+              items: [
+                {
+                  id: "concepts/cold-storage",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "concepts/cold-storage-late-rows",
+                  type: "doc",
+                  label: "Late rows",
+                },
+              ],
             },
             {
               id: "concepts/resource-groups",

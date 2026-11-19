@@ -46,6 +46,151 @@ SELECT build();
 | ---------------------------------------------------------------------------------------------- |
 | Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
+## cold_storage_compactions
+
+:::note
+
+[Cold storage](/docs/concepts/cold-storage/) and the `cold_storage_compactions()`
+function are available in **QuestDB Enterprise** only.
+
+:::
+
+`cold_storage_compactions()` lists this instance's queued and running
+compactions of [late rows in cold storage](/docs/concepts/cold-storage-late-rows/),
+whether requested with
+[`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/) or started by
+background maintenance, and its last 128 failures. It requires the
+`SYSTEM ADMIN` permission.
+
+**Columns:**
+
+| Column           | Type        | Description                                                                                            |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `table_name`     | _VARCHAR_   | Table name.                                                                                            |
+| `partition_name` | _VARCHAR_   | Partition name.                                                                                        |
+| `kind`           | _VARCHAR_   | `residual` merges runs of late rows on local disk, `base` writes a new Parquet base, `full` does both. |
+| `origin`         | _VARCHAR_   | `requested` by `ALTER TABLE COMPACT`, or `background` maintenance.                                     |
+| `status`         | _VARCHAR_   | `queued`, `running`, or `failed`.                                                                      |
+| `since`          | _TIMESTAMP_ | When the compaction entered its current status.                                                        |
+| `error`          | _VARCHAR_   | Why the compaction failed. `NULL` unless the status is `failed`.                                       |
+
+**Example:**
+
+```questdb-sql title="Failed compactions"
+SELECT * FROM cold_storage_compactions() WHERE status = 'failed';
+```
+
+## cold_storage_pin_owners
+
+:::note
+
+[Cold storage](/docs/concepts/cold-storage/) and the `cold_storage_pin_owners()`
+function are available in **QuestDB Enterprise** only.
+
+:::
+
+`cold_storage_pin_owners()` returns one row per owner of
+[pins](/docs/operations/cold-storage/#pins) in this instance's cold storage
+root. It runs only on the cold storage manager, reads the pins as garbage
+collection sees them at each call, and requires the `SYSTEM ADMIN` permission.
+On another instance it fails with `only the cold storage manager lists and
+releases pins; this node is not the manager`.
+
+**Columns:**
+
+| Column          | Type        | Description                                                                                                                                                  |
+| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `owner_id`      | _VARCHAR_   | Owner identifier, the argument of [`cold_storage_release_pins()`](#cold_storage_release_pins).                                                               |
+| `kind`          | _VARCHAR_   | `backup` for the backup index of one instance and backup destination, `root` for the root of a database recovered by point-in-time recovery.                 |
+| `origin`        | _VARCHAR_   | For a `backup` owner, its backup destination's location, without credentials, and instance name. For a `root` owner, the recovered database's root location. |
+| `registered_at` | _TIMESTAMP_ | When the owner registered.                                                                                                                                   |
+| `pinned_bases`  | _LONG_      | Number of bases the owner pins.                                                                                                                              |
+
+**Example:**
+
+```questdb-sql title="Owners of pins"
+SELECT * FROM cold_storage_pin_owners();
+```
+
+## cold_storage_pins
+
+:::note
+
+[Cold storage](/docs/concepts/cold-storage/) and the `cold_storage_pins()`
+function are available in **QuestDB Enterprise** only.
+
+:::
+
+`cold_storage_pins('tableName')` returns one row per
+[pin](/docs/operations/cold-storage/#pins) of a base of the table.
+`cold_storage_pins()` returns the pins of every table, dropped tables included.
+Both run only on the cold storage manager, read the pins as garbage collection
+sees them at each call, and require the `SYSTEM ADMIN` permission.
+
+**Arguments:**
+
+- `tableName` (`string`, optional): the name of an existing table.
+
+**Columns:**
+
+| Column             | Type                  | Description                                                                                                                                   |
+| ------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `timestamp`        | _TIMESTAMP_ or _LONG_ | Partition timestamp. Without an argument it is a number, the one in the base's object key, since a dropped table's timestamp type is unknown. |
+| `seq_txn`          | _LONG_                | WAL transaction the base reflects.                                                                                                            |
+| `metadata_version` | _LONG_                | Table metadata version of the base.                                                                                                           |
+| `owner_id`         | _VARCHAR_             | Owner of the pin, see [`cold_storage_pin_owners()`](#cold_storage_pin_owners).                                                                |
+| `source`           | _VARCHAR_             | `backup` for a pin of a backup, `inherited` for a base a recovered database inherited from this root.                                         |
+| `table_dir`        | _VARCHAR_             | Table directory name. Only without an argument.                                                                                               |
+
+The partition timestamp, `seq_txn` and `metadata_version` identify the base's
+object key, `<table>/<timestamp>-<seq_txn>-<metadata_version>/`.
+
+**Example:**
+
+```questdb-sql title="Pinned bases of one table"
+SELECT * FROM cold_storage_pins('trades');
+```
+
+## cold_storage_release_pins
+
+:::note
+
+[Cold storage](/docs/concepts/cold-storage/) and the
+`cold_storage_release_pins()` function are available in **QuestDB Enterprise**
+only.
+
+:::
+
+`cold_storage_release_pins('ownerId')` releases every
+[pin](/docs/operations/cold-storage/#pins) of an owner gone for good, such as a
+backup destination removed from the configuration or a retired recovered
+database, and returns `true`. Garbage collection then deletes its bases once
+nothing else pins them. It runs only on the cold storage manager and requires
+the `SYSTEM ADMIN` permission.
+
+**Arguments:**
+
+- `ownerId` (`string`): an `owner_id` from
+  [`cold_storage_pin_owners()`](#cold_storage_pin_owners), as a constant or a
+  bind variable. It must not be `NULL`.
+
+It fails for an owner the root does not list.
+
+:::danger
+
+Releasing pins cannot be undone. Releasing a backup index still in use drops
+the pins of its older backups. Releasing the `root` owner of a recovered
+database still in use lets garbage collection delete the bases that database
+reads, and its reads of those partitions then fail.
+
+:::
+
+**Example:**
+
+```questdb-sql title="Release a retired backup destination"
+SELECT cold_storage_release_pins('<owner_id>');
+```
+
 ## current_data_id
 
 Returns the data ID: a UUID that identifies this database, generated on first
@@ -301,61 +446,61 @@ seed progress.
 
 Returns a `table` with the following columns:
 
-| Column                                         | Type      | Description                                                                                                            |
-| ---------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `view_name`                                    | STRING    | Live view name                                                                                                         |
-| `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                            |
-| `base_table_name`                              | STRING    | Base table name                                                                                                        |
-| `view_sql`                                     | STRING    | Query used to maintain the view                                                                                        |
+| Column                                         | Type      | Description                                                                                                                                                                                                   |
+| ---------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `view_name`                                    | STRING    | Live view name                                                                                                                                                                                                |
+| `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                                                                                                                   |
+| `base_table_name`                              | STRING    | Base table name                                                                                                                                                                                               |
+| `view_sql`                                     | STRING    | Query used to maintain the view                                                                                                                                                                               |
 | `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable`. A suspended WAL on the view still shows `active`; check [`wal_tables()`](#wal_tables) |
-| `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                     |
-| `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                           |
-| `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                |
-| `in_memory_interval`                           | LONG      | `IN MEMORY` interval value                                                                                             |
-| `in_memory_interval_unit`                      | STRING    | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                  |
-| `in_mem_bytes`                                 | LONG      | Native capacity of the in-memory tier; a peak-sticky high-water mark                                                   |
-| `in_mem_rows`                                  | LONG      | Live row count in the published in-memory tier                                                                         |
-| `o3_rejected_count`                            | LONG      | Late out-of-order rows rejected below the view lower bound; resets on restart                                          |
-| `below_lower_bound_count`                      | LONG      | In-order rows dropped below the view lower bound; resets on restart                                                    |
-| `lag_seqtxn`                                   | LONG      | Base transactions applied to the base table beyond `last_processed_seqtxn`                                             |
-| `lag_micros`                                   | LONG      | Microseconds since the last successful flush; `NULL` until the first flush after creation or restart                   |
-| `last_processed_seqtxn`                        | LONG      | Last base transaction whose output was flushed to the view; the in-memory tier can be ahead of it                      |
-| `applied_watermark`                            | LONG      | Last base transaction durably applied to the view's disk tier                                                          |
-| `lv_consumed_seqtxn`                           | LONG      | Base WAL purge floor held by this view                                                                                 |
-| `view_lower_bound_timestamp`                   | TIMESTAMP | Resolved `START FROM` boundary; `NULL` for `BEGINNING`                                                                 |
-| `writer_stall_micros`                          | LONG      | How long the in-memory tier has been unable to publish because readers pin both buffer slots, or `0`                   |
-| `seed_target_seqtxn`                           | LONG      | Target base transaction during initial seeding; otherwise `NULL`                                                       |
-| `o3_resume_replay_rows`                        | LONG      | Rows emitted by repairs resumed from a checkpoint; resets on restart                                                   |
-| `o3_boundary_replay_rows`                      | LONG      | Rows emitted by rebuild repairs; resets on restart                                                                     |
-| `o3_replay_scan_rows`                          | LONG      | Base rows scanned by both repair paths; resets on restart                                                              |
-| `checkpoint_timeline_generation`               | LONG      | Current published checkpoint-timeline generation                                                                       |
-| `checkpoint_timeline_entries`                  | LONG      | Checkpoint roots in the current generation                                                                             |
-| `checkpoint_timeline_normalized_base_seqtxn`   | LONG      | Base transaction through which the timeline is normalized                                                              |
-| `checkpoint_timeline_logical_bytes`            | LONG      | Bytes the roots would use as independent complete state images                                                         |
-| `checkpoint_timeline_physical_bytes`           | LONG      | Bytes physically stored for the current timeline generation                                                            |
-| `checkpoint_timeline_shared_bytes`             | LONG      | Logical bytes avoided through state sharing                                                                            |
-| `checkpoint_timeline_sharing_ratio`            | DOUBLE    | Shared bytes divided by logical bytes                                                                                  |
-| `checkpoint_timeline_row_position_delta_bytes` | LONG      | Bytes used by the row-position delta index                                                                             |
-| `checkpoint_data_segment_count`                | LONG      | Data segments found by the latest checkpoint purge sweep                                                               |
-| `checkpoint_obsolete_segment_bytes`            | LONG      | Obsolete segment bytes found by the latest purge sweep                                                                 |
-| `checkpoint_oldest_pinned_generation`          | LONG      | Oldest checkpoint generation still retained                                                                            |
-| `checkpoint_gc_lag_generations`                | LONG      | Generations between the current and oldest retained generation                                                         |
-| `checkpoint_last_write_micros`                 | LONG      | Duration of the latest checkpoint write                                                                                |
-| `checkpoint_last_restore_micros`               | LONG      | Duration of the latest checkpoint restore                                                                              |
-| `checkpoint_last_write_new_bytes`              | LONG      | New bytes written by the latest checkpoint publication                                                                 |
-| `checkpoint_last_lookup_depth`                 | LONG      | Metadata-tree depth of the latest checkpoint lookup                                                                    |
-| `checkpoint_repair_in_progress`                | BOOLEAN   | Whether a localized repair is suspended across refresh turns                                                           |
-| `checkpoint_repair_correction_timestamp`       | TIMESTAMP | Earliest timestamp whose output may have changed in the active repair                                                  |
-| `checkpoint_repair_low_timestamp`              | TIMESTAMP | Inclusive base timestamp from which the active repair scans                                                            |
-| `checkpoint_repair_high_timestamp`             | TIMESTAMP | Repair convergence boundary; `NULL` when it runs to end of data                                                        |
-| `checkpoint_repair_roots_versioned`            | LONG      | Checkpoint roots versioned by repairs; resets on restart                                                               |
-| `checkpoint_repair_new_bytes`                  | LONG      | Bytes written by repairs; resets on restart                                                                            |
-| `checkpoint_repair_resumes`                    | LONG      | Times a repair resumed in a later refresh turn; resets on restart                                                      |
-| `checkpoint_repair_failures`                   | LONG      | Repair failures; resets on restart                                                                                     |
-| `checkpoint_repair_plan`                       | STRING    | Available localized plan: `range`, `rows`, `anchor`, a `+` combination, `none`, or `NULL` before compilation           |
-| `checkpoint_repair_last_disposition`           | STRING    | Last executor used: `localized rebuild`, `boundary rebuild`, or `resume from anchor`                                   |
-| `checkpoint_repair_last_denial`                | STRING    | Reason the last repair did not use a localized rebuild; otherwise `NULL`                                               |
-| `checkpoint_seal_failures`                     | LONG      | Failed checkpoint seals; growth means restart-recovery state is going stale; resets on restart                         |
+| `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                                                                                                            |
+| `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                                                                                                                  |
+| `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                                                                                                       |
+| `in_memory_interval`                           | LONG      | `IN MEMORY` interval value                                                                                                                                                                                    |
+| `in_memory_interval_unit`                      | STRING    | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                                                                                                         |
+| `in_mem_bytes`                                 | LONG      | Native capacity of the in-memory tier; a peak-sticky high-water mark                                                                                                                                          |
+| `in_mem_rows`                                  | LONG      | Live row count in the published in-memory tier                                                                                                                                                                |
+| `o3_rejected_count`                            | LONG      | Late out-of-order rows rejected below the view lower bound; resets on restart                                                                                                                                 |
+| `below_lower_bound_count`                      | LONG      | In-order rows dropped below the view lower bound; resets on restart                                                                                                                                           |
+| `lag_seqtxn`                                   | LONG      | Base transactions applied to the base table beyond `last_processed_seqtxn`                                                                                                                                    |
+| `lag_micros`                                   | LONG      | Microseconds since the last successful flush; `NULL` until the first flush after creation or restart                                                                                                          |
+| `last_processed_seqtxn`                        | LONG      | Last base transaction whose output was flushed to the view; the in-memory tier can be ahead of it                                                                                                             |
+| `applied_watermark`                            | LONG      | Last base transaction durably applied to the view's disk tier                                                                                                                                                 |
+| `lv_consumed_seqtxn`                           | LONG      | Base WAL purge floor held by this view                                                                                                                                                                        |
+| `view_lower_bound_timestamp`                   | TIMESTAMP | Resolved `START FROM` boundary; `NULL` for `BEGINNING`                                                                                                                                                        |
+| `writer_stall_micros`                          | LONG      | How long the in-memory tier has been unable to publish because readers pin both buffer slots, or `0`                                                                                                          |
+| `seed_target_seqtxn`                           | LONG      | Target base transaction during initial seeding; otherwise `NULL`                                                                                                                                              |
+| `o3_resume_replay_rows`                        | LONG      | Rows emitted by repairs resumed from a checkpoint; resets on restart                                                                                                                                          |
+| `o3_boundary_replay_rows`                      | LONG      | Rows emitted by rebuild repairs; resets on restart                                                                                                                                                            |
+| `o3_replay_scan_rows`                          | LONG      | Base rows scanned by both repair paths; resets on restart                                                                                                                                                     |
+| `checkpoint_timeline_generation`               | LONG      | Current published checkpoint-timeline generation                                                                                                                                                              |
+| `checkpoint_timeline_entries`                  | LONG      | Checkpoint roots in the current generation                                                                                                                                                                    |
+| `checkpoint_timeline_normalized_base_seqtxn`   | LONG      | Base transaction through which the timeline is normalized                                                                                                                                                     |
+| `checkpoint_timeline_logical_bytes`            | LONG      | Bytes the roots would use as independent complete state images                                                                                                                                                |
+| `checkpoint_timeline_physical_bytes`           | LONG      | Bytes physically stored for the current timeline generation                                                                                                                                                   |
+| `checkpoint_timeline_shared_bytes`             | LONG      | Logical bytes avoided through state sharing                                                                                                                                                                   |
+| `checkpoint_timeline_sharing_ratio`            | DOUBLE    | Shared bytes divided by logical bytes                                                                                                                                                                         |
+| `checkpoint_timeline_row_position_delta_bytes` | LONG      | Bytes used by the row-position delta index                                                                                                                                                                    |
+| `checkpoint_data_segment_count`                | LONG      | Data segments found by the latest checkpoint purge sweep                                                                                                                                                      |
+| `checkpoint_obsolete_segment_bytes`            | LONG      | Obsolete segment bytes found by the latest purge sweep                                                                                                                                                        |
+| `checkpoint_oldest_pinned_generation`          | LONG      | Oldest checkpoint generation still retained                                                                                                                                                                   |
+| `checkpoint_gc_lag_generations`                | LONG      | Generations between the current and oldest retained generation                                                                                                                                                |
+| `checkpoint_last_write_micros`                 | LONG      | Duration of the latest checkpoint write                                                                                                                                                                       |
+| `checkpoint_last_restore_micros`               | LONG      | Duration of the latest checkpoint restore                                                                                                                                                                     |
+| `checkpoint_last_write_new_bytes`              | LONG      | New bytes written by the latest checkpoint publication                                                                                                                                                        |
+| `checkpoint_last_lookup_depth`                 | LONG      | Metadata-tree depth of the latest checkpoint lookup                                                                                                                                                           |
+| `checkpoint_repair_in_progress`                | BOOLEAN   | Whether a localized repair is suspended across refresh turns                                                                                                                                                  |
+| `checkpoint_repair_correction_timestamp`       | TIMESTAMP | Earliest timestamp whose output may have changed in the active repair                                                                                                                                         |
+| `checkpoint_repair_low_timestamp`              | TIMESTAMP | Inclusive base timestamp from which the active repair scans                                                                                                                                                   |
+| `checkpoint_repair_high_timestamp`             | TIMESTAMP | Repair convergence boundary; `NULL` when it runs to end of data                                                                                                                                               |
+| `checkpoint_repair_roots_versioned`            | LONG      | Checkpoint roots versioned by repairs; resets on restart                                                                                                                                                      |
+| `checkpoint_repair_new_bytes`                  | LONG      | Bytes written by repairs; resets on restart                                                                                                                                                                   |
+| `checkpoint_repair_resumes`                    | LONG      | Times a repair resumed in a later refresh turn; resets on restart                                                                                                                                             |
+| `checkpoint_repair_failures`                   | LONG      | Repair failures; resets on restart                                                                                                                                                                            |
+| `checkpoint_repair_plan`                       | STRING    | Available localized plan: `range`, `rows`, `anchor`, a `+` combination, `none`, or `NULL` before compilation                                                                                                  |
+| `checkpoint_repair_last_disposition`           | STRING    | Last executor used: `localized rebuild`, `boundary rebuild`, or `resume from anchor`                                                                                                                          |
+| `checkpoint_repair_last_denial`                | STRING    | Reason the last repair did not use a localized rebuild; otherwise `NULL`                                                                                                                                      |
+| `checkpoint_seal_failures`                     | LONG      | Failed checkpoint seals; growth means restart-recovery state is going stale; resets on restart                                                                                                                |
 
 The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes`
 is the peak-sticky arena footprint that does not shrink after a burst, while
@@ -466,11 +611,11 @@ SELECT view_name, view_status, base_table_name, refresh_base_table_txn,
 FROM materialized_views();
 ```
 
-| view_name       | view_status | base_table_name | refresh_base_table_txn | base_table_txn | expire_clause                       | expire_cleanup_every | expire_enforcement |
-| --------------- | ----------- | --------------- | ---------------------- | -------------- | ----------------------------------- | -------------------- | ------------------ |
-| trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                | null                 | null               |
-| trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now()) | 30m                  | FILTER_AND_RECLAIM |
-| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST ON timestamp PARTITION BY symbol | 1h          | FILTER_ONLY        |
+| view_name       | view_status | base_table_name | refresh_base_table_txn | base_table_txn | expire_clause                                | expire_cleanup_every | expire_enforcement |
+| --------------- | ----------- | --------------- | ---------------------- | -------------- | -------------------------------------------- | -------------------- | ------------------ |
+| trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                         | null                 | null               |
+| trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now())          | 30m                  | FILTER_AND_RECLAIM |
+| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST ON timestamp PARTITION BY symbol | 1h                   | FILTER_ONLY        |
 
 ## memory_metrics
 
@@ -707,22 +852,22 @@ it gets `Access denied for <user> [RESOURCE GROUP ADMIN]`.
 
 Returns a table with these columns:
 
-| Column                     | Type      | Description                                                                                  |
-| -------------------------- | --------- | -------------------------------------------------------------------------------------------- |
-| `name`                     | `VARCHAR` | Group name                                                                                   |
+| Column                     | Type      | Description                                                                                     |
+| -------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
+| `name`                     | `VARCHAR` | Group name                                                                                      |
 | `memory_limit_bytes`       | `LONG`    | Effective memory ceiling in bytes, after the process budget caps it; `0` means no group ceiling |
-| `max_active_queries`       | `INT`     | Concurrent admission limit as configured; `null` when the group sets none                     |
-| `max_queued_queries`       | `INT`     | Queue capacity as configured; `null` when the group sets none, `0` to disable queueing        |
-| `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds, falling back to the instance default             |
-| `cpu_weight`               | `INT`     | Effective relative scheduling weight; `100` when the group sets none                          |
-| `active_queries`           | `LONG`    | Queries currently holding admission slots                                                    |
-| `queued_queries`           | `LONG`    | Queries waiting for admission                                                                |
-| `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                            |
-| `memory_used_bytes`        | `LONG`    | Published tracked native query memory in bytes                                               |
-| `cpu_nanos_total`          | `LONG`    | CPU nanoseconds measured by managed scheduling                                               |
-| `cpu_wait_nanos_total`     | `LONG`    | Cumulative time queries spent waiting for CPU, in nanoseconds                                |
-| `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                             |
-| `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                |
+| `max_active_queries`       | `INT`     | Concurrent admission limit as configured; `null` when the group sets none                       |
+| `max_queued_queries`       | `INT`     | Queue capacity as configured; `null` when the group sets none, `0` to disable queueing          |
+| `queue_timeout_millis`     | `LONG`    | Effective admission timeout in milliseconds, falling back to the instance default               |
+| `cpu_weight`               | `INT`     | Effective relative scheduling weight; `100` when the group sets none                            |
+| `active_queries`           | `LONG`    | Queries currently holding admission slots                                                       |
+| `queued_queries`           | `LONG`    | Queries waiting for admission                                                                   |
+| `oldest_queue_wait_millis` | `LONG`    | Age of the oldest admission waiter in milliseconds; `0` when none                               |
+| `memory_used_bytes`        | `LONG`    | Published tracked native query memory in bytes                                                  |
+| `cpu_nanos_total`          | `LONG`    | CPU nanoseconds measured by managed scheduling                                                  |
+| `cpu_wait_nanos_total`     | `LONG`    | Cumulative time queries spent waiting for CPU, in nanoseconds                                   |
+| `admission_rejections`     | `LONG`    | Cumulative queue-full rejections                                                                |
+| `admission_timeouts`       | `LONG`    | Cumulative admission timeouts                                                                   |
 
 The policy columns do not all report the same thing. `max_active_queries` and
 `max_queued_queries` show what the group itself sets, and are `null` when it sets
@@ -938,8 +1083,12 @@ function are available in **QuestDB Enterprise** only.
 
 `table_cold_partitions('tableName')` returns one row per partition in the
 table's remote manifest, with the state of its object in the store. Use it to
-follow a partition through upload and sealing, and to find partitions that are
-not progressing.
+follow a partition through upload, to find partitions that are not
+progressing, and to find the object that currently holds a partition's data.
+
+A partition can have several bases in the object store over time, each under
+its own key. The function shows, for each partition, its newest `active` base,
+otherwise its newest `deleting` one, otherwise its newest `pending` one.
 
 **Arguments:**
 
@@ -952,24 +1101,32 @@ the caller [cannot see](/docs/security/rbac/#object-visibility), it fails with
 
 **Columns:**
 
-| Column           | Type        | Description                                                                                     |
-| ---------------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| `timestamp`      | _TIMESTAMP_ | Lower bound of the partition.                                                                   |
-| `state`          | _STRING_    | `pending`, `live`, `sealed`, or `deleting`. See below.                                          |
-| `seq_txn`        | _LONG_      | WAL transaction version the uploaded object was built from. `NULL` until the object is durable. |
-| `size`           | _LONG_      | Size of the uploaded object in bytes. `NULL` until the object is durable.                       |
-| `last_modified`  | _TIMESTAMP_ | When the object was last written. `NULL` until the object is durable.                           |
-| `deleting_since` | _TIMESTAMP_ | When the garbage-collection grace timer started. `NULL` unless the state is `deleting`.         |
-| `partition_path` | _STRING_    | Object key of the partition's `data.parquet`.                                                   |
+| Column           | Type        | Description                                                                             |
+| ---------------- | ----------- | --------------------------------------------------------------------------------------- |
+| `timestamp`      | _TIMESTAMP_ | Lower bound of the partition.                                                           |
+| `state`          | _VARCHAR_   | `pending`, `active`, `deleting`, or `unknown`. See below.                               |
+| `seq_txn`        | _LONG_      | WAL transaction version the object was built from.                                      |
+| `size`           | _LONG_      | Size of the uploaded object in bytes. `NULL` until the object is durable.               |
+| `last_modified`  | _TIMESTAMP_ | When the object was last written. `NULL` until the object is durable.                   |
+| `deleting_since` | _TIMESTAMP_ | When the garbage-collection grace timer started. `NULL` unless the state is `deleting`. |
+| `partition_path` | _VARCHAR_   | Object key of the base's `data.parquet`.                                                |
 
 **Partition states:**
 
-| State      | Meaning                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------------------- |
-| `pending`  | Upload work is registered, but the object is not yet durable. The object-fact columns are `NULL`.       |
-| `live`     | The uploaded snapshot is durable. The partition is still served locally and can still accept late data. |
-| `sealed`   | The partition is read-only and approved for remote service.                                             |
-| `deleting` | The table no longer references the partition. Its objects are reclaimed once the grace period elapses.  |
+| State      | Meaning                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `pending`  | Upload work is registered, but the object is not yet durable. The object-fact columns are `NULL`. |
+| `active`   | The object is durable, and is the one the partition serves, or will serve after `DROP LOCAL`.     |
+| `deleting` | The table no longer references the object. It is reclaimed once the grace period elapses.         |
+| `unknown`  | The manifest holds a state this instance does not recognise.                                      |
+
+:::warning
+
+Breaking change in QuestDB Enterprise ENTERPRISE_VERSION_TBD: the `live` and
+`sealed` states are replaced by `active`. Update monitoring queries that filter
+on them.
+
+:::
 
 **Example:**
 
@@ -979,10 +1136,10 @@ SELECT * FROM table_cold_partitions('trades');
 
 | timestamp                   | state    | seq_txn | size    | last_modified               | deleting_since              | partition_path                                  |
 | --------------------------- | -------- | ------- | ------- | --------------------------- | --------------------------- | ----------------------------------------------- |
-| 2026-02-08T00:00:00.000000Z | deleting | 152300  | 5318144 | 2026-02-15T01:30:11.482000Z | 2026-03-11T08:32:50.000000Z | trades~5/year=2026/month=02/day=08/data.parquet |
-| 2026-02-09T00:00:00.000000Z | sealed   | 153118  | 5290992 | 2026-02-16T01:30:09.044000Z | null                        | trades~5/year=2026/month=02/day=09/data.parquet |
-| 2026-02-10T00:00:00.000000Z | live     | 198404  | 5275600 | 2026-02-17T01:30:14.210000Z | null                        | trades~5/year=2026/month=02/day=10/data.parquet |
-| 2026-02-11T00:00:00.000000Z | pending  | null    | null    | null                        | null                        | trades~5/year=2026/month=02/day=11/data.parquet |
+| 2026-02-08T00:00:00.000000Z | deleting | 152300  | 5318144 | 2026-02-15T01:30:11.482000Z | 2026-03-11T08:32:50.000000Z | trades~5/1770508800000000-152300-7/data.parquet |
+| 2026-02-09T00:00:00.000000Z | active   | 153118  | 5290992 | 2026-02-16T01:30:09.044000Z | null                        | trades~5/1770595200000000-153118-7/data.parquet |
+| 2026-02-10T00:00:00.000000Z | active   | 198404  | 5275600 | 2026-02-17T01:30:14.210000Z | null                        | trades~5/1770681600000000-198404-7/data.parquet |
+| 2026-02-11T00:00:00.000000Z | pending  | 199020  | null    | null                        | null                        | trades~5/1770768000000000-199020-7/data.parquet |
 
 ```questdb-sql title="Partitions that are not yet durable"
 SELECT timestamp, state, partition_path
@@ -1100,7 +1257,11 @@ Returns a table with the following columns:
   (same output as function
   [size_pretty](/docs/query/functions/numeric/#size_pretty))
 - `readOnly` - _BOOLEAN_, true if the partition is
-  [attached via soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links)
+  [attached via soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
+  or sealed by a storage policy's `DROP LOCAL` stage (Enterprise). False for a
+  partition that keeps
+  [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), also
+  once it is remotely served
 - `active` - _BOOLEAN_, true if the partition is the last partition, and whether
   we are writing to it (at least one record)
 - `attached` - _BOOLEAN_, true if the partition is
@@ -1125,8 +1286,9 @@ Returns a table with the following columns:
 - `seqTxn` - _LONG_, WAL transaction version the partition was last written at
 - `isRemotelyServed` - _BOOLEAN_, true if the partition's data lives in object
   storage and is fetched with range reads. Only local Parquet metadata and
-  symbol indexes remain on disk. A remotely served partition is always
-  read-only. See [cold storage](/docs/concepts/cold-storage/) (Enterprise)
+  symbol indexes remain on disk. A remotely served partition is read-only,
+  unless it keeps late rows. See [cold storage](/docs/concepts/cold-storage/)
+  (Enterprise)
 
 - `deadRows` - _LONG_, physical rows no longer referenced by live pieces;
   zero for a standard native partition
@@ -1277,20 +1439,20 @@ Returns a `table` with the following columns:
 
 ### Basic table information
 
-| Column                 | Type    | Description                                                        |
-| ---------------------- | ------- | ------------------------------------------------------------------ |
-| `id`                   | INT     | Internal table ID                                                  |
-| `table_name`           | STRING  | Table name                                                         |
-| `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
-| `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`                | BOOLEAN | Whether deduplication is enabled, in either mode. [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause) shows the mode |
-| `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
-| `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
-| `matView`              | BOOLEAN | Whether this is a materialized view                                |
-| `directoryName`        | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
-| `maxUncommittedRows`   | INT     | Table's `maxUncommittedRows` setting                               |
-| `o3MaxLag`             | LONG    | Table's `o3MaxLag` setting in microseconds                         |
+| Column                | Type    | Description                                                                                                                        |
+| --------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                  | INT     | Internal table ID                                                                                                                  |
+| `table_name`          | STRING  | Table name                                                                                                                         |
+| `designatedTimestamp` | STRING  | Name of the designated timestamp column, or `null`                                                                                 |
+| `partitionBy`         | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                                                                 |
+| `walEnabled`          | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                                                                                           |
+| `dedup`               | BOOLEAN | Whether deduplication is enabled, in either mode. [`SHOW CREATE TABLE`](/docs/query/sql/show/#deduplication-clause) shows the mode |
+| `ttlValue`            | INT     | TTL (Time-To-Live) value                                                                                                           |
+| `ttlUnit`             | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                                                                                   |
+| `matView`             | BOOLEAN | Whether this is a materialized view                                                                                                |
+| `directoryName`       | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)                                                                      |
+| `maxUncommittedRows`  | INT     | Table's `maxUncommittedRows` setting                                                                                               |
+| `o3MaxLag`            | LONG    | Table's `o3MaxLag` setting in microseconds                                                                                         |
 
 :::note
 
@@ -1335,17 +1497,17 @@ highest.
 
 ### WAL metrics (wal\_\* prefix)
 
-| Column                            | Type      | Description                                                   |
-| --------------------------------- | --------- | ------------------------------------------------------------- |
-| `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table              |
+| Column                            | Type      | Description                                                                                                                                                               |
+| --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table                                                                                                                          |
 | `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication in either mode (since server start). A duplicate counts even when it is identical to the stored row and `UPSERT` changes nothing |
-| `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)            |
-| `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)     |
-| `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)          |
-| `wal_tx_size_p50`                 | LONG      | Median transaction size in rows                               |
-| `wal_tx_size_p90`                 | LONG      | 90th percentile transaction size in rows                      |
-| `wal_tx_size_p99`                 | LONG      | 99th percentile transaction size in rows                      |
-| `wal_tx_size_max`                 | LONG      | Maximum transaction size in rows                              |
+| `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)                                                                                                                        |
+| `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)                                                                                                                 |
+| `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)                                                                                                                      |
+| `wal_tx_size_p50`                 | LONG      | Median transaction size in rows                                                                                                                                           |
+| `wal_tx_size_p90`                 | LONG      | 90th percentile transaction size in rows                                                                                                                                  |
+| `wal_tx_size_p99`                 | LONG      | 99th percentile transaction size in rows                                                                                                                                  |
+| `wal_tx_size_max`                 | LONG      | Maximum transaction size in rows                                                                                                                                          |
 
 ### Replica metrics (replica\_\* prefix)
 
@@ -1366,7 +1528,7 @@ On primary instances, these columns will be `0` or `false`.
 ### Row-expiry policy
 
 | Column                 | Type   | Description                                                               |
-| ---------------------- | ------ | --------------------------------------------------------------            |
+| ---------------------- | ------ | ------------------------------------------------------------------------- |
 | `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy in its canonical form, or `null` |
 | `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                                 |
 

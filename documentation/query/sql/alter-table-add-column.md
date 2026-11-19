@@ -18,6 +18,8 @@ first failure. It is therefore possible to add some columns and not others.
 - Adding a new column does not lock the table for reading and does not wait on
   any reads to finish.
 
+- In QuestDB Enterprise, `ADD COLUMN ... INDEX` fails with `cannot create index, table has a delta-active partition` on a table that holds partitions with [late rows in cold storage](/docs/concepts/cold-storage-late-rows/).
+
 :::
 
 ## Syntax

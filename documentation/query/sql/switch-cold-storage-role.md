@@ -40,6 +40,10 @@ Issue them against the specific node whose role you want to change or inspect.
 
 The role is independent of the [replication](/docs/high-availability/overview/) primary and replica roles. Promoting a replica to primary does not move the manager role, and moving the manager role does not affect replication.
 
+Promotion to manager fails with [`ER010`](/docs/troubleshooting/error-codes/#er010) when the root belongs to another database. A root written by a manager of QuestDB Enterprise ENTERPRISE_VERSION_TBD or later cannot be managed by an earlier release, which logs `incompatible version: got 2.0, expected major version 1` and pauses cold storage. See [Upgrade](/docs/operations/upgrade/).
+
+The functions that list and release [pins](/docs/operations/cold-storage/#pins), such as [`cold_storage_pin_owners()`](/docs/query/functions/meta/#cold_storage_pin_owners), run only on the manager.
+
 A role set this way does **not** survive a restart. Update `cold.storage.role` in `server.conf` after a durable handoff, otherwise the instance boots back into its configured role.
 
 ### Status columns
@@ -51,7 +55,7 @@ A role set this way does **not** survive a restart. Update `cold.storage.role` i
 | `state` | _STRING_ | `REFRESHER`, `PROMOTING`, `MANAGER`, or `DEMOTING`                 |
 | `term`  | _LONG_   | Ownership term, positive only while manager work is being accepted |
 
-`PROMOTING` and `DEMOTING` are transient. A stable role is `REFRESHER` or `MANAGER`; treat a `MANAGER` state with a non-positive `term` as not yet accepting work.
+`PROMOTING` and `DEMOTING` are transient. An instance that cannot reach the root, for example because of wrong credentials, can stay in `PROMOTING`: check its log and object store access. A stable role is `REFRESHER` or `MANAGER`; treat a `MANAGER` state with a non-positive `term` as not yet accepting work.
 
 ### Timeout behaviour
 

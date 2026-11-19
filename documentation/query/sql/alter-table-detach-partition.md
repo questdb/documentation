@@ -5,7 +5,8 @@ description: DETACH PARTITION SQL keyword reference documentation.
 ---
 
 Makes partition data unavailable for reads and prepares partition directory for
-transportation. A partition detached by this SQL keyword can be "re-attached"
+transportation. This is a manual archiving workflow, separate from QuestDB
+Enterprise [cold storage](/docs/concepts/cold-storage/). A partition detached by this SQL keyword can be "re-attached"
 using the complementary SQL keyword
 [ALTER TABLE ATTACH PARTITION](/docs/query/sql/alter-table-attach-partition/).
 
@@ -61,3 +62,5 @@ named `timestamp`:
 - The operation does not support detaching:
   - An active (the last) partition.
   - The only partition in case of non-partitioned tables.
+  - A read-only partition, such as one [attached from a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links): `cannot detach partition, partition is read-only`. Use [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) instead, which removes the link and keeps its target.
+- In QuestDB Enterprise, `DETACH PARTITION` is refused on a table tracked by [cold storage](/docs/concepts/cold-storage/), or whose storage policy has a `TO REMOTE` stage, with `cannot detach partition, table is tracked by cold storage`, and on a partition that keeps [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), with `cannot detach partition, partition is delta-active`. See [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables).

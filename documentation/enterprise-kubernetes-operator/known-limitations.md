@@ -72,6 +72,14 @@ promotion never waits on cold ownership; while the manager is lost, new
 uploads and remote garbage collection pause and refreshers continue serving
 already-offloaded partitions.
 
+Upgrading to QuestDB Enterprise ENTERPRISE_VERSION_TBD needs the opposite
+placement for the duration of the image rollout: the manager on the primary,
+which the rollout recreates last. Plan no `Planned` promotion until the
+rollout completes and the manager is back on a replica, see
+[Upgrade QuestDB with cold storage](/docs/enterprise-kubernetes-operator/configuration/#upgrade-questdb-with-cold-storage).
+QuestDB itself also refuses a promotion of a replica that is behind the
+cold-storage root, with [`ER011`](/docs/troubleshooting/error-codes/#er011).
+
 ### Promotion can be unbounded
 
 A live but hung final upload can hold `Draining`: the operator cannot

@@ -95,6 +95,7 @@ runs on. It is not replicated.
   [object storage](/docs/concepts/cold-storage/) have no local files to
   rebuild. They are skipped, and the statement fails if every selected
   partition is cold.
+- **Partitions that keep [late rows in cold storage](/docs/concepts/cold-storage-late-rows/)** are skipped, and the statement fails with `cannot reindex Delta partitions` if every selected partition is one of them or cold.
 - **Partitions attached from a soft link** are skipped, because a new
   directory version would move them off their attached volume.
 
@@ -130,15 +131,15 @@ holds affected partitions.
 
 ## Errors
 
-| Error                                                                                    | Cause                                                                           |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `'parquet' expected`                                                                     | The `PARQUET` keyword is missing after `FORCE REINDEX`.                         |
-| `Invalid column: columnName`                                                             | The column does not exist.                                                      |
-| `column is not indexed`                                                                  | The `COLUMN` clause names a column without an index.                            |
-| `partition does not exist`                                                               | A partition in `PARTITION LIST` does not exist.                                 |
-| `partition is not parquet, use REINDEX TABLE ... LOCK EXCLUSIVE for native partitions`   | A partition in `PARTITION LIST` is in native format. No partition is rebuilt.   |
-| `cannot reindex cold partitions, they have no local data`                                | Every selected partition is cold.                                               |
-| `table is not partitioned, use REINDEX TABLE ... LOCK EXCLUSIVE`                         | The table has no partitions, so it has no Parquet partitions.                   |
+| Error                                                                                  | Cause                                                                         |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `'parquet' expected`                                                                   | The `PARQUET` keyword is missing after `FORCE REINDEX`.                       |
+| `Invalid column: columnName`                                                           | The column does not exist.                                                    |
+| `column is not indexed`                                                                | The `COLUMN` clause names a column without an index.                          |
+| `partition does not exist`                                                             | A partition in `PARTITION LIST` does not exist.                               |
+| `partition is not parquet, use REINDEX TABLE ... LOCK EXCLUSIVE for native partitions` | A partition in `PARTITION LIST` is in native format. No partition is rebuilt. |
+| `cannot reindex cold partitions, they have no local data`                              | Every selected partition is cold.                                             |
+| `table is not partitioned, use REINDEX TABLE ... LOCK EXCLUSIVE`                       | The table has no partitions, so it has no Parquet partitions.                 |
 
 The statement also fails, rather than waiting, when another operation holds the
 table writer, for example while WAL transactions are being applied. Retry it

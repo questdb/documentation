@@ -309,8 +309,10 @@ still cannot read rows: `SELECT * FROM trades` fails with `Access denied`.
 credentials like an administrator's. Besides visibility, it authorizes:
 
 - [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/), which
-  discards a table's pending WAL, and
-  [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/)
+  discards a table's pending WAL,
+  [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/), and
+  the `cold_storage_*` functions, including
+  [`cold_storage_release_pins()`](/docs/query/functions/meta/#cold_storage_release_pins)
 - System functions, such as `hydrate_table_metadata()` and `reload_tls()`
 - `files()` and `glob()` on any directory of the server
 
@@ -1212,7 +1214,7 @@ SELECT * FROM all_permissions();
 | SYSTEM ADMIN              | Database                            | System functions (reload_tls, reader_pool, etc.); makes objects [visible](#object-visibility) |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
 | UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
-| VACUUM TABLE              | Database &#124; Table               | Reclaim storage                         |
+| VACUUM TABLE              | Database &#124; Table               | Reclaim storage; also [`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/) and `COMPACT CANCEL` |
 
 ### User management permissions
 
@@ -1253,6 +1255,9 @@ A few operations have no permission of their own. They require `SYSTEM ADMIN`, w
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/)     | Rebuilds a suspended WAL table under a fresh sequencer                                      |
 | [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) | Moves the [cold storage](/docs/concepts/cold-storage/) manager role, including with `FORCE` |
+| [`cold_storage_compactions()`](/docs/query/functions/meta/#cold_storage_compactions) | Lists this instance's compactions of late rows in cold storage |
+| [`cold_storage_pin_owners()`](/docs/query/functions/meta/#cold_storage_pin_owners), [`cold_storage_pins()`](/docs/query/functions/meta/#cold_storage_pins) | List the cold storage [pins](/docs/operations/cold-storage/#pins) of the root |
+| [`cold_storage_release_pins()`](/docs/query/functions/meta/#cold_storage_release_pins) | Releases an owner's cold storage pins, irreversibly |
 
 By contrast, [`SWITCH ROLE`](/docs/query/sql/switch-role/), which moves the
 replication role, is an ordinary grantable permission.

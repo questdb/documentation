@@ -44,7 +44,12 @@ SELECT ... FROM subQueryName;
 If the target partition is
 [attached by a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
 the partition is read-only. `INSERT` operation on a read-only partition triggers
-a critical-level log in the server, and the insert is a no-op.
+a critical-level log in the server, and the insert is a no-op. On a WAL table
+with deduplication, the transaction fails instead and the table is suspended,
+see [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
+The same applies to partitions that QuestDB Enterprise
+[cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows) sealed,
+unless [late rows](/docs/concepts/cold-storage-late-rows/) are enabled.
 
 :::
 

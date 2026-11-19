@@ -82,11 +82,14 @@ deployments), reducing the local storage footprint. These remote partitions
 remain directly queryable from QuestDB with SQL, exactly as if they were stored
 locally, and the primary and all replicas share the same object storage.
 
-In QuestDB Enterprise this is automated through [cold storage](/docs/concepts/cold-storage/), driven by the `TO REMOTE` and `DROP REMOTE` stages of a [storage policy](/docs/concepts/storage-policy/). A partition is uploaded as Parquet, sealed as read-only, and then evicted from local disk, keeping only its metadata and symbol indexes locally so that queries fetch just the column chunks they need.
+In QuestDB Enterprise this is automated through [cold storage](/docs/concepts/cold-storage/), driven by the `TO REMOTE` and `DROP REMOTE` stages of a [storage policy](/docs/concepts/storage-policy/). A partition is uploaded as Parquet, sealed as read-only, and then evicted from local disk, keeping only its metadata and symbol indexes locally so that queries fetch just the column chunks they need. With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, the partition is not sealed: rows that arrive later stay on local disk, queries merge them with the remote Parquet, and background maintenance folds them into a new Parquet object.
 
 Once partitions are in object storage, they can be catalogued into data lakes,
 for example through Hive partition registration, an Iceberg catalog, or a
-DuckLake catalog.
+DuckLake catalog. Cold storage keeps one object per version of a partition
+rather than a Hive-style layout, so take the current object of each partition
+from
+[`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions).
 
 
 

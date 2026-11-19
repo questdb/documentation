@@ -32,7 +32,7 @@ available in all editions.
 | Where does this data come from? | [`SHOW CREATE`](/docs/query/sql/show/), [`views()`](/docs/query/functions/meta/#views), [`materialized_views()`](/docs/query/functions/meta/#materialized_views) | All |
 | How long is it kept? | [Storage policies](/docs/concepts/storage-policy/) | QuestDB Enterprise |
 | How long is it kept? | [TTL](/docs/concepts/ttl/) | QuestDB open source |
-| Can it still change? | [Immutability after `DROP LOCAL`](/docs/concepts/cold-storage/#immutability-after-drop-local) | QuestDB Enterprise |
+| Can it still change? | [What happens to late rows after `DROP LOCAL`](/docs/concepts/cold-storage/#what-happens-to-late-rows) | QuestDB Enterprise |
 | Can we recover it? | [Backup](/docs/operations/backup/), [point-in-time recovery](/docs/operations/point-in-time-recovery/), [replication](/docs/high-availability/overview/) | QuestDB Enterprise |
 | Can we recover it? | [Checkpoints](/docs/operations/backup/#questdb-oss-manual-backups-with-checkpoints) | All |
 
@@ -217,15 +217,19 @@ ALTER TABLE fx_trades SET STORAGE POLICY(
 ```
 
 Once `DROP LOCAL` runs, a partition is
-[sealed](/docs/concepts/cold-storage/#immutability-after-drop-local): later
+[sealed](/docs/concepts/cold-storage/#what-happens-to-late-rows): later
 inserts and updates that target it are not applied, and removing the policy does
-not unseal it. Partitions in cold storage remain queryable with normal SQL.
+not unseal it. With
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) enabled, a
+table without deduplication keeps accepting inserts for the partition instead,
+but still refuses `UPDATE`. Partitions in cold storage remain queryable with
+normal SQL.
 
 To check that retention is applied,
 [`storage_policies`](/docs/query/functions/meta/#storage_policies) lists the
 policy on each table, including system tables such as `sys.view_audit`, and
 [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions)
-shows which partitions of a table are uploaded and sealed.
+shows which partitions of a table are uploaded to the object store.
 
 In QuestDB open source, [TTL](/docs/concepts/ttl/) drops partitions older than a set
 age. QuestDB Enterprise rejects TTL on user tables in favor of storage

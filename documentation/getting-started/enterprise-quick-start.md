@@ -534,12 +534,14 @@ Tiering saves more storage on top of Parquet compression:
   every replica read the same object instead of each holding its own copy.
 - History is no longer limited by the size of a single volume.
 
-`DROP LOCAL` makes a partition read-only, so set it beyond the longest window
-in which late rows or corrections can arrive. See
-[Immutability after DROP LOCAL](/docs/concepts/cold-storage/#immutability-after-drop-local).
+By default, `DROP LOCAL` makes a partition read-only, so set it beyond the
+longest window in which late rows or corrections can arrive. To keep rows that
+arrive later, enable
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/). See
+[What happens to late rows](/docs/concepts/cold-storage/#what-happens-to-late-rows).
 
 Tiering requires [cold storage](/docs/concepts/cold-storage/) to be enabled and
-an object store prefix to be configured first. See
+an object store root to be configured first. See
 [Operating cold storage](/docs/operations/cold-storage/) for the setup
 procedure.
 
