@@ -211,7 +211,7 @@ timestamp keeps that permission as an
 mapped to, chosen with
 [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/) or with the
 `resource_group` parameter of an HTTP request. It is available from QuestDB
-Enterprise 4.2.0. Grant it for one group:
+Enterprise 4.2.2. Grant it for one group:
 
 ```questdb-sql
 GRANT USE ON RESOURCE GROUP alerts TO monitoring;

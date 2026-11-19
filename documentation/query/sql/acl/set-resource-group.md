@@ -14,14 +14,14 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   instance.
 </EnterpriseNote>
 
-`SET RESOURCE GROUP` runs the rest of a PostgreSQL session's queries in a
-resource group other than the one its principal is mapped to. One account can
-then send urgent and routine work to groups with different policies: a
-monitoring account, for example, can evaluate its alert rules in a heavily
+`SET RESOURCE GROUP` chooses a group for later managed queries on the same
+PostgreSQL or [QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/)
+connection. This lets one account send urgent and routine work to groups with
+different policies. A monitoring account can evaluate its alert rules in a heavily
 weighted group while its dashboards stay in an ordinary one.
 `RESET RESOURCE GROUP` returns the session to the mapped group.
 
-HTTP has no SQL session, so a request chooses its group with the
+An HTTP request chooses its group with the
 `resource_group` parameter of
 [`/execute`](/docs/connect/compatibility/rest-api/#execute) instead, under the
 same permission rules.
@@ -34,7 +34,7 @@ principal's queries run in by default, map the principal with
 `... SET RESOURCE GROUP`.
 
 `SET RESOURCE GROUP`, `RESET RESOURCE GROUP` and the `resource_group` parameter
-are available from QuestDB Enterprise 4.2.0.
+are available from QuestDB Enterprise 4.2.2.
 
 ---
 
@@ -85,18 +85,20 @@ Two related statements fail instead of doing something unexpected:
 
 ### Which connections can switch
 
-Only a PostgreSQL wire connection has a SQL session. A PostgreSQL connection
-parameter cannot set the group, so send `SET RESOURCE GROUP` after connecting.
-On any other connection, `SET RESOURCE GROUP` and `RESET RESOURCE GROUP` fail
-with
-`Resource Group switching needs a session, over HTTP send the group in the resource_group parameter of /exec`,
-where `/exec` is the older name of `/execute`:
+Send `SET RESOURCE GROUP` as SQL after opening a PostgreSQL connection or a
+QWP egress WebSocket. PostgreSQL startup parameters leave the mapped group in
+effect. For QWP, send `SET`, each query, and `RESET` as separate `QUERY_REQUEST`
+messages. The selected group belongs to the connection. After
+a disconnect or failover, the new connection starts in the principal's mapped
+group and can switch again with `SET RESOURCE GROUP`.
 
-- Over HTTP, send the group with each request to `/execute`, as in the
-  [example below](#choose-the-group-for-one-http-request). The export endpoint
-  `/exp` does not take the parameter, so its exports run in the mapped group.
-- Clients that query over QWP have neither a session nor a parameter, so their
-  queries always run in the principal's mapped group.
+Outside a SQL session, `SET RESOURCE GROUP` and `RESET RESOURCE GROUP` fail with
+`Resource Group switching needs a session, over HTTP send the group in the resource_group parameter of /exec`,
+where `/exec` is the older name of `/execute`.
+
+Over HTTP, send the group with each request to `/execute`, as in the
+[example below](#choose-the-group-for-one-http-request). Exports through `/exp`
+use the mapped group.
 
 ### Permissions
 
@@ -142,20 +144,23 @@ check the HTTP parameter gets:
   message when its query starts. A request whose statement is not managed, such
   as `INSERT ... VALUES`, does not check the parameter at all.
 
-With access control disabled nothing is checked. Mapping statements need access
-control, so on such an instance choosing a group per session or request is the
-only way to run queries outside `DEFAULT`.
+With access control disabled, QuestDB skips the permission check. The selected
+group must still exist. Mapping statements require access control, so choose a
+group per session or request to run queries outside `DEFAULT`.
 
 ### Connection pools
 
-`DISCARD ALL` and `RESET ALL` clear the session's group. A pooler that resets
-each connection with one of them before handing it to the next client, such as
-PgBouncer in session pooling mode, starts every client in its mapped group.
-Many pools do not reset sessions: PgBouncer in transaction pooling mode, and
-application-side pools such as HikariCP, hand the connection on with the group
-still chosen, so the next client's queries run in that group too. Give the work
-that switches groups a pool or connection of its own, and switch once after it
-connects.
+`SET RESOURCE GROUP` applies to the database connection that runs it. In
+PgBouncer's transaction pooling mode, for example, `SET RESOURCE GROUP alerts`
+can run on connection A and the next `SELECT current_resource_group()` on
+connection B. The `SELECT` returns B's group. A keeps `alerts`, which a later
+client can inherit if the pool leaves the connection as is.
+
+Use a direct connection or session pooling to keep the setting and the queries
+that use it on the same connection. Before returning a shared connection to
+the pool, run `RESET RESOURCE GROUP`, `DISCARD ALL`, or `RESET ALL` to restore
+its mapped group. PgBouncer does this with `DISCARD ALL` by default in session
+pooling mode.
 
 ## Examples
 

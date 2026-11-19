@@ -257,7 +257,7 @@ WHERE table_name = 'prices';
 
 :::caution
 
-QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.0,
+QuestDB versions before 10.2.0 and QuestDB Enterprise versions before 4.2.1,
 including replicas that still run such a version, do not recognize the `SKIP`
 mode:
 

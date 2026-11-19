@@ -182,6 +182,23 @@ When commits are flushed to the disk, for the whole instance:
 Any other value stops the start. See
 [Durability and commit modes](/docs/concepts/durability/).
 
+### cairo.commit.mode.adaptive.downgrade
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Prepares the database for an earlier release. QuestDB 10.2.1 and QuestDB
+Enterprise 4.2.1 lock every table they write, and QuestDB 10.1.0, QuestDB
+Enterprise 4.1.0, and earlier releases refuse to open a locked table. With
+`true`, the start removes the checksums and the lock from every table, and the
+server stores neither while it runs. Restart once with it, stop the server, and
+install the earlier release.
+
+It works only with `cairo.commit.mode=nosync`. In any other mode, the server
+does not start. Remove it after upgrading again, or the server keeps running
+without checksums. See
+[Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+
 ### cairo.max.uncommitted.rows
 
 - **Default**: `500000`
@@ -602,9 +619,26 @@ looked up in database files.
 - **Default**: `256`
 - **Reloadable**: no
 
-Approximate capacity for `SYMBOL` columns. Should equal the number of unique
-symbol values stored in the table. Getting this value significantly wrong
-causes performance degradation. Must be a power of 2.
+Starting capacity for `SYMBOL` columns created without `CAPACITY`. Capacity
+grows automatically afterwards, see `cairo.auto.scale.symbol.capacity`. Must
+be a power of 2.
+
+### cairo.auto.scale.symbol.capacity
+
+- **Default**: `true`
+- **Reloadable**: no
+
+When `true`, a `SYMBOL` column's capacity grows automatically after a commit
+that leaves it holding more than `cairo.auto.scale.symbol.capacity.threshold`
+of its capacity. The new capacity is at least double the old one.
+
+### cairo.auto.scale.symbol.capacity.threshold
+
+- **Default**: `0.8`
+- **Reloadable**: no
+
+Fraction of a `SYMBOL` column's capacity that, once exceeded, triggers the
+automatic resize. Must be greater than zero.
 
 ### cairo.index.value.block.size
 

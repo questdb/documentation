@@ -115,7 +115,7 @@ change, never one already running.
 A mapping gives each principal one group, but one account often sends work of
 different urgency, such as a monitoring account that evaluates alert rules and
 also serves dashboards. Such an account can choose the group itself: a
-PostgreSQL session with
+PostgreSQL or QWP egress connection with
 [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/), and an HTTP
 request with the `resource_group` parameter of
 [`/execute`](/docs/connect/compatibility/rest-api/#execute).
@@ -125,11 +125,11 @@ SET RESOURCE GROUP alerts;
 ```
 
 Choosing a group per session or request is available from QuestDB Enterprise
-4.2.0. The chosen group replaces the mapping for every managed query the session
+4.2.2. The chosen group replaces the mapping for every managed query the session
 starts afterwards, until `RESET RESOURCE GROUP`, `RESET ALL` or `DISCARD ALL`,
 or until the session ends. It covers only the session's or the request's own
-queries: a `COPY ... TO` export, the `/exp` endpoint and clients that query over
-QWP keep the mapped group. A group other than the principal's own requires the
+queries. `COPY ... TO` exports and exports through `/exp` use the mapped group.
+A group other than the principal's own requires the
 `USE RESOURCE GROUP` permission, granted for one group with
 [`GRANT USE ON RESOURCE GROUP`](/docs/query/sql/acl/grant/#grant-use-of-resource-groups)
 or for every group with `GRANT USE RESOURCE GROUP`, so users cannot move
@@ -205,19 +205,19 @@ CREATE RESOURCE GROUP adhoc WITH (cpu_weight = 50);
 
 Weights only matter when groups compete. A group that is alone on the instance
 uses everything it can, regardless of its weight, unless it has a
-[CPU limit](#a-cpu-limit-is-a-ceiling-not-a-share). When two groups both have
-work, the scheduler hands out CPU so that measured CPU divided by `cpu_weight`
-stays balanced: weights 100 and 50 converge to a 2:1 split of query CPU. A query
-that was running alone starts sharing at its next checkpoint.
+[CPU limit](#a-cpu-limit-is-a-ceiling-not-a-share). When two groups keep competing
+for the same workers, the scheduler balances measured CPU use in proportion to
+their weights. With enough work to use their shares, groups weighted 100 and 50
+approach a 2:1 split of query CPU. A query that was running alone starts sharing
+at its next checkpoint.
 
 Weights are relative. 100 and 50 are the same as 2 and 1.
 [`resource_groups()`](/docs/query/functions/meta/#resource_groups) shows each
-weight as a percentage of all weights in `cpu_min_share_pct`: the share a group
-can count on while every group has work, up to its CPU limit if it has one.
-Adding a group lowers every other group's percentage, and the column shows by
-how much.
+group's weight as a percentage of all weights in `cpu_min_share_pct`. Adding a
+group lowers every other group's percentage. Actual CPU use also depends on
+the work each group can run, the available workers, and any CPU limits.
 
-From QuestDB Enterprise 4.2.0, idle CPU is not banked in either direction. A
+From QuestDB Enterprise 4.2.2, idle CPU is not banked in either direction. A
 group that becomes active takes the next free worker and then runs at its
 share: it gains nothing for the time it left its share unused, and a group that
 used the spare CPU meanwhile owes nothing for it. This holds however long the instance has been running. A
@@ -230,22 +230,19 @@ between its own users and queries depends on its
 
 ### A CPU limit is a ceiling, not a share
 
-```questdb-sql title="Never more than a quarter of the node, even when it is idle"
+```questdb-sql title="Set a query CPU limit of 25%"
 CREATE RESOURCE GROUP tenant_a WITH (cpu_limit = '25%');
 ```
 
 `cpu_limit` caps the query CPU a group may use at a percentage of the CPUs
 available to the QuestDB process, which respects a container's CPU limit. On 16
-CPUs, `'25%'` is 4 cores and `'5%'` is 0.8 of a core. A weight lets a group use
-CPU that others leave idle; a limit does not, so the group stays at its limit
-when the rest of the node has nothing to do. Use a limit for capacity sold by
-the core, or to keep room for work outside resource groups, such as ingestion.
-CPU limits are available from QuestDB Enterprise 4.2.0.
+CPUs, `'25%'` normally allows up to four workers and `'5%'` allows 0.8 of a
+core on average. The limit applies even when other groups are idle, so it can
+leave CPU available for work such as ingestion. CPU limits are available from
+QuestDB Enterprise 4.2.2.
 
-A limit only caps. Below it the group competes by weight as usual, so while
-other groups are busy it can get less than its limit. To keep a group at its
-limit under contention as well, give it a weight whose `cpu_min_share_pct` is at
-least its `cpu_limit_pct`.
+Below its limit, the group competes by weight and may receive less CPU when
+other groups are busy.
 
 The limit holds on average over a short window, and it is enforced in two
 parts:
@@ -313,8 +310,8 @@ though, including the table writer of an `INSERT ... SELECT`.
 CREATE RESOURCE GROUP research WITH (scheduling_policy = 'fair');
 ```
 
-Scheduling policies are available from QuestDB Enterprise 4.2.0; earlier
-releases always serve a group in arrival order. The policy decides which query
+Scheduling policies are available from QuestDB Enterprise 4.2.2. Earlier
+releases serve a group in arrival order. The policy decides which query
 of a group gets the next worker the group is entitled to:
 
 - `fifo`, the default, serves the group's work in arrival order. A long query
@@ -334,11 +331,11 @@ stops one user from taking ten parts by sending ten queries, and dividing by
 query second keeps the queries of an application that uses a single account
 from queuing behind each other in arrival order.
 
-Admission follows the same rule. When a `fair` group is at
-`max_active_queries`, the waiting user with the fewest admitted queries goes
-next, and a tie goes to the user who has waited longest since their last
-admission. One user's queue therefore does not keep everyone else out, and with
-`max_active_queries = 1` users take turns.
+When a query slot opens, a `fair` group takes a queued query from the user with
+the fewest admitted queries. A tie goes to the user who has waited longest
+since their last admission. With `max_active_queries = 1`, users already in the
+queue take turns. Once the queue reaches `max_queued_queries`, it rejects new
+queries, including from users with none running.
 
 The user is the principal that logged in. With access control disabled it is
 the login name the client used, so clients that share one login count as one

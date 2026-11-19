@@ -28,7 +28,7 @@ include(FetchContent)
 FetchContent_Declare(
     c_questdb_client_proj
     GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
-    GIT_TAG        7.2.0)   # or a newer release tag, or a commit SHA
+    GIT_TAG        7.3.0)   # or a newer release tag, or a commit SHA
 FetchContent_MakeAvailable(c_questdb_client_proj)
 
 target_link_libraries(your_target questdb_client)
@@ -55,6 +55,10 @@ Three QWP entry headers, in both a C (`.h`) and a C++ (`.hpp`) flavour:
 | `questdb/client` | The pool: `questdb_db` / `questdb::pool` |
 | `questdb/ingress/qwp_sender` | Senders: `questdb_db_borrow_sender` / `pool::borrow_sender()` |
 | `questdb/egress/qwp_reader` | Readers: `questdb_db_borrow_reader` / `pool::borrow_reader()` |
+
+Authentication adds `questdb/oidc.h` / `.hpp` for device-flow sign-in and
+`questdb/token_provider.h` / `.hpp` for application-supplied rotating tokens.
+Both are included in the native library; no extra CMake feature is needed.
 
 Both borrow headers include the pool header, so a program that only ingests
 includes only `qwp_sender`, and one that only queries includes only
@@ -251,8 +255,8 @@ threads, close it at shutdown.
 You don't open connections yourself: **borrow** a lease (a sender or reader),
 use it on one thread, then **return** it (recycles the connection) or **drop**
 it (retires it). In C++ the borrowed sender wrapper and pooled reader return on
-destruction; `drop_on_return()` forces a drop. The pool connects lazily, and
-reconnects and fails over on its own.
+destruction; `drop_on_return()` forces a drop. The pool reconnects and fails
+over on its own.
 
 ### Which borrow?
 
@@ -271,14 +275,17 @@ the schema server-side.
 
 The connect string uses a QWP/WebSocket scheme: `ws` / `wss`. For auth and TLS
 keys, see the
-[connect string reference](/docs/connect/clients/connect-string/). The pool is
-**lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
-parse and validate the string but perform no blocking network I/O, so auth /
-TLS / connect errors surface from the first borrow, not at construction. The
-one exception is the on-disk send queue (`sf_dir`, see
-[Durability and backpressure](#durability-and-backpressure)): at connect the
-pool reopens any queue directories a previous run left holding unacknowledged
-rows, then reconnects and resends them in the background.
+[connect string reference](/docs/connect/clients/connect-string/).
+`questdb_db_connect` (C) and the `questdb::pool` constructor (C++) open the
+warm minimum connections eagerly, so authentication, TLS, and connection
+errors can surface at construction. Set `lazy_connect=true` to defer
+connections: senders queue locally and connect in the background, and readers
+connect on first borrow.
+
+With an on-disk send queue (`sf_dir`, see
+[Durability and backpressure](#durability-and-backpressure)), the pool may
+also reopen queue directories holding unacknowledged rows from an earlier run
+and replay them in the background.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -303,7 +310,9 @@ if (!db) { /* read err, handle */ }
 ## Authentication and TLS
 
 Authentication happens during the WebSocket upgrade, before any data is
-exchanged. All keys go in the connect string:
+exchanged. Put fixed credentials in the connect string, or attach an
+[OIDC helper](#oidc-device-flow) or
+[rotating token provider](#rotating-bearer-tokens) in code:
 
 ```text
 wss::addr=db.example.com:9000;username=admin;password=quest;   # HTTP basic
@@ -320,21 +329,486 @@ wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (E
   rejects it.
 - **`auth_timeout_ms`** (default 15000) bounds the WebSocket upgrade.
 
-Because the pool connects lazily, a bad credential surfaces as
-`line_sender_error_auth_error` from the **first borrow** on each connection.
-Handle it there, not at `connect` (see
-[Which errors mean what](#which-errors-mean-what)).
+A rejected credential reports `line_sender_error_auth_error` (C++
+`questdb::error_code::auth_error`) from connection setup or an operation that
+waits for it. Mutual TLS with client certificates is not supported; use
+bearer tokens over `wss` instead.
 
-### Unsupported auth paths
+### OIDC device flow
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
+Client **7.3.0 or later** can sign a user in through their identity provider's
+browser page without collecting their password. This requires QuestDB
+Enterprise with OIDC configured and the device grant enabled on the IdP
+application named by `acl.oidc.client.id`. See
+[Device authorization flow](/docs/security/oidc/#device-authorization-flow)
+for the IdP settings, discovery, scopes, and token selection.
 
-| Path | Status | Workaround |
-|---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. |
-| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the pool and build a fresh one with the new token. |
+Sign in before constructing the pool, then attach the authentication object,
+not a token string. Every pooled sender and reader shares it, so reconnects
+can use silently refreshed credentials without rebuilding the pool. Replace
+the example QuestDB URL and issuer with your deployment's values.
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp title="Sign in and query with a shared OIDC provider"
+#include <questdb/egress/qwp_reader.hpp>
+#include <questdb/oidc.hpp>
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        auto auth = questdb::oidc::builder::from_questdb(
+            "https://db.example.com:9000")
+            .issuer("https://idp.example.com/realms/questdb")
+            .build();
+        auth.sign_in();  // Only this call may prompt or open a browser.
+
+        questdb::pool pool{"wss::addr=db.example.com:9000;", auth};
+        auto reader = pool.borrow_reader();
+        auto cursor = reader.execute("SELECT current_user()"_utf8);
+        while (auto batch = cursor.next_batch())
+            std::cout << batch->row_count() << " row(s)\n";
+    }
+    catch (const questdb::error& error)
+    {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c title="Sign in and attach OIDC to a connection pool"
+#include <questdb/client.h>
+#include <questdb/oidc.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void)
+{
+    const char* url = "https://db.example.com:9000";
+    const char* issuer = "https://idp.example.com/realms/questdb";
+    const char* conf = "wss::addr=db.example.com:9000;";
+    questdb_error* error = NULL;
+    questdb_oidc_auth* auth = NULL;
+    questdb_db* db = NULL;
+    int status = 1;
+
+    questdb_oidc_builder* builder = questdb_oidc_builder_from_questdb(
+        url, strlen(url), &error);
+    if (!builder) goto cleanup;
+    if (!questdb_oidc_builder_issuer(
+            builder, issuer, strlen(issuer), &error)) goto cleanup;
+    auth = questdb_oidc_builder_build(builder, &error);
+    if (!auth) goto cleanup;
+    if (!questdb_oidc_auth_sign_in(auth, &error)) goto cleanup;
+
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.oidc_auth = auth;
+    db = questdb_db_connect_ex(conf, strlen(conf), &options, &error);
+    if (!db) goto cleanup;
+
+    /* Borrow senders and readers from db for your application work. */
+    status = 0;
+
+cleanup:
+    if (error)
+    {
+        size_t len = 0;
+        const char* message = questdb_error_msg(error, &len);
+        fprintf(stderr, "%.*s\n", (int)len, message);
+    }
+    questdb_db_close(db);
+    questdb_oidc_auth_free(auth);
+    questdb_oidc_builder_free(builder);
+    questdb_error_free(error);
+    return status;
+}
+```
+
+</TabItem>
+</Tabs>
+
+The default renderer prints a verification URL and code. Disable browser
+opening with C++ `builder.open_browser(false)` or C
+`questdb_oidc_builder_open_browser`; a custom UI can use `event_handler` /
+`questdb_oidc_builder_event_handler`. For clickable links or QR codes, use
+only the event's vetted `browser_target`, not its display-only verification
+URLs.
+
+The examples preserve the server's configured scopes. To request a refresh
+token, include `offline_access` in the server's `acl.oidc.scope`, or supply a
+complete scope override that also retains required `profile`, groups, and
+API scopes. The IdP must actually issue a refresh token for silent renewal to
+work.
+
+`sign_in()` prompts only when no valid cached, persisted, or silently
+refreshable credential exists, so call it at every process start. Token
+lookups and reconnects never prompt. When only a new sign-in can help, they
+fail with an interaction-required OIDC error: pool, reader, and direct OIDC
+calls in C++ throw `questdb::oidc::error` with
+`kind() == questdb::oidc::error_kind::interaction_required` (a sender's
+`line_sender_error` keeps it in `oidc_diagnostic()`), and C reports
+`QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` through
+`questdb_error_oidc_get_view`. The error code itself describes the failing
+call, often a retryable `socket_error`, so check the OIDC detail first. When
+`acquisition_busy` is set, another thread is already signing in; retry later
+instead of starting a second sign-in. Otherwise call `sign_in()` again on
+your UI thread, never from a transport callback, and retry once:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp title="Sign in again when a query needs it"
+#include <questdb/egress/qwp_reader.hpp>
+#include <questdb/oidc.hpp>
+#include <cstddef>
+
+using namespace questdb::ingress::literals;
+
+static std::size_t count_rows(questdb::pool& pool)
+{
+    auto reader = pool.borrow_reader();
+    auto cursor = reader.execute("SELECT current_user()"_utf8);
+    std::size_t rows = 0;
+    while (auto batch = cursor.next_batch())
+        rows += batch->row_count();
+    return rows;
+}
+
+std::size_t count_rows_with_sign_in(
+    questdb::pool& pool, const questdb::oidc::device_auth& auth)
+{
+    try
+    {
+        return count_rows(pool);
+    }
+    catch (const questdb::oidc::error& error)
+    {
+        if (error.kind() != questdb::oidc::error_kind::interaction_required ||
+            error.acquisition_busy())
+            throw;
+        auth.sign_in();  // Prompts on this thread, never in a callback.
+        return count_rows(pool);  // Retry once.
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c title="Sign in again when a query needs it"
+#include <questdb/egress/qwp_reader.h>
+#include <questdb/oidc.h>
+#include <string.h>
+
+/* True when only an explicit sign-in can supply a credential. */
+static bool needs_sign_in(const questdb_error* error)
+{
+    questdb_oidc_error_view view;
+    memset(&view, 0, sizeof view);
+    view.struct_size = sizeof view;
+    return questdb_error_oidc_get_view(error, &view) &&
+           view.kind == QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED &&
+           !view.acquisition_busy;
+}
+
+static bool query_current_user(questdb_db* db, questdb_error** error)
+{
+    qwp_reader_cursor* cursor = NULL;
+    bool ok = false;
+    qwp_reader* reader = questdb_db_borrow_reader(db, error);
+    if (!reader) return false;
+    cursor = qwp_reader_execute(
+        reader, QDB_UTF8_LITERAL("SELECT current_user()"), error);
+    if (cursor)
+    {
+        while (qwp_reader_cursor_next_batch(cursor, error) != NULL) {}
+        ok = *error == NULL;
+    }
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(reader);
+    return ok;
+}
+
+/* The caller initializes *error to NULL and frees it after a failure. */
+bool query_with_sign_in(
+    questdb_db* db, const questdb_oidc_auth* auth, questdb_error** error)
+{
+    if (query_current_user(db, error))
+        return true;
+    if (!needs_sign_in(*error))
+        return false;
+    questdb_error_free(*error);
+    *error = NULL;
+    /* Prompts on this thread, never in a callback. Retries the query once. */
+    return questdb_oidc_auth_sign_in(auth, error) &&
+           query_current_user(db, error);
+}
+```
+
+</TabItem>
+</Tabs>
+
+For private CAs, use C++ `builder.ca_bundle("/etc/questdb/oidc-ca.pem")` or C
+`questdb_oidc_builder_ca_bundle` before building the auth. This PEM bundle
+covers discovery and IdP requests; the pool's `tls_roots` does not configure
+it. These requests connect directly: they ignore `HTTPS_PROXY` and
+`ALL_PROXY`, and there is no proxy setting. The separate OIDC request timeout
+uses milliseconds: C++
+`builder.timeout_ms(10000)` or C `questdb_oidc_builder_timeout_ms` (default
+`30000`, maximum `120000`). A token lookup waiting behind another thread's
+silent refresh can take up to six times that timeout, independently of
+sender timeouts. See
+[TLS trust and timeouts](/docs/security/oidc/#tls-trust-and-timeouts).
+
+Credentials stay in memory by default. To opt into persistence, use
+`builder.default_file_token_store()` in C++, or
+`questdb_oidc_builder_default_file_token_store` in C before building the auth.
+The store writes **plaintext credentials**, including refresh tokens, and
+currently supports writes only on Unix. See
+[Credential storage and shutdown](/docs/security/oidc/#credential-storage-and-shutdown).
+
+### Rotating bearer tokens
+
+For an unattended service, supply a source that obtains tokens from your
+identity SDK, OAuth2 client-credentials flow, or secrets manager. A refreshing
+provider caches the token and renews it on a dedicated thread. The native
+client does not bundle an Azure or other identity SDK.
+
+These helpers take your application's token source and attach one shared
+provider to a pool:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp title="Use an application token source"
+#include <questdb/egress/qwp_reader.hpp>
+#include <questdb/token_provider.hpp>
+#include <functional>
+#include <utility>
+
+using namespace questdb::ingress::literals;
+
+void query_with_tokens(
+    std::function<questdb::expiring_token()> fetch_token)
+{
+    auto tokens = questdb::token_provider::refreshing(
+        std::move(fetch_token));
+    {
+        questdb::pool pool{"wss::addr=db.example.com:9000;", tokens};
+        auto reader = pool.borrow_reader();
+        auto cursor = reader.execute("SELECT current_user()"_utf8);
+        while (cursor.next_batch()) {}
+    }  // Close clients before their provider.
+    tokens.close();
+}
+```
+
+The source returns `questdb::expiring_token{token, expires_at}`, where
+`expires_at` is a `std::chrono::system_clock::time_point`. For a relative
+lifetime, add the IdP's `expires_in` to the local time of receipt. Throw
+`questdb::token_unavailable(message, retryable)` to classify a fetch failure.
+Catch `questdb::error` around calls to this helper.
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c title="Use a token-source callback"
+#include <questdb/egress/qwp_reader.h>
+#include <questdb/token_provider.h>
+#include <string.h>
+
+/* The caller initializes *error to NULL and frees it after a failure. */
+bool query_with_tokens(
+    questdb_token_source_fn fetch_token,
+    void* user_data,
+    questdb_token_release_fn release,
+    questdb_error** error)
+{
+    const char* conf = "wss::addr=db.example.com:9000;";
+    questdb_db* db = NULL;
+    qwp_reader* reader = NULL;
+    qwp_reader_cursor* cursor = NULL;
+    bool ok = false;
+    questdb_token_provider* tokens = questdb_refreshing_token_provider_new(
+        fetch_token, user_data, release, NULL, error);
+    if (!tokens) return false;
+
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.token_provider = tokens;
+    db = questdb_db_connect_ex(conf, strlen(conf), &options, error);
+    if (!db) goto cleanup;
+    reader = questdb_db_borrow_reader(db, error);
+    if (!reader) goto cleanup;
+    cursor = qwp_reader_execute(
+        reader, QDB_UTF8_LITERAL("SELECT current_user()"), error);
+    if (!cursor) goto cleanup;
+    while (qwp_reader_cursor_next_batch(cursor, error) != NULL) {}
+    ok = *error == NULL;
+
+cleanup:
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(reader);
+    questdb_db_close(db);
+    questdb_token_provider_close(tokens);
+    questdb_token_provider_free(tokens);
+    return ok;
+}
+```
+
+Implement `fetch_token(void* user_data, questdb_token_sink* sink)` in your
+application. Report exactly one result per invocation:
+
+- `questdb_token_sink_set_token(sink, token, len, expires_at_ms, refresh_at_ms)`
+  copies the raw token. Expiry is Unix epoch **milliseconds**; pass `0` for
+  `refresh_at_ms` when the platform supplies no refresh hint.
+- `questdb_token_sink_set_error(sink, retryable, retry_after_ms, msg, len)`
+  reports failure. Pass a negative `retry_after_ms`, such as `-1`, when there
+  is no retry-after hint.
+
+After successful provider creation, `release(user_data)` owns cleanup, even
+if connecting the pool subsequently fails. If provider creation itself
+fails, ownership stays with the caller. Closing does not wait for an active
+fetch, so release callback resources in `release`, not immediately after
+`questdb_token_provider_close` or `free`.
+
+</TabItem>
+</Tabs>
+
+The source is called serially on the refresher thread. Bound its network I/O
+and do not call back into an attached client. In C++, capture source resources
+by value or shared ownership: an in-flight fetch can outlive `close()`.
+
+A failure's classification only decides whether a connect the caller waits
+for retries it. The provider keeps retrying the fetch with backoff, and
+background reconnects keep retrying either kind. A source cannot stop the
+attached clients; close the refreshing provider to do that.
+
+By default, refresh happens around half the token lifetime; tokens with
+60 seconds or less remaining are not handed out, and a caller with no usable
+token waits up to 30 seconds. Adjust `handout_floor` / `cold_wait` in C++
+`refreshing_token_provider_options`, or the `_ms` fields in C
+`questdb_refreshing_token_provider_options`, for shorter-lived tokens.
+`await_ready()` / `questdb_token_provider_await_ready` can gate startup;
+`status()` / `questdb_token_provider_get_status` expose fetch diagnostics.
+
+If your application already caches credentials, use
+`questdb::token_provider::from` with a `bearer_token_provider` implementation,
+or `questdb_token_provider_new` with a C vtable. Its `token()` / `get_token`
+returns the raw token without `Bearer `; the optional `on_rejected` callback
+invalidates a rejected cached token. Unlike a refreshing source, these
+callbacks can run concurrently and must be fast and thread-safe.
+
+### Attachment, failures, and ownership
+
+Providers work with QWP/WebSocket pools, standalone senders and readers, and
+ILP/HTTP senders, not TCP or UDP. The standalone attachment points are:
+
+| Client | C | C++ |
+| --- | --- | --- |
+| Sender | `line_sender_opts_oidc_auth` / `line_sender_opts_token_provider` | `opts.oidc_auth(auth)` / `opts.token_provider(tokens)` |
+| Reader | `qwp_reader_from_conf_with_oidc` / `qwp_reader_from_conf_with_token_provider` | `reader(conf, auth)` / `reader(conf, tokens)` |
+
+Use `wss::` or `https::` to protect tokens in transit. Choose exactly one
+credential source: OIDC, a token provider, a fixed `token`, or
+`username`/`password`. Providers are attached in code; `token_provider` and
+the `azure_*` provider keys in connection strings are rejected.
+
+A provider is consulted on each WebSocket connect/reconnect round and
+normally once per ILP/HTTP flush, not per batch on an established WebSocket.
+An eligible HTTP 401 can trigger one retry with a changed token; `403` or an
+`insufficient_scope` challenge does not. See
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
+
+C errors retain structured details through `questdb_error_oidc_get_view` and
+`questdb_error_token_unavailable_get_view`; initialize each output view's
+`struct_size` before calling. In C++, pool construction, reader operations,
+and direct OIDC calls throw `questdb::oidc::error` when an OIDC failure caused
+the error; sender failures throw `line_sender_error` and keep the OIDC detail
+in `oidc_diagnostic()`. Both derive from `questdb::error`, whose
+`token_unavailable_diagnostic()` exposes a provider's classification.
+
+Background reconnects report credential problems as connection events, not
+as errors. Register a callback before the pool connects, through the
+`event_callback` field of the `questdb_db_connect_options` passed to
+`questdb_db_connect_ex`. The callback runs on a dispatcher thread; do not
+call back into the pool from it. `questdb_connection_event_auth_failed` means
+the server rejected the credential.
+`questdb_connection_event_credential_unavailable` means the client could not
+obtain one, and its `cause_code` tells whether the sender keeps reconnecting
+(`line_sender_error_socket_error`) or has stopped
+(`line_sender_error_auth_error` or `line_sender_error_config_error`, for
+example after its provider was closed). The C++ `questdb::pool` constructors
+take no event callback; to receive these events from C++, open the pool with
+the C API.
+
+```c title="Log credential events from a pool"
+#include <questdb/client.h>
+#include <stdio.h>
+#include <string.h>
+
+static void on_connection_event(
+    void* user_data, const questdb_connection_event* event)
+{
+    (void)user_data;
+    if (event->kind == questdb_connection_event_auth_failed)
+    {
+        fprintf(stderr, "credential rejected: %.*s\n",
+            (int)event->cause_msg_len, event->cause_msg);
+    }
+    else if (event->kind == questdb_connection_event_credential_unavailable)
+    {
+        const bool stopped =
+            event->cause_code == line_sender_error_auth_error ||
+            event->cause_code == line_sender_error_config_error;
+        fprintf(stderr, "no credential%s: %.*s\n",
+            stopped ? ", sender stopped" : "",
+            (int)event->cause_msg_len, event->cause_msg);
+    }
+}
+
+questdb_db* connect_with_events(
+    const char* conf,
+    const questdb_token_provider* tokens,
+    questdb_error** error)
+{
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.token_provider = tokens;
+    options.event_callback = on_connection_event;
+    return questdb_db_connect_ex(conf, strlen(conf), &options, error);
+}
+```
+
+Clients retain their own references. Freeing a C auth/provider handle or
+destroying a C++ wrapper releases only that reference. Explicitly closing an
+OIDC auth object or a refreshing token provider permanently disables token
+acquisition for all attached clients, so close clients first. Cancelling
+sign-in leaves the auth usable; clearing credentials does not revoke them
+at the IdP.
+
+For application-defined providers created with `questdb_token_provider_new`
+or `questdb::token_provider::from`, `questdb_token_provider_close` and C++
+`token_provider::close()` are no-ops. To stop every attached client when
+retrying can never succeed, report a terminal failure: call
+`questdb_token_sink_set_terminal_error(sink, msg, len)` from `get_token` (C),
+or throw `questdb::error{questdb::error_code::invalid_api_call, message}` from
+`token()` (C++). Clients then report `config_error` and stop reconnecting.
+Queued frames are not deleted, and a disk-backed store-and-forward slot stays
+drainable by a later process. Any other failure, including one classified as
+not retryable, leaves background reconnects running. Alternatively, close
+every attached client. Do not free callback resources while clients can still
+invoke them; use the release callback or shared ownership.
 
 ## Headers
 
@@ -1561,9 +2035,9 @@ The pool owns reconnection and connection health so borrowers don't have to:
   fails with `role_mismatch` rather than a connect error.
 - **Retrying borrow.** `questdb_db_borrow_sender_with_retry(db, budget_ms,
   &err)` (C++ `pool::borrow_sender_with_retry(budget_ms)`) retries the connect
-  within `budget_ms` using the pool's reconnect backoff. Authentication and
-  protocol-version errors are terminal; `budget_ms == 0` makes a single
-  attempt.
+  within `budget_ms` using the pool's reconnect backoff. `auth_error` and
+  `protocol_version_error` (a durable-ack capability mismatch) are terminal;
+  `budget_ms == 0` makes a single attempt.
 - **Failover budget.** `questdb_db_reconnect_max_duration_ms(db)` (C++
   `pool::reconnect_max_duration_ms()`, default 300000 ms) is the pool's overall
   reconnect budget. Pass the remaining budget to the `_with_retry` calls when
@@ -1579,14 +2053,34 @@ The pool owns reconnection and connection health so borrowers don't have to:
   `pool_reap=manual`, call `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`)
   yourself; it returns the number of connections it closed.
 
+A rejected credential (HTTP 401/403) stops a sender that has not connected
+yet, in every `initial_connect_retry` mode, including pools with
+`lazy_connect=true`. Once a QWP/WebSocket sender has connected, it retries
+later 401/403 rejections with capped backoff, even with fixed credentials,
+and retains unacknowledged rows, so an `auth_failed` event does not always
+mean the sender stopped. See
+[Attachment, failures, and ownership](#attachment-failures-and-ownership) for
+the connection events, and
+[Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
+
 ### Which errors mean what {#which-errors-mean-what}
 
 Dispatch on `line_sender_error_get_code(err)` (C++
 `e.code()`). What to do with the borrow after each class:
 
+With an OIDC auth or a token provider attached, check the OIDC and
+token-provider detail first: `questdb_error_oidc_get_view` and
+`questdb_error_token_unavailable_get_view` (C++ `questdb::oidc::error`,
+`oidc_diagnostic()`, and `token_unavailable_diagnostic()`). A failed
+credential acquisition keeps that detail while its code describes the
+failing call, often a retryable `socket_error`. An interaction-required OIDC
+error without `acquisition_busy` needs a new [sign-in](#oidc-device-flow),
+not a retry.
+
 | Error code | Meaning | Borrow state | What to do |
 | --- | --- | --- | --- |
-| `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
+| `auth_error` | The server rejected the credential before the sender connected, or the attached OIDC auth or token provider was closed | n/a (borrow failed) | Replace the credential, sign in again, or attach a new provider; retrying with the same one won't help. The retry helpers treat it as terminal. |
+| `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
 | `failover_retry` | Transient transport failure; delivery of queued rows may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved rows replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
@@ -1610,7 +2104,7 @@ keys.
 | --- | --- | --- |
 | `sender_pool_min` | 1 | Warm/minimum ingestion connections. Once connections have been opened, this many stay open however long they sit idle. |
 | `sender_pool_max` | 4 | Hard cap on ingestion auto-grow. |
-| `query_pool_min` | 1 | Warm/minimum query connections. |
+| `query_pool_min` | 1 (`0` with `lazy_connect=true`) | Warm/minimum query connections. |
 | `query_pool_max` | 4 | Hard cap on query auto-grow. |
 | `acquire_timeout_ms` | 5000 | How long a borrow waits for a returned connection once its pool is at its cap, before returning an error. `0` fails fast. |
 | `idle_timeout_ms` | 60000 | Idle connections above the warm minimum are closed after this long. |
@@ -1728,9 +2222,13 @@ between plain return and drop.
 
 ## Production shape: TLS, token, multi-host, retry
 
-A production-shaped configuration: TLS with OS roots, bearer token, two
-endpoints, a store-and-forward spool, durable acks, and a retry-bounded
-borrow:
+A production-shaped, ingestion-only configuration: TLS with OS roots, bearer
+token, two endpoints, a store-and-forward spool, durable acks, and an explicit
+two-minute initial-connect retry budget. Pool construction eagerly opens the
+sender with `initial_connect_retry=on`; merely setting `reconnect_*` does not
+enable startup retry for native pools. `query_pool_min=0` avoids prewarming
+readers, whose initial connections do not use the ingestion retry policy.
+Later borrows also retry if they need to open a replacement connection:
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -1749,12 +2247,15 @@ int main()
             "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
             "token=YOUR_BEARER_TOKEN;"
             "tls_ca=os_roots;"              // trust the OS store (corporate CAs)
+            "initial_connect_retry=on;"
+            "reconnect_max_duration_millis=120000;"
+            "query_pool_min=0;"             // ingestion only; no reader prewarm
             "sf_dir=/var/spool/questdb;"
             "sender_id=ingest-01;"
             // Enterprise; the connect fails against a server without replication.
             "request_durable_ack=on;"};
 
-        // First borrow opens the connection: give it the failover budget.
+        // Prewarm already connected; retry if a replacement is needed.
         auto sender =
             pool.borrow_sender_with_retry(pool.reconnect_max_duration_ms());
 
@@ -1796,6 +2297,9 @@ int main(void)
         "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
         "token=YOUR_BEARER_TOKEN;"
         "tls_ca=os_roots;"              /* trust the OS store (corporate CAs) */
+        "initial_connect_retry=on;"
+        "reconnect_max_duration_millis=120000;"
+        "query_pool_min=0;"             /* ingestion only; no reader prewarm */
         "sf_dir=/var/spool/questdb;"
         "sender_id=ingest-01;"
         /* Enterprise; the connect fails against a server without replication. */
@@ -1803,7 +2307,7 @@ int main(void)
     db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
-    /* First borrow opens the connection: give it the failover budget. */
+    /* Prewarm already connected; retry if a replacement is needed. */
     sender = questdb_db_borrow_sender_with_retry(
         db, questdb_db_reconnect_max_duration_ms(db), &err);
     if (!sender) goto on_error;
@@ -1908,6 +2412,8 @@ The installed headers are the complete reference:
 | `questdb/ingress/qwp_sender.h` | Sender borrowing, buffers, chunks, and ingestion |
 | `questdb/ingress/line_sender.h` | Errors, table and column names, UTF-8 helpers |
 | `questdb/egress/qwp_reader.h` | Reader borrowing, queries, cursors, and Arrow result batches |
+| `questdb/oidc.h` | Device-flow sign-in, discovery, rendering, persistence, and OIDC diagnostics |
+| `questdb/token_provider.h` | Rotating token sources, providers, refresh settings, and status |
 
 Each has a `.hpp` counterpart wrapping the same surface in RAII types that
 throw `questdb::error` instead of returning `false`.

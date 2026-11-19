@@ -322,9 +322,9 @@ group between its users instead:
 ALTER RESOURCE GROUP analysts SET (scheduling_policy = 'fair');
 ```
 
-Busy users now split the group evenly, and one user alone can still use all of
-it. With `max_active_queries` set, admission also takes the user with the fewest
-admitted queries first, so one user's queue no longer keeps the others out. See
+Busy users now split the group's available CPU evenly. When a query slot opens,
+`fair` takes a queued query from the user with the fewest admitted queries.
+A full queue still rejects new queries. See
 [the scheduling policy](/docs/concepts/resource-groups/#the-scheduling-policy-divides-a-group-between-its-users).
 
 ### One account sends both urgent and routine queries
@@ -340,14 +340,14 @@ ALTER USER monitoring SET RESOURCE GROUP dashboards;
 GRANT USE ON RESOURCE GROUP alerts TO monitoring;
 ```
 
-The connections that evaluate alert rules come from a pool of their own and run
-`SET RESOURCE GROUP alerts` once after connecting. A pool shared with dashboards
-would hand a switched connection to dashboard queries, unless it resets every
-session with `DISCARD ALL` or `RESET ALL`. An HTTP client sends
-`resource_group=alerts` with each alert query instead. Everything else stays in
-`dashboards`. Other users cannot choose `alerts` without the same grant, so the
-heavier group stays reserved for the work you grant it to. See
-[SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/).
+For PostgreSQL, run `SET RESOURCE GROUP alerts` on the connection that runs the
+alert queries. If alerts and dashboards share a pool, reset the group before
+returning the connection. See
+[Connection pools](/docs/query/sql/acl/set-resource-group/#connection-pools).
+
+QWP egress clients select the group on each WebSocket, including after
+reconnect. HTTP clients send `resource_group=alerts` with each alert query.
+Dashboard queries use the account's mapped group, `dashboards`.
 
 ### Operators need a protected share
 
@@ -363,10 +363,10 @@ CREATE RESOURCE GROUP ops WITH (cpu_weight = 5);
 ALTER USER dba SET RESOURCE GROUP ops;
 ```
 
-While every group is busy, `ops` can count on its `cpu_min_share_pct`, and it
-uses more when other groups are idle. Diagnostic queries are light, so a small
-weight is enough: what matters is that they do not wait behind the workload.
-Leave the group's admission limits unset, so they are not queued either.
+The `ops` group competes for its own share of CPU when the instance is busy.
+Diagnostic queries usually need little CPU, so start with a small weight.
+Leave the group's admission limits unset to let diagnostic queries start
+without waiting for a query slot.
 
 The built-in admin cannot be mapped. It runs in `DEFAULT` unless its session runs
 `SET RESOURCE GROUP ops`, which needs no grant, so lowering the weight of
@@ -384,9 +384,9 @@ that matter day to day:
   is busy.
 - `admission_rejections` and `admission_timeouts` for work already turned away.
 - `memory_used_bytes` against `memory_limit_bytes` for headroom.
-- `cpu_min_share_pct` for the share of query CPU each group can count on while
-  every group has work, up to its CPU limit, and `cpu_limit_pct`,
-  `cpu_limit_cores` and `scheduling_policy` for its CPU limit and policy.
+- `cpu_min_share_pct` for each group's weight as a percentage of the total
+  weight, and `cpu_limit_pct`, `cpu_limit_cores`, and `scheduling_policy` for
+  its CPU limit and policy.
 
 Weights are relative, so they need not add up to 100, but weights that do read
 directly as percentages:
@@ -415,12 +415,11 @@ On a node with 16 CPUs:
 | research | 49         | 49.0              | 75            | 12.0            | fifo              |
 | trading  | 45         | 45.0              | 0             | 0.0             | fair              |
 
-The smallest weight is 1, so `DEFAULT`, which also holds the built-in admin's
-queries, takes at least one point of a scheme that adds up to 100. `research`
-can count on 49% of query CPU, about 7.8 cores, while every group is busy, and
-can use idle CPU up to its limit of 12 cores, while the other groups can use all
-of it. `cpu_min_share_pct` does not account for limits: a group whose limit is
-below its percentage gets only its limit, and the rest goes to the other groups.
+The weights add up to 100, so `research` has a weight-based share of 49%. That
+corresponds to about 7.8 cores on this node when all groups compete for the same
+workers and have enough work to use their shares. A single-threaded query uses
+at most one core. When other groups are idle, `research` can use more workers,
+normally up to 12 with its 75% CPU limit.
 
 Mappings are attributes of the principals themselves. `SHOW USERS` and
 `SHOW SERVICE ACCOUNTS` carry a `resource_group` column, and `SHOW GROUPS`
@@ -463,14 +462,15 @@ five instance-wide series describing the feature itself. Every name, type and
 meaning is in the
 [metrics reference](/docs/operations/logging-metrics/#resource-group-metrics).
 
-Two signals are worth alerting on: a non-zero
-`questdb_resource_groups_cpu_scheduler_degraded`, which means CPU weights, CPU
-limits and the `fair` policy are no longer enforced until the next restart, and
-a steadily growing `questdb_resource_group_admission_timeouts_total`, which
-means a group's queue settings are rejecting work the application expects to
-succeed. `questdb_resource_groups_cpu_managed_dispatch` stays at `1` after the
-scheduler degrades, because it reports whether the groups and their policies
-require CPU scheduling, not whether it is working.
+A non-zero `questdb_resource_groups_cpu_scheduler_degraded` means CPU weights,
+CPU limits, and fair worker allocation stop taking effect until restart. The
+group still enforces its active and queued query limits and uses `fair` to
+choose the next queued query when configured.
+
+A steadily growing `questdb_resource_group_admission_timeouts_total` means
+queries keep timing out while waiting for a query slot.
+`questdb_resource_groups_cpu_managed_dispatch` still reports whether the
+configured policies require CPU scheduling, even when it has degraded.
 
 ## Errors clients see
 
@@ -496,11 +496,9 @@ is idle, the other is expected to use everything, unless it has a CPU limit. A
 query that started before CPU scheduling engaged stays outside it until it next
 suspends or finishes; every other query starts sharing at its next checkpoint.
 A degraded scheduler, reported by
-`questdb_resource_groups_cpu_scheduler_degraded`, stops sharing altogether. Also
-confirm the work you are watching is managed at all, since ingestion, WAL apply
-and view refresh are outside the feature. `query_activity()` shows the group
-each running query belongs to, which is the quickest way to tell whether the
-load you are watching is attributed where you expect.
+`questdb_resource_groups_cpu_scheduler_degraded`, stops allocating workers by
+weight. Ingestion, WAL apply, and view refresh run outside resource groups.
+Use `query_activity()` to check which group each running query belongs to.
 
 **A group with a CPU limit waits while the node is idle.** That is the
 difference between a limit and a weight: a limit holds even when nothing else
@@ -599,9 +597,8 @@ running.
   fractional limit back-to-back copies can keep a group close to a whole core
   however small its limit. In a group without a limit, its parallel tasks are
   not charged to the group.
-- A group chosen per session or request does not reach `COPY ... TO` exports,
-  exports through `/exp`, or queries over QWP, which run in the principal's
-  mapped group. See
+- `COPY ... TO` exports and exports through `/exp` use the principal's mapped
+  group. See
   [SET RESOURCE GROUP](/docs/query/sql/acl/set-resource-group/#which-connections-can-switch).
 - A statement waiting for its group's CPU budget keeps its locks, such as the
   table writer of an `INSERT ... SELECT`.

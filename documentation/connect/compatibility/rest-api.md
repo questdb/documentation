@@ -41,7 +41,7 @@ insert-capable entrypoints:
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
-| `/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
+| `/api/v1/sql/execute?query=..`  | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/connect/compatibility/rest-api/) docs.
@@ -186,7 +186,7 @@ parameters. `POST` is not supported and returns `405`.
 | `timings`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include a `timings` property in the response which gives details about the execution times.                                   |
 | `explain`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include an `explain` property in the response which gives details about the execution plan.                                   |
 | `quoteLargeNum` | No       | `false` | `true` or `false`. When set to `true`, QuestDB will surround `LONG` type numbers with double quotation marks that will make them parsed as strings.                                    |
-| `resource_group` | No      |         | QuestDB Enterprise 4.2.0 and later. Runs the query in this [resource group](/docs/concepts/resource-groups/). A group other than the principal's own, its mapped group or `DEFAULT` when unmapped, takes the `USE RESOURCE GROUP` permission. The name is case-sensitive except `DEFAULT`, and it is checked when the query starts, so a statement that resource groups do not manage ignores it. The HTTP counterpart of [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/#permissions), for this request only; `/exp` does not take it. |
+| `resource_group` | No      |         | QuestDB Enterprise 4.2.2 and later. Runs the query in this [resource group](/docs/concepts/resource-groups/). A group other than the principal's own, its mapped group or `DEFAULT` when unmapped, takes the `USE RESOURCE GROUP` permission. The name is case-sensitive except `DEFAULT`, and it is checked when the query starts, so a statement that resource groups do not manage ignores it. The HTTP counterpart of [`SET RESOURCE GROUP`](/docs/query/sql/acl/set-resource-group/#permissions), for this request only; `/exp` does not take it. |
 
 The parameters must be URL encoded.
 
@@ -224,9 +224,9 @@ A HTTP status code of `200` is returned with the following response body:
       "type": "DOUBLE"
     }
   ],
-  "timestamp": 0
+  "timestamp": 0,
   "dataset": [
-    ["2024-01-01T00:00:00.000000Z", 142.50],
+    ["2024-01-01T00:00:00.000000Z", 142.5],
     ["2024-01-01T00:00:01.000000Z", 142.75]
   ],
   "count": 2

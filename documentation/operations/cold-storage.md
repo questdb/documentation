@@ -38,6 +38,12 @@ Prefer cloud instance roles, workload identities, or managed identities over lon
 
 Disable any provider lifecycle rule that would transition objects to an archive tier or expire them. QuestDB manages object retention itself through `DROP REMOTE` and remote garbage collection.
 
+Enable object versioning on the bucket or container: versioning on AWS S3, blob versioning on Azure Blob Storage, and Object Versioning or soft delete on Google Cloud Storage. After `DROP LOCAL`, the object store holds the only copy of a partition, and cold objects change far less often than replication objects, so versioning adds little cost. It keeps a deleted or overwritten object recoverable after remote garbage collection has run, which otherwise leaves only the [grace period](/docs/operations/point-in-time-recovery/#protect-dropped-cold-data-during-the-grace-period) to act after a mistaken drop.
+
+Pair it with a lifecycle rule that expires only **noncurrent** versions, after the recovery window you want. That rule never touches the current objects QuestDB reads, so it is compatible with the rule above. Versioning applies to the whole S3 or GCS bucket and to the whole Azure storage account, so keep the cold prefix apart from [replication](/docs/high-availability/setup/#1-configure-object-storage) storage, which should not be versioned.
+
+To recover an object, make the previous version current again, for example by removing the S3 delete marker. If the restored object comes back with a different ETag, the first read fails and the retry succeeds, as described in [Backup and restore](#backup-and-restore).
+
 ## 2. Configure every instance
 
 Cold storage settings are not reloadable, so this step requires a restart.

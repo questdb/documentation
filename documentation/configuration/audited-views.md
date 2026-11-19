@@ -19,8 +19,8 @@ None of these settings are reloadable: changing any of them requires a restart.
 The server checks the values at startup, and refuses to start, naming the
 property, when a numeric value is out of range.
 
-For example, to absorb longer bursts of audited reads and keep 90 days of the
-trail:
+For example, to absorb longer bursts of audited reads and delete daily
+partitions using a 90-day partition-age threshold:
 
 ```ini title="server.conf"
 view.audit.queue.capacity=16384
@@ -82,14 +82,23 @@ same log message.
 [Storage policy](/docs/concepts/storage-policy/) that `sys.view_audit` is
 created with. The value is the list of stages written inside
 `SET STORAGE POLICY(...)`, separated by commas, such as
-`TO PARQUET 1d, DROP LOCAL 90d`. The default converts each daily partition to
-Parquet one day after the partition ends, and never deletes a row.
+`TO PARQUET 1d, DROP LOCAL 90d`. The default never deletes rows. It makes
+inactive daily partitions eligible for Parquet conversion when the
+[reference time](/docs/concepts/storage-policy/#ttl-evaluation) is at least one
+day after the partition's start, not its end. Conversion runs asynchronously.
 
 - The setting applies only when the server creates the table. Replicas take the
   table, and its policy, from the primary.
-- It does not change the policy of a table that already exists. Use
-  [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
-  for that.
+- It does not change the policy of a table that already exists. Only the
+  built-in admin can do that, with
+  [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/):
+  see [Retention](/docs/security/audited-views/#retention).
+- If you disable the built-in admin,
+  [`acl.admin.user.enabled=false`](/docs/configuration/iam/#acladminuserenabled),
+  include a `DROP LOCAL` stage, as in `TO PARQUET 1d, DROP LOCAL 90d`, and set
+  the property on every node before the first start. Once the table exists,
+  only that admin can change its policy, and a replica that becomes primary
+  before the primary's table reaches it creates a table of its own.
 - Set the property to an empty value to create the table with no storage
   policy. If the server rejects the policy, it logs the error and creates the
   table without one.

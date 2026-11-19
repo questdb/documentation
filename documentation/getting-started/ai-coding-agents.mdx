@@ -116,9 +116,10 @@ to the online documentation automatically.
 npx skills add questdb/skills
 ```
 
-This installs the skill globally for Claude Code. To install it for a specific
-project only, run the command from the project directory with the `--local`
-flag.
+This installs the skill globally for Claude Code and Codex: the files go to
+`~/.agents/skills/questdb/`, and Claude Code reads them through a link in
+`~/.claude/skills/`. To install it for a specific project only, run the
+command from the project directory with the `--local` flag.
 
 </TabItem>
 
@@ -135,8 +136,8 @@ your skills directory:
 
 **Codex:**
 
-- `~/.codex/skills/questdb/`: available in all projects
-- `<project>/.codex/skills/questdb/`: available in a specific project
+- `~/.agents/skills/questdb/`: available in all projects
+- `<project>/.agents/skills/questdb/`: available in a specific project
 
 The folder must contain `SKILL.md` and the `references/` directory.
 

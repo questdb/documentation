@@ -84,7 +84,7 @@ fails with
 `unknown scheduling policy, expected 'fifo' or 'fair'`. See
 [the scheduling policy](/docs/concepts/resource-groups/#the-scheduling-policy-divides-a-group-between-its-users).
 
-`cpu_limit` and `scheduling_policy` are available from QuestDB Enterprise 4.2.0.
+`cpu_limit` and `scheduling_policy` are available from QuestDB Enterprise 4.2.2.
 
 A group ceiling only ever lowers what a query may use. `memory_limit` is capped
 by `resource.groups.process.memory.limit.bytes`, and it never raises a limit set
