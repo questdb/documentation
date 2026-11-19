@@ -177,6 +177,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Basic-auth credentials                            | both      | `username`, `password`                 | `auth_timeout_ms`                                                                           |
 | Bearer-token credentials                          | both      | `token`                                | `auth_timeout_ms`                                                                           |
 | Entra ID tokens that the client renews (Java)     | both      | `token_provider=azure`, `azure_resource` | `azure_credential`, `azure_client_id`                                                     |
+| Auto-create tables owned by a group (Java)        | ingress   | `owned_by`                             | Required for an external (OIDC) user to auto-create tables and columns; QuestDB Enterprise  |
 | Multi-host failover                               | both      | `addr=h1,h2,…`                         | `target`, `zone`, `reconnect_*` (ingress), `failover_*` (egress)                            |
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
@@ -302,6 +303,62 @@ These keys contain no secret, so they are safe to log. Clients built from
 equivalent connect strings share one provider in a process. See
 [Token providers](/docs/connect/clients/java/#token-providers) in the Java
 client reference.
+
+### Owner of auto-created tables {#owned-by}
+
+*Applies to: ingress. Available in the Java client 1.3.13 or later only, with
+QuestDB Enterprise 4.2.2 or later.*
+
+When a batch names a table or a column that does not exist yet, the server
+creates it, if the principal holds `CREATE TABLE` or `ADD COLUMN`. The creator
+then receives every permission on the new table or column, with the `GRANT`
+option: the [owner permissions](/docs/security/rbac/#owner-grants). `owned_by`
+hands them to another entity instead, the way the
+[`OWNED BY`](/docs/query/sql/create-table/#owned-by) clause does in SQL:
+
+- `owned_by` — the user, group, or service account that receives the owner
+  permissions on every table the sender creates and every column it adds,
+  including columns of tables it did not create. A principal may name itself
+  or one of its groups, and the built-in admin any existing user, group, or
+  service account. Unset by default.
+
+```
+wss::addr=db.example.com:9000;token=<OIDC token>;owned_by=fxIngest;
+```
+
+An [external user](/docs/security/oidc/#user-permissions), one that
+authenticates with an OIDC token, such as an Entra ID token from a token
+provider, cannot receive permissions itself. It must name one of its groups
+for the server to create tables and columns for it at all: without
+`owned_by`, the server refuses them. Writing to existing tables and columns
+needs no owner.
+
+The client sends the owner on the WebSocket upgrade of every connection,
+reconnects and failovers included, and the server checks it there:
+
+- An owner the principal may not name fails the connection with HTTP `403`
+  and the reason, such as `owned_by refused: fxIngest does not exist`.
+- QuestDB open source, and QuestDB Enterprise with access control disabled,
+  cannot set an owner, so they fail the connection with HTTP `400`.
+- A server that predates `owned_by` ignores it, so the client fails the
+  connection itself rather than create tables that the owner does not own.
+
+The server checks the owner again before it creates each table or column,
+because the permissions may have changed since the connection opened. If the
+principal may no longer name it, for example because the group was dropped,
+the batch fails with a security error and nothing is created.
+
+Other clients do not support `owned_by` yet, so leave it out of a connect
+string shared with them. The Java client accepts it only on the `ws` and
+`wss` schemas. The wire format is described in the
+[QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#owner-of-auto-created-tables).
+
+:::note QuestDB Enterprise
+
+`owned_by` needs QuestDB Enterprise with access control. Try it with a
+[free 30-day trial](https://questdb.com/enterprise/trial/).
+
+:::
 
 ## TLS {#tls}
 
@@ -1088,6 +1145,7 @@ description and behaviour notes.
 | `on_security_error`                     | enum                          | `terminal`                    | [Error handling](#error-handling)                             |
 | `on_server_error`                       | enum                          | `auto`                        | [Error handling](#error-handling)                             |
 | `on_write_error`                        | enum                          | `retriable`                   | [Error handling](#error-handling)                             |
+| `owned_by`                              | string                        | unset                         | [Owner of auto-created tables](#owned-by) (Java only)         |
 | `pass`                                  | string                        | unset                         | [Authentication](#auth) (alias of `password`)                 |
 | `password`                              | string                        | unset                         | [Authentication](#auth)                                       |
 | `poison_min_escalation_window_millis`   | int (ms)                      | `5000`                        | [Error handling](#error-handling)                             |

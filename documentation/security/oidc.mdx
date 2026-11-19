@@ -2046,9 +2046,14 @@ GRANT HTTP TO fxIngest;
 GRANT INSERT ON fx_trades TO fxIngest;
 ```
 
-Ingestion cannot create a table or add a column for an external user, so
-create the table, with every column that the service writes, in advance, as a
-database user such as the built-in admin:
+An external user cannot hold permissions itself, so ingestion creates a table
+or adds a column for it only when the connection names a group to own them
+with [`owned_by`](/docs/connect/clients/connect-string/#owned-by), such as
+`owned_by=fxIngest`. This needs QuestDB Enterprise 4.2.2 or later and the Java
+client 1.3.13 or later, and the service needs `CREATE TABLE`, or `ADD COLUMN`
+on the table, through its groups. Otherwise, create the table, with every
+column that the service writes, in advance, as a database user such as the
+built-in admin:
 
 ```questdb-sql title="Create the table that the service ingests into"
 CREATE TABLE fx_trades (
