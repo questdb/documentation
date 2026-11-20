@@ -32,6 +32,62 @@ The [Web Console](/docs/getting-started/web-console/overview/) is the official W
   SQL statement without running it
 - [`/exp`](#exp---export-data) to export data
 
+## Browser requests and reverse proxies
+
+QuestDB rejects requests that another website sends through a visitor's
+browser, even when the request carries valid credentials. The
+[HTTP browser check](/docs/configuration/http-server/#httpbrowserallowedorigins)
+uses `Sec-Fetch-Site` and `Origin`, and applies to both Open Source and
+Enterprise.
+
+For a trusted web application on another origin, list its origin in
+[`http.browser.allowed.origins`](/docs/configuration/http-server/#httpbrowserallowedorigins).
+This allows the request through QuestDB's browser check; it does not enable
+CORS. A cross-origin REST integration still needs a proxy that adds the
+appropriate CORS response headers and handles preflight requests. QWP
+WebSockets use a [separate origin setting](/docs/configuration/qwp/#qwpbrowserallowedorigins).
+
+Links and embedded resources on other sites normally send no `Origin`
+header. Over HTTPS and on localhost, these requests get `403 Forbidden`, even
+if the referring site's origin is listed. For example, a link to an `/exp`
+URL on a wiki page is rejected. Paste the API URL into the address bar or open
+it from a bookmark instead. Links to the Web Console's static pages still
+work.
+
+### Reverse proxies
+
+When the Web Console is served over plain HTTP at an address other than
+localhost, a proxy that rewrites `Host` can cause CSV imports and settings
+saves to fail with `403 Forbidden`. The browser's `Origin` no longer matches
+the `Host` QuestDB receives. Preserve the browser's `Host`, including its
+port. In nginx, add this to the `location` block that proxies QuestDB:
+
+```nginx
+proxy_set_header Host $http_host;
+```
+
+Alternatively, list the console's origin in `http.browser.allowed.origins`.
+Without authentication, the host name received by QuestDB must also pass
+[`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts).
+
+Behind a TLS-terminating proxy, current browsers report the console's
+requests as `Sec-Fetch-Site: same-origin`, which takes precedence over the
+HTTPS `Origin` not matching QuestDB's plain HTTP connection. Preserve this
+header. The QWP-specific
+[`qwp.browser.tls.termination.enabled`](/docs/configuration/qwp/#qwpbrowsertlsterminationenabled)
+setting does not change REST request checks.
+
+:::warning Use HTTPS and authentication for remote access
+
+Browsers send `Sec-Fetch-Site` to HTTPS and localhost URLs, but not to remote
+plain-HTTP URLs. A GET from a link or image on another site can carry neither
+`Sec-Fetch-Site` nor `Origin` when it targets a remote plain-HTTP address, and
+passes the browser check. Serve QuestDB over HTTPS and enable authentication
+when browsers on other machines can reach it. These checks are not access
+control: non-browser clients can omit or forge the headers.
+
+:::
+
 ## Examples
 
 QuestDB exposes a REST API for compatibility with a wide range of libraries and
@@ -150,8 +206,9 @@ need high-performance inserts.
 
 `/exec` is the older name for [`/execute`](#execute), documented immediately
 below. It is still supported and takes the same parameters and returns the same
-response, so an existing integration keeps working unchanged. Use `/execute` for
-new work.
+response. Both paths follow the same
+[HTTP request checks](#browser-requests-and-reverse-proxies). Use `/execute`
+for new work.
 
 :::
 
@@ -757,6 +814,21 @@ and the character `position` at which compilation failed:
 ```
 
 ## Error responses
+
+### HTTP request rejections
+
+The HTTP browser and host checks return `403 Forbidden` with a plain-text
+reason, rather than the SQL error JSON described below:
+
+| Message starts with | Cause and action |
+| ------------------- | ---------------- |
+| `host name rejected` | HTTP authentication is disabled and the request's `Host` is not accepted. Add the name to [`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts). This also affects scripts, ingestion clients, and monitoring probes. |
+| `cross-site browser request rejected` | `Sec-Fetch-Site` is neither `same-origin` nor `none`. List a trusted application's `Origin` in [`http.browser.allowed.origins`](/docs/configuration/http-server/#httpbrowserallowedorigins). If the message says there is no `Origin`, open the URL directly; the list cannot admit that request. |
+| `cross-origin browser request rejected` | There is no `Sec-Fetch-Site`, and `Origin` does not match the `Host` and connection scheme. Check the [reverse proxy configuration](#reverse-proxies) or list the trusted application's origin. |
+
+An endpoint that requires authentication returns `401 Unauthorized` instead
+when the request lacks valid credentials. Valid credentials do not bypass the
+browser check.
 
 ### Malformed queries
 

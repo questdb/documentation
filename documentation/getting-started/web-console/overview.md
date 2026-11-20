@@ -23,6 +23,11 @@ all without installing anything.
 The Web Console is available at `http://[server-address]:9000`. When
 running locally, this is `http://localhost:9000`.
 
+Without HTTP authentication, custom host names must be accepted by
+[`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts).
+If CSV imports or settings saves return `403 Forbidden` behind a proxy, see
+[Reverse proxies](/docs/connect/compatibility/rest-api/#reverse-proxies).
+
 ## Layout
 
 <Screenshot
