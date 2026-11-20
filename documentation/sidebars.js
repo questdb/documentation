@@ -828,6 +828,11 @@ module.exports = {
           type: "doc",
           id: "security/tls",
         },
+        {
+          id: "security/vulnerabilities",
+          type: "doc",
+          label: "Vulnerabilities (CVEs)",
+        },
       ],
     },
 
