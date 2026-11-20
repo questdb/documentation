@@ -1960,6 +1960,7 @@ Common WebSocket-specific options:
 | `sf_dir` | unset | Store-and-forward directory. |
 | `sender_id` | `default` | Sender directory name for SF. |
 | `request_durable_ack` | `off` | Durable acknowledgement tier: `off`, `local`, `replicated`, `local,replicated`, or `on` (the original name of `replicated`). |
+| `owned_by` | unset | Owner of the tables and columns the sender auto-creates (QuestDB Enterprise 4.2.2 or later, client 1.3.13 or later); an external user must name one of its groups. Builder: `ownedBy(...)`. See [Owner of auto-created tables](/docs/connect/clients/connect-string/#owned-by). |
 | `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget only. |
 | `failover` | `on` | Egress per-query reconnect switch. |
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`, `auto`). |
