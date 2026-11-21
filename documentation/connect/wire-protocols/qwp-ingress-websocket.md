@@ -184,18 +184,25 @@ key, and needs QuestDB Enterprise 4.2.2 or later.
   echoes an accepted owner in `X-QWP-Owned-By`, in the encoding above. A
   client that named an owner must fail the connection when the echo is absent
   or names another owner: a server that predates the header ignores it, and
-  the tables it creates would not get the owner.
-- **Refusal.** A malformed value, and an owner that the server cannot set,
-  because it is QuestDB open source or Enterprise with access control
-  disabled, get `400 Bad Request`. An owner that the principal may not name
-  gets `403 Forbidden`. Both responses carry the reason as a `text/plain`
-  body.
+  the tables it creates would not get the owner. This holds even when another
+  host of the same endpoint walk answered `421`: the host that answered `101`
+  accepts writes, so the walk did find a primary, one that cannot set the
+  owner, and reports that rather than a missing primary.
+- **Refusal.** A malformed value gets `400 Bad Request`. An owner that the
+  principal may not name gets `403 Forbidden`, and so does any owner when the
+  server cannot set one, because it is QuestDB open source or Enterprise with
+  access control disabled. Like a failed authentication, the refusal holds on
+  every host, so it ends the endpoint walk. Both responses carry the reason
+  as a `text/plain` body.
 - **Each auto-create.** The server checks the owner again before it creates
   each table or column. The batch fails with `SECURITY_ERROR`, and nothing is
   created, when the principal may no longer name the owner, or when the
   principal is an [external user](/docs/security/oidc/#user-permissions) and
   the connection named no owner: an external user cannot hold permissions
-  itself.
+  itself. A table or column that another connection creates at the same
+  moment needs no owner from this one, so the write lands in it. While the
+  other connection still holds the name of a table it is creating, the server
+  refuses the batch with `WRITE_ERROR`, which a client retries.
 
 ## Client lifecycle
 

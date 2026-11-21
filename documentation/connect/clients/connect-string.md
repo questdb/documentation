@@ -339,7 +339,7 @@ reconnects and failovers included, and the server checks it there:
 - An owner the principal may not name fails the connection with HTTP `403`
   and the reason, such as `owned_by refused: fxIngest does not exist`.
 - QuestDB open source, and QuestDB Enterprise with access control disabled,
-  cannot set an owner, so they fail the connection with HTTP `400`.
+  cannot set an owner, so they fail the connection with HTTP `403` too.
 - A server that predates `owned_by` ignores it, so the client fails the
   connection itself rather than create tables that the owner does not own.
 
