@@ -615,6 +615,23 @@ The description follows as a paragraph after the metadata. Keep it concise
 but include practical guidance (when to change it, what the trade-offs are)
 when relevant.
 
+## Vulnerability (CVE) entries
+
+`security/vulnerabilities.md` records QuestDB's assessment of published CVEs.
+When adding an entry:
+
+- Add it as a new `## CVE-YYYY-NNNNN (common name)` section at the top of the
+  page. Entries are ordered most recent first.
+- Link the official CVE record (`https://www.cve.org/CVERecord?id=...`).
+- State the affected component, the assessment month, and the QuestDB and
+  QuestDB Enterprise versions that are and are not affected. Use exact version
+  boundaries ("7.1.4 and later"), never "current versions" alone.
+- Explain why QuestDB is or is not affected in terms of what reaches the
+  vulnerable code, and list the conditions an exposed version needs.
+- Give the mitigation: the upgrade target first, then any workaround.
+- Have the engineers who assessed the CVE confirm the version ranges before
+  publishing.
+
 ## SVG diagrams
 
 When documentation needs visual diagrams (algorithm comparisons, data flow,
