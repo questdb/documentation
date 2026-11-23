@@ -13,7 +13,7 @@ tested combinations:
 | Platform   | Kubernetes | QuestDB Enterprise |
 | ---------- | ---------- | ------------------ |
 | Amazon EKS | 1.31–1.37  | 4.0.1              |
-| Azure AKS  | 1.33–1.37  | 4.0.1              |
+| Azure AKS  | 1.34–1.37  | 4.0.1              |
 
 Other Kubernetes distributions and versions are untested. Only the latest
 release receives fixes; obtain its `<operator-version>` and private registry

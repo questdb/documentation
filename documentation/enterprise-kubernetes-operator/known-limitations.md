@@ -150,7 +150,7 @@ Gateway, or LoadBalancer. Do not mutate operator-owned Service types.
 | Platform   | Tested Kubernetes | Tested QuestDB Enterprise |
 | ---------- | ----------------- | ------------------------- |
 | Amazon EKS | 1.31–1.37         | 4.0.1                     |
-| Azure AKS  | 1.33–1.37         | 4.0.1                     |
+| Azure AKS  | 1.34–1.37         | 4.0.1                     |
 
 Other Kubernetes distributions, versions, CSI/fsGroup behavior, and QuestDB
 versions are untested. They are not blocked by admission.

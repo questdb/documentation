@@ -18,7 +18,7 @@ needed to pull the private operator and database images.
 
 Before you start, make sure your AKS cluster has:
 
-- Kubernetes 1.33 through 1.37;
+- Kubernetes 1.34 through 1.37;
 - at least one worker node;
 - Linux on every schedulable worker node;
 - the Azure Disk CSI driver, `disk.csi.azure.com`;
@@ -150,7 +150,7 @@ printf 'AKS version: %s\nAzure location: %s\n' \
   "$AKS_VERSION" "$AZURE_LOCATION"
 ```
 
-Continue if the Kubernetes version is between 1.33 and 1.37.
+Continue if the Kubernetes version is between 1.34 and 1.37.
 
 ## 2. Check the cluster
 
