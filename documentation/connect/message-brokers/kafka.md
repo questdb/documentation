@@ -299,27 +299,27 @@ indexes, and column types.
 ### Lookup enrichment
 
 Events often carry only an identifier (`instrument_id`) while the readable
-attribute (`ticker`) lives in a reference table in the same QuestDB instance.
-The connector looks up that attribute and adds it to every row as it is
-written, so queries need no join. Lookup enrichment requires `ws` or `wss` and
-connector 0.26 or newer.
+attributes (`ticker`, `market`) live in a reference table in the same QuestDB
+instance. The connector looks up those attributes and adds them to every row as
+it is written, so queries need no join. Lookup enrichment requires `ws` or `wss`
+and connector 0.26 or newer.
 
 ```properties
-enrichment.sql=SELECT instrument_id, ticker FROM instruments LATEST ON ts PARTITION BY instrument_id
+enrichment.sql=SELECT instrument_id, ticker, market FROM instruments LATEST ON ts PARTITION BY instrument_id
 enrichment.key.field=instrument_id
 ```
 
 A record `{"instrument_id": 42, "price": 101.5}` lands as:
 
-| instrument_id | price | ticker |
-|---------------|-------|--------|
-| 42            | 101.5 | ACME   |
+| instrument_id | price | ticker | market |
+|---------------|-------|--------|--------|
+| 42            | 101.5 | ACME   | EQ     |
 
-The query must return two columns: the lookup key, then the value. The value is
-written as a [symbol](/docs/concepts/symbol/) column named after the second
-column; alias it in the SQL to rename it (`ticker AS instrument_ticker`). An
-existing `VARCHAR` or `STRING` column of that name keeps its type. The value
-column must be `VARCHAR`, `STRING` or `SYMBOL`; the key column can also be
+The query must return the lookup key, then one or more value columns. Each
+value column is written as a [symbol](/docs/concepts/symbol/) column of the
+same name; alias it in the SQL to rename it (`ticker AS instrument_ticker`). An
+existing `VARCHAR` or `STRING` column of that name keeps its type. Value
+columns must be `VARCHAR`, `STRING` or `SYMBOL`; the key column can also be
 `BYTE`, `SHORT`, `INT` or `LONG`. Cast other types in the SQL, for example
 `instrument_id::varchar`.
 
@@ -337,12 +337,17 @@ memory and reloads it in the background every `enrichment.refresh.ms` (default
 
 #### Enrichment behavior
 
-- A record with no mapping is written immediately with the column null, and is
-  not backfilled later.
-- A row gets the value known when the connector processes the record, not the
-  value valid at the record's timestamp.
-- A redelivered record can get a different value. Do not include the enriched
-  column in `DEDUP UPSERT KEYS`.
+- A record with no mapping is written immediately with the value columns null,
+  and is not backfilled later.
+- A row gets the values known when the connector processes the record, not the
+  values valid at the record's timestamp. All of them come from the same lookup
+  row.
+- A value that is null in the lookup leaves its column null. The other values
+  are still written.
+- If the query returns a key more than once, the last row wins. `LATEST ON`
+  avoids that.
+- A redelivered record can get different values. Do not include the enriched
+  columns in `DEDUP UPSERT KEYS`.
 - The query must succeed when a task starts; an empty lookup table is fine. A
   rejected query (bad SQL, missing table or permission) fails the task.
 - If a later reload fails, the connector keeps the previous lookup and
@@ -351,12 +356,12 @@ memory and reloads it in the background every `enrichment.refresh.ms` (default
   finishes, at most `enrichment.query.timeout.ms` (default 10 seconds) unless
   QuestDB is unreachable. Later reloads do not hold up ingestion. Keep the query
   small and the timeout well below the consumer's `max.poll.interval.ms`.
-- The value column must not share a name with a record field. A clash with
-  `timestamp` or a field named in `enrichment.key.field`,
-  `timestamp.field.name`, `symbols`, `doubles`, or `timestamp.string.fields`
-  fails the load. Other clashes send the records to the
-  [dead letter queue](#dead-letter-queue), or fail the task without one.
-- If the enriched column stays null, check the connector log. Each task logs
+- A value column must not share a name with a record field or with another
+  value column. A clash with `timestamp` or a field named in
+  `enrichment.key.field`, `timestamp.field.name`, `symbols`, `doubles`, or
+  `timestamp.string.fields` fails the load. Other clashes send the records to
+  the [dead letter queue](#dead-letter-queue), or fail the task without one.
+- If the enriched columns stay null, check the connector log. Each task logs
   how many keys have no mapping whenever that number changes, with the keys
   themselves at `DEBUG`. It warns once when records have no value in
   `enrichment.key.field`, usually a misspelled or unflattened name, and once
@@ -808,7 +813,7 @@ These options apply only to `ws` and `wss`. Set `enrichment.sql` and
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| enrichment.sql | `string` | N/A | Query that returns two columns: the lookup key, then the value |
+| enrichment.sql | `string` | N/A | Query that returns the lookup key, then one or more value columns |
 | enrichment.key.field | `string` | N/A | Flattened name of the record field to look up |
 | enrichment.refresh.ms | `long` | 5000 | Time between lookup reloads, in milliseconds, at least 100. Each task reloads in the background, also while idle |
 | enrichment.query.timeout.ms | `long` | 10000 | Maximum time for one lookup query, in milliseconds. Also caps `connect_timeout` and `auth_timeout_ms` for the query connection unless `client.conf.string` sets them |
