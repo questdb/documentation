@@ -47,6 +47,8 @@ integrations:
   platform for simplified data pipelines.
 - [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
+- [Apache Iggy](/docs/connect/message-brokers/iggy/): Stream messages from
+  Apache Iggy into QuestDB with the QuestDB sink connector.
 - [Databento connector](/docs/connect/connectors/databento/): Stream Live market
   data and run Historical backfills with QuestDB Enterprise. On QuestDB Open
   Source, see [Databento with Python](/docs/integrations/other/databento/).
