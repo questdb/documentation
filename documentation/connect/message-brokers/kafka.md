@@ -316,12 +316,18 @@ A record `{"instrument_id": 42, "price": 101.5}` lands as:
 | 42            | 101.5 | ACME   | EQ     |
 
 The query must return the lookup key, then one or more value columns. Each
-value column is written as a [symbol](/docs/concepts/symbol/) column of the
-same name; alias it in the SQL to rename it (`ticker AS instrument_ticker`). An
-existing `VARCHAR` or `STRING` column of that name keeps its type. Value
-columns must be `VARCHAR`, `STRING` or `SYMBOL`; the key column can also be
-`BYTE`, `SHORT`, `INT` or `LONG`. Cast other types in the SQL, for example
-`instrument_id::varchar`.
+value column keeps its name and type from the query. Alias it in the SQL to rename it (`ticker AS instrument_ticker`), and
+cast it to write another type (`market::varchar AS market`).
+
+| Column | Supported types |
+|--------|-----------------|
+| Key (the first column) | `VARCHAR`, `STRING`, `SYMBOL`, `BYTE`, `SHORT`, `INT`, `LONG` |
+| Values | `BOOLEAN`, `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `CHAR`, `TIMESTAMP`, `TIMESTAMP_NS`, `VARCHAR`, `STRING` (written as `VARCHAR`), `SYMBOL` |
+
+A column of another type, such as `DATE` or `UUID`, makes the load fail; cast
+it in the SQL, for example `created::timestamp AS created_ts`. If the target
+table already has a column of that name, its type must accept the value, or
+the rows are rejected.
 
 `enrichment.key.field` is the [flattened](#how-data-is-mapped) field name, such
 as `address_city`, including any `value.prefix`. A primitive key or value takes
@@ -337,8 +343,10 @@ memory and reloads it in the background every `enrichment.refresh.ms` (default
 
 #### Enrichment behavior
 
-- A record with no mapping is written immediately with the value columns null,
-  and is not backfilled later.
+- A record with no mapping is written immediately and is not backfilled later.
+  Its value columns are null, except `BOOLEAN`, `BYTE` and `SHORT` columns,
+  which are not nullable and get `false` or `0`. Cast such a column to `INT` in
+  the SQL to get a null instead.
 - A row gets the values known when the connector processes the record, not the
   values valid at the record's timestamp. All of them come from the same lookup
   row.
@@ -352,6 +360,8 @@ memory and reloads it in the background every `enrichment.refresh.ms` (default
   rejected query (bad SQL, missing table or permission) fails the task.
 - If a later reload fails, the connector keeps the previous lookup and
   ingestion continues.
+- If a value column changes its type between reloads, the connector keeps the
+  previous lookup until the connector is restarted.
 - The first load, when a task starts, blocks the task until the query
   finishes, at most `enrichment.query.timeout.ms` (default 10 seconds) unless
   QuestDB is unreachable. Later reloads do not hold up ingestion. Keep the query
