@@ -521,6 +521,27 @@ function convertClients(content) {
 }
 
 /**
+ * Converts <IntegrationGrid> blocks of <IntegrationCard> components to the
+ * markdown list they render as: "- [name](href): description"
+ */
+function convertIntegrationCards(content) {
+  const withCards = replaceComponent(content, 'IntegrationCard', (match) => {
+    const { name, href } = match.props
+    const description = match.children.trim().replace(/\s+/g, ' ')
+    return `- [${name}](${href}): ${description}\n`
+  })
+
+  return replaceComponent(withCards, 'IntegrationGrid', (match) => {
+    const items = match.children
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .join('\n')
+    return `\n\n${items}\n\n`
+  })
+}
+
+/**
  * Main function to convert all components in content
  * @param {string} content - The markdown content
  * @param {string} currentFileDir - Directory of the current file (for resolving imports)
@@ -540,6 +561,7 @@ async function convertAllComponents(content, currentFileDir, docsRoot, repoExamp
   processed = convertRemoteRepoExample(processed, repoExamples)
   processed = convertILPClientsTable(processed)
   processed = convertClients(processed)
+  processed = convertIntegrationCards(processed)
   processed = convertScreenshot(processed)
   processed = convertVideo(processed)
   processed = convertDocButton(processed)
