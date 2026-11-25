@@ -437,6 +437,15 @@ SELECT * FROM trades
 WHERE timestamp IN '$now-1y..$now';
 ```
 
+`BETWEEN` is a timestamp operator. It also accepts integer columns, but
+`DOUBLE`, `FLOAT`, `DECIMAL` and `VARCHAR` columns fail with
+``there is no matching operator `between` ``. For those, use comparison operators:
+
+```questdb-sql title="Numeric range"
+SELECT * FROM trades
+WHERE price >= 60000 AND price <= 70000;
+```
+
 ##### Inclusivity example
 
 Inclusivity is precise, and may be more granular than the provided dates appear.

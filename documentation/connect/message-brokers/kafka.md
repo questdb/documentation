@@ -634,10 +634,16 @@ transforms.orderbook.mappings=buy_entries:bids:price,size;sell_entries:asks:pric
 
 The `mappings` format is `sourceField:targetField:field1,field2;...`
 
+Set `transforms.orderbook.empty.as.array=true` to store an empty source array,
+such as a book side with no orders, as an empty array instead of `NULL`. The
+result has one empty row per struct field: `[[],[]]` for `price,size`, shape
+(2, 0). The default is `false`. Available from connector version 0.26.
+
 **Behavior:**
 - All extracted values are converted to `double`
 - Missing source fields are skipped (no error)
-- Empty source arrays are skipped
+- Empty source arrays leave the target `NULL`, unless `empty.as.array` is set
+- Null source arrays always leave the target `NULL`
 - Null values inside structs cause an error
 - If the target field name already exists in the input, it is replaced
 - Works with both schema-based and schemaless messages

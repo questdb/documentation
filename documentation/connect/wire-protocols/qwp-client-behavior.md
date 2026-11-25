@@ -143,6 +143,16 @@ knob silently turns startup into a multi-minute **blocking** retry. If no
 `reconnect_*` knob is set either, the mode is `OFF`. Always set
 `initial_connect_retry` explicitly to avoid this ([sharp edge #1](#known-sharp-edges)).
 
+**Native/Python pool exception:** the C, C++, Rust, and Python clients apply
+this implicit promotion only to standalone senders, not pools. Their eager
+pools honor an explicitly set `initial_connect_retry` and otherwise fail fast
+even when `reconnect_*` keys are set. Reader prewarm is always synchronous
+and is not covered by the ingestion retry mode; use `query_pool_min=0` to
+defer it. `lazy_connect=true` selects background ingestion and defaults
+`query_pool_min` to `0`; these pools reject it together with an explicit
+`initial_connect_retry` other than `async`, or with a nonzero
+`query_pool_min`.
+
 ### Facade prewarm
 
 `QuestDBBuilder.build()` validates both configs (without connecting), then
@@ -169,7 +179,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_pool_min` | `1` |
 | `sender_pool_max` | `4` |
-| `query_pool_min` | `1` |
+| `query_pool_min` | `1` (`0` with `lazy_connect`) |
 | `query_pool_max` | `4` |
 | `acquire_timeout_ms` | `5000` |
 | `idle_timeout_ms` | `60000` (`0` ⇒ infinite) |
@@ -363,9 +373,12 @@ Exhausting `sf_append_deadline_millis` on `append()` with `sf_max_total_bytes`
 reached fails only that call; the sender stays alive and keeps retrying.
 ⚠ The Java client treats an
 authentication rejection or a durable-ack capability mismatch as terminal only
-before the sender first connects, and retries them afterwards. A Node.js
-sender that uses store-and-forward or `initial_connect_retry=async` does the
-same once it has connected, as do some browser senders: see
+before the sender first connects, and retries them afterwards. C, C++, and
+Rust 7.3.0 or later and Python 6.1.0 or later also retry authentication
+rejections after the sender has connected, including with fixed credentials,
+but keep a durable-ack capability mismatch terminal. A Node.js sender that
+uses store-and-forward or `initial_connect_retry=async` retries both kinds
+once it has connected, as do some browser senders: see
 [Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ### Reconnect and outage handling
@@ -400,12 +413,13 @@ and apply back-pressure to the producer rather than dropping data.
 
 :::
 
-⚠ In the Java client, a running sender also retries authentication failures.
-So does a Node.js sender that uses store-and-forward or
-`initial_connect_retry=async`, and a browser sender that authenticates with
-`sessionBootstrap` and was started with `initialConnectMode: "async"`, once it
-has connected. A browser sender that authenticates with `auth` cannot see why
-an upgrade failed, so once it has connected it retries a rejected credential
+⚠ In Java, C/C++ and Rust 7.3.0 or later, and Python 6.1.0 or later, a running
+sender also retries authentication failures. So does a Node.js sender that
+uses store-and-forward or `initial_connect_retry=async`, and a browser sender
+that authenticates with `sessionBootstrap` and was started with
+`initialConnectMode: "async"`, once it has connected. A browser sender that
+authenticates with `auth` cannot see why an upgrade failed, so once it has
+connected it retries a rejected credential
 like an outage, whatever its mode, and reports `endpoint-attempt-failed`
 rather than `auth-failed`. Other senders treat authentication failures as
 terminal. See
@@ -414,15 +428,22 @@ terminal. See
 ### Authentication failures and token providers
 
 A client sends its credential only on the WebSocket upgrade request, and never
-authenticates an established connection again. A client with a token provider,
-such as the [Java client](/docs/connect/clients/java/#token-providers), asks
-the provider for the credential at the start of every connect round: the
-initial connect, every reconnect and failover, every orphan-drain connect, and
-every query client connect. When the provider fails, the round ends without
-contacting any endpoint, as a **credential-unavailable** failure, which the
-provider classifies as retryable or permanent. An exception from a provider
-that the application supplies counts as permanent, unless it is a token
-failure marked as retryable.
+authenticates an established connection again. The
+[Java](/docs/connect/clients/java/#token-providers),
+[C/C++](/docs/connect/clients/c-and-cpp/#rotating-bearer-tokens),
+[Rust](/docs/connect/clients/rust/#rotating-bearer-tokens), and
+[Python](/docs/connect/clients/python/#rotating-bearer-tokens) clients support
+token providers. They ask the provider for a credential at the start of every
+connect round: the initial connect, every reconnect and failover, every
+orphan-drain connect, and every query client connect. When the provider fails,
+the round ends without contacting any endpoint, as a
+**credential-unavailable** failure, which the provider can classify as
+retryable or permanent.
+
+In Java, an unclassified exception from an application provider counts as
+permanent. In C, C++, Rust, and Python, an unclassified token-source failure
+counts as retryable. Classify failures explicitly when implementing a source.
+A closed provider is terminal regardless of the retry policy.
 
 When an upgrade that presented a token from a provider receives `401`, without
 a Bearer `error` or with `error="invalid_token"`, the client tells the provider
@@ -443,20 +464,41 @@ fails, or the token did not change, the phase decides what happens:
 
 *Retry indefinitely* means with capped exponential backoff for as long as the
 sender is open. No setting bounds it, because store-and-forward must not end a
-live producer. The client reports each failed round to the error handler as a
-retriable `SECURITY_ERROR`, and in its connection health, so an application
-that prefers a hard failure can close the sender itself. A query that fails
-names the failure class in its error, and the next query connects again.
+live producer. Java reports each failed round to the error handler as a
+retriable `SECURITY_ERROR`, and in its connection health. C, C++, Rust, and
+Python distinguish `credential_unavailable` / `CredentialUnavailable`
+connection events from server rejection events (`auth_failed` / `AuthFailed`).
+An application that prefers a hard failure can close a standalone sender
+from its own code, outside callbacks. With native or Python pools, returning
+a sender lease (including Python's `PooledSender.close()`) can leave its
+background delivery running. Release all leases and close the pool to stop
+it, or explicitly retire a borrowed native connection instead of recycling
+it. Closing a shared OIDC or refreshing provider also disables future token
+pulls. In C, C++, Rust, and Python, an application-defined provider stops its
+clients by reporting a failure that retrying can never clear; see
+[Token refresh and reconnects](/docs/security/oidc/#token-refresh-and-reconnects).
 
-⚠ This is the behaviour of the Java client 1.3.11 and later. The browser
-client's `auth` option also accepts a function that supplies a credential
-before every connection attempt, and some Node.js and browser senders retry a
-rejected credential once they have connected, as described in
+The table describes Java 1.3.11 and later. C, C++, and Rust 7.3.0 or later and
+Python 6.1.0 or later follow the same sender-phase distinction: a `401` or
+`403` stops a sender that has not connected yet in every
+`initial_connect_retry` mode, including pools with `lazy_connect=true`, and a
+foreground failure does not mean an established sender stopped reconnecting.
+An OIDC provider that needs user interaction ends a caller-awaited connection
+attempt; arrange explicit sign-in, never a prompt inside the reconnect loop.
+Their readers apply their own failover limits to recoverable acquisition
+failures; after an exhausted failover, a later query can connect again. A
+server authentication rejection still fails the query after any eligible
+one-time token replacement.
+
+The browser client's `auth` option also accepts a function that supplies a
+credential before every connection attempt, and some Node.js and browser
+senders retry a rejected credential once they have connected, as described in
 [Reconnect and outage handling](#reconnect-and-outage-handling). A browser
 query session that authenticates with `auth` cannot see the status of a failed
 upgrade, so instead of failing the query it fails over as it would during an
-outage, until its failover limits run out. The other clients send fixed credentials only,
-and treat a `401` or `403` as terminal in every phase.
+outage, until its failover limits run out. Other clients without these
+capabilities send fixed credentials and treat a `401` or `403` as terminal in
+every phase.
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 

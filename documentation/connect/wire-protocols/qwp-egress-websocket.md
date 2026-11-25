@@ -629,9 +629,11 @@ When `target=primary`, zone preference is still recorded but every host's zone
 tier is treated as equivalent (the primary must be followed across zones).
 
 The `421 + X-QuestDB-Role` (and optional `X-QuestDB-Zone`) upgrade-reject
-convention is shared with ingress: the server returns HTTP 421 when the
-connecting client's role filter does not match, allowing the client to try the
-next endpoint without completing the WebSocket handshake.
+convention is shared with ingress: the server returns HTTP 421 when its role
+cannot serve the connection (for example, a replica refusing a write), allowing
+the client to try the next endpoint without completing the WebSocket handshake.
+The `target` filter itself is applied by the client after it reads
+`SERVER_INFO`.
 
 ## Null sentinel conventions
 
@@ -797,13 +799,14 @@ section of the connect string reference. The shared failover primitives
 Key behaviors:
 
 - An authentication error at any host fails the query; the reconnect loop does
-  not continue past it. A Java client with a token provider first retries the
-  same host once after a `401`, with a new token, and its next query connects
-  again. A browser query session that authenticates with the browser client's
-  `auth` option cannot see the status of a failed upgrade, so a rejected
-  credential looks like an unreachable host: it does not end the endpoint
-  walk, and a session that has connected before keeps failing over until its
-  failover limits run out. See
+  not continue past it. A client with a token provider (Java 1.3.11, C, C++,
+  and Rust 7.3.0, and Python 6.1.0 or later) first retries the same host once
+  after an eligible `401`, if the provider supplies a different token, and its
+  next query connects again. A browser query session that authenticates with
+  the browser client's `auth` option cannot see the status of a failed
+  upgrade, so a rejected credential looks like an unreachable host: it does
+  not end the endpoint walk, and a session that has connected before keeps
+  failing over until its failover limits run out. See
   [Authentication failures and token providers](/docs/connect/wire-protocols/qwp-client-behavior/#authentication-failures-and-token-providers).
 - A `CANCEL` acknowledged with `QUERY_ERROR(CANCELLED)` routes through the
   normal error path, not the transport-error path, so it never triggers

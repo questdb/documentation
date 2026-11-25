@@ -615,6 +615,23 @@ The description follows as a paragraph after the metadata. Keep it concise
 but include practical guidance (when to change it, what the trade-offs are)
 when relevant.
 
+## Vulnerability (CVE) entries
+
+`security/vulnerabilities.md` records QuestDB's assessment of published CVEs.
+When adding an entry:
+
+- Add it as a new `## CVE-YYYY-NNNNN (common name)` section at the top of the
+  page. Entries are ordered most recent first.
+- Link the official CVE record (`https://www.cve.org/CVERecord?id=...`).
+- State the affected component, the assessment month, and the QuestDB and
+  QuestDB Enterprise versions that are and are not affected. Use exact version
+  boundaries ("7.1.4 and later"), never "current versions" alone.
+- Explain why QuestDB is or is not affected in terms of what reaches the
+  vulnerable code, and list the conditions an exposed version needs.
+- Give the mitigation: the upgrade target first, then any workaround.
+- Have the engineers who assessed the CVE confirm the version ranges before
+  publishing.
+
 ## SVG diagrams
 
 When documentation needs visual diagrams (algorithm comparisons, data flow,
@@ -709,6 +726,24 @@ in `src/theme/MDXComponents.js`). Store screenshots as `.webp` in
 ```
 cwebp -lossless -z 9 -m 6 -mt input.png -o output.webp
 ```
+
+Commit only the WebP. The repo's lint-staged hook quantizes staged PNG and
+JPEG files lossily (pngquant, mozjpeg), and leaves WebP alone.
+
+#### Capture at 2x
+
+A screenshot shown at `width={800}` needs to be at least 1600 px wide to stay
+sharp on a retina screen, captured as PNG and kept lossless until the WebP.
+Screenshots from the Claude in Chrome `screenshot` action are downscaled 1x
+JPEGs and look blurry; so does a wide window shrunk into the column. Capture
+Web Console and other UI screenshots with headless Chrome at
+`deviceScaleFactor: 2` instead. Read
+[references/ui-screenshots/README.md](references/ui-screenshots/README.md)
+before taking any: it covers loading notebooks from the user's browser into a
+throwaway profile, running every cell, cleaning the frame, showing "MCP
+connected" without opening the user's browser, and the encode check. The
+driver script `references/ui-screenshots/cdp-shot.mjs` needs only Node 22 and
+Chrome.
 
 ## SQL parser sync check
 

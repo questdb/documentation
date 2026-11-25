@@ -15,8 +15,8 @@ first.
 ## Common keys
 
 `addr` and `auth_timeout_ms` apply to every WS / WSS / HTTP / HTTPS client.
-`zone` is accepted everywhere but only takes effect on egress; `target` is an
-egress-only key and is rejected as an unknown key on an ingress connect string.
+`zone` and `target` are accepted on every connect string but only take effect
+on egress, so one string can drive both directions.
 They are documented in full on the
 [connect-string reference](/docs/connect/clients/connect-string#failover-keys);
 the table below summarises the failover-relevant subset.
@@ -25,7 +25,7 @@ the table below summarises the failover-relevant subset.
 |---|---|---|---|
 | `addr` | `host:port[,host:port…]` | required | Comma-separated peer list. The two syntactic forms (`addr=h1,h2` and repeated `addr=h1;addr=h2`) accumulate. Empty entries are rejected. |
 | `zone` | string | unset | Client's zone identifier (opaque, case-insensitive — `eu-west-1a`, `dc-amsterdam`, etc.). Egress prefers same-zone peers when `target` is `any` or `replica`. Silently accepted but ignored on ingress. |
-| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Rejected as an unknown key on an ingress connect string. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
+| `target` | `any` \| `primary` \| `replica` | `any` | **Egress only.** Which server role the query client accepts. Accepted and ignored on ingress, which always writes to the primary. See [Role filter](/docs/high-availability/client-failover/concepts/#role-filter-target) for the role table. |
 | `auth_timeout_ms` | int (ms) | `15000` | Upper bound on the HTTP-upgrade response read per host. Does **not** cover the TCP connect or TLS handshake — those use the OS default. Set lower if you have well-known network paths and want faster failover; set higher only if upgrade is genuinely slow. |
 
 `addr` syntax — both of these are equivalent and produce the same three-peer
