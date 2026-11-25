@@ -315,68 +315,53 @@ A record `{"instrument_id": 42, "price": 101.5}` lands as:
 |---------------|-------|--------|--------|
 | 42            | 101.5 | ACME   | EQ     |
 
-The query must return the lookup key, then one or more value columns. Each
-value column keeps its name and type from the query. Alias it in the SQL to rename it (`ticker AS instrument_ticker`), and
-cast it to write another type (`market::varchar AS market`).
+The query must return the lookup key first, followed by one or more value
+columns. Each value column keeps its name and type from the query; alias it in
+the SQL to rename it (`ticker AS instrument_ticker`), or cast it to write a
+different type (`market::varchar AS market`).
 
 | Column | Supported types |
 |--------|-----------------|
-| Key (the first column) | `VARCHAR`, `STRING`, `SYMBOL`, `BYTE`, `SHORT`, `INT`, `LONG` |
+| Key (first column) | `VARCHAR`, `STRING`, `SYMBOL`, `BYTE`, `SHORT`, `INT`, `LONG` |
 | Values | `BOOLEAN`, `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `CHAR`, `TIMESTAMP`, `TIMESTAMP_NS`, `VARCHAR`, `STRING` (written as `VARCHAR`), `SYMBOL` |
 
-A column of another type, such as `DATE` or `UUID`, makes the load fail; cast
-it in the SQL, for example `created::timestamp AS created_ts`. If the target
-table already has a column of that name, its type must accept the value, or
-the rows are rejected.
+Other column types, such as `DATE` or `UUID`, fail the load; cast them in the
+SQL (for example, `created::timestamp AS created_ts`).
 
-`enrichment.key.field` is the [flattened](#how-data-is-mapped) field name, such
-as `address_city`, including any `value.prefix`. A primitive key or value takes
-the name of its prefix, or `key` or `value` if the prefix is empty. The field
-can hold a string, an integer, a floating-point number or a boolean. It
-matches by value, whatever its type: `42` and `"42"` both match the integer key
-`42`. `42.0` and `"042"` do not.
-
-The query runs with the address and credentials from `client.conf.string`,
-which need read access to the lookup table. Each task keeps the whole result in
-memory and reloads it in the background every `enrichment.refresh.ms` (default
-5 seconds), also while no records arrive.
+`enrichment.key.field` takes the [flattened](#how-data-is-mapped) field name,
+such as `address_city`, including any `value.prefix` or `key.prefix` (for an
+unprefixed primitive key or value, use `key` or `value`). The field can hold a
+string, integer, floating-point number, or boolean. Keys match by their string
+representation: `42` and `"42"` both match key `42`, while `42.0` and `"042"`
+do not.
 
 #### Enrichment behavior
 
-- A record with no mapping is written immediately and is not backfilled later.
-  Its value columns are null, except `BOOLEAN`, `BYTE` and `SHORT` columns,
-  which are not nullable and get `false` or `0`. Cast such a column to `INT` in
-  the SQL to get a null instead.
-- A row gets the values known when the connector processes the record, not the
-  values valid at the record's timestamp. All of them come from the same lookup
-  row.
-- A value that is null in the lookup leaves its column null. The other values
-  are still written.
-- If the query returns a key more than once, the last row wins. `LATEST ON`
-  avoids that.
-- A redelivered record can get different values. Do not include the enriched
-  columns in `DEDUP UPSERT KEYS`.
-- The query must succeed when a task starts; an empty lookup table is fine. A
-  rejected query (bad SQL, missing table or permission) fails the task.
-- If a later reload fails, the connector keeps the previous lookup and
-  ingestion continues.
-- If a value column changes its type between reloads, the connector keeps the
-  previous lookup until the connector is restarted.
-- The first load, when a task starts, blocks the task until the query
-  finishes, at most `enrichment.query.timeout.ms` (default 10 seconds) unless
-  QuestDB is unreachable. Later reloads do not hold up ingestion. Keep the query
-  small and the timeout well below the consumer's `max.poll.interval.ms`.
-- A value column must not share a name with a record field or with another
-  value column. A clash with `timestamp` or a field named in
-  `enrichment.key.field`, `timestamp.field.name`, `symbols`, `doubles`, or
-  `timestamp.string.fields` fails the load. Other clashes send the records to
-  the [dead letter queue](#dead-letter-queue), or fail the task without one.
-- If the enriched columns stay null, check the connector log. Each task logs
-  how many keys have no mapping whenever that number changes, with the keys
-  themselves at `DEBUG`. It warns once when records have no value in
-  `enrichment.key.field`, usually a misspelled or unflattened name, and once
-  when the field holds a value that cannot be a key: a struct, array, bytes or
-  decimal.
+The query runs with the credentials from `client.conf.string` (which need read
+access to the lookup table), and each task keeps the full result in memory. The
+first load runs at startup and must succeed (an empty table is fine). Keep the
+query small and `enrichment.query.timeout.ms` (default 10 seconds) well below
+`max.poll.interval.ms`. After startup, each task reloads the lookup in the
+background every `enrichment.refresh.ms` (default 5 seconds), even while idle,
+without blocking ingestion. If a reload fails or a value column changes type,
+the connector logs a warning and keeps the previous lookup. Restart the
+connector for a column type change to take effect.
+
+Each record is enriched from the current in-memory map at processing time. If
+the query returns duplicate keys, the last row wins (`LATEST ON` avoids that).
+Records with no matching key are written immediately and are not backfilled
+later; their enriched columns stay null, except `BOOLEAN`, `BYTE`, and `SHORT`,
+which are not nullable in QuestDB and default to `false` or `0`. Do not include
+enriched columns in `DEDUP UPSERT KEYS`, because a redelivered record can pick
+up newer values.
+
+Value column names must be unique and must not match `timestamp` or any field in
+the incoming record; alias them in the SQL if needed.
+
+If enriched columns stay null, check the connector log. Each task logs unmapped
+key counts whenever they change (enable `DEBUG` to see the keys), and warns once
+if `enrichment.key.field` is missing from records (often a misspelled or
+unflattened name) or holds an unsupported key type.
 
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ### Delivery guarantees {#fault-tolerance}
