@@ -47,14 +47,15 @@ governs it instead. QuestDB Enterprise
 [resource groups](/docs/concepts/resource-groups/) require Fiber mode on
 whichever pool actually serves PostgreSQL.
 
-### pg.worker.split.by.cpu.socket
+### pg.worker.groups
 
-- **Default**: `false`
+- **Default**: `1`
 - **Reloadable**: no
 
-Linux only. Makes the dedicated PostgreSQL worker pool CPU-socket-local when
-`pg.worker.count` is above `0`. Can't be combined with `pg.worker.affinity`. See
-[CPU-socket-local network pools](/docs/configuration/shared-workers/#cpu-socket-local-network-pools).
+Linux only. The number of worker groups the dedicated PostgreSQL worker pool
+splits into when `pg.worker.count` is above `0`, each group with its own IO
+dispatcher. See
+[Network worker groups](/docs/configuration/shared-workers/#network-worker-groups).
 
 ### pg.daemon.pool
 

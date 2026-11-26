@@ -126,6 +126,16 @@ Core indexes are 0-based.
 Number of dedicated I/O worker threads for parsing TCP input. When `0`,
 uses the shared worker pool.
 
+### line.tcp.io.worker.groups
+
+- **Default**: `1`
+- **Reloadable**: no
+
+Linux only. The number of worker groups the dedicated ILP/TCP I/O worker pool
+splits into when `line.tcp.io.worker.count` is above `0`, each group with its
+own IO dispatcher. See
+[Network worker groups](/docs/configuration/shared-workers/#network-worker-groups).
+
 ### line.tcp.io.worker.sleep.threshold
 
 - **Default**: `1000`
@@ -133,16 +143,6 @@ uses the shared worker pool.
 
 Number of consecutive idle loop iterations before the I/O worker goes to
 sleep.
-
-### line.tcp.io.worker.split.by.cpu.socket
-
-- **Default**: `false`
-- **Reloadable**: no
-
-Linux only. Makes the dedicated ILP/TCP I/O worker pool CPU-socket-local when
-`line.tcp.io.worker.count` is above `0`. Can't be combined with
-`line.tcp.io.worker.affinity`. See
-[CPU-socket-local network pools](/docs/configuration/shared-workers/#cpu-socket-local-network-pools).
 
 ### line.tcp.io.worker.yield.threshold
 

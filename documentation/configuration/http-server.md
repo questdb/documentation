@@ -79,6 +79,17 @@ is the setting that governs it instead. QuestDB Enterprise
 [resource groups](/docs/concepts/resource-groups/) require Fiber mode on
 whichever pool actually serves HTTP.
 
+### http.worker.groups
+
+- **Default**: `1`
+- **Reloadable**: no
+
+Linux only. The number of worker groups the private HTTP worker pool splits
+into when `http.worker.count` is above `0`, each group with its own IO
+dispatcher. QWP over WebSocket, the REST API and the web console run on this
+pool too. See
+[Network worker groups](/docs/configuration/shared-workers/#network-worker-groups).
+
 ### http.worker.haltOnError
 
 - **Default**: `false`
@@ -86,16 +97,6 @@ whichever pool actually serves HTTP.
 
 Flag that indicates if the worker thread must stop when an unexpected error
 occurs. Changing the default value is strongly discouraged.
-
-### http.worker.split.by.cpu.socket
-
-- **Default**: `false`
-- **Reloadable**: no
-
-Linux only. Makes the private HTTP worker pool CPU-socket-local when
-`http.worker.count` is above `0`. QWP over WebSocket, the REST API and the web
-console run on this pool too. Can't be combined with `http.worker.affinity`. See
-[CPU-socket-local network pools](/docs/configuration/shared-workers/#cpu-socket-local-network-pools).
 
 ## Authentication
 
