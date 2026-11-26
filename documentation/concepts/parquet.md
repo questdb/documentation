@@ -100,10 +100,9 @@ A policy can also move Parquet partitions off local disk entirely. The `TO REMOT
 
 ### Converting to Parquet
 
-On all editions, partitions can be converted manually with `ALTER TABLE`. You
-need to pass a filter specifying the partitions to convert. The filter can be
-either a `WHERE` or a `LIST`, in the same way it is used for the
-[`DETACH` command](/docs/query/sql/alter-table-detach-partition/).
+On all editions, use `ALTER TABLE` to convert partitions manually. Select the
+partitions with a `WHERE` condition on the designated timestamp or a `LIST` of
+partition names.
 
 :::tip
 The active (most recent) partition will never be converted into Parquet, even if it matches the filter.

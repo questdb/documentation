@@ -392,16 +392,13 @@ for more information on configuring the symbol capacity.
   <summary>What happens in a database crash or OS reboot?</summary>
 <p>
 
-If reboot/power loss happens while partitions are being attached, the table
-may be left with incomplete data. Truncate the table before re-importing
-with:
+After a reboot or power loss, check the destination table. If no imported rows
+are visible, retry the import. If the table was empty before the import and now
+contains only part of the CSV, truncate it before retrying:
 
 ```questdb-sql
 TRUNCATE TABLE table_name;
 ```
-
-If reboot/power loss happens before any partitions being attached, the import
-should not be affected.
 
 </p>
 </details>

@@ -154,7 +154,7 @@ refused them, whatever it holds, with
 `only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
 
 - `TRUNCATE TABLE`
-- `ALTER TABLE DROP PARTITION`, `SQUASH PARTITIONS`, and `DETACH PARTITION`
+- `ALTER TABLE DROP PARTITION` and `SQUASH PARTITIONS`
 - `ALTER TABLE SET TTL` and `SET PARAM`
 - `ALTER TABLE SET STORAGE POLICY`, with any policy, and
   `ENABLE STORAGE POLICY`
@@ -168,8 +168,8 @@ with a storage policy:
 ```questdb-sql title="On 4.1.0: who can remove rows from the trail"
 SELECT entity_name, entity_type, permission, table_name
 FROM active_permissions()
-WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'DETACH PARTITION',
-    'SET TABLE PARAM', 'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
+WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'SET TABLE PARAM',
+    'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
   AND (table_name IS NULL OR table_name = 'sys.view_audit');
 ```
 

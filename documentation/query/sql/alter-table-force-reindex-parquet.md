@@ -95,8 +95,6 @@ runs on. It is not replicated.
   [object storage](/docs/concepts/cold-storage/) have no local files to
   rebuild. They are skipped, and the statement fails if every selected
   partition is cold.
-- **Partitions attached from a soft link** are skipped, because a new
-  directory version would move them off their attached volume.
 
 ## Automatic repair
 
