@@ -191,30 +191,23 @@ These errors protect a [cold storage](/docs/concepts/cold-storage/) root, which 
 ER010 - Connected to a cold storage root that holds another database's data. The local and cold storage DataIDs do not match [local=<data id>, cold_storage=<data id>].
 ```
 
-The catalog of a cold storage root records the Data ID of the database that writes the root. An instance of another database refuses that root: it starts, but its cold storage promotion fails, its cold reads fail, and it writes nothing to the root. A restore from a backup that holds cold partitions fails with this error, before it changes the database, when the root belongs to another database.
+A cold storage root records the Data ID of its database, and an instance of another database refuses it. The instance starts, but its cold storage promotion, its cold reads and any restore of cold partitions onto that root fail, and it writes nothing to the root.
 
-Common causes:
+Common causes are two databases with the same `cold.storage.object.store`, a [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage) pointed at the source root, and a deleted or replaced `.data_id` file.
 
-- Two databases configured with the same `cold.storage.object.store`.
-- A database recovered with [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage), which has a new Data ID, pointed at the source root.
-- A database whose `.data_id` was deleted or replaced.
-
-To resolve, point `cold.storage.object.store` at the root of this database, or at a new, empty root for a new database. Replicas of a database, and a plain restore of its backup, keep its Data ID and can use its root.
+To resolve, point `cold.storage.object.store` at this database's root, or at a new, empty root, see [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
 
 ### ER011
 
 ```text
-promote refused: ER011 - The cold storage root holds data this instance does not have. Restore the database from a backup onto a new cold storage root [table=<table>, coldStorageSeqTxn=<txn>, localSeqTxn=<txn>]
+ER011 - The cold storage root holds data this instance does not have. Restore the database from a backup onto a new cold storage root [table=<table>, coldStorageSeqTxn=<txn>, localSeqTxn=<txn>]
 ```
 
-Raised when a replica is promoted to primary while one of its tables is behind what the cold storage root has published for it: the root holds data for transactions this instance does not have. [`SWITCH STATUS`](/docs/query/sql/switch-role/) shows the refusal in its `last_refusal` column.
+Raised when a replica is promoted to primary while one of its tables is behind what the cold storage root has published. [`SWITCH STATUS`](/docs/query/sql/switch-role/) shows it in `last_refusal`, after `switch refused: promote refused:` and the error code URL.
 
-To resolve:
+To resolve, wait until the table's `sequencerTxn` in [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reaches the `coldStorageSeqTxn` in the message, then promote again. If the transactions are lost, restore the database from a backup onto a new root, see [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
 
-- If the replica is still catching up, wait until its tables have applied the replicated WAL, then promote it again.
-- If it cannot catch up, because the transactions it misses are lost, restore the database from a backup onto a new cold storage root.
-
-A table whose WAL transaction numbers restarted on a release before QuestDB Enterprise ENTERPRISE_VERSION_TBD, through `ALTER TABLE ... REBASE WAL` or a `SET TYPE` round trip, can keep the root ahead of the replica and block promotion in the same way. Catching up with the primary is not enough here: promotion goes ahead once the table's `sequencerTxn` in [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reaches the `coldStorageSeqTxn` in the message, which takes new transactions on the table. If you cannot wait for that, restore the database from a backup onto a new cold storage root.
+A table whose transaction numbers restarted on a release before QuestDB Enterprise ENTERPRISE_VERSION_TBD, through `REBASE WAL` or a `SET TYPE` round trip, can also block promotion: its `sequencerTxn` reaches `coldStorageSeqTxn` only as new transactions arrive.
 
 ## Operating system error codes
 

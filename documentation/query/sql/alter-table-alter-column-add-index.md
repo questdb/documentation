@@ -28,9 +28,9 @@ index for SQL executions.
 
 :::note QuestDB Enterprise cold storage
 
-`ADD INDEX` fails with `cannot create index, table has a delta-active or remotely served partition` while any partition of the table is served from [cold storage](/docs/concepts/cold-storage/), or keeps [late rows in cold storage](/docs/concepts/cold-storage-late-rows/). Create indexes before a table's partitions go cold.
+`ADD INDEX` is refused while any partition of the table is served from [cold storage](/docs/concepts/cold-storage/), with `cannot add index, table has partitions in cold storage [...]`, or keeps [late rows](/docs/concepts/cold-storage-late-rows/), with `cannot create index, table has a delta-active or remotely served partition`. Create indexes before a table's partitions go cold.
 
-The check runs on the instance that receives the statement. Another instance that serves a partition from cold storage, for example because of `storage.policy.drop.local.override`, skips the replicated `ADD INDEX`, logs `index not created on this instance`, and has no index on that column, also after a failover. Its rows are the same; only queries on that column are slower there.
+The check runs on the instance that receives the statement. Another instance that already serves a partition from cold storage skips the replicated `ADD INDEX`, logs `index not created on this instance`, and keeps no index on that column, so queries on it are slower there, also after a failover.
 
 :::
 

@@ -165,15 +165,12 @@ attached from a soft link or sealed by QuestDB Enterprise
 `cannot convert parquet partition to native, partition is read-only`, or, for a
 partition in cold storage,
 `cannot convert parquet partition to native, partition is in cold storage and read-only`.
-Releases before QuestDB QUESTDB_VERSION_TBD and QuestDB Enterprise
-ENTERPRISE_VERSION_TBD accepted the statement and suspended the table when it
-applied. Query such a partition in place, or copy its rows into another table.
+Earlier releases accepted it and then suspended the table. Query such a
+partition in place instead.
 
-In QuestDB Enterprise, neither conversion applies to a partition that keeps
-[late rows in cold storage](/docs/concepts/cold-storage-late-rows/):
-`CONVERT PARTITION TO NATIVE` fails with
-`cannot convert parquet partition to native, partition is delta-active`, and
-`CONVERT PARTITION TO PARQUET` with
+In QuestDB Enterprise, neither conversion applies to a partition with
+[late rows](/docs/concepts/cold-storage-late-rows/): they fail with
+`cannot convert parquet partition to native, partition is delta-active` and
 `cannot convert partition to parquet, partition is delta-active`.
 
 ### Data Compression
@@ -260,7 +257,8 @@ Parquet-related settings.
 
 ### Limitations
 
-* `UPDATE` statements are not supported on Parquet partitions. Overwriting rows
+* `UPDATE` statements are not supported on Parquet partitions, and a WAL table
+  refuses them while any partition is in Parquet format. Overwriting rows
   through a dedup upsert is supported, since it is an insert.
 * While a partition is being converted, writes to that partition are briefly
   blocked.

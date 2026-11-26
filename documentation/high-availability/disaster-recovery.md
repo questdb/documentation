@@ -64,6 +64,7 @@ To recover, do one of the following:
   different history, so removing it from the list later does not resume its
   replication: the primary holds its uploads. To replicate it again, rebase it
   with [`ALTER TABLE ... REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/).
+  Cold storage tables refuse `REBASE WAL`, so use the first option for them.
 
 In `sync` and `adaptive` mode, a primary uploads only transactions that are
 already on its disk. QuestDB Enterprise 4.1.0 and earlier started in this
@@ -81,7 +82,7 @@ migration flow to move to new storage.
 
 If the cluster uses [cold storage](/docs/concepts/cold-storage/), the manager role does not move with the primary role. Migrating the primary leaves the cold storage manager where it was. Move it separately with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) if the instance holding it is being retired.
 
-A cold storage root belongs to one database, identified by its DataID. A migrated or rebuilt primary keeps using the root only when it keeps the database's DataID, as a migration from this database's replication store or a restore of its backup does. A new database is refused with [`ER010`](/docs/troubleshooting/error-codes/#er010). A [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage) creates a new DataID, and needs a new root.
+A cold storage root belongs to one database. A migrated or rebuilt primary keeps using it when it keeps the database's Data ID, as a migration from this database's replication store or a restore of its backup does. Another database is refused with [`ER010`](/docs/troubleshooting/error-codes/#er010), and a [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage) needs a new root.
 
 :::
 

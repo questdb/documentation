@@ -76,10 +76,9 @@ A provider-level `root` on `QuestDBObjectStore` does **not** add a base prefix;
 the per-use backup, replication, or cold-storage root overrides it. Scope cloud
 permissions to the effective per-use prefixes.
 
-On the cold-storage root, QuestDB pods that take backups also need `GET`, `PUT`
-and `DELETE` on `<cold root>/_retention/*`, and `GET` on the table manifests,
-`<cold root>/<table>/_manifest.msgpack`: backups pin the cold objects they need
-there, and backups of cold partitions fail without these permissions. See
+QuestDB pods that take backups also need `GET`, `PUT` and `DELETE` on
+`<cold root>/_retention/*`, and `GET` on `<cold root>/*/_manifest.msgpack`, or
+their backups of cold partitions fail. See
 [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
 
 ## Backup and HA
@@ -182,7 +181,7 @@ two managers.
 The operator configures and observes cold storage; it never reads or deletes
 cold objects, never assigns
 [storage policies](/docs/concepts/storage-policy/) to tables, and never
-garbage-collects the prefix. Assign policies with
+garbage-collects the cold storage root. Assign policies with
 [`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/).
 `spec.coldStorage` may be added to a running cluster but cannot be removed,
 and `objectStoreRef` is immutable: changing the store or root would re-point
@@ -192,12 +191,9 @@ only after moving the manager to a remaining serial.
 ### Upgrade QuestDB with cold storage
 
 QuestDB Enterprise ENTERPRISE_VERSION_TBD changes the cold-storage root
-one-way: once a manager of that release writes to it, instances on an earlier
-release pause cold storage and cannot read the partitions uploaded since, until
-they are upgraded too. Upgrade the instance that holds the cold-storage manager
-last. See
+one-way, so the instance that holds the cold-storage manager must be upgraded
+last, see
 [Upgrading to ENTERPRISE_VERSION_TBD](/docs/operations/upgrade/#upgrading-to-enterprise_version_tbd).
-
 An image rollout recreates replicas before the primary, so before changing
 `spec.image` to such a release,
 [move `spec.coldStorage.manager`](/docs/enterprise-kubernetes-operator/operations/database/#move-the-cold-storage-manager)

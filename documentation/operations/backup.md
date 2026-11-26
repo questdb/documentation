@@ -76,7 +76,7 @@ The backup process requires write access to the target storage. Authentication
 is optional—you can use instance credentials (IAM roles, managed identities) or
 provide explicit credentials in the connection string.
 
-On a database that uses [cold storage](/docs/concepts/cold-storage/), each instance that takes backups also needs `GET`, `PUT` and `DELETE` on `_retention/*` in its cold storage root, and `GET` on the table manifests, `<table>/_manifest.msgpack`. Without them, backups of cold partitions fail. See [Cold storage partitions](#cold-storage-partitions).
+On a database that uses [cold storage](/docs/concepts/cold-storage/), instances that take backups also need access to the cold storage root, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
 
 #### Network
 
@@ -430,18 +430,11 @@ If a cold object is lost after `DROP LOCAL` evicted the local copy, QuestDB has 
 
 :::
 
-Instead of copying the objects, a backup **pins** the base each cold partition needs in the instance's cold storage root, so garbage collection keeps that base while the backup exists, also after its partition or table is dropped. The cleanup of expired backups releases their pins. See [Pins](/docs/operations/cold-storage/#pins).
+Instead of copying the objects, a backup **pins** the bases it needs in the cold storage root, so garbage collection keeps them while the backup exists, even after their partition or table is dropped. A backup that cannot pin a base fails, and backups taken before the upgrade to QuestDB Enterprise ENTERPRISE_VERSION_TBD pin nothing. The backup format is 1.5.
 
-- A backup fails when it cannot pin a base, for example without the `_retention/*` [permissions](#permissions).
-- Expect the cold storage root to keep dropped data for as long as a kept backup needs it.
-- The backup format is 1.5. Backups taken before the upgrade to a release that pins cold objects pin nothing, so garbage collection may delete a base one of them needs once its partition is dropped. Take a backup right after the upgrade.
-- Late rows that a partition keeps on local disk, and that are not yet in a base, are in the backup like other local data.
+A restore onto another host or backend can change an object's version even when its bytes are unchanged. The first read of an affected partition fails, QuestDB re-checks the object in the background, and the retry succeeds.
 
-A restore onto the root the backup came from checks that the root still holds every base the backup refers to, and fails before it changes the database otherwise. A restore onto the root of another database fails with [`ER010`](/docs/troubleshooting/error-codes/#er010). A standalone instance that uploaded to the root after its backup, or after a power loss in the `nosync` or `async` commit mode, must restore onto a new root. A [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage) always uses a new root.
-
-A restore onto a different host, or onto a different object store backend, can change an object's version even when its bytes are unchanged. The first read of an affected partition fails, QuestDB re-checks the object in the background, and the retry succeeds. An object that is genuinely different is refused rather than silently accepted.
-
-See [Operating cold storage](/docs/operations/cold-storage/#backup-and-restore) for the restore paths worth testing.
+Which root to restore onto, and the restore paths worth testing, are under [Backup and restore](/docs/operations/cold-storage/#backup-and-restore) in Operating cold storage.
 
 ### Limitations
 
@@ -572,7 +565,7 @@ A restored backup does not bring cold data back on its own. The backup
 carries the local metadata for
 [cold storage partitions](#cold-storage-partitions), but not their
 `data.parquet` bytes, which exist only in the object store. A backup taken
-after the upgrade to a release that pins cold objects keeps them in the object
+on QuestDB Enterprise ENTERPRISE_VERSION_TBD or later keeps them in the object
 store while the backup exists. For older backups, dropping a table or
 partition hands its remote objects to garbage collection after a grace period
 measured in minutes, so **for those backups the grace period, not your backup

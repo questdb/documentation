@@ -67,7 +67,7 @@ policy:
              TO PARQUET        TO REMOTE         DROP LOCAL       DROP REMOTE
    Native ───────┬───────────────────┬───────────────┬─────────────────┬──────
                  ▼                   ▼               ▼                 ▼
-          Local Parquet      Uploaded, still    Sealed, served    Removed and
+          Local Parquet      Uploaded, still    Cold, served      Removed and
                              served locally     from the store    reclaimed
 ```
 
@@ -81,13 +81,11 @@ ever being uploaded.
 deleted and nothing queryable is left behind. Include `TO REMOTE` whenever the
 partition must stay online after local eviction.
 
-With `TO REMOTE`, `DROP LOCAL` is also the point at which a partition is
-sealed as read-only, unless
-[late rows](/docs/concepts/cold-storage-late-rows/) are enabled and the table
-has no deduplication. Rows that arrive for a sealed partition afterwards are
-dropped, or suspend a table with deduplication, so without late rows set
-`DROP LOCAL` beyond the longest late-arrival, replay, and correction window for
-the table. See
+With `TO REMOTE`, `DROP LOCAL` also seals the partition: rows that arrive for
+it afterwards are dropped, or suspend a table with deduplication. Unless a
+table without deduplication keeps
+[late rows](/docs/concepts/cold-storage-late-rows/), set `DROP LOCAL` beyond
+the longest late-arrival, replay, and correction window for the table. See
 [What happens to late rows](/docs/concepts/cold-storage/#what-happens-to-late-rows).
 
 :::
@@ -415,7 +413,8 @@ ALTER TABLE trades DROP STORAGE POLICY;
   queryable in Parquet format
 - Use `DROP LOCAL` with care. Without `TO REMOTE` it permanently removes the
   local data; with `TO REMOTE` it seals the partition as read-only, unless
-  [late rows](/docs/concepts/cold-storage-late-rows/) are enabled, and
+  [late rows](/docs/concepts/cold-storage-late-rows/) are enabled and the
+  table has no deduplication, and
   removing the policy does not unseal it
 - Add `DROP REMOTE` only once remote retention is a deliberate decision: it is
   the only stage that physically deletes data with no local copy left

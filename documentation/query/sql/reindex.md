@@ -56,9 +56,10 @@ only partly rebuilt.
 - With `PARTITION` naming a Parquet partition, `REINDEX` fails with
   `cannot reindex parquet partition`.
 
-In QuestDB Enterprise, a partition that keeps
+In QuestDB Enterprise, a native partition that keeps
 [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) is skipped
-the same way, and naming it fails with `cannot reindex Delta partition`.
+the same way, and naming it fails with `cannot reindex Delta partition`. Such
+a partition in Parquet format fails as any Parquet partition does.
 
 Use
 [`ALTER TABLE FORCE REINDEX PARQUET`](/docs/query/sql/alter-table-force-reindex-parquet/)

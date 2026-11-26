@@ -59,7 +59,10 @@ including when merge-append is disabled:
    sweep; stop starting new work when the sweep's I/O or time budget is spent.
 
 The active partition is not merged by the sweep. Remote partitions and
-symbolically linked partitions are skipped. Most users only need the sweep
+symbolically linked partitions are skipped. The late rows of QuestDB Enterprise
+cold storage partitions are compacted separately, see
+[Late rows in cold storage](/docs/concepts/cold-storage-late-rows/#compaction).
+Most users only need the sweep
 interval and two idle timeouts in the
 [partition compaction settings](/docs/configuration/cairo-engine/#partition-compaction).
 Use [`SQUASH PARTITIONS`](/docs/query/sql/alter-table-squash-partitions/)

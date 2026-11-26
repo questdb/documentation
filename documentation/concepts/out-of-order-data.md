@@ -249,3 +249,4 @@ On a table with deduplication, such rows suspend the table instead, see
 - [Deduplication](/docs/concepts/deduplication/)
 - [Write-ahead log](/docs/concepts/write-ahead-log/)
 - [Write amplification](/docs/getting-started/capacity-planning/#write-amplification)
+- [Late rows in cold storage](/docs/concepts/cold-storage-late-rows/)

@@ -57,10 +57,13 @@ function are available in **QuestDB Enterprise** only.
 
 `cold_storage_compactions()` lists this instance's queued and running
 compactions of [late rows in cold storage](/docs/concepts/cold-storage-late-rows/),
-whether requested with
-[`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/) or started by
-background maintenance, and its last 128 failures. It requires the
-`SYSTEM ADMIN` permission.
+from [`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/) or background
+maintenance, and its last 128 failures. A finished compaction leaves the list.
+It requires the `SYSTEM ADMIN` permission.
+
+**Arguments:**
+
+- `cold_storage_compactions()` does not require arguments.
 
 **Columns:**
 
@@ -91,20 +94,23 @@ function are available in **QuestDB Enterprise** only.
 
 `cold_storage_pin_owners()` returns one row per owner of
 [pins](/docs/operations/cold-storage/#pins) in this instance's cold storage
-root. It runs only on the cold storage manager, reads the pins as garbage
-collection sees them at each call, and requires the `SYSTEM ADMIN` permission.
-On another instance it fails with `only the cold storage manager lists and
-releases pins; this node is not the manager`.
+root. It runs only on the cold storage manager, and fails elsewhere with
+`only the cold storage manager lists and releases pins`. It requires the
+`SYSTEM ADMIN` permission.
+
+**Arguments:**
+
+- `cold_storage_pin_owners()` does not require arguments.
 
 **Columns:**
 
-| Column          | Type        | Description                                                                                                                                                  |
-| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `owner_id`      | _VARCHAR_   | Owner identifier, the argument of [`cold_storage_release_pins()`](#cold_storage_release_pins).                                                               |
-| `kind`          | _VARCHAR_   | `backup` for the backup index of one instance and backup destination, `root` for the root of a database recovered by point-in-time recovery.                 |
-| `origin`        | _VARCHAR_   | For a `backup` owner, its backup destination's location, without credentials, and instance name. For a `root` owner, the recovered database's root location. |
-| `registered_at` | _TIMESTAMP_ | When the owner registered.                                                                                                                                   |
-| `pinned_bases`  | _LONG_      | Number of bases the owner pins.                                                                                                                              |
+| Column          | Type        | Description                                                                                                            |
+| --------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `owner_id`      | _VARCHAR_   | Owner UUID, the argument of [`cold_storage_release_pins()`](#cold_storage_release_pins).                               |
+| `kind`          | _VARCHAR_   | `backup` for one instance's backups to one destination, `root` for a database restored onto a new root, or `unknown`.  |
+| `origin`        | _VARCHAR_   | For `backup`, the destination's location, without credentials, and the instance name. For `root`, the root's location. |
+| `registered_at` | _TIMESTAMP_ | When the owner registered.                                                                                             |
+| `pinned_bases`  | _LONG_      | Number of bases the owner pins.                                                                                        |
 
 **Example:**
 
@@ -122,28 +128,29 @@ function are available in **QuestDB Enterprise** only.
 :::
 
 `cold_storage_pins('tableName')` returns one row per
-[pin](/docs/operations/cold-storage/#pins) of a base of the table.
-`cold_storage_pins()` returns the pins of every table, dropped tables included.
-Both run only on the cold storage manager, read the pins as garbage collection
-sees them at each call, and require the `SYSTEM ADMIN` permission.
+[pin](/docs/operations/cold-storage/#pins) of a base of the table, and
+`cold_storage_pins()` the pins of every table, dropped tables included. Both
+run only on the cold storage manager, and require the `SYSTEM ADMIN`
+permission.
 
 **Arguments:**
 
-- `tableName` (`string`, optional): the name of an existing table.
+- `tableName` (optional, `string`): the name of an existing table, as a
+  constant. A bind variable or `NULL` is refused.
 
 **Columns:**
 
-| Column             | Type                  | Description                                                                                                                                   |
-| ------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `timestamp`        | _TIMESTAMP_ or _LONG_ | Partition timestamp. Without an argument it is a number, the one in the base's object key, since a dropped table's timestamp type is unknown. |
-| `seq_txn`          | _LONG_                | WAL transaction the base reflects.                                                                                                            |
-| `metadata_version` | _LONG_                | Table metadata version of the base.                                                                                                           |
-| `owner_id`         | _VARCHAR_             | Owner of the pin, see [`cold_storage_pin_owners()`](#cold_storage_pin_owners).                                                                |
-| `source`           | _VARCHAR_             | `backup` for a pin of a backup, `inherited` for a base a recovered database inherited from this root.                                         |
-| `table_dir`        | _VARCHAR_             | Table directory name. Only without an argument.                                                                                               |
+| Column             | Type                  | Description                                                                                            |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `timestamp`        | _TIMESTAMP_ or _LONG_ | Partition timestamp. Without an argument, a number, since a dropped table's timestamp type is unknown. |
+| `seq_txn`          | _LONG_                | WAL transaction the base reflects.                                                                     |
+| `metadata_version` | _LONG_                | Table metadata version of the base.                                                                    |
+| `owner_id`         | _VARCHAR_             | Owner of the pin, see [`cold_storage_pin_owners()`](#cold_storage_pin_owners).                         |
+| `source`           | _VARCHAR_             | `backup`, `inherited` for a base that a restored database reads from this root, or `unknown`.          |
+| `table_dir`        | _VARCHAR_             | Table directory name. Only without an argument.                                                        |
 
-The partition timestamp, `seq_txn` and `metadata_version` identify the base's
-object key, `<table>/<timestamp>-<seq_txn>-<metadata_version>/`.
+The partition timestamp, `seq_txn` and `metadata_version` make up the base's
+[object key](/docs/concepts/cold-storage/#object-store-layout).
 
 **Example:**
 
@@ -163,25 +170,21 @@ only.
 
 `cold_storage_release_pins('ownerId')` releases every
 [pin](/docs/operations/cold-storage/#pins) of an owner gone for good, such as a
-backup destination removed from the configuration or a retired recovered
-database, and returns `true`. Garbage collection then deletes its bases once
-nothing else pins them. It runs only on the cold storage manager and requires
-the `SYSTEM ADMIN` permission.
+removed backup destination or a retired recovered database, and returns
+`true`. Garbage collection then deletes the bases that nothing else pins. It
+runs only on the cold storage manager, and requires the `SYSTEM ADMIN`
+permission.
 
 **Arguments:**
 
 - `ownerId` (`string`): an `owner_id` from
   [`cold_storage_pin_owners()`](#cold_storage_pin_owners), as a constant or a
-  bind variable. It must not be `NULL`.
-
-It fails for an owner the root does not list.
+  bind variable. An owner the root does not list, or `NULL`, is refused.
 
 :::danger
 
-Releasing pins cannot be undone. Releasing a backup index still in use drops
-the pins of its older backups. Releasing the `root` owner of a recovered
-database still in use lets garbage collection delete the bases that database
-reads, and its reads of those partitions then fail.
+Releasing pins cannot be undone. Releasing an owner still in use lets garbage
+collection delete the bases that its backups or reads need.
 
 :::
 
@@ -1101,15 +1104,15 @@ the caller [cannot see](/docs/security/rbac/#object-visibility), it fails with
 
 **Columns:**
 
-| Column           | Type        | Description                                                                             |
-| ---------------- | ----------- | --------------------------------------------------------------------------------------- |
-| `timestamp`      | _TIMESTAMP_ | Lower bound of the partition.                                                           |
-| `state`          | _VARCHAR_   | `pending`, `active`, `deleting`, or `unknown`. See below.                               |
-| `seq_txn`        | _LONG_      | WAL transaction version the object was built from.                                      |
-| `size`           | _LONG_      | Size of the uploaded object in bytes. `NULL` until the object is durable.               |
-| `last_modified`  | _TIMESTAMP_ | When the object was last written. `NULL` until the object is durable.                   |
-| `deleting_since` | _TIMESTAMP_ | When the garbage-collection grace timer started. `NULL` unless the state is `deleting`. |
-| `partition_path` | _VARCHAR_   | Object key of the base's `data.parquet`.                                                |
+| Column           | Type        | Description                                                                                                                                              |
+| ---------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `timestamp`      | _TIMESTAMP_ | Lower bound of the partition.                                                                                                                            |
+| `state`          | _VARCHAR_   | `pending`, `active`, `deleting`, or `unknown`. See below.                                                                                                |
+| `seq_txn`        | _LONG_      | WAL transaction version the object was built from.                                                                                                       |
+| `size`           | _LONG_      | Size of the uploaded object in bytes. `NULL` until the object is durable.                                                                                |
+| `last_modified`  | _TIMESTAMP_ | When the object was last written. `NULL` until the object is durable.                                                                                    |
+| `deleting_since` | _TIMESTAMP_ | When the garbage-collection grace timer started. `NULL` unless the state is `deleting`.                                                                  |
+| `partition_path` | _VARCHAR_   | Object key of the base's `data.parquet`, relative to the cold storage root. See [Object store layout](/docs/concepts/cold-storage/#object-store-layout). |
 
 **Partition states:**
 

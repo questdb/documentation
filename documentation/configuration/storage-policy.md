@@ -48,10 +48,9 @@ storage.policy.drop.local.override=trades~5=90 DAYS;*=45 DAYS
 table's `DROP LOCAL` and the override have passed. The other instances drop
 their copies on schedule. Lengthening the override brings sealed cold partitions
 back to local disk, but not
-[Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions),
-which stay served from the object store. Enabling late rows switches most sealed
-partitions, cold ones included, to Delta partitions. On the primary, a partition
-the override still keeps also holds back `DROP REMOTE` for the whole cluster.
+[Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions).
+On the primary, a partition the override still keeps also holds back
+`DROP REMOTE` for the whole cluster.
 
 The table directory name is the `directoryName` column of
 [`tables()`](/docs/query/functions/meta/#tables), such as `trades~5`.

@@ -708,22 +708,9 @@ module.exports = {
             {
               type: "category",
               label: "Cold Storage",
-              link: {
-                type: "doc",
-                id: "concepts/cold-storage",
-              },
-              items: [
-                {
-                  id: "concepts/cold-storage",
-                  type: "doc",
-                  label: "Overview",
-                },
-                {
-                  id: "concepts/cold-storage-late-rows",
-                  type: "doc",
-                  label: "Late rows",
-                },
-              ],
+              collapsed: false,
+              // Labels come from each page's sidebar_label: Overview, Late rows
+              items: ["concepts/cold-storage", "concepts/cold-storage-late-rows"],
             },
             {
               id: "concepts/resource-groups",

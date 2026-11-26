@@ -134,15 +134,10 @@ session that submitted it. The outcome is visible through `SWITCH STATUS`,
 `GET /lifecycle`, and the server log. See
 [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
 
-With [cold storage](/docs/concepts/cold-storage/) enabled, a promotion is
-refused with [`ER011`](/docs/troubleshooting/error-codes/#er011) when one of the
-replica's tables is behind what the cold storage root has published for it.
-Let the replica catch up, then promote it again. A table whose WAL transaction
-numbers restarted on a release before QuestDB Enterprise
-ENTERPRISE_VERSION_TBD, through `REBASE WAL` or a `SET TYPE` round trip, can
-block promotion the same way, see
-[`ER011`](/docs/troubleshooting/error-codes/#er011). `SWITCH STATUS` shows the
-refusal in `last_refusal`.
+With [cold storage](/docs/concepts/cold-storage/), a promotion is refused with
+[`ER011`](/docs/troubleshooting/error-codes/#er011) while one of the replica's
+tables is behind what the cold storage root has published. `SWITCH STATUS`
+shows the refusal in `last_refusal`.
 
 With [resource groups](/docs/concepts/resource-groups/) enabled, a promotion is
 also refused when the node has not yet received the resource group catalog. The

@@ -25,12 +25,14 @@ SET columnName = expression [, columnName = expression ...]
   [attached by a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
   the partition is read-only. `UPDATE` operation on a read-only partition will
   fail and generate an error.
-- In QuestDB Enterprise, a WAL `UPDATE` that touches a partition sealed by
-  [cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows) is
-  skipped as a whole transaction. A table that holds partitions with
-  [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) refuses
-  `UPDATE` with
-  `cannot update table with delta partitions [...]; delta partitions are read-only for UPDATE`.
+- A WAL table refuses `UPDATE` while any of its partitions is in
+  [Parquet format](/docs/concepts/parquet/), with
+  `cannot update table with parquet partitions [...]`. In QuestDB Enterprise,
+  this includes every partition in [cold storage](/docs/concepts/cold-storage/),
+  and a table with [late rows](/docs/concepts/cold-storage-late-rows/) refuses
+  `UPDATE` with `cannot update table with delta partitions [...]`. A WAL
+  `UPDATE` that still reaches such a partition when it is applied suspends the
+  table.
 - On a WAL table, `UPDATE` is applied by the WAL apply job and counts against
   [`cairo.wal.apply.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairowalapplymemorylimitbytes)
   rather than the query memory limit. This holds for every form of `UPDATE` a

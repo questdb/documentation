@@ -53,18 +53,18 @@ This permanently removes the storage policy from the table.
 A storage policy defines up to four TTL-based stages that control how partitions
 transition from native format to Parquet and eventually get removed:
 
-| Setting             | Effect                                                                                                                                                                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `TO PARQUET <ttl>`  | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file                                                                                                                                               |
-| `TO REMOTE <ttl>`   | Upload a compact Parquet snapshot to object storage. The local partition stays writable and is still the serving copy                                                                                                                                                          |
-| `DROP LOCAL <ttl>`  | Remove the partition's local copies. With `TO REMOTE` set, the partition is sealed as read-only, or keeps [late rows](/docs/concepts/cold-storage-late-rows/) when they are enabled, and reads switch to the remote copy. A partition only cold storage holds is never removed |
-| `DROP REMOTE <ttl>` | Remove the partition from the table and reclaim its remote objects after a grace period                                                                                                                                                                                        |
+| Setting             | Effect                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TO PARQUET <ttl>`  | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file                 |
+| `TO REMOTE <ttl>`   | Upload a compact Parquet snapshot to object storage. The local partition stays writable and is still the serving copy                            |
+| `DROP LOCAL <ttl>`  | Remove the partition's local copies. With `TO REMOTE` set, reads switch to the remote copy. A partition only cold storage holds is never removed |
+| `DROP REMOTE <ttl>` | Remove the partition from the table and reclaim its remote objects after a grace period                                                          |
 
 The two remote stages drive [cold storage](/docs/concepts/cold-storage/) and require it to be enabled and configured on every instance.
 
 :::warning
 
-`DROP LOCAL` without `TO REMOTE` permanently deletes the partition's local data. With `TO REMOTE` it seals the partition as read-only: later rows for it are dropped, or suspend a table with deduplication, and disabling or removing the policy does not unseal it. With [late rows](/docs/concepts/cold-storage-late-rows/) enabled, tables without deduplication keep accepting rows for it instead, and enabling late rows later switches most partitions already sealed to accept rows again, see [Partitions sealed before late rows were enabled](/docs/concepts/cold-storage-late-rows/#partitions-sealed-before-late-rows-were-enabled).
+`DROP LOCAL` without `TO REMOTE` permanently deletes the partition's local data. With `TO REMOTE`, it seals the partition, and removing the policy does not unseal it: later rows for it are dropped, or suspend a table with deduplication. Tables without deduplication can keep them with [late rows](/docs/concepts/cold-storage-late-rows/).
 
 `DROP REMOTE` is the only stage that physically deletes data with no local copy left behind.
 
@@ -106,8 +106,7 @@ Both singular and plural forms are accepted.
   error otherwise
 - `TO REMOTE` is refused while a [`SET TYPE`](/docs/query/sql/alter-table-set-type/)
   conversion is pending, with `cannot upload a table with a pending type change,
-  cancel it with SET TYPE to its current type`. A `SET TYPE` to the table's
-  current type cancels the conversion
+  cancel it with SET TYPE to its current type`
 - A policy with `TO REMOTE` makes the table refuse `ATTACH PARTITION`,
   `DETACH PARTITION` and `SET TYPE`. See
   [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables)
@@ -212,7 +211,7 @@ Stages that are not set are omitted from the output.
 - [Storage Policy concept](/docs/concepts/storage-policy/)
 - [Cold storage](/docs/concepts/cold-storage/) — what the `TO REMOTE` and `DROP REMOTE` stages do
 - [Late rows in cold storage](/docs/concepts/cold-storage-late-rows/) — keep rows that arrive after `DROP LOCAL`
-- [ALTER TABLE COMPACT (cold storage)](/docs/query/sql/alter-table-compact/) — compact late rows on demand
+- [ALTER TABLE COMPACT](/docs/query/sql/alter-table-compact/) — compact late rows on demand
 - [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) — per-partition remote state
 - [CREATE TABLE](/docs/query/sql/create-table/) — `STORAGE POLICY` clause at
   table creation

@@ -40,9 +40,7 @@ Issue them against the specific node whose role you want to change or inspect.
 
 The role is independent of the [replication](/docs/high-availability/overview/) primary and replica roles. Promoting a replica to primary does not move the manager role, and moving the manager role does not affect replication.
 
-Promotion to manager fails with [`ER010`](/docs/troubleshooting/error-codes/#er010) when the root belongs to another database. A root written by a manager of QuestDB Enterprise ENTERPRISE_VERSION_TBD or later cannot be managed by an earlier release, which logs `incompatible version: got 2.0, expected major version 1` and pauses cold storage. See [Upgrade](/docs/operations/upgrade/).
-
-The functions that list and release [pins](/docs/operations/cold-storage/#pins), such as [`cold_storage_pin_owners()`](/docs/query/functions/meta/#cold_storage_pin_owners), run only on the manager.
+Promotion to manager fails with [`ER010`](/docs/troubleshooting/error-codes/#er010) when the root belongs to another database. An earlier release cannot manage a root that a manager of QuestDB Enterprise ENTERPRISE_VERSION_TBD or later wrote, see [Upgrading to ENTERPRISE_VERSION_TBD](/docs/operations/upgrade/#upgrading-to-enterprise_version_tbd). The [pin](/docs/operations/cold-storage/#pins) functions run only on the manager.
 
 A role set this way does **not** survive a restart. Update `cold.storage.role` in `server.conf` after a durable handoff, otherwise the instance boots back into its configured role.
 

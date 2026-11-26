@@ -12,7 +12,7 @@ Cold storage is [Enterprise](/enterprise/) only.
 
 :::
 
-[Cold storage](/docs/concepts/cold-storage/) moves historical partitions to an object store as Parquet and serves them with range reads. These settings control the store connection, which instance owns write access, how partitions are uploaded, how cold reads fetch and cache bytes, and when remote objects are reclaimed.
+[Cold storage](/docs/concepts/cold-storage/) moves historical partitions to an object store as Parquet and serves them with range reads. These settings control the store connection, which instance owns write access, how partitions are uploaded, how cold reads fetch and cache bytes, when remote objects are reclaimed, whether partitions keep late rows, and how maintenance compacts them.
 
 Cold storage runs on its own dedicated async runtime, isolated from WAL, backup, and replication I/O.
 
@@ -31,7 +31,22 @@ The partition lifecycle itself is driven by the shared storage policy worker poo
 
 Master switch. When `false`, cold storage is inert and all other `cold.storage.*` keys are ignored.
 
-Turning it off on an instance that already holds cold partitions keeps them in their tables: a query that reads a partition only the object store holds fails with `partition <partition> of table <table> is in cold storage, which is disabled on this instance`, and `DROP LOCAL` deletes local partitions that keep [late rows](/docs/concepts/cold-storage-late-rows/), including late rows not yet uploaded. See [Disabling cold storage](/docs/operations/cold-storage/#disabling-cold-storage).
+Turning it off keeps cold partitions in their tables, but queries that read them fail, and `DROP LOCAL` deletes the partitions with [late rows](/docs/concepts/cold-storage-late-rows/) whose base is still local, with those rows. See [Disabling cold storage](/docs/operations/cold-storage/#disabling-cold-storage).
+
+### cold.storage.linked.object.stores
+
+- **Default**: empty
+- **Reloadable**: no
+
+Connection strings of the roots that a database restored onto a new root, for example by [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage), reads its inherited cold partitions from. Entries are comma-separated `<root_id>=<connection string>` pairs, so a connection string here cannot contain a comma:
+
+```ini
+cold.storage.linked.object.stores=<root_id>=s3::bucket=old-bucket;root=cold;region=eu-west-1;
+```
+
+`<root_id>` is the UUID that instances of the source database log as `rootId` in `loaded the cold storage root's identity [...]`, and that a restore missing an entry names in its error. Without an entry, an instance opens the root at its recorded location with its ambient credentials, which works only on S3 or GCS without a custom `endpoint`, `ca_cert_file` or `role_arn`. Set the same entries on every instance of the database.
+
+The value is sensitive, and can be loaded from a file with `QDB_COLD_STORAGE_LINKED_OBJECT_STORES_FILE`.
 
 ### cold.storage.object.store
 
@@ -49,7 +64,7 @@ cold.storage.object.store=fs::root=/mnt/cold/final;atomic_write_dir=/mnt/cold/sc
 
 Use a root dedicated to one database: an instance of another database refuses it with [`ER010`](/docs/troubleshooting/error-codes/#er010). Prefer instance roles or workload identities over embedded credentials. The value can be loaded from a file with `QDB_COLD_STORAGE_OBJECT_STORE_FILE`.
 
-The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. The store must support conditional requests, and an `fs` root must be on a filesystem that supports hard links, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root). For bucket creation and credentials, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
+The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. For the store's requirements, such as conditional requests, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root). For bucket creation, credentials, and the NFS mount requirements, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
 
 For a store fronted by a private, internal, or self-signed CA, the string also accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
@@ -63,21 +78,6 @@ The role this instance boots into, either `manager` or `refresher`. Designate ex
 The role is independent of the replication primary and replica roles, and is enforced at runtime by a lock at the object store root. A second instance configured as `manager` finds the foreign lock and starts as a refresher rather than competing.
 
 The live role can be moved at runtime with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/), but a hot-switched role reverts to this value on restart.
-
-### cold.storage.linked.object.stores
-
-- **Default**: empty
-- **Reloadable**: no
-
-Connection strings for the roots a database inherited cold partitions from in a [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage), as comma-separated `<root_id>=<connection string>` entries:
-
-```ini
-cold.storage.linked.object.stores=<root_id>=s3::bucket=old-bucket;root=cold;region=eu-west-1;
-```
-
-Every instance that uses a root logs its `root_id` when it loads the root's catalog, as `rootId` in `loaded the cold storage root's identity [role=..., instance=..., rootId=<root_id>, dataId=...]`, and a restore that lacks an entry names it in its error. Without an entry, an instance opens a source root at the location the restore recorded, with its ambient credentials, and only for an S3 or GCS location without `endpoint`. Set an entry on every instance of the recovered database for a root on Azure or `fs`, behind a custom endpoint, a private CA (`ca_cert_file`) or an assumed role (`role_arn`), and whenever the instance's ambient credentials cannot reach the root. Without an entry for a location that needs one, the restore fails with `the linked cold storage root has no entry in cold.storage.linked.object.stores, and its location needs one`.
-
-The value is sensitive, like `cold.storage.object.store`, and can be loaded from a file with `QDB_COLD_STORAGE_LINKED_OBJECT_STORES_FILE`. An entry that does not parse fails startup; the error names it by position or `root_id`, never by its connection string.
 
 ## Runtime
 
@@ -109,18 +109,18 @@ Whether the manager reclaims remote objects for partitions the table no longer r
 - **Default**: `30m`
 - **Reloadable**: no
 
-How long a partition stays marked for deletion before its objects are removed. The window lets in-flight readers drain, and lets WAL apply restore a partition that a lagging replica-turned-manager has not caught up on. Capped at 24 hours.
+How long a partition stays marked for deletion before its objects are removed. The window lets in-flight readers drain, and lets WAL apply restore a partition that a lagging replica-turned-manager has not caught up on. Must be at most 24 hours: a larger value stops startup.
 
-The same grace applies to a base replaced by a newer upload or a compaction. An instance stopped or behind on replication for longer than the grace fails reads of the partitions dropped or replaced meanwhile, until it catches up, so set both grace periods to cover the longest time an instance may stay stopped or behind, and no lower than 10 minutes. A [pinned](/docs/operations/cold-storage/#pins) base outlives the grace until it is unpinned.
+The same grace applies to a base replaced by a newer upload or a compaction, and a [pinned](/docs/operations/cold-storage/#pins) base outlives it. Set both grace periods above the longest time an instance may stay stopped or behind on replication: until it catches up, such an instance fails reads of the partitions dropped or replaced meanwhile.
 
 ### cold.storage.gc.table.grace.period
 
 - **Default**: `60m`
 - **Reloadable**: no
 
-How long a dropped table's objects are retained before removal. The table's local files go once the catalog records the drop, without waiting for this period. A [pinned](/docs/operations/cold-storage/#pins) base, and the table's manifest, outlive it until they are unpinned. Capped at 7 days. Size it as advised under [`cold.storage.gc.partition.grace.period`](#coldstoragegcpartitiongraceperiod).
+How long a dropped table's objects are retained before removal. The table's local files go once the catalog records the drop. A [pinned](/docs/operations/cold-storage/#pins) base, and the table's manifest, outlive this period. Must be at most 7 days: a larger value stops startup. Size it as advised under [`cold.storage.gc.partition.grace.period`](#coldstoragegcpartitiongraceperiod).
 
-## Catalog and manifests
+## Catalog and manifests {#catalog}
 
 ### cold.storage.catalog.refresh.interval
 
@@ -143,7 +143,7 @@ How often the manager writes pending partition state changes to the table manife
 - **Default**: `10`
 - **Reloadable**: no
 
-How many cold storage transfers run at once across the whole instance. Rehydrates, which download a sealed cold partition back to local disk after its `DROP LOCAL` was lengthened, share this limit and may use up to half of it.
+How many cold storage transfers run at once across the whole instance. Rehydrates, which download a sealed cold partition back after its `DROP LOCAL` was lengthened, may use up to half of it, at least one.
 
 The upload bandwidth must exceed this value multiplied by `cold.storage.object.store.upload.requests.min.throughput`, 256 KiB/s by default. Otherwise large uploads can repeatedly time out and stop cold offload from progressing; lower the concurrency on slower links.
 
@@ -189,13 +189,11 @@ Debounce between re-uploads of a partition that a later out-of-order write re-di
 - **Default**: `false`
 - **Reloadable**: no
 
-Whether partitions keep [late rows](/docs/concepts/cold-storage-late-rows/) after `DROP LOCAL`, instead of being sealed as read-only. It applies to WAL tables without deduplication whose storage policy has a `TO REMOTE` stage, and is read only when `cold.storage.enabled` is `true`.
-
-Set it only once every instance runs a release that supports it, and set it the same on every instance: only the primary acts on it, so a replica that may be promoted needs it too. Turning it off again stops new switches, but existing [Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions) keep accepting late rows.
+Whether the cold partitions of WAL tables without deduplication keep [late rows](/docs/concepts/cold-storage-late-rows/) after `DROP LOCAL`, instead of being sealed. Read only with `cold.storage.enabled=true`. Set the same value on every instance. Turning it off stops new switches, but existing [Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions) stay, see [Before you enable late rows](/docs/concepts/cold-storage-late-rows/#before-you-enable-late-rows).
 
 ## Maintenance
 
-These settings control the background work that merges late rows and moves them into new Parquet bases. See [Compaction](/docs/concepts/cold-storage-late-rows/#compaction).
+These settings control the background work that merges late rows and moves them into new Parquet bases, see [Compaction](/docs/concepts/cold-storage-late-rows/#compaction). To compact on demand, use [`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/).
 
 ### cold.storage.maintenance.base.delta.ratio
 
@@ -209,7 +207,7 @@ The manager writes a new base for a partition once its late rows reach this frac
 - **Default**: `128M`
 - **Reloadable**: no
 
-The least amount of late rows, in bytes, for which the manager writes a new base in the background. Must be `0` or greater.
+The least amount of late rows, in bytes as stored on local disk, for which the manager writes a new base in the background. Must be `0` or greater.
 
 ### cold.storage.maintenance.retry.delay
 
@@ -230,21 +228,21 @@ Threads of the cold storage maintenance pool, which writes and installs new base
 - **Default**: `2s`
 - **Reloadable**: no
 
-How long maintenance waits after a write before it visits the table, so that several writes are handled together. Must be `0` or greater. Read even when cold storage is disabled.
+How long maintenance waits after a write before it visits the table, so that several writes are handled together. Must be `0` or greater.
 
 ### delta.maintenance.sweep.interval
 
 - **Default**: `5m`
 - **Reloadable**: no
 
-How often maintenance visits every table with late rows. It bounds how soon a partition that keeps late rows becomes remotely served after `DROP LOCAL`. Must be greater than `0`. Read even when cold storage is disabled.
+How often maintenance visits every table with late rows. It bounds how soon a partition that keeps late rows becomes remotely served after `DROP LOCAL`. Must be greater than `0`.
 
 ### delta.maintenance.worker.count
 
 - **Default**: half the CPU cores, at least `1`
 - **Reloadable**: no
 
-Threads of the pool that merges runs of late rows on local disk. Must be greater than `0`. Read even when cold storage is disabled.
+Threads of the pool that merges runs of late rows on local disk. Must be greater than `0`.
 
 ## Read path
 
@@ -331,7 +329,7 @@ Minimum average throughput an upload must keep. `0` leaves only the base timeout
 
 ## Advanced late-row storage
 
-These settings tune how late rows are stored on local disk. The defaults suit most deployments. They are read at every startup, even with cold storage disabled, and an invalid value stops startup.
+These settings tune how late rows are stored on local disk. The defaults suit most deployments.
 
 ### delta.catalog.validation
 

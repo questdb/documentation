@@ -351,7 +351,7 @@ retries fail.
 
 ### native.async.io.threads
 
-- **Default**: CPU count
+- **Default**: half the CPU cores, at least `1`
 - **Reloadable**: no
 
 The number of async (network) I/O threads used for replication. The default
@@ -359,7 +359,7 @@ should be appropriate for most use cases.
 
 ### native.max.blocking.threads
 
-- **Default**: CPU count x 4
+- **Default**: twice the CPU cores, at least `4`
 - **Reloadable**: no
 
 Maximum number of threads for parallel blocking disk I/O read/write
