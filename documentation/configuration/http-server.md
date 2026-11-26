@@ -87,6 +87,16 @@ whichever pool actually serves HTTP.
 Flag that indicates if the worker thread must stop when an unexpected error
 occurs. Changing the default value is strongly discouraged.
 
+### http.worker.split.by.cpu.socket
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Linux only. Makes the private HTTP worker pool CPU-socket-local when
+`http.worker.count` is above `0`. QWP over WebSocket, the REST API and the web
+console run on this pool too. Can't be combined with `http.worker.affinity`. See
+[CPU-socket-local network pools](/docs/configuration/shared-workers/#cpu-socket-local-network-pools).
+
 ## Authentication
 
 ### http.password

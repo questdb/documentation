@@ -201,6 +201,11 @@ bottlenecked on IOPS, the throughput of read-only queries scales proportionally
 with the number of available cores. As a result, a machine with more cores will
 provide better query performance.
 
+On a Linux server with more than one CPU socket, you can make the network pools
+CPU-socket-local. See
+[CPU-socket-local network pools](/docs/configuration/shared-workers/#cpu-socket-local-network-pools)
+for the keys and how to size the pools.
+
 ### Writer page size
 
 The default page size for writers is 16MB. This should be adjusted according to
