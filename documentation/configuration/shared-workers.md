@@ -41,31 +41,29 @@ the write pool, while `0` for either refresh pool disables that refresh.
 
 ## Network worker groups
 
-Every network request passes through its server's IO dispatcher twice: once
-when the request arrives, and once when its connection goes back to waiting for
-the next request. The IO dispatcher is a task deployed to all the threads of a
-pool, but only one thread can run it at a time. Threads coordinate over a shared
-RAM location that holds the state of a mutex lock. Because of that, one IO
-dispatcher caps the throughput of a server, however many threads its pool has.
+Every network event passes through its server's IO dispatcher twice: once when a
+data packet arrives, and again when its connection goes back to waiting for the
+next event. The IO dispatcher is a task deployed to all the threads of a pool,
+but only one thread can run it at a time. Threads coordinate over a shared RAM
+location that holds the state of a mutex lock. On a large thread pool, this
+can result in the IO dispatcher bottlenecking the server throughput.
 
 QuestDB offers an option to split a network thread pool into groups, each with
-its own IO dispatcher in every server that runs on the pool. The dispatchers run
-in parallel, so splitting raises throughput even on a machine with a single CPU
-socket. This only works on Linux.
+its own IO dispatcher that runs in parallel with the others. This only works on
+Linux.
 
-By default, any worker thread of a given thread pool can run on any CPU core.
-Normally this is beneficial because it helps balance the total CPU load across
-cores. There is some cost to it as well: the shared RAM locations every worker
-often touches must move across core-local caches every time any of the parallel
-threads touches it. This is especially costly on a dual-socket server machine,
-where the cache lines carrying the dispatcher's lock and data travel across the
-sockets' bridge. On such a machine, QuestDB can confine each group to one CPU
-socket, as [Placement](#placement) describes.
+Additionally, on a large machine with multiple CPU sockets, QuestDB prefers to
+confine each worker group to a single CPU socket (see [Placement](#placement)).
+We mentioned the mutex lock; in order to acquire it, the thread must take
+exclusive ownership of the underlying cache line, and this implies data traffic
+inside the CPU cache layer. If the previous owner was on another CPU socket,
+data must travel across the socket bridge, which takes a lot of time. Confining
+the entire worker group to a single socket avoids this.
 
 Depending on your configuration, there may be one or more thread pools that
 handle network traffic. By default, only one shared network pool handles
 everything, but you can also enable dedicated HTTP, PostgreSQL Wire, and ILP/TCP
-pools. Each of them has its own group count:
+pools. Each of them has its own worker group count:
 
 | Pool | Key |
 |------|-----|
@@ -74,69 +72,96 @@ pools. Each of them has its own group count:
 | PostgreSQL wire pool, when `pg.worker.count` is above `0` | `pg.worker.groups` |
 | ILP/TCP IO pool, when `line.tcp.io.worker.count` is above `0` | `line.tcp.io.worker.groups` |
 
-A group count of `1`, the default, leaves the pool unsplit. A group count on a
-pool that serves no server has no effect, and QuestDB logs why: the shared
-network pool's count when every server has a pool of its own or is disabled, and
-a dedicated pool's count when its worker count is `0`, which runs the server on
-the shared network pool.
+A group count of `1` (the default) leaves the pool unsplit; a count below `1` is
+invalid and the server fails to start. If this is configured for a thread pool
+that ends up not hosting a server, it has no effect. For example, HTTP might be
+disabled by config, and then its dedicated pool wouldn't host any server.
 
-### Sizing
+### Sizing limits
 
-Each group needs at least 8 workers, and a pool splits into at most 16 groups.
-QuestDB reduces a group count that the pool's workers can't fill, and logs the
-reduction. A pool of fewer than 16 workers stays unsplit.
+There are two rules that limit the number of worker groups in a pool:
 
-On a single CPU socket of 32 cores, a 32-worker shared network pool with
-`shared.network.worker.groups=2` runs two groups of 16 workers, each on any
-core.
+1. A group must have at least 8 workers.
+2. A pool can't be split into more than 16 groups.
+
+If the configured group count exceeds a limit, QuestDB automatically lowers
+it so that it fits within the limits.
 
 ### Placement
 
-On a machine with several CPU sockets, QuestDB confines each group to one CPU
-socket when the group count divides evenly over the CPU sockets: the first
-groups go to the first CPU socket, and so on. On two CPU sockets of 48 cores
-each, a 96-worker HTTP pool with `http.worker.groups=2` runs 48 workers on each
-CPU socket, and with `http.worker.groups=4`, two groups of 24 on each. With SMT
-(hyperthreading) on, count hardware threads instead of cores.
+On a machine with several CPU sockets, QuestDB prefers to confine each worker
+group to one CPU socket, but some conditions must be met. In the following cases
+the placement of a group's threads will not be confined, and the reason will
+show up in the log on startup:
 
-In these cases the groups run on any core, and QuestDB logs which one applies:
-
-- The machine, or the cpuset QuestDB runs in, has a single CPU socket.
+- All cores are already on a single CPU socket. QuestDB counts only the cores it
+  is allowed to use. Various tools can restrict this: `taskset`, a cgroup
+  cpuset, `docker --cpuset-cpus`, etc.
 - The group count doesn't divide evenly over the CPU sockets, for example 3
-  groups on 2 CPU sockets.
-- The detected CPU layout doesn't look like real hardware: an unreadable
-  topology, many tiny CPU sockets, CPU sockets sharing a NUMA node, or lopsided
-  cpusets.
-- The pool's affinity key is set, which keeps each worker on the core it names.
+  groups on 2 CPU sockets. Watch out for automatic group reduction: you may have
+  asked for four groups, but QuestDB reduced it to three to fit the limits. This
+  will result in three unconfined groups.
+- The detected CPU layout doesn't look like real hardware, as on some virtual
+  machines: QuestDB can't read the topology, finds more than 8 CPU sockets, a
+  CPU socket with fewer than 8 allowed CPUs, a CPU without a NUMA node, or a
+  NUMA node that spans two CPU sockets, or the CPU sockets' allowed CPU counts
+  differ by more than 25%.
+- The configuration enables a pool's thread affinity, which keeps each worker on
+  the core it names.
 
-Threads that a worker starts run on the same cores as the worker. With groups
-confined to CPU sockets, a large `ORDER BY` over HTTP or PostgreSQL sorts on one
-CPU socket's cores.
+### Examples
+
+Example 1: a 12-worker pool can't be split. If you configure two or more
+groups, QuestDB ignores this.
+
+Example 2: a 32-worker pool with `shared.network.worker.groups=4` splits into
+four groups of eight workers. If you configure more than four, you still get
+exactly four groups.
+
+Example 3: a 96-worker pool with `shared.network.worker.groups=4` splits into
+four groups of 24 workers each. If this is on a dual-CPU socket machine, each
+CPU socket runs two groups.
 
 ### Connections on a split pool
 
 The groups of a split pool share each server's port through `SO_REUSEPORT`:
 
 - The kernel spreads new connections over the groups by a hash, not by load.
-- `http.net.connection.limit`, `pg.net.connection.limit` and
-  `line.tcp.net.connection.limit` apply per group, so a server can hold up to
-  the limit times the group count.
+- Max connection count (`*.net.connection.limit`) applies per group, so with
+  four groups you're actually allowing four times the limit.
 - A group at its connection limit stops accepting, but the kernel keeps sending
-  it its share of new connections. They wait in its backlog until one of its
-  connections closes or the server's `net.connection.queue.timeout` passes.
-  Then the group closes its listener, which refuses the waiting connections,
-  and new connections go to the other groups until it reopens.
-- Another process of the same user that also sets `SO_REUSEPORT` could join
-  the port.
+  it new connections. They wait in its backlog until one of its connections
+  closes or the server's queue timeout passes
+  (`*.net.connection.queue.timeout`). Then the group closes its listener, which
+  refuses the waiting connections, and only then the new connections go to the
+  other groups until it reopens.
+- HTTP's soft limits per endpoint, such as `http.query.connection.limit` and
+  `http.ilp.connection.limit`, still count connections across the whole server.
+- QuestDB fails to start if another process already holds the port, as it does
+  with an unsplit pool. After startup, another process of the same user that
+  also sets `SO_REUSEPORT` can join the port and receive a share of its
+  connections.
 
 In Fiber mode, each group has its own fiber runtime, so a connection's fibers
 stay in its group, and on its CPU socket when the groups are confined to CPU
 sockets. The pool's fiber limits divide across the groups in proportion to
-their workers.
+their workers. A busy group doesn't borrow workers or fiber capacity from an
+idle one, so one group can saturate while another idles.
+
+The fiber metrics report each group of a split pool on its own. Their Prometheus
+samples carry a `group` label next to `worker_pool`, so summing by
+`worker_pool` gives the pool's totals. In
+[`sys.metrics`](/docs/operations/logging-metrics/#persisted-metrics), the column
+names add the group to the pool name, for example
+`worker_pool_fiber_live__shared_network_g0`.
 
 With QuestDB Enterprise [resource groups](/docs/concepts/resource-groups/), each
-group has an execution domain of its own, so CPU weights apply within a group,
-not across the pool.
+worker group schedules its queries in an execution domain of its own. On a
+split pool, a query competes for CPU only with the queries in its worker group,
+so CPU weights apply within a worker group, not across the pool. A resource
+group whose queries run in a quiet worker group gets that worker group's full
+capacity, whatever its weight. CPU that a resource group uses in one worker
+group still counts against it where it competes in another.
 
 ### Limitations
 

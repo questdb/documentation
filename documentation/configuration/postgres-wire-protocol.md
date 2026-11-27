@@ -139,7 +139,9 @@ Windows-specific flag to overcome OS limitations on TCP backlog size.
 - **Reloadable**: yes
 
 Maximum number of simultaneous Postgres connections. Controls server memory
-consumption.
+consumption. On a pool split into worker groups, each group applies this limit,
+so the server can hold up to the limit times the group count. See
+[Connections on a split pool](/docs/configuration/shared-workers/#connections-on-a-split-pool).
 
 ### pg.net.connection.queue.timeout
 
