@@ -18,7 +18,7 @@ access to the private operator and database images.
 
 Before you start, make sure your EKS cluster has:
 
-- Kubernetes 1.31 through 1.36;
+- Kubernetes 1.31 through 1.37;
 - at least one managed, EC2-backed node group;
 - Linux on every schedulable worker node;
 - the Amazon EBS CSI managed add-on, `ebs.csi.aws.com`;
@@ -148,7 +148,7 @@ aws eks describe-addon \
 kubectl get csidriver ebs.csi.aws.com
 ```
 
-Continue if the Kubernetes version is between 1.31 and 1.36. You should also see
+Continue if the Kubernetes version is between 1.31 and 1.37. You should also see
 `ACTIVE` and the `ebs.csi.aws.com` driver.
 
 The driver still needs permission to create volumes. Confirm that its controller
