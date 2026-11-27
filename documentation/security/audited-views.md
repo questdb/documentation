@@ -461,7 +461,6 @@ statements, whatever it holds, including `DATABASE ADMIN` and grants
 - [`DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/) and
   [`SQUASH PARTITIONS`](/docs/query/sql/alter-table-squash-partitions/), which
   needs the same `DROP PARTITION` permission
-- [`DETACH PARTITION`](/docs/query/sql/alter-table-detach-partition/)
 - [`SET TTL`](/docs/query/sql/alter-table-set-ttl/), which Enterprise accepts
   on the trail, and [`SET PARAM`](/docs/query/sql/alter-table-set-param/),
   which needs the same `SET TABLE PARAM` permission

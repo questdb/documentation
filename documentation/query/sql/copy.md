@@ -134,7 +134,7 @@ the `/Users` tree and set the root directory accordingly.
 | errors        | long      | The number of errors for the given phase                                      |
 
 
-**Parallel import phases**
+**Examples of parallel import phases**
   - setup
   - boundary_check
   - indexing
@@ -143,7 +143,6 @@ the `/Users` tree and set the root directory accordingly.
   - update_symbol_keys
   - build_symbol_index
   - move_partitions
-  - attach_partitions
   - analyze_file_structure
   - cleanup
 

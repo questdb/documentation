@@ -56,8 +56,8 @@ sequential reads, materialized views, and in-memory processing.
   incremental timestamp sorting, this reduces latency.
 
 - **Lifecycle policies:**
-  The system can delete partitions manually or automatically via TTL. It also supports
-  detaching or attaching partitions using SQL commands.
+  Use [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) to remove old data manually,
+  or set a [TTL](/docs/concepts/ttl/) to expire partitions automatically.
 
 ### Materialized views
 
