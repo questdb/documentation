@@ -107,6 +107,7 @@ using custom headers.
 | `X-QWP-Max-Version` | No       | Maximum QWP version the client supports (positive integer). Defaults to 1 if absent. |
 | `X-QWP-Client-Id`   | No       | Free-form client identifier (e.g., `java/1.0.2`, `zig/0.1.0`).                      |
 | `X-QWP-Request-Durable-Ack` | No | Durable-ack tiers to request: `local`, `replicated`, `local,replicated`, or `true` (the original value, same as `replicated`). See [Durable acknowledgement](#durable-acknowledgement). |
+| `X-QWP-Owned-By` | No | Owner of the tables and columns that the server auto-creates for the connection, as percent-encoded UTF-8. QuestDB Enterprise only. See [Owner of auto-created tables](#owner-of-auto-created-tables). |
 
 **Server response headers:**
 
@@ -115,6 +116,7 @@ using custom headers.
 | `X-QWP-Version`        | The QWP version selected for this connection.                                                                                                                                                                                                                              |
 | `X-QWP-Max-Batch-Size` | Server's effective per-message payload cap in bytes, computed as `min(http.recv.buffer.size − 14, 16 MiB)` (the protocol ceiling clamped by the actual WebSocket recv buffer minus the worst-case frame header). Clients should size batches to stay under this value. Absent on servers older than the introduction of this header — clients fall back to their locally configured byte budget. |
 | `X-QWP-Durable-Ack`    | The granted durable-ack tiers: `local`, `replicated`, or `local,replicated`, or `enabled` for a `true` request. Sent only when the client opted in via `X-QWP-Request-Durable-Ack` *and* the server can grant every requested tier. Absent in every other case. |
+| `X-QWP-Owned-By`       | The accepted owner, in the canonical encoding described in [Owner of auto-created tables](#owner-of-auto-created-tables). Sent only when the client named an owner. |
 
 The server selects the version as `min(clientMax, serverMax)`. The selected
 version is never higher than either side's maximum. The server may also
@@ -157,6 +159,51 @@ one on its next connect, such as a reconnect or a failover. The Java client
 client 6.1.0 or later can request and renew tokens with a token provider for
 this; see [Rotating bearer tokens](/docs/security/oidc/#rotating-bearer-tokens).
 
+### Owner of auto-created tables
+
+The server creates a table or a column that a batch names and that does not
+exist yet, and grants the creator every permission on it, as
+[`OWNED BY`](/docs/query/sql/create-table/#owned-by) does in SQL. The
+`X-QWP-Owned-By` request header names a user, group, or service account to
+receive these permissions instead, for every table and column the connection
+auto-creates. It carries the
+[`owned_by`](/docs/connect/clients/connect-string/#owned-by) connect-string
+key, and needs QuestDB Enterprise 4.2.2 or later.
+
+- **Encoding.** The value is the name as UTF-8, percent-encoded as in
+  [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1): the
+  unreserved characters `A`–`Z`, `a`–`z`, `0`–`9`, `-`, `.`, `_`, and `~`
+  stay as they are, and every other byte becomes `%XX`, with upper-case hex
+  digits. `+` stands for itself, not for a space. A browser, which cannot set
+  the header, can send the name in the `qwp_owned_by` URL parameter instead,
+  URL-encoded like any query parameter, as `encodeURIComponent()` does. The
+  server reads the parameter only when the header is absent.
+- **Confirmation.** The server checks the owner before it completes the
+  upgrade, by the rules of `OWNED BY`: a principal may name itself or one of
+  its groups, and the built-in admin any existing entity. The `101` response
+  echoes an accepted owner in `X-QWP-Owned-By`, in the encoding above. A
+  client that named an owner must fail the connection when the echo is absent
+  or names another owner: a server that predates the header ignores it, and
+  the tables it creates would not get the owner. This holds even when another
+  host of the same endpoint walk answered `421`: the host that answered `101`
+  accepts writes, so the walk did find a primary, one that cannot set the
+  owner, and reports that rather than a missing primary.
+- **Refusal.** A malformed value gets `400 Bad Request`. An owner that the
+  principal may not name gets `403 Forbidden`, and so does any owner when the
+  server cannot set one, because it is QuestDB open source or Enterprise with
+  access control disabled. Like a failed authentication, the refusal holds on
+  every host, so it ends the endpoint walk. Both responses carry the reason
+  as a `text/plain` body.
+- **Each auto-create.** The server checks the owner again before it creates
+  each table or column. The batch fails with `SECURITY_ERROR`, and nothing is
+  created, when the principal may no longer name the owner, or when the
+  principal is an [external user](/docs/security/oidc/#user-permissions) and
+  the connection named no owner: an external user cannot hold permissions
+  itself. A table or column that another connection creates at the same
+  moment needs no owner from this one, so the write lands in it. While the
+  other connection still holds the name of a table it is creating, the server
+  refuses the batch with `WRITE_ERROR`, which a client retries.
+
 ## Client lifecycle
 
 The end-to-end shape of a QWP client session, before the encoding details:
@@ -169,6 +216,9 @@ The end-to-end shape of a QWP client session, before the encoding details:
    - Authentication header (`Authorization: Basic …` or `Authorization: Bearer …`).
    - `X-QWP-Request-Durable-Ack: <tiers>` — optional, opt-in for durable
      acks: `local`, `replicated`, `local,replicated`, or `true`.
+   - `X-QWP-Owned-By: <owner>` — optional, the percent-encoded owner of the
+     tables and columns that the server auto-creates for the connection
+     (Enterprise). See [Owner of auto-created tables](#owner-of-auto-created-tables).
 2. **Verify the upgrade.** On `101 Switching Protocols`, read the response
    headers:
    - `X-QWP-Version` — the version the connection runs on. Use it for the
@@ -178,6 +228,8 @@ The end-to-end shape of a QWP client session, before the encoding details:
      you opted in. It must name exactly the requested tiers (`enabled` for
      `true`). If you opted in and this header is absent or different, fail the
      connection (don't silently wait for acks the server will never send).
+   - `X-QWP-Owned-By` — confirms the owner, only if you named one. If it is
+     absent or names another owner, fail the connection.
    - `X-QWP-Max-Batch-Size` (optional, older servers omit it) — server's
      effective per-message payload cap in bytes. Clients should clamp their
      batch-size triggers to fit under this value (a safety margin of ~10%
