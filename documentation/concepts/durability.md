@@ -84,8 +84,8 @@ copy of the table, and the table files as a copy that can be rebuilt from it.
    and `_meta` files) to `_epoch.manifest.0` or `_epoch.manifest.1` in the
    table directory, alternately. A table also takes a save point when its
    writer closes cleanly, and once more about one interval after its last
-   change. Some operations, such as `ALTER COLUMN TYPE`, `ATTACH PARTITION`,
-   and `DETACH PARTITION`, also take a save point. Configuration keys, the
+   change. Some operations, such as `ALTER COLUMN TYPE`, also take a save point.
+   Configuration keys, the
    `wal_tables()` columns, and some log messages call a save point an *epoch*.
 4. **Recovery.** After a crash, the start puts each table back at its last save
    point, and the WAL apply replays every transaction after it. A table keeps
@@ -561,9 +561,8 @@ could not complete durable epoch after <operation>; retry the operation or
 RESUME WAL [table=...]
 ```
 
-A `DETACH PARTITION` or a direct partition change could not take its save
-points. Its effect may be visible, but it is not complete. Fix the cause, then
-retry the operation or `RESUME WAL`.
+The partition change could not take its save points. Its effect may be visible,
+but it is not complete. Fix the cause, then retry the operation or `RESUME WAL`.
 
 **A save point after an operation was skipped.**
 
@@ -572,8 +571,8 @@ durable epoch skipped after <operation>, a crash before the next one undoes it
 [table=...]
 ```
 
-The save point after an operation such as `ATTACH PARTITION` was skipped. The
-change is visible. Check that a later save point succeeds.
+The change is visible, but a crash before the next save point would undo it.
+Check that a later save point succeeds.
 
 **The newer save point was damaged.**
 

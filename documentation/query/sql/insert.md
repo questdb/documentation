@@ -41,10 +41,9 @@ SELECT ... FROM subQueryName;
 
 :::note
 
-If the target partition is
-[attached by a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
-the partition is read-only. `INSERT` operation on a read-only partition triggers
-a critical-level log in the server, and the insert is a no-op.
+Rows that target a read-only partition are not inserted. In QuestDB Enterprise,
+rows targeting a [sealed cold-storage partition](/docs/concepts/cold-storage/#immutability-after-drop-local)
+are skipped at WAL apply time.
 
 :::
 
