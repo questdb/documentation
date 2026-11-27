@@ -6,7 +6,7 @@ description:
   Enterprise cold storage partitions, and compact them into new Parquet objects.
 ---
 
-By default, `DROP LOCAL` seals a [cold storage](/docs/concepts/cold-storage/) partition, and rows that arrive for it later are dropped. With late rows enabled, the partition keeps accepting them: queries return the late rows, and background compaction moves them into the object store. Tables that receive late, backfilled or corrected data can then use cold storage without a `DROP LOCAL` sized for the longest delay.
+By default, `DROP LOCAL` seals a [cold storage](/docs/concepts/cold-storage/) partition, and rows that arrive for it later are dropped. With late rows enabled, the partition keeps accepting them: queries return the late rows, and background compaction moves them into the object store. Tables that receive late or backfilled rows can then use cold storage without a `DROP LOCAL` sized for the longest delay. Only tables without deduplication keep late rows, so a row sent again to correct an earlier one is added next to it, not merged.
 
 Late rows are off by default, apply to every eligible table, and cannot be turned off for the partitions that already keep them. Read [Before you enable late rows](#before-you-enable-late-rows) first.
 
@@ -109,7 +109,7 @@ A Delta partition whose base is still local looks like any writable local partit
 
 ## Roll back
 
-Turning the setting off does not convert Delta partitions back. Releases before ENTERPRISE_VERSION_TBD refuse to open a table that holds them, and with `cairo.commit.mode=adaptive` they refuse to start. To roll back, restore a backup taken on this release before you enabled late rows, onto the root described under [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
+Turning the setting off does not convert Delta partitions back. Releases before ENTERPRISE_VERSION_TBD refuse to open a table that holds them, and with `cairo.commit.mode=adaptive` they refuse to start. To roll back, restore a backup taken on this release before you enabled late rows. The whole database returns to that backup, so every write since then, on every table, is lost. Restore onto a new, empty root, because the manager has uploaded to the current one after the backup, as described under [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
 
 ## See also
 

@@ -41,7 +41,7 @@ Access requirements differ by role:
 
 Without the `_retention/*` permissions, backups of cold partitions fail.
 
-The object store must support conditional requests, `If-None-Match` on create and `If-Match` on replace and delete, as AWS S3, Azure Blob Storage and Google Cloud Storage do. An S3-compatible store must also support `If-Match` on `DeleteObject`. An `fs` root needs a filesystem with hard links, with `atomic_write_dir` on the same mount as `root`, and an NFS mount needs working file locks.
+The object store must support conditional requests, `If-None-Match` on create and `If-Match` on replace and delete, as AWS S3, Azure Blob Storage and Google Cloud Storage do. An S3-compatible store must also support `If-Match` on `DeleteObject`. An `fs` root needs a filesystem with hard links, with `atomic_write_dir` on the same mount as `root`, and every instance that uses it must run on the same host: an `fs` root shared by several hosts over NFS is not supported.
 
 Prefer cloud instance roles, workload identities, or managed identities over long-lived credentials in `server.conf`. Where credentials are unavoidable, load them from a file with [`QDB_COLD_STORAGE_OBJECT_STORE_FILE`](/docs/configuration/overview/#enterprise-properties).
 
@@ -80,7 +80,7 @@ To keep [late rows](/docs/concepts/cold-storage-late-rows/), also set `cold.stor
 
 ### Object store connection strings
 
-The same syntax as replication and backup storage. For provider setup in more depth, including bucket creation, credentials, and the NFS mount requirements, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage).
+The same syntax as replication and backup storage. For provider setup in more depth, including bucket creation and credentials, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage).
 
 ```ini title="AWS S3"
 cold.storage.object.store=s3::bucket=${BUCKET_NAME};root=cold;region=${AWS_REGION};
@@ -94,7 +94,7 @@ cold.storage.object.store=azblob::endpoint=https://${STORE_ACCOUNT}.blob.core.wi
 cold.storage.object.store=gcs::bucket=${BUCKET_NAME};root=cold;
 ```
 
-```ini title="Filesystem or NFS"
+```ini title="Filesystem, single host"
 cold.storage.object.store=fs::root=/mnt/cold/final;atomic_write_dir=/mnt/cold/scratch;
 ```
 
@@ -327,7 +327,7 @@ This includes Delta partitions whose base is still local, with all their [late r
 | Late rows are missing, and the log shows `o3 ignoring write on read-only partition`                     | Their partition was sealed                                                                                                    | Enable [late rows](/docs/concepts/cold-storage-late-rows/), or see [Partitions sealed before late rows were enabled](/docs/concepts/cold-storage-late-rows/#partitions-sealed-before-late-rows-were-enabled). Re-send the dropped rows |
 | A deduplicated table is suspended with `cannot insert into read-only partition`                         | A transaction holds rows for a sealed partition                                                                               | See [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions)                                                                                                                                       |
 | A table is suspended with `cannot update read-only partition` or `cannot update delta-active partition` | A WAL `UPDATE` reached a sealed or Delta partition                                                                            | Skip the transaction with [`RESUME WAL FROM TRANSACTION`](/docs/query/sql/alter-table-resume-wal/) on every instance                                                                                                                   |
-| A table is suspended when late rows switch a sealed partition                                           | The partition is local Parquet, and its `_pm` file is missing or corrupt                                                      | Restore the file, or run `FORCE DROP PARTITION` on every instance, then `RESUME WAL`                                                                                                                                                   |
+| A table is suspended when late rows switch a sealed partition                                           | The partition is local Parquet, and its `_pm` file is missing or corrupt                                                      | Restore the file. Otherwise, run `ALTER TABLE ... FORCE DROP PARTITION LIST '<partition>'` on every instance, as it bypasses the WAL, then `RESUME WAL`. This deletes the partition's rows                                             |
 | WAL apply lags but the table is not suspended                                                           | A partition holds too many runs of late rows                                                                                  | See [Batch your writes](/docs/concepts/cold-storage-late-rows/#batch-your-writes)                                                                                                                                                      |
 | A compaction fails                                                                                      | See the `error` column of `cold_storage_compactions()`                                                                        | Fix the cause, then run [`COMPACT`](/docs/query/sql/alter-table-compact/) again, or wait for the background retry                                                                                                                      |
 | A backup fails to pin a base                                                                            | Missing [permissions](#1-prepare-the-object-store-root) on `_retention/*` or the manifests                                    | Grant them                                                                                                                                                                                                                             |

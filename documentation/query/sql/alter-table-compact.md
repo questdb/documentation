@@ -52,7 +52,7 @@ Run the statement again once the cause is gone.
 
 ### Confirm the result
 
-A finished compaction leaves `cold_storage_compactions()`. Its new base is the partition's `active` row in [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions), with a higher `seq_txn`. Its `partition_path` is the object an external tool should read:
+A finished compaction leaves `cold_storage_compactions()`. Its new base is the partition's `active` row in [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions), with a higher `seq_txn`. Its `partition_path`, relative to the cold storage root, is the object an external tool should read. Garbage collection deletes the replaced base after [`cold.storage.gc.partition.grace.period`](/docs/configuration/cold-storage/#coldstoragegcpartitiongraceperiod), 30 minutes by default, and background maintenance can replace this one later, so read `partition_path` again before each run instead of keeping it:
 
 ```questdb-sql title="Current object of each cold partition"
 SELECT timestamp, seq_txn, partition_path

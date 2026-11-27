@@ -207,7 +207,7 @@ cold.storage.linked.object.stores=<source root_id>=s3::bucket=<source-bucket>;ro
 ```
 
 - `cold.storage.object.store` must be a new, empty root, or the one this recovery started and did not finish.
-- [`cold.storage.linked.object.stores`](/docs/configuration/cold-storage/#coldstoragelinkedobjectstores) tells the node how to open the source root. A source root on S3 or GCS that the node's ambient credentials can read needs no entry.
+- [`cold.storage.linked.object.stores`](/docs/configuration/cold-storage/#coldstoragelinkedobjectstores) tells the node how to open the source root. A source root on S3 or GCS without a custom `endpoint`, `ca_cert_file` or `role_arn`, that the node's ambient credentials can read, needs no entry.
 - `cold.storage.role` stays `refresher` until the recovery is verified: a manager would stamp the new root with the source's Data ID, and the recovery would then refuse it.
 - Set `cold.storage.delta.enabled` as on the source database.
 - The node needs read access to the source root, and `PUT` and `DELETE` on its `_retention/*`, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).

@@ -467,7 +467,10 @@ and create a new engine.
 
 Flushes of Parquet partition metadata, and QuestDB Enterprise cold storage
 flushes, do not stop the server. When they fail, the statement fails or the
-table is suspended, and no acknowledged data is lost.
+table is suspended, and no acknowledged data is lost. A failed flush of
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) is the
+exception: in `sync` and `adaptive` mode it stops the server like any other
+flush.
 
 ### QuestDB refuses to start {#the-start-refuses}
 

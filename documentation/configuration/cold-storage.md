@@ -64,7 +64,7 @@ cold.storage.object.store=fs::root=/mnt/cold/final;atomic_write_dir=/mnt/cold/sc
 
 Use a root dedicated to one database: an instance of another database refuses it with [`ER010`](/docs/troubleshooting/error-codes/#er010). Prefer instance roles or workload identities over embedded credentials. The value can be loaded from a file with `QDB_COLD_STORAGE_OBJECT_STORE_FILE`.
 
-The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. For the store's requirements, such as conditional requests, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root). For bucket creation, credentials, and the NFS mount requirements, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
+The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. For the store's requirements, such as conditional requests, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root). For bucket creation and credentials, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
 
 For a store fronted by a private, internal, or self-signed CA, the string also accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
