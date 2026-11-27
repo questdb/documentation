@@ -1004,6 +1004,7 @@ module.exports = {
           collapsed: true,
           items: [
             "integrations/visualization/grafana",
+            "integrations/visualization/metabase",
             "integrations/visualization/qstudio",
             "integrations/visualization/superset",
             "integrations/visualization/powerbi",
