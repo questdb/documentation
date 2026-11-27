@@ -38,6 +38,36 @@ Tables are automatically created during insert.
 
 There is no need for an upfront schema!
 
+## How InfluxDB concepts map to QuestDB
+
+Before changing any code, it helps to know what happens to your data model.
+QuestDB has no buckets, no measurements and no tag/field split. An ILP line
+lands in a table with typed columns, and that is the whole model:
+
+| InfluxDB | QuestDB | Notes |
+| -------- | ------- | ----- |
+| Bucket | _(nothing)_ | The `bucket` argument is accepted and ignored. QuestDB routes by measurement name, so a single QuestDB instance replaces every bucket you have. |
+| Measurement | Table | Created on first write, with no schema declared up front. |
+| Tag | [`SYMBOL`](/docs/concepts/symbol/) column | Dictionary-encoded and optionally indexed — the same job tags do in InfluxDB, except you can also filter and `JOIN` on them like any other column. |
+| Field | Typed column | The type is inferred from the first write and enforced afterwards, which is why the string-instead-of-double example below is rejected. |
+| Point | Row | |
+| Timestamp | [Designated timestamp](/docs/concepts/designated-timestamp/) | Every table has exactly one. It drives partitioning, `SAMPLE BY` and `LATEST ON`. |
+| Series (measurement + tag set) | _(nothing)_ | Rows sharing `SYMBOL` values are just rows. There is no series object to create, count or compact. |
+| Shard / shard group | [Partition](/docs/concepts/partitions/) | Sized with `PARTITION BY HOUR`, `DAY`, `WEEK`, `MONTH` or `YEAR`. |
+| Retention policy | [TTL](/docs/concepts/ttl/) | `TTL n DAYS` drops a partition once its entire range ages out. |
+| Continuous query / task | [Materialized view](/docs/concepts/materialized-views/) | Refreshes incrementally as the base table is written to, rather than on a schedule. |
+| Flux / InfluxQL | SQL | Standard SQL, with time-series extensions such as `SAMPLE BY`, `LATEST ON` and `ASOF JOIN`. |
+
+Two consequences are worth calling out, because they change how you size a
+deployment:
+
+- **Tags are not special.** A `SYMBOL` is an ordinary column that happens to be
+  dictionary-encoded, so a value you stored as a field in InfluxDB can be a
+  `SYMBOL` here, and vice versa, without redesigning the schema.
+- **There is no series to track.** QuestDB does not materialise an object per
+  measurement-and-tag-set combination, so a high-cardinality tag costs storage
+  in that column rather than multiplying into series the database must manage.
+
 ## Example with InfluxDB's Python client
 
 Our example is adapted from the
@@ -234,6 +264,73 @@ this with a small configuration change:
   ## aggregator and will not get sent to the output plugins.
   drop_original = true
 ```
+
+### Collapse the rows continuously with a materialized view
+
+`INSERT` is a one-off. If ILP keeps writing sparse rows, you want the collapse
+to happen as data arrives — which is what a
+[materialized view](/docs/concepts/materialized-views/) does. It stores the
+result of the query above and refreshes incrementally on every write to the
+base table:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW diagnostics_merged AS (
+  SELECT
+    timestamp,
+    device_version,
+    driver,
+    fleet,
+    model,
+    name,
+    max(current_load) AS current_load,
+    max(fuel_capacity) AS fuel_capacity,
+    max(fuel_state) AS fuel_state,
+    max(load_capacity) AS load_capacity,
+    max(nominal_fuel_consumption) AS nominal_fuel_consumption,
+    max(status) AS status
+  FROM diagnostics
+  SAMPLE BY 1s
+) PARTITION BY DAY;
+```
+
+The `SAMPLE BY 1s` bucket is what merges the fragments. Every ILP line that
+InfluxDB split out of a single reading carries the same timestamp, so they fall
+into one bucket and `max()` picks the single non-null value from each column.
+Widen the interval if the lines for one reading can straddle a bucket boundary.
+
+Query the view as you would any table, and read dense rows:
+
+```questdb-sql
+SELECT * FROM diagnostics_merged
+WHERE timestamp = '2016-01-01T00:00:00.000000Z' AND driver = 'Andy';
+```
+
+### Expire the raw table with TTL
+
+Once the view holds the shape you actually query, the raw sparse table is only
+worth keeping for as long as you might need to rebuild from it. Give it a
+[TTL](/docs/concepts/ttl/) and QuestDB drops whole partitions as they age out,
+with no cron job:
+
+```questdb-sql
+ALTER TABLE diagnostics SET TTL 7 DAYS;
+```
+
+A materialized view has its own retention, independent of its base table, so
+the merged data outlives the raw rows it came from:
+
+```questdb-sql
+ALTER MATERIALIZED VIEW diagnostics_merged SET TTL 1 YEAR;
+```
+
+:::note
+
+On QuestDB Enterprise, `TTL` on a regular table is superseded by
+[storage policies](/docs/concepts/storage-policy/), which can convert
+partitions to Parquet before dropping them. Materialized views continue to use
+`TTL` on Enterprise.
+
+:::
 
 ## Migrating from InfluxDB with Telegraf
 
