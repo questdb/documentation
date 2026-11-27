@@ -310,20 +310,22 @@ and `/read/v1`, when the page has the same origin as QuestDB, or when the
 page's origin is listed in `qwp.browser.allowed.origins`. It treats a page as
 same-origin when the upgrade's `Origin` header matches its `Host` header. It
 rejects every other origin, which protects the server from cross-site
-WebSocket hijacking.
+WebSocket hijacking. REST endpoints use a separate
+[HTTP browser check](/docs/configuration/http-server/#httpbrowserallowedorigins);
+`http.browser.allowed.origins` does not allow QWP connections.
+
+Without HTTP authentication, every WebSocket upgrade also checks the `Host`
+header to prevent DNS rebinding. When clients reach QuestDB under a name such
+as `questdb.example.com` or `questdb.monitoring`, add it to
+[`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts), or
+the upgrade returns `403 Forbidden` even if the origin is allowed. This also
+applies when a reverse proxy forwards the browser's `Host`.
 
 :::warning Enable authentication before you expose QuestDB
 
-The origin check is not access control:
-
-- It covers only the QWP routes. `/exec` and QuestDB's other REST endpoints
-  do not check the origin: any web page can make a visitor's browser send them
-  a request, and without authentication QuestDB runs it.
-- It compares the `Origin` header with the `Host` header, so a DNS-rebinding
-  attack, which reaches QuestDB under the attacker's own host name, gets
-  through.
-- Clients other than browsers can leave out the `Origin` header or send any
-  value.
+The browser and host checks are not access control. Non-browser clients can
+omit `Origin` and `Sec-Fetch-Site` or send any header values. Browser checks
+also have [limits over plain HTTP](/docs/connect/compatibility/rest-api/#browser-requests-and-reverse-proxies).
 
 A reverse proxy or an allowed origin makes QuestDB reachable from wherever
 your application is. Without authentication, anyone who reaches it there can

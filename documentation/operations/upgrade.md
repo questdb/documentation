@@ -34,6 +34,58 @@ If this is your first time setting up QuestDB, see the
    `cairo.commit.mode.adaptive.downgrade=true` to unlock the database. See
    [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
 
+## HTTP security changes
+
+The HTTP servers reject requests from other browser origins and, without
+authentication, unlisted host names. These changes affect both QuestDB Open
+Source and Enterprise, on the main HTTP port and the minimal HTTP port used
+for health checks, metrics, and lifecycle operations.
+
+Before upgrading, check the following integrations:
+
+- **Web applications on another origin.** Requests now get `403 Forbidden`,
+  even with valid credentials, unless the application's origin is listed in
+  [`http.browser.allowed.origins`](/docs/configuration/http-server/#httpbrowserallowedorigins)
+  (`QDB_HTTP_BROWSER_ALLOWED_ORIGINS`). List only trusted applications. QWP
+  WebSockets keep using `qwp.browser.allowed.origins` instead.
+- **Clients using custom host names without authentication.** Names such as
+  `questdb.example.com` and the Kubernetes short name `questdb.monitoring`
+  must be listed in
+  [`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts)
+  (`QDB_HTTP_ALLOWED_HOSTS`). This affects ILP-over-HTTP and QWP clients, REST
+  scripts, Prometheus scrapes, probes, and callers of
+  `POST /lifecycle/switch`. IP addresses, single-label names, and special-use
+  domains such as `.local` and `.internal` remain accepted. With HTTP
+  authentication enabled, including Enterprise's default `acl.enabled=true`,
+  this host-name check does not apply.
+- **Links to API URLs from other websites.** Over HTTPS and on localhost, a
+  link to an API URL such as `/exp` gets `403 Forbidden`. Such requests send
+  no `Origin`, so listing the referring site cannot admit them. Open the URL
+  directly instead. Links to Web Console static pages still work.
+- **Web Console behind a plain-HTTP proxy.** At an address other than
+  localhost, a proxy that rewrites `Host` can break CSV imports and settings
+  saves. Preserve the browser's `Host`, including the port, or list the
+  console's origin. See
+  [Reverse proxies](/docs/connect/compatibility/rest-api/#reverse-proxies).
+
+:::warning Configure host names before upgrading
+
+For QWP store-and-forward deployments without authentication, list required
+host names before upgrading the server. A rejected host can prevent the
+initial connection, keep a running sender buffering and retrying, or cause an
+orphaned store-and-forward slot to be quarantined and reported as data loss
+instead of being drained.
+
+:::
+
+Both new settings can be
+[reloaded without a restart](/docs/configuration/overview/#reloadable-settings)
+in Open Source and Enterprise. See
+[HTTP request rejections](/docs/connect/compatibility/rest-api/#http-request-rejections)
+for the error messages and corrective actions, and
+[Browser requests and reverse proxies](/docs/connect/compatibility/rest-api/#browser-requests-and-reverse-proxies)
+for the protection limits over plain HTTP.
+
 ## Upgrade steps
 
 ### Docker

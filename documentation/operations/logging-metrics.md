@@ -207,6 +207,11 @@ curl -v http://127.0.0.1:9003/status
 For configuration options, see the
 [Minimal HTTP server](/docs/configuration/http-min-server/) reference.
 
+Health checks, Prometheus scrapes, and lifecycle requests follow the shared
+[HTTP host and browser checks](/docs/configuration/http-server/#security).
+Without HTTP authentication, list custom host names such as
+`questdb.monitoring` in `http.allowed.hosts` to avoid `403 Forbidden`.
+
 :::warning
 
 On systems with

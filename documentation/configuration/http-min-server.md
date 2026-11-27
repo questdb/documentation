@@ -17,6 +17,14 @@ section for the health check and lifecycle endpoints, and
 the switch endpoint. TLS for this port is configured with the `http.min.tls.*`
 settings on the [TLS](/docs/configuration/tls/) page.
 
+This port shares the main HTTP server's
+[`http.allowed.hosts`](/docs/configuration/http-server/#httpallowedhosts) and
+[`http.browser.allowed.origins`](/docs/configuration/http-server/#httpbrowserallowedorigins)
+settings. Without HTTP authentication, a probe, Prometheus scrape, or lifecycle
+client using a name such as `questdb.monitoring` receives `403 Forbidden`
+unless the name is allowed. The fully qualified
+`questdb.monitoring.svc.cluster.local` name is accepted by default.
+
 ## http.health.check.authentication.required
 
 - **Default**: `true`
@@ -26,6 +34,10 @@ Whether `GET /status`, `GET /metrics`, and `GET /lifecycle` require
 authentication when the HTTP server does. Set to `false` to let a load balancer
 or a Kubernetes probe call them without credentials. `POST /lifecycle/switch`
 always requires credentials, regardless of this setting.
+
+Setting this to `false` does not disable the browser request check. When HTTP
+authentication is enabled, the host-name check remains skipped even for
+endpoints that this setting makes accessible without credentials.
 
 ## http.min.bind.to
 

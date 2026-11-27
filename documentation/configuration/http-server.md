@@ -292,6 +292,19 @@ optimal value for most workloads.
 
 ## Security
 
+[`http.allowed.hosts`](#httpallowedhosts) and
+[`http.browser.allowed.origins`](#httpbrowserallowedorigins) protect against
+DNS rebinding and requests sent by other websites through a visitor's browser.
+Both settings apply to the main and
+[minimal HTTP server](/docs/configuration/http-min-server/), in QuestDB Open
+Source and Enterprise. Neither replaces authentication or network access
+controls.
+
+Edit these settings in `server.conf` and call
+[`reload_config()`](/docs/configuration/overview/#reloadable-settings) to
+apply them without restarting. An invalid value prevents startup. On reload,
+QuestDB logs the error and keeps the previous value.
+
 ### circuit.breaker.buffer.size
 
 - **Default**: `32`
@@ -316,6 +329,105 @@ terminated.
 
 Number of internal iterations (such as loops over data) before checking if
 the HTTP connection is still open.
+
+### http.allowed.hosts
+
+- **Default**: `""` (empty)
+- **Reloadable**: yes
+
+Comma-separated list of additional host names that QuestDB serves when HTTP
+authentication is disabled. The environment variable is
+`QDB_HTTP_ALLOWED_HOSTS`. This prevents DNS rebinding, where a website's owner
+points its host name at QuestDB so the browser treats the database as part of
+that website.
+
+Without authentication, QuestDB checks the `Host` header of every HTTP
+request, including requests for static files and QWP WebSocket upgrades. By
+default, it accepts:
+
+- IP addresses.
+- Single-label names, such as `localhost` or the Docker service name `questdb`.
+- The special-use domains `.localhost`, `.local`, `.internal`, `.home.arpa`,
+  and `.test`, including their subdomains. For example,
+  `questdb.monitoring.svc.cluster.local` and `host.docker.internal` work
+  without configuration.
+
+Other host names return `403 Forbidden` with a message starting with
+`host name rejected`. This affects all clients, not only browsers. For
+example, a Prometheus scrape or an ILP-over-HTTP sender using
+`questdb.monitoring` needs that name listed, even though the fully qualified
+`.svc.cluster.local` name does not.
+
+```ini title="server.conf"
+http.allowed.hosts=questdb.example.com,.corp.example.com
+```
+
+List host names without schemes, ports, or paths. A leading dot, as in
+`.corp.example.com`, allows both `corp.example.com` and all its subdomains.
+Names are matched case-insensitively, ignoring the request's port and a
+trailing dot. Use `.example.com`, not `*.example.com`.
+
+With HTTP authentication enabled, QuestDB accepts any host name and does not
+apply this list. Enable authentication with `http.user` and `http.password`
+in QuestDB Open Source, or `acl.enabled=true` in Enterprise, where access
+control is enabled by default.
+
+:::warning
+
+Setting `http.allowed.hosts=*` accepts any host name and disables the DNS
+rebinding check. Prefer listing only the names your clients use. The list adds
+to the built-in accepted names; it cannot restrict access to only those listed.
+
+:::
+
+### http.browser.allowed.origins
+
+- **Default**: `""` (empty)
+- **Reloadable**: yes
+
+Comma-separated list of trusted browser origins, besides QuestDB's own, that
+may call HTTP endpoints. The environment variable is
+`QDB_HTTP_BROWSER_ALLOWED_ORIGINS`. An origin consists of a scheme, host, and
+port, so another subdomain or port is a different origin.
+
+```ini title="server.conf"
+http.browser.allowed.origins=https://app.example.com,https://desk.example.com:8443
+```
+
+Write each origin exactly as a browser sends it in the `Origin` header:
+lowercase `http` or `https` scheme and host, a port only when it is not the
+default for the scheme, and no path, trailing slash, or wildcard. IP addresses
+must use their canonical form, such as `127.0.0.1` or `[::1]`. Matching is
+exact; `null` is not an allowed origin.
+
+QuestDB checks browser requests in this order:
+
+1. If `Sec-Fetch-Site` is present, `same-origin` and `none` pass. Any other
+   value, including `same-site` and `cross-site`, requires an `Origin` listed
+   here. This header takes precedence over `Origin`.
+2. Without `Sec-Fetch-Site`, an `Origin` must match the request's `Host` and
+   connection scheme, or be listed here.
+3. Requests with neither header pass this check. Non-browser clients normally
+   send neither header.
+
+Rejected requests return `403 Forbidden` even with valid credentials. An
+endpoint that requires authentication still returns `401 Unauthorized` when
+the request lacks valid credentials. The Web Console's static files are
+exempt from the browser check. QWP WebSockets on `/write/v4` and `/read/v1`
+follow [`qwp.browser.allowed.origins`](/docs/configuration/qwp/#qwpbrowserallowedorigins)
+instead. Neither exception bypasses [`http.allowed.hosts`](#httpallowedhosts).
+
+:::warning
+
+List only trusted applications. A page from a listed origin can send requests
+with credentials its visitors' browsers hold for QuestDB. This setting does
+not add CORS response headers or handle CORS preflight requests.
+
+:::
+
+See [Browser requests and reverse proxies](/docs/connect/compatibility/rest-api/#browser-requests-and-reverse-proxies)
+for proxy configuration, links to API URLs, and the limits of these checks
+over plain HTTP.
 
 ### http.pessimistic.health.check.enabled
 
