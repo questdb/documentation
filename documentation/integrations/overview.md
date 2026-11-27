@@ -66,6 +66,9 @@ integrations:
   <IntegrationCard name="Apache Flink" href="/docs/connect/message-brokers/flink/" logo="/images/logos/flink.svg">
     Process real-time data streams efficiently.
   </IntegrationCard>
+  <IntegrationCard name="Apache Iggy" href="/docs/connect/message-brokers/iggy/" logo="/images/logos/apache-iggy-dark.svg">
+    Stream messages from Apache Iggy into QuestDB with the QuestDB sink connector.
+  </IntegrationCard>
   <IntegrationCard name="Databento connector" href="/docs/connect/connectors/databento/" logo="/images/logos/databento-icon.svg">
     Stream Live market data and run Historical backfills with QuestDB Enterprise. On QuestDB Open Source, see [Databento with Python](/docs/integrations/other/databento/).
   </IntegrationCard>
