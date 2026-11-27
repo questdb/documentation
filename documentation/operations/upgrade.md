@@ -33,6 +33,9 @@ If this is your first time setting up QuestDB, see the
    earlier release, restart once with `cairo.commit.mode=nosync` and
    `cairo.commit.mode.adaptive.downgrade=true` to unlock the database. See
    [Downgrade to an earlier release](/docs/concepts/durability/#downgrade).
+   With cold storage, an upgrade to QuestDB Enterprise ENTERPRISE_VERSION_TBD
+   cannot be undone this way, see
+   [Upgrading to ENTERPRISE_VERSION_TBD](#upgrading-to-enterprise_version_tbd).
 
 ## Upgrade steps
 
@@ -98,6 +101,11 @@ store. If a replica running an older version encounters metadata it does not
 recognize, it will error. Upgrading replicas first ensures they can handle any
 new metadata the primary produces after its upgrade.
 
+With [cold storage](/docs/concepts/cold-storage/), also upgrade the instance
+that runs the cold storage manager last: run the manager on the primary during
+the upgrade, so that both orders agree. See
+[Upgrading to ENTERPRISE_VERSION_TBD](#upgrading-to-enterprise_version_tbd).
+
 When upgrading to 4.0.0 or later, grant the `SWITCH ROLE` permission only after
 every node runs the new version. The permission is stored in a form older
 versions cannot read. A principal that holds `DATABASE ADMIN`, including
@@ -106,6 +114,49 @@ Others, such as accounts that triggered role switches through `SYSTEM ADMIN` on
 3.3.x, need an explicit `GRANT SWITCH ROLE`. See
 [Failover operator](/docs/security/rbac/#failover-operator) and
 [Database administrator](/docs/security/rbac/#database-administrator).
+
+### Upgrading to ENTERPRISE_VERSION_TBD
+
+This release changes how [cold storage](/docs/concepts/cold-storage/) writes its root, one-way. Without cold storage, only [Deduplicated tables](#deduplicated-tables) and [Strict configuration validation](#strict-configuration-validation) below apply. Whether or not you use cold storage, the release adds about 15 ns to each table that a query opens, and about 2.5 KB of memory per table.
+
+#### Cold storage
+
+A cold storage manager of this release writes the root's catalog and manifests at version 2.0. Earlier releases cannot use such a root: they log `incompatible version: got 2.0, expected major version 1`, pause cold storage, and cannot read the partitions uploaded since, until they are upgraded. There is no downgrade.
+
+Check before upgrading:
+
+- **Object store requirements.** The cold storage manager now writes the catalog, manifests and lock with conditional requests, which the store must support, including `If-Match` on `DeleteObject` for an S3-compatible store. An `fs` root needs hard links, and every instance that uses it must run on the same host, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
+- **Backup permissions.** Instances that take backups need new permissions on the root, or their backups of cold partitions fail, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
+- **Object key layout.** New uploads use one key per version of a partition, not Hive-style paths. Tools that read the root by path must take keys from `table_cold_partitions()`, see [Object store layout](/docs/concepts/cold-storage/#object-store-layout).
+- **`table_cold_partitions()` states.** `live` and `sealed` become `active`, so update monitoring queries.
+- **One root per database.** An instance of another database refuses the root with [`ER010`](/docs/troubleshooting/error-codes/#er010). A replica behind the root cannot be promoted, with [`ER011`](/docs/troubleshooting/error-codes/#er011), and neither can one with a table that went through `REBASE WAL` or a `SET TYPE` round trip on an earlier release, until the table's `sequencerTxn` reaches the `coldStorageSeqTxn` that the `ER011` message names. That can take as many transactions as the table had before its transaction numbers restarted.
+- **Point-in-time recovery** needs a new root and a backup taken after the upgrade, see [Point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage).
+- **`DROP LOCAL`** no longer removes a partition that only cold storage holds. While cold storage is disabled, a query that reads one fails instead of skipping it.
+- **New refusals** on cold storage tables, such as `REBASE WAL` and `SET TYPE`, see [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables). `CONVERT PARTITION TO NATIVE` also refuses read-only partitions on every table.
+- **From 4.0.x**, no extra step: this release reads the 4.0.x manager lock.
+
+Upgrade the instance that runs the cold storage manager **last**. With a primary P and its replicas, which share one root, this also follows [Replication: upgrade order](#replication-upgrade-order):
+
+1. Run the cold storage manager on P. If it runs on a replica, move it to P with a [manager handoff](/docs/operations/cold-storage/#manager-handoff) before you upgrade anything.
+2. Upgrade each replica, and every other instance that uses the root, and start it with `cold.storage.role=refresher`.
+3. Stop P. Until it is back, the database takes no writes, and uploads and garbage collection pause.
+4. Upgrade P and start it with `cold.storage.role=manager`. It stamps the root with the database's Data ID and a new `root_id`, and writes version 2.0 from then on. This is the point of no return.
+5. [Take a backup](/docs/operations/backup/) on each instance that takes backups: earlier backups pin no cold objects.
+6. Optionally, move the manager back to a replica with a manager handoff, and update `cold.storage.role` in both instances' `server.conf`.
+
+To keep writes available, replace step 3 with a [planned switchover](/docs/high-availability/failover/#planned-switchover) to an upgraded replica R that stays a cold storage refresher, and set `replication.role=primary` in R's `server.conf`. If R's promotion is refused with `ER011`, promote P back first. Stop P right after the switchover, since it still runs the earlier release, and in step 4 start it as a replica.
+
+#### Late rows in cold storage
+
+This release adds [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), off by default. Enable them only once every instance that uses the root is upgraded, see [Before you enable late rows](/docs/concepts/cold-storage-late-rows/#before-you-enable-late-rows). Earlier releases refuse to open a table that keeps late rows.
+
+#### Deduplicated tables
+
+A transaction with rows for a read-only partition, such as one sealed by cold storage, now suspends a WAL table with deduplication, instead of dropping those rows. See [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
+
+#### Strict configuration validation
+
+With `config.validation.strict=true`, which the `server.conf` of a new installation sets, a boolean setting whose value is not `true` or `false` now fails startup, see [Config validation](/docs/configuration/overview/#configvalidationstrict). Earlier releases read such a value as `false`.
 
 ### Upgrading to 4.2.1 {#upgrading-to-420}
 

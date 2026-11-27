@@ -215,3 +215,4 @@ ALTER TABLE trades SQUASH PARTITIONS;
 - [TTL](/docs/concepts/ttl/) — Automatic partition cleanup by age
 - [Storage Policy](/docs/concepts/storage-policy/) — Graduated partition lifecycle (convert to Parquet, upload, then drop) in QuestDB Enterprise
 - [Cold storage](/docs/concepts/cold-storage/) — Keep historical partitions queryable from object storage in QuestDB Enterprise
+- [Late rows in cold storage](/docs/concepts/cold-storage-late-rows/) — Keep rows that arrive for partitions already in cold storage

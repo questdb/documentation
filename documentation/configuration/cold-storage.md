@@ -2,7 +2,8 @@
 title: Cold storage
 description:
   Configuration settings for QuestDB Enterprise cold storage, covering the
-  object store connection, roles, upload, read path, and garbage collection.
+  object store connection, roles, upload, read path, garbage collection, and
+  late rows with their compaction.
 ---
 
 :::note
@@ -11,13 +12,13 @@ Cold storage is [Enterprise](/enterprise/) only.
 
 :::
 
-[Cold storage](/docs/concepts/cold-storage/) moves historical partitions to an object store as Parquet and serves them with range reads. These settings control the store connection, which instance owns write access, how partitions are uploaded, how cold reads fetch and cache bytes, and when remote objects are reclaimed.
+[Cold storage](/docs/concepts/cold-storage/) moves historical partitions to an object store as Parquet and serves them with range reads. These settings control the store connection, which instance owns write access, how partitions are uploaded, how cold reads fetch and cache bytes, when remote objects are reclaimed, whether partitions keep late rows, and how maintenance compacts them.
 
 Cold storage runs on its own dedicated async runtime, isolated from WAL, backup, and replication I/O.
 
 None of these settings are reloadable: changing any of them requires a restart.
 
-While `cold.storage.enabled` is `false`, cold storage keys are skipped entirely during configuration parsing, so a malformed value cannot prevent startup with the feature off.
+While `cold.storage.enabled` is `false`, `cold.storage.*` keys are skipped entirely during configuration parsing, so a malformed value cannot prevent startup with the feature off. The `delta.*` keys are always parsed: an invalid value stops startup even with cold storage disabled.
 
 The partition lifecycle itself is driven by the shared storage policy worker pool. See [Storage policy configuration](/docs/configuration/storage-policy/) for `storage.policy.*`.
 
@@ -29,6 +30,23 @@ The partition lifecycle itself is driven by the shared storage policy worker poo
 - **Reloadable**: no
 
 Master switch. When `false`, cold storage is inert and all other `cold.storage.*` keys are ignored.
+
+Turning it off keeps cold partitions in their tables, but queries that read them fail, and `DROP LOCAL` deletes the partitions with [late rows](/docs/concepts/cold-storage-late-rows/) whose base is still local, with those rows. See [Disabling cold storage](/docs/operations/cold-storage/#disabling-cold-storage).
+
+### cold.storage.linked.object.stores
+
+- **Default**: empty
+- **Reloadable**: no
+
+Connection strings of the roots that a database restored onto a new root, for example by [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage), reads its inherited cold partitions from. Entries are comma-separated `<root_id>=<connection string>` pairs, so a connection string here cannot contain a comma:
+
+```ini
+cold.storage.linked.object.stores=<root_id>=s3::bucket=old-bucket;root=cold;region=eu-west-1;
+```
+
+`<root_id>` is the UUID that instances of the source database log as `rootId` in `loaded the cold storage root's identity [...]`, and that a restore missing an entry names in its error. Without an entry, an instance opens the root at its recorded location with its ambient credentials, which works only on S3 or GCS without a custom `endpoint`, `ca_cert_file` or `role_arn`. Set the same entries on every instance of the database.
+
+The value is sensitive, and can be loaded from a file with `QDB_COLD_STORAGE_LINKED_OBJECT_STORES_FILE`.
 
 ### cold.storage.object.store
 
@@ -44,9 +62,9 @@ cold.storage.object.store=gcs::bucket=my-bucket;root=cold;
 cold.storage.object.store=fs::root=/mnt/cold/final;atomic_write_dir=/mnt/cold/scratch;
 ```
 
-Use a prefix dedicated to one cluster, and prefer instance roles or workload identities over embedded credentials. The value can be loaded from a file with `QDB_COLD_STORAGE_OBJECT_STORE_FILE`.
+Use a root dedicated to one database: an instance of another database refuses it with [`ER010`](/docs/troubleshooting/error-codes/#er010). Prefer instance roles or workload identities over embedded credentials. The value can be loaded from a file with `QDB_COLD_STORAGE_OBJECT_STORE_FILE`.
 
-The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. For bucket creation, credentials, and the NFS mount requirements, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
+The format is `scheme::key1=value1;key2=value2;` and is shared by every QuestDB object store setting, so provider setup is documented once. For the store's requirements, such as conditional requests, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root). For bucket creation and credentials, see [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage); the connection strings shown there apply unchanged here.
 
 For a store fronted by a private, internal, or self-signed CA, the string also accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
@@ -60,6 +78,22 @@ The role this instance boots into, either `manager` or `refresher`. Designate ex
 The role is independent of the replication primary and replica roles, and is enforced at runtime by a lock at the object store root. A second instance configured as `manager` finds the foreign lock and starts as a refresher rather than competing.
 
 The live role can be moved at runtime with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/), but a hot-switched role reverts to this value on restart.
+
+## Runtime
+
+### cold.storage.async.io.threads
+
+- **Default**: half the CPU cores, at least `1`
+- **Reloadable**: no
+
+Threads of the cold storage runtime that run object store requests and other asynchronous I/O.
+
+### cold.storage.max.blocking.threads
+
+- **Default**: twice the CPU cores, at least `4`
+- **Reloadable**: no
+
+Maximum number of threads the cold storage runtime starts for blocking work, such as local disk I/O. They start on demand and stop when idle.
 
 ## Garbage collection
 
@@ -75,16 +109,18 @@ Whether the manager reclaims remote objects for partitions the table no longer r
 - **Default**: `30m`
 - **Reloadable**: no
 
-How long a partition stays marked for deletion before its objects are removed. The window lets in-flight readers drain, and lets WAL apply restore a partition that a lagging replica-turned-manager has not caught up on. Capped at 24 hours.
+How long a partition stays marked for deletion before its objects are removed. The window lets in-flight readers drain, and lets WAL apply restore a partition that a lagging replica-turned-manager has not caught up on. Must be at most 24 hours: a larger value stops startup.
+
+The same grace applies to a base replaced by a newer upload or a compaction, and a [pinned](/docs/operations/cold-storage/#pins) base outlives it. Set both grace periods above the longest time an instance may stay stopped or behind on replication: until it catches up, such an instance fails reads of the partitions dropped or replaced meanwhile.
 
 ### cold.storage.gc.table.grace.period
 
 - **Default**: `60m`
 - **Reloadable**: no
 
-How long a dropped table's objects are retained before removal. Local removal of the table is also gated on its remote objects being reclaimed. Capped at 7 days.
+How long a dropped table's objects are retained before removal. The table's local files go once the catalog records the drop. A [pinned](/docs/operations/cold-storage/#pins) base, and the table's manifest, outlive this period. Must be at most 7 days: a larger value stops startup. Size it as advised under [`cold.storage.gc.partition.grace.period`](#coldstoragegcpartitiongraceperiod).
 
-## Catalog
+## Catalog and manifests {#catalog}
 
 ### cold.storage.catalog.refresh.interval
 
@@ -93,21 +129,51 @@ How long a dropped table's objects are retained before removal. Local removal of
 
 How often a refresher polls the cold table catalog for a generation change. This bounds how quickly a refresher notices new remote partitions.
 
+### cold.storage.manifest.flush.interval
+
+- **Default**: `1s`
+- **Reloadable**: no
+
+How often the manager writes pending partition state changes to the table manifests in the object store. Changes within one interval are written together, so this bounds how long a change waits before it is durable. Must be greater than `0`.
+
 ## Upload
 
 ### cold.storage.max.concurrent.uploads
 
-- **Default**: `32`
+- **Default**: `10`
 - **Reloadable**: no
 
-Cap on concurrent partition uploads across the whole instance.
+How many cold storage transfers run at once across the whole instance. Rehydrates, which download a sealed cold partition back after its `DROP LOCAL` was lengthened, may use up to half of it, at least one.
+
+The upload bandwidth must exceed this value multiplied by `cold.storage.object.store.upload.requests.min.throughput`, 256 KiB/s by default. Otherwise large uploads can repeatedly time out and stop cold offload from progressing; lower the concurrency on slower links.
 
 ### cold.storage.multipart.part.size
 
-- **Default**: `64 MiB`
+- **Default**: `67108864` (64 MiB)
 - **Reloadable**: no
 
-Multipart upload part size. Must be between 5 MiB and 5 GiB.
+Multipart upload part size, in bytes. Must be between 5 MiB and 5 GiB.
+
+### cold.storage.policy.cold.switch.lease.interval
+
+- **Default**: `1m`
+- **Reloadable**: no
+
+How long the storage policy waits for a step it started on a partition, such as a cold switch, to apply before it starts that step again. Set it above the time such a step normally takes; a step started twice applies once. Must be greater than `0` and at most 76 hours.
+
+### cold.storage.policy.max.partitions.in.flight.per.table
+
+- **Default**: `8`
+- **Reloadable**: no
+
+Per table, how many partitions upload at once, and separately how many rehydrate at once, so one table cannot take every transfer. `0` removes the cap.
+
+### cold.storage.policy.rehydrate.retry.interval
+
+- **Default**: `5m`
+- **Reloadable**: no
+
+How long a failed rehydrate waits before it is retried. `0` retries without waiting. Must be at most 76 hours.
 
 ### cold.storage.upload.settle.interval
 
@@ -115,6 +181,68 @@ Multipart upload part size. Must be between 5 MiB and 5 GiB.
 - **Reloadable**: no
 
 Debounce between re-uploads of a partition that a later out-of-order write re-dirtied. The initial upload is immediate; only re-uploads are debounced, which rate-limits a churning historical partition to one upload per window. `0` disables the debounce.
+
+## Late rows
+
+### cold.storage.delta.enabled
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Whether the cold partitions of WAL tables without deduplication keep [late rows](/docs/concepts/cold-storage-late-rows/) after `DROP LOCAL`, instead of being sealed. Read only with `cold.storage.enabled=true`. Set the same value on every instance. Turning it off stops new switches, but existing [Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions) stay, see [Before you enable late rows](/docs/concepts/cold-storage-late-rows/#before-you-enable-late-rows).
+
+## Maintenance
+
+These settings control the background work that merges late rows and moves them into new Parquet bases, see [Compaction](/docs/concepts/cold-storage-late-rows/#compaction). To compact on demand, use [`ALTER TABLE COMPACT`](/docs/query/sql/alter-table-compact/).
+
+### cold.storage.maintenance.base.delta.ratio
+
+- **Default**: `0.25`
+- **Reloadable**: no
+
+The manager writes a new base for a partition once its late rows reach this fraction of the size of its base, and at least `cold.storage.maintenance.base.min.delta.bytes`. Must be finite and `0` or greater.
+
+### cold.storage.maintenance.base.min.delta.bytes
+
+- **Default**: `128M`
+- **Reloadable**: no
+
+The least amount of late rows, in bytes as stored on local disk, for which the manager writes a new base in the background. Must be `0` or greater.
+
+### cold.storage.maintenance.retry.delay
+
+- **Default**: `30s`
+- **Reloadable**: no
+
+How long a refused or failed maintenance step waits before its retry. Must be greater than `0`.
+
+### cold.storage.maintenance.worker.count
+
+- **Default**: half the CPU cores, at least `1`
+- **Reloadable**: no
+
+Threads of the cold storage maintenance pool, which writes and installs new bases. Must be greater than `0`.
+
+### delta.maintenance.hint.delay
+
+- **Default**: `2s`
+- **Reloadable**: no
+
+How long maintenance waits after a write before it visits the table, so that several writes are handled together. Must be `0` or greater.
+
+### delta.maintenance.sweep.interval
+
+- **Default**: `5m`
+- **Reloadable**: no
+
+How often maintenance visits every table with late rows. It bounds how soon a partition that keeps late rows becomes remotely served after `DROP LOCAL`. Must be greater than `0`.
+
+### delta.maintenance.worker.count
+
+- **Default**: half the CPU cores, at least `1`
+- **Reloadable**: no
+
+Threads of the pool that merges runs of late rows on local disk. Must be greater than `0`.
 
 ## Read path
 
@@ -127,10 +255,10 @@ Largest byte gap that may be bridged when merging two chunk reads into one range
 
 ### cold.storage.read.coalesce.max.span
 
-- **Default**: `64 MiB`
+- **Default**: `67108864` (64 MiB)
 - **Reloadable**: no
 
-Upper bound on the span of a single coalesced range request. A lone chunk larger than this is never split. `0` disables coalescing, producing one request per chunk.
+Upper bound, in bytes, on the span of a single coalesced range request. A lone chunk larger than this is never split. `0` disables coalescing, producing one request per chunk.
 
 ### cold.storage.read.max.in.flight
 
@@ -139,7 +267,30 @@ Upper bound on the span of a single coalesced range request. A lone chunk larger
 
 Cap on concurrent cold read chunk downloads.
 
+### cold.storage.read.max.pending.batches
+
+- **Default**: `10000`
+- **Reloadable**: no
+
+Cap on the cold read batches waiting for downloads at once on this instance. When it is reached, a query that needs chunks not yet downloaded fails at once with `cold-storage backpressure exceeded: too many pending batches` rather than waiting.
+
 ## Object store requests
+
+A transfer times out once it runs longer than its base timeout plus the time its bytes take at its minimum throughput, so a large transfer gets more time.
+
+### cold.storage.object.store.download.requests.base.timeout
+
+- **Default**: `30000` (milliseconds)
+- **Reloadable**: no
+
+Base timeout of a download from the object store, cold reads and rehydrates included. Must be greater than `0`.
+
+### cold.storage.object.store.download.requests.min.throughput
+
+- **Default**: `262144` (bytes per second)
+- **Reloadable**: no
+
+Minimum average throughput a download must keep. `0` leaves only the base timeout.
 
 ### cold.storage.object.store.requests.per.second
 
@@ -161,3 +312,49 @@ Retries beyond the initial attempt on transient transport errors.
 - **Reloadable**: no
 
 Base interval between retries, jittered by plus or minus 20 percent.
+
+### cold.storage.object.store.upload.requests.base.timeout
+
+- **Default**: `30000` (milliseconds)
+- **Reloadable**: no
+
+Base timeout of an upload to the object store. Must be greater than `0`.
+
+### cold.storage.object.store.upload.requests.min.throughput
+
+- **Default**: `262144` (bytes per second)
+- **Reloadable**: no
+
+Minimum average throughput an upload must keep. `0` leaves only the base timeout. See [`cold.storage.max.concurrent.uploads`](#coldstoragemaxconcurrentuploads) for sizing it against the link.
+
+## Advanced late-row storage
+
+These settings tune how late rows are stored on local disk. The defaults suit most deployments.
+
+### delta.catalog.validation
+
+- **Default**: `none`
+- **Reloadable**: no
+
+Optional checks when QuestDB opens the local catalog of a partition's late rows: `none`, or `crc` to also verify checksums. Structural checks always run.
+
+### delta.index.sort.max.bytes
+
+- **Default**: `64M`
+- **Reloadable**: no
+
+Memory used to sort one index of late rows before the writer spills sorted parts to disk. Must be `8` or greater.
+
+### delta.placement.roots
+
+- **Default**: empty
+- **Reloadable**: no
+
+Local directories that hold the late-row files, as comma-separated `<class>=<absolute directory>` entries. QuestDB writes late rows in class `0`, so `0=/mnt/fast/delta` places new late-row files under `/mnt/fast/delta` instead of the partition directory. Empty keeps them in the partition directory. Each directory must exist; an invalid entry or a missing directory stops startup. Files never move once written, so keep a directory configured while it holds files.
+
+### delta.run.page.target.rows
+
+- **Default**: `65536`
+- **Reloadable**: no
+
+Target number of rows per independently decodable page in a run of late rows. Must be a multiple of `1024`, from `1024` to `2147482624`.

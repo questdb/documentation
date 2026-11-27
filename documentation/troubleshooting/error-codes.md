@@ -161,6 +161,54 @@ Changing the Data ID on a database with existing data will:
 
 See the [Backup and Restore guide](/docs/operations/backup/) for more information.
 
+### ER008
+
+```text
+ER008 - Bad replication source. Data ID mismatch. [remote=<data id>, local=<data id>]
+```
+
+Raised on a replica when the replication object store it downloads from belongs to another database: the Data ID recorded in the store differs from the replica's own.
+
+To resolve, check that the replica's `replication.object.store` points at the store of its primary. If the replica was built from another database's backup or snapshot, rebuild it from a backup of its primary, see [Create a replica from a backup](/docs/operations/backup/#create-a-replica-from-a-backup).
+
+### ER009
+
+```text
+ER009 - replication consistency error: the in-memory replication index sync id has run more than one step ahead of the persisted `_replication_sync_id.d` value, ...
+```
+
+Raised on a primary when its replication sync ID in memory is more than one step ahead of the copy in `_replication_sync_id.d`. Uploading the replication index could then corrupt the index in the object store, so the primary stops replicating instead.
+
+This is not a configuration error. Keep the logs, check the disk that holds the database for errors, and contact QuestDB support before restarting the instance.
+
+## Cold Storage Errors
+
+These errors protect a [cold storage](/docs/concepts/cold-storage/) root, which belongs to one database. For the setup, see [Operating cold storage](/docs/operations/cold-storage/).
+
+### ER010
+
+```text
+ER010 - Connected to a cold storage root that holds another database's data. The local and cold storage DataIDs do not match [local=<data id>, cold_storage=<data id>].
+```
+
+A cold storage root records the Data ID of its database, and an instance of another database refuses it. The instance starts, but its cold storage promotion, its cold reads and any restore of cold partitions onto that root fail, and it writes nothing to the root.
+
+Common causes are two databases with the same `cold.storage.object.store`, a [point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage) pointed at the source root, and a deleted or replaced `.data_id` file.
+
+To resolve, point `cold.storage.object.store` at this database's root, or at a new, empty root, see [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
+
+### ER011
+
+```text
+ER011 - The cold storage root holds data this instance does not have. Restore the database from a backup onto a new cold storage root [table=<table>, coldStorageSeqTxn=<txn>, localSeqTxn=<txn>]
+```
+
+Raised when a replica is promoted to primary while one of its tables is behind what the cold storage root has published. [`SWITCH STATUS`](/docs/query/sql/switch-role/) shows it in `last_refusal`, after `switch refused: promote refused:` and the error code URL.
+
+To resolve, wait until the table's `sequencerTxn` in [`wal_tables()`](/docs/query/functions/meta/#wal_tables) reaches the `coldStorageSeqTxn` in the message, then promote again. If the transactions are lost, restore the database from a backup onto a new root, see [Backup and restore](/docs/operations/cold-storage/#backup-and-restore).
+
+A table whose transaction numbers restarted on a release before QuestDB Enterprise ENTERPRISE_VERSION_TBD, through `REBASE WAL` or a `SET TYPE` round trip, can also block promotion: its `sequencerTxn` reaches `coldStorageSeqTxn` only as new transactions arrive.
+
 ## Operating system error codes
 
 Refer to the [OS error codes](/docs/troubleshooting/os-error-codes/) page for any

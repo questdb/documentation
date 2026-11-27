@@ -76,6 +76,8 @@ The backup process requires write access to the target storage. Authentication
 is optional—you can use instance credentials (IAM roles, managed identities) or
 provide explicit credentials in the connection string.
 
+On a database that uses [cold storage](/docs/concepts/cold-storage/), instances that take backups also need access to the cold storage root, see [Prepare the object store root](/docs/operations/cold-storage/#1-prepare-the-object-store-root).
+
 #### Network
 
 Network requirements depend on your chosen storage backend. Ensure QuestDB can
@@ -424,13 +426,15 @@ primary/replica backups below).
 
 A backup of a database using [cold storage](/docs/concepts/cold-storage/) is **not** a complete copy of the data. The backup contains the local transaction state, Parquet metadata, and symbol indexes needed to reopen a cold partition, but not the `data.parquet` bytes, which live only in the object store.
 
-Protect the database backup and the cold storage prefix as one recovery set. If a cold object is lost after `DROP LOCAL` evicted the local copy, QuestDB has no local source from which to regenerate it, and no backup will contain it.
+If a cold object is lost after `DROP LOCAL` evicted the local copy, QuestDB has no local source from which to regenerate it, and no backup will contain it. Never delete or rewrite objects in the cold storage root yourself.
 
 :::
 
-A restore onto a different host, or onto a different object store backend, can change an object's version even when its bytes are unchanged. The first read of an affected partition fails, QuestDB re-checks the object in the background, and the retry succeeds. An object that is genuinely different is refused rather than silently accepted.
+Instead of copying the objects, a backup **pins** the bases it needs in the cold storage root, so garbage collection keeps them while the backup exists, even after their partition or table is dropped. A backup that cannot pin a base fails, and backups taken before the upgrade to QuestDB Enterprise ENTERPRISE_VERSION_TBD pin nothing. The backup format is 1.5.
 
-See [Operating cold storage](/docs/operations/cold-storage/#backup-and-restore) for the restore paths worth testing.
+A restore onto another host or backend can change an object's version even when its bytes are unchanged. The first read of an affected partition fails, QuestDB re-checks the object in the background, and the retry succeeds.
+
+Which root to restore onto, and the restore paths worth testing, are under [Backup and restore](/docs/operations/cold-storage/#backup-and-restore) in Operating cold storage.
 
 ### Limitations
 
@@ -439,8 +443,8 @@ See [Operating cold storage](/docs/operations/cold-storage/#backup-and-restore) 
   all user tables, materialized views, live views, and metadata.
 - **Cold storage data is not included**: partitions served from object storage
   contribute their metadata and symbol indexes to the backup, but not their
-  `data.parquet` bytes. See
-  [Cold storage partitions](#cold-storage-partitions).
+  `data.parquet` bytes. The backup pins those objects in the cold storage root
+  instead. See [Cold storage partitions](#cold-storage-partitions).
 - **One backup at a time**: Only one backup can run at any given time. Starting
   a new backup while one is running will return an error.
 - **Primary and replica backups are separate**: Each QuestDB instance has its
@@ -560,9 +564,11 @@ empty replication object store, or none at all.
 A restored backup does not bring cold data back on its own. The backup
 carries the local metadata for
 [cold storage partitions](#cold-storage-partitions), but not their
-`data.parquet` bytes, which exist only in the object store. Dropping a table
-or partition also hands its remote objects to garbage collection after a
-grace period measured in minutes, so **the grace period, not your backup
+`data.parquet` bytes, which exist only in the object store. A backup taken
+on QuestDB Enterprise ENTERPRISE_VERSION_TBD or later keeps them in the object
+store while the backup exists. For older backups, dropping a table or
+partition hands its remote objects to garbage collection after a grace period
+measured in minutes, so **for those backups the grace period, not your backup
 retention, is the deadline for recovering cold data after a drop**. See
 [cold storage in point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage)
 for the grace periods and how to halt reclamation.
@@ -785,6 +791,17 @@ some suggestions:
   Azure etc
 - On-prem backup tools and software you typically use
 - Basic command line tools, such as `cp` or `rsync`
+
+:::note
+
+On QuestDB Enterprise with [cold storage](/docs/concepts/cold-storage/), a
+checkpoint snapshot does not pin the cold objects it refers to. After restoring
+it, cold partitions whose objects were dropped or replaced since the snapshot,
+and reclaimed after their grace period, cannot be read. Use
+[`BACKUP DATABASE`](#questdb-enterprise-built-in-backup-and-restore) for tables
+with cold partitions.
+
+:::
 
 ### Data backup checklist
 

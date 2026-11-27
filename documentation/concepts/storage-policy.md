@@ -52,7 +52,7 @@ stage in the partition lifecycle:
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TO PARQUET`  | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file            |
 | `TO REMOTE`   | Upload a compact Parquet snapshot of the partition to object storage. The local partition remains writable and is still the serving copy       |
-| `DROP LOCAL`  | Seal the partition as read-only and remove its local data. With `TO REMOTE` set, reads switch to the remote copy; without it, the data is gone |
+| `DROP LOCAL`  | Remove the partition's local data. With `TO REMOTE` set, the partition moves to cold storage and reads switch to the remote copy; without it, the local data is gone. A partition only cold storage holds is never removed |
 | `DROP REMOTE` | Remove the partition from the table and reclaim its remote objects after a grace period                                                        |
 
 All settings are optional. Use only the ones relevant to your use case. All TTL
@@ -67,7 +67,7 @@ policy:
              TO PARQUET        TO REMOTE         DROP LOCAL       DROP REMOTE
    Native ───────┬───────────────────┬───────────────┬─────────────────┬──────
                  ▼                   ▼               ▼                 ▼
-          Local Parquet      Uploaded, still    Sealed, served    Removed and
+          Local Parquet      Uploaded, still    Cold, served      Removed and
                              served locally     from the store    reclaimed
 ```
 
@@ -81,10 +81,12 @@ ever being uploaded.
 deleted and nothing queryable is left behind. Include `TO REMOTE` whenever the
 partition must stay online after local eviction.
 
-`DROP LOCAL` is also the point at which a partition becomes read-only. Writes
-that arrive for it afterwards are skipped, so set it beyond the longest
-late-arrival, replay, and correction window for the table. See
-[Cold storage](/docs/concepts/cold-storage/#immutability-after-drop-local).
+With `TO REMOTE`, `DROP LOCAL` also seals the partition: rows that arrive for
+it afterwards are dropped, or suspend a table with deduplication. Unless a
+table without deduplication keeps
+[late rows](/docs/concepts/cold-storage-late-rows/), set `DROP LOCAL` beyond
+the longest late-arrival, replay, and correction window for the table. See
+[What happens to late rows](/docs/concepts/cold-storage/#what-happens-to-late-rows).
 
 :::
 
@@ -293,7 +295,10 @@ node's storage policy [check interval](#configuration) last fired. The state
 converges as each instance processes its own queue.
 
 The remote stages behave differently: one designated instance does the uploading,
-and partition bytes never travel through the replication stream. See
+and partition bytes never travel through the replication stream. The primary
+writes the `DROP LOCAL` event that seals a partition, or switches it to keep
+[late rows](/docs/concepts/cold-storage-late-rows/), to the table's WAL, and
+every instance applies it at the same point. See
 [Cold storage roles](/docs/concepts/cold-storage/#roles) for how that is divided,
 and
 [Replication overview](/docs/high-availability/overview/#storage-policies-in-a-replicated-cluster)
@@ -309,7 +314,6 @@ values:
 | ------------------------------------- | ------------------ | ---------------------------------------------------------------- |
 | `storage.policy.check.interval`       | `5m` (5 min)       | How often QuestDB scans for partitions to process                |
 | `storage.policy.retry.interval`       | `1m` (1 min)       | Retry interval for failed tasks                                  |
-| `storage.policy.max.reschedule.count` | `20`               | Maximum retries before abandoning a task                         |
 | `storage.policy.worker.count`         | `4`                | Number of storage policy worker threads (0 disables the feature) |
 | `storage.policy.worker.affinity`      | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list)       |
 | `storage.policy.worker.sleep.timeout` | `100ms`            | Sleep duration when worker has no tasks                          |
@@ -408,7 +412,10 @@ ALTER TABLE trades DROP STORAGE POLICY;
 - Start with `TO PARQUET` to reduce local disk usage while keeping data
   queryable in Parquet format
 - Use `DROP LOCAL` with care. Without `TO REMOTE` it permanently removes the
-  data; with `TO REMOTE` it makes the partition read-only for good
+  local data; with `TO REMOTE` it seals the partition as read-only, unless
+  [late rows](/docs/concepts/cold-storage-late-rows/) are enabled and the
+  table has no deduplication, and
+  removing the policy does not unseal it
 - Add `DROP REMOTE` only once remote retention is a deliberate decision: it is
   the only stage that physically deletes data with no local copy left
 - TTL values should be significantly larger than the partition interval

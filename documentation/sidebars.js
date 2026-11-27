@@ -350,6 +350,7 @@ module.exports = {
                     },
                     // Ordered by the label the sidebar renders, not the doc id
                     "query/sql/alter-table-change-column-type", // COLUMN TYPE
+                    "query/sql/alter-table-compact", // COMPACT
                     "query/sql/alter-table-disable-deduplication", // DEDUP DISABLE
                     "query/sql/alter-table-enable-deduplication", // DEDUP ENABLE
                     "query/sql/alter-table-drop-column", // DROP COLUMN
@@ -703,9 +704,11 @@ module.exports = {
             "concepts/expire-rows",
             "concepts/storage-policy",
             {
-              id: "concepts/cold-storage",
-              type: "doc",
+              type: "category",
               label: "Cold Storage",
+              collapsed: false,
+              // Labels come from each page's sidebar_label: Overview, Late rows
+              items: ["concepts/cold-storage", "concepts/cold-storage-late-rows"],
             },
             {
               id: "concepts/resource-groups",

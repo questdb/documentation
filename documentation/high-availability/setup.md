@@ -39,7 +39,7 @@ Create an S3 bucket following
 - Disable blob versioning. QuestDB continuously writes and deletes
   replication objects, so versioning only accumulates noncurrent versions you
   pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
-  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-prefix)
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-root)
   are different: enable versioning there, in a separate bucket
 
 **Connection string:**
@@ -98,7 +98,7 @@ then create a Blob Container.
 - Disable blob versioning. QuestDB continuously writes and deletes
   replication objects, so versioning only accumulates noncurrent versions you
   pay to store. [Backups](/docs/operations/backup/#object-store-versioning) and
-  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-prefix)
+  [cold storage](/docs/operations/cold-storage/#1-prepare-the-object-store-root)
   are different: enable versioning there, in a separate storage account,
   because Azure enables versioning for a whole account
 
@@ -128,6 +128,8 @@ equivalent) permissions. Download the JSON key and encode it as Base64:
 ```bash
 cat <key>.json | base64
 ```
+
+Each write of the replication index, `index.msgpack`, is a resumable upload, two requests per write.
 
 **Connection string:**
 

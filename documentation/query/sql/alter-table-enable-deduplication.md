@@ -35,6 +35,8 @@ ALTER TABLE tableName DEDUP ENABLE { UPSERT | SKIP }
   enabled can still contain duplicate data.
 - Enabling deduplication does not have any effect on modifying data with
   `UPDATE` statements.
+- In QuestDB Enterprise, a table that holds partitions with [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) refuses `DEDUP ENABLE` with `cannot enable deduplication, table has delta-active partitions`, until those partitions are dropped.
+- On a table with deduplication, a transaction with rows for a read-only partition suspends the table. See [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
 
 :::
 

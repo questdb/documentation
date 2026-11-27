@@ -574,7 +574,10 @@ for a compact projection of the new columns.
 
 `isRemotelyServed` is `true` when the partition's data lives in object storage
 and is fetched with range reads. See
-[cold storage](/docs/concepts/cold-storage/) (Enterprise).
+[cold storage](/docs/concepts/cold-storage/) (Enterprise). A remotely served
+partition reports `readOnly` as `true` once a storage policy sealed it, and as
+`false` when it keeps
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/).
 
 :::note
 

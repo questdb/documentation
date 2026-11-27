@@ -64,6 +64,7 @@ in the background: poll `SWITCH STATUS`, or
 | `current_role`     | _STRING_    | `PRIMARY`, `REPLICA`, or `UNKNOWN`                                                             |
 | `switch_in_flight` | _BOOLEAN_   | `true` while a switch is running. `current_role` keeps the previous role until it completes    |
 | `captured_at`      | _TIMESTAMP_ | When the status was read                                                                       |
+| `last_refusal`     | _STRING_    | Why the last switch was refused, such as an `ER011` promotion refusal. `NULL` when the last switch was not refused; a new switch clears it |
 
 `UNKNOWN` means a switch was aborted part-way and the instance holds neither
 role: it is read-only and is not replicating. Retry the switch to heal it, see
@@ -133,6 +134,11 @@ session that submitted it. The outcome is visible through `SWITCH STATUS`,
 `GET /lifecycle`, and the server log. See
 [Refusals and the torn state](/docs/high-availability/failover/#refusals-and-the-torn-state).
 
+With [cold storage](/docs/concepts/cold-storage/), a promotion is refused with
+[`ER011`](/docs/troubleshooting/error-codes/#er011) while one of the replica's
+tables is behind what the cold storage root has published. `SWITCH STATUS`
+shows the refusal in `last_refusal`.
+
 With [resource groups](/docs/concepts/resource-groups/) enabled, a promotion is
 also refused when the node has not yet received the resource group catalog. The
 server log names `RESOURCE_GROUP_CATALOG_UNAVAILABLE` with the reason. See
@@ -154,9 +160,9 @@ SWITCH ROLE TO REPLICA TIMEOUT 60000;
 SWITCH STATUS;
 ```
 
-| current_role | switch_in_flight | captured_at                 |
-| ------------ | ---------------- | --------------------------- |
-| REPLICA      | false            | 2026-08-28T10:15:02.114233Z |
+| current_role | switch_in_flight | captured_at                 | last_refusal |
+| ------------ | ---------------- | --------------------------- | ------------ |
+| REPLICA      | false            | 2026-08-28T10:15:02.114233Z | null         |
 
 ```questdb-sql title="3. Promote the replica, on the other instance"
 SWITCH ROLE TO PRIMARY;
@@ -166,9 +172,9 @@ SWITCH ROLE TO PRIMARY;
 SWITCH STATUS;
 ```
 
-| current_role | switch_in_flight | captured_at                 |
-| ------------ | ---------------- | --------------------------- |
-| PRIMARY      | false            | 2026-08-28T10:15:09.771902Z |
+| current_role | switch_in_flight | captured_at                 | last_refusal |
+| ------------ | ---------------- | --------------------------- | ------------ |
+| PRIMARY      | false            | 2026-08-28T10:15:09.771902Z | null         |
 
 Read the role from any session, without the `SWITCH ROLE` permission:
 

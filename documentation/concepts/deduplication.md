@@ -58,9 +58,9 @@ INSERT INTO prices VALUES ('2026-01-15T10:00:00', 'AAPL', 186.00);  -- replaces 
 SELECT * FROM prices;
 ```
 
-| ts | ticker | price |
-|----|--------|-------|
-| 2026-01-15T10:00:00 | AAPL | 186.00 |
+| ts                  | ticker | price  |
+| ------------------- | ------ | ------ |
+| 2026-01-15T10:00:00 | AAPL   | 186.00 |
 
 Only the last value is kept. With `DEDUP SKIP KEYS(ts, ticker)`, the second
 insert is discarded and the price stays at `185.50`.
@@ -72,12 +72,12 @@ The two modes share the key rules and differ in which row survives when a new
 row matches a stored row, or an earlier row of the same commit, on every key
 column:
 
-| | `UPSERT` | `SKIP` |
-|---|---|---|
-| A new row matches a stored row | Replaces the stored row | Is discarded |
-| Duplicates within one commit | The last row is kept | The first row is kept |
-| Rule | Latest write wins | First write wins |
-| PostgreSQL equivalent | `INSERT ... ON CONFLICT DO UPDATE` | `INSERT ... ON CONFLICT DO NOTHING` |
+|                                | `UPSERT`                           | `SKIP`                              |
+| ------------------------------ | ---------------------------------- | ----------------------------------- |
+| A new row matches a stored row | Replaces the stored row            | Is discarded                        |
+| Duplicates within one commit   | The last row is kept               | The first row is kept               |
+| Rule                           | Latest write wins                  | First write wins                    |
+| PostgreSQL equivalent          | `INSERT ... ON CONFLICT DO UPDATE` | `INSERT ... ON CONFLICT DO NOTHING` |
 
 Write order is the order in which transactions commit to the table, then the
 row order within a transaction. When several connections write the same key,
@@ -108,8 +108,8 @@ INSERT INTO quotes VALUES
 SELECT * FROM quotes;
 ```
 
-| timestamp | symbol | bid | ask | received_at |
-|-----------|--------|-----|-----|-------------|
+| timestamp           | symbol | bid    | ask    | received_at         |
+| ------------------- | ------ | ------ | ------ | ------------------- |
 | 2026-01-15T10:00:00 | EURUSD | 1.0841 | 1.0843 | 2026-01-15T10:00:01 |
 
 With `DEDUP UPSERT KEYS(timestamp, symbol)`, `received_at` would read
@@ -242,6 +242,38 @@ SELECT table_name, wal_dedup_row_count_since_start
 FROM tables()
 WHERE table_name = 'prices';
 ```
+
+## Rows for read-only partitions
+
+A partition is read-only when it accepts no writes, such as one that a storage
+policy's `DROP LOCAL` stage sealed for
+[cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows) in
+QuestDB Enterprise.
+Deduplication could have to replace a stored row in such a partition, so on a
+WAL table with deduplication, a transaction with rows for a read-only partition
+fails with `cannot insert into read-only partition` and the table is
+suspended. Tables without deduplication drop such rows, log
+`o3 ignoring write on read-only partition`, and apply the rest of the
+transaction, as releases before QuestDB QUESTDB_VERSION_TBD and QuestDB
+Enterprise ENTERPRISE_VERSION_TBD did for every table. QuestDB Enterprise never
+keeps [late rows in cold storage](/docs/concepts/cold-storage-late-rows/) for a
+table with deduplication.
+
+To get the table going again:
+
+1. Skip the failed transaction, the one after `writerTxn` in
+   [`wal_tables()`](/docs/query/functions/meta/#wal_tables), whose
+   `errorMessage` shows the error. Resuming from it fails again while the
+   partition stays read-only. With `writerTxn` at 1233:
+
+   ```questdb-sql title="Skip the failed transaction 1234"
+   ALTER TABLE trades RESUME WAL FROM TRANSACTION 1235;
+   ```
+
+2. Re-send the skipped transaction's rows for writable partitions from their
+   source.
+3. Resume the replicas that suspended on the same transaction the same way.
+   For a partition sealed by cold storage, that is every replica.
 
 ## Requirements
 

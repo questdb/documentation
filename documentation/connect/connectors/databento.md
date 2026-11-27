@@ -347,9 +347,11 @@ ALTER TABLE equs_orderbook SET STORAGE POLICY(
   Without `TO REMOTE`, it deletes the partition.
 - `DROP REMOTE`, commented out here, deletes the partition from object storage.
 
-`DROP LOCAL` also seals the partition as read-only, and later writes to it are
-skipped. Keep it beyond the range of any
-[Historical backfill](#historical-backfills) into the same table.
+`DROP LOCAL` also seals the partition as read-only: later rows for it are
+dropped, or suspend a table with deduplication. Keep it beyond the range of any
+[Historical backfill](#historical-backfills) into the same table, or, for a
+table without deduplication, enable
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/).
 
 ## Materialized views and live views
 

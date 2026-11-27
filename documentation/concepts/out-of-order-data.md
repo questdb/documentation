@@ -235,6 +235,13 @@ Out-of-order writes targeting a partition that has been converted to Parquet
 are governed by storage-tier rules rather than the standard merge path. See
 [Storage policy](/docs/concepts/storage-policy/) for the full behavior.
 
+In QuestDB Enterprise, a partition that a storage policy moved to
+[cold storage](/docs/concepts/cold-storage/) is sealed as read-only, and later
+rows for it are dropped, unless
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) are enabled.
+On a table with deduplication, such rows suspend the table instead, see
+[Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
+
 ## See also
 
 - [Designated timestamp](/docs/concepts/designated-timestamp/)
@@ -242,3 +249,4 @@ are governed by storage-tier rules rather than the standard merge path. See
 - [Deduplication](/docs/concepts/deduplication/)
 - [Write-ahead log](/docs/concepts/write-ahead-log/)
 - [Write amplification](/docs/getting-started/capacity-planning/#write-amplification)
+- [Late rows in cold storage](/docs/concepts/cold-storage-late-rows/)

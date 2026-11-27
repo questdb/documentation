@@ -93,7 +93,10 @@ QuestDB compresses data by converting partitions to
 compression by default and keeps partitions fully queryable. In QuestDB
 Enterprise, a [storage policy](/docs/concepts/storage-policy/) converts
 partitions automatically as they age, and can also tier them to
-[cold storage](/docs/concepts/cold-storage/) in object storage. In QuestDB open
+[cold storage](/docs/concepts/cold-storage/) in object storage. With
+[late rows in cold storage](/docs/concepts/cold-storage-late-rows/) enabled,
+rows that arrive for a cold partition use local disk until background
+maintenance moves them to the object store. In QuestDB open
 source, convert partitions manually with
 [`ALTER TABLE CONVERT PARTITION`](/docs/concepts/parquet/#converting-to-parquet).
 

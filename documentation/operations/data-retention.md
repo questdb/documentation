@@ -32,7 +32,12 @@ QuestDB offers five approaches for data retention:
   storage policy to move historical partitions to object storage as Parquet
   instead of deleting them. They stay queryable with normal SQL while leaving
   local disk. Use this when retention is driven by cost or compliance rather
-  than by the data no longer being useful. See
+  than by the data no longer being useful. With the opt-in
+  [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), cold
+  partitions of tables without deduplication keep accepting rows that arrive
+  late.
+  `DROP LOCAL` without `TO REMOTE` never removes a partition that only cold
+  storage holds; `DROP REMOTE` or `DROP PARTITION` does. See
   [cold storage](/docs/concepts/cold-storage/).
 - **Manual**: Use `DROP PARTITION` commands as described on this page for
   explicit control over which partitions to remove and when.

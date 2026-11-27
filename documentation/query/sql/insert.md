@@ -41,9 +41,13 @@ SELECT ... FROM subQueryName;
 
 :::note
 
-Rows that target a read-only partition are not inserted. In QuestDB Enterprise,
-rows targeting a [sealed cold-storage partition](/docs/concepts/cold-storage/#immutability-after-drop-local)
-are skipped at WAL apply time.
+Rows that target a read-only partition are not inserted, and the server logs a
+critical-level message. On a WAL table with deduplication, the transaction
+fails instead and the table is suspended, see
+[Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
+In QuestDB Enterprise, this includes the partitions that
+[cold storage](/docs/concepts/cold-storage/#what-happens-to-late-rows) sealed,
+unless [late rows](/docs/concepts/cold-storage-late-rows/) are enabled.
 
 :::
 

@@ -130,6 +130,10 @@ result in `NULL` values for inconvertible string values.
 When column type change results into range overflow or precision loss, the same
 rules as explicit [CAST](/docs/query/sql/cast/) apply.
 
+## Read-only and cold storage partitions
+
+A column type change rewrites column data, so it is refused on a table with a read-only partition, with `cannot change column type, table has read-only partitions`. In QuestDB Enterprise it is also refused on a table with partitions in [cold storage](/docs/concepts/cold-storage/), with `cannot change column type, table has partitions in cold storage`, and on a table with partitions that keep [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), with `cannot change column type, table has delta-active partitions`. See [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables). To change the type, add a column of the new type and copy the values into it.
+
 ## Parquet partitions
 
 `ALTER TABLE ... ALTER COLUMN ... TYPE` works on tables that contain

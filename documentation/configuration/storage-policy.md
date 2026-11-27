@@ -29,6 +29,39 @@ How often QuestDB scans for partitions to process. This is a backstop full
 sweep: lifecycle transitions such as an applied partition seal or a manifest
 flush also trigger a recheck, so convergence is not bound to this interval.
 
+## storage.policy.drop.local.override
+
+- **Default**: none
+- **Reloadable**: no
+
+Keeps this instance's local copies of partitions longer than the table's
+`DROP LOCAL` stage, as `<tableDirName>=<interval>` entries separated by `;`.
+`*` sets the interval for every table, and a table's own entry wins. The
+interval takes the same values as `DROP LOCAL`, such as `90 DAYS` or `3M`, and
+must be positive; an invalid entry stops startup.
+
+```ini
+storage.policy.drop.local.override=trades~5=90 DAYS;*=45 DAYS
+```
+
+`DROP LOCAL` then removes a partition on this instance only once both the
+table's `DROP LOCAL` and the override have passed. The other instances drop
+their copies on schedule. Lengthening the override brings sealed cold partitions
+back to local disk, but not
+[Delta partitions](/docs/concepts/cold-storage-late-rows/#delta-partitions).
+On the primary, a partition the override still keeps also holds back
+`DROP REMOTE` for the whole cluster.
+
+The table directory name is the `directoryName` column of
+[`tables()`](/docs/query/functions/meta/#tables), such as `trades~5`.
+
+## storage.policy.max.reschedule.count
+
+This setting is obsolete and has no effect. With
+[`config.validation.strict=true`](/docs/configuration/overview/#config-validation),
+it stops startup; otherwise startup logs it as obsolete. Remove it from
+`server.conf`.
+
 ## storage.policy.recheck.drain.interval
 
 - **Default**: `1s`
@@ -37,13 +70,6 @@ flush also trigger a recheck, so convergence is not bound to this interval.
 How often coalesced recheck requests are drained, off the worker hot loop.
 Requests coalesce per table, so a burst affecting one table costs a single
 recheck. This paces convergence latency rather than `storage.policy.check.interval`.
-
-## storage.policy.max.reschedule.count
-
-- **Default**: `20`
-- **Reloadable**: no
-
-Maximum number of retries before abandoning a storage policy task.
 
 ## storage.policy.retry.interval
 

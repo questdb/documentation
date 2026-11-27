@@ -21,9 +21,14 @@ SET columnName = expression [, columnName = expression ...]
   as it would be ambiguous
 - the designated timestamp column cannot be updated as it would lead to altering
   history of the [time-series data](/blog/what-is-time-series-data/)
-- In QuestDB Enterprise, a WAL `UPDATE` that touches a
-  [sealed cold-storage partition](/docs/concepts/cold-storage/#immutability-after-drop-local)
-  is skipped in full, even if it also matches rows in writable partitions.
+- A WAL table refuses `UPDATE` while any of its partitions is in
+  [Parquet format](/docs/concepts/parquet/), with
+  `cannot update table with parquet partitions [...]`. In QuestDB Enterprise,
+  this includes every partition in [cold storage](/docs/concepts/cold-storage/),
+  and a table with [late rows](/docs/concepts/cold-storage-late-rows/) refuses
+  `UPDATE` with `cannot update table with delta partitions [...]`. A WAL
+  `UPDATE` that still reaches such a partition when it is applied suspends the
+  table.
 - On a WAL table, `UPDATE` is applied by the WAL apply job and counts against
   [`cairo.wal.apply.memory.limit.bytes`](/docs/configuration/cairo-engine/#cairowalapplymemorylimitbytes)
   rather than the query memory limit. This holds for every form of `UPDATE` a
