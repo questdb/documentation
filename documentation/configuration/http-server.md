@@ -79,6 +79,17 @@ is the setting that governs it instead. QuestDB Enterprise
 [resource groups](/docs/concepts/resource-groups/) require Fiber mode on
 whichever pool actually serves HTTP.
 
+### http.worker.groups
+
+- **Default**: `1`
+- **Reloadable**: no
+
+Linux only. The number of worker groups the private HTTP worker pool splits
+into when `http.worker.count` is above `0`, each group with its own IO
+dispatcher. QWP over WebSocket, the REST API and the web console run on this
+pool too. See
+[Network worker groups](/docs/configuration/shared-workers/#network-worker-groups).
+
 ### http.worker.haltOnError
 
 - **Default**: `false`
@@ -196,7 +207,10 @@ Windows-specific flag to overcome OS limitations on TCP backlog size.
 - **Reloadable**: no
 
 Maximum number of simultaneous TCP connections to the HTTP server. Controls
-server memory consumption.
+server memory consumption. On a pool split into worker groups, each group
+applies this limit, so the server can hold up to the limit times the group
+count. See
+[Connections on a split pool](/docs/configuration/shared-workers/#connections-on-a-split-pool).
 
 ### http.net.connection.queue.timeout
 

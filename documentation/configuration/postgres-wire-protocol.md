@@ -47,6 +47,16 @@ governs it instead. QuestDB Enterprise
 [resource groups](/docs/concepts/resource-groups/) require Fiber mode on
 whichever pool actually serves PostgreSQL.
 
+### pg.worker.groups
+
+- **Default**: `1`
+- **Reloadable**: no
+
+Linux only. The number of worker groups the dedicated PostgreSQL worker pool
+splits into when `pg.worker.count` is above `0`, each group with its own IO
+dispatcher. See
+[Network worker groups](/docs/configuration/shared-workers/#network-worker-groups).
+
 ### pg.daemon.pool
 
 - **Default**: `true`
@@ -129,7 +139,9 @@ Windows-specific flag to overcome OS limitations on TCP backlog size.
 - **Reloadable**: yes
 
 Maximum number of simultaneous Postgres connections. Controls server memory
-consumption.
+consumption. On a pool split into worker groups, each group applies this limit,
+so the server can hold up to the limit times the group count. See
+[Connections on a split pool](/docs/configuration/shared-workers/#connections-on-a-split-pool).
 
 ### pg.net.connection.queue.timeout
 

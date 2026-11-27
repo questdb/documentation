@@ -170,6 +170,14 @@ Shares are between groups, not between queries. Within a group, work is served
 in arrival order, and a parallel query can hold several places in that order, so
 there is no promise of equal CPU between individual queries.
 
+On a network pool split into
+[worker groups](/docs/configuration/shared-workers/#network-worker-groups), the
+part of a query that runs on the network pool runs only on the workers of the
+worker group that accepted its connection, and competes only with the queries in
+that worker group. Weights then balance network pool CPU within each worker
+group, not across the pool. Parallel tasks on the shared query pool still
+compete across the whole query pool.
+
 ### Memory limits use batched accounting
 
 ```questdb-sql title="Everything this group runs at once must fit in 8 GiB"
