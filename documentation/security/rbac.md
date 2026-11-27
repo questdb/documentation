@@ -1197,7 +1197,7 @@ SELECT * FROM all_permissions();
 ```
 
 <details>
-<summary>Full permissions table (click to expand)</summary>
+<summary>Permissions table (click to expand)</summary>
 
 ### Database permissions
 
@@ -1209,7 +1209,6 @@ SELECT * FROM all_permissions();
 | ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
 | ALTER SYMBOL CAPACITY     | Database &#124; Table &#124; Column | Change symbol column capacity           |
 | ALTER VIEW                | Database &#124; Table               | Change view definitions                 |
-| ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
 | AUDIT VIEW                | Database                            | Create, alter and drop [audited views](/docs/security/audited-views/#permissions) |
 | BACKUP DATABASE           | Database                            | Create database backups                 |
 | BACKUP TABLE              | Database &#124; Table               | Grantable, but no statement requires it |
@@ -1223,7 +1222,6 @@ SELECT * FROM all_permissions();
 | CREATE LIVE VIEW          | Database                            | Create live views                       |
 | DEDUP ENABLE              | Database &#124; Table               | Enable deduplication, or change its keys or its `UPSERT` or `SKIP` mode |
 | DEDUP DISABLE             | Database &#124; Table               | Disable deduplication                   |
-| DETACH PARTITION          | Database &#124; Table               | Detach partitions                       |
 | DISABLE STORAGE POLICY    | Database &#124; Table               | Disable storage policies                |
 | DROP COLUMN               | Database &#124; Table &#124; Column | Drop columns                            |
 | DROP INDEX                | Database &#124; Table &#124; Column | Drop indexes                            |

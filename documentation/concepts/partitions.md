@@ -20,7 +20,7 @@ Partitioning provides significant benefits for time-series workloads:
   one partition, not the entire table.
 - **Data lifecycle**: Drop old data instantly with
   [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) - no expensive
-  DELETE operations. Detach partitions to archive storage, reattach when needed.
+  DELETE operations.
 - **Write efficiency**: Out-of-order data only rewrites affected partitions, not
   the entire table. Smaller partitions mean less write amplification.
 - **Concurrent access**: Different partitions can be written and read
@@ -206,15 +206,12 @@ To manually squash all splits:
 ALTER TABLE trades SQUASH PARTITIONS;
 ```
 
-Partition operations (`ATTACH`, `DETACH`, `DROP`) treat all splits of a
-partition as a single unit.
+`DROP PARTITION` removes all splits of the named partition.
 
 ## See also
 
 - [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for partitioning
 - [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) — Remove old partitions
-- [DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/) — Move to archive storage
-- [ATTACH PARTITION](/docs/query/sql/alter-table-attach-partition/) — Restore detached data
 - [TTL](/docs/concepts/ttl/) — Automatic partition cleanup by age
 - [Storage Policy](/docs/concepts/storage-policy/) — Graduated partition lifecycle (convert to Parquet, upload, then drop) in QuestDB Enterprise
 - [Cold storage](/docs/concepts/cold-storage/) — Keep historical partitions queryable from object storage in QuestDB Enterprise

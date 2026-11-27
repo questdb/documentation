@@ -132,7 +132,7 @@ Check before upgrading:
 - **One root per database.** An instance of another database refuses the root with [`ER010`](/docs/troubleshooting/error-codes/#er010). A replica behind the root cannot be promoted, with [`ER011`](/docs/troubleshooting/error-codes/#er011), and neither can one with a table that went through `REBASE WAL` or a `SET TYPE` round trip on an earlier release, until the table's `sequencerTxn` reaches the `coldStorageSeqTxn` that the `ER011` message names. That can take as many transactions as the table had before its transaction numbers restarted.
 - **Point-in-time recovery** needs a new root and a backup taken after the upgrade, see [Point-in-time recovery](/docs/operations/point-in-time-recovery/#cold-storage).
 - **`DROP LOCAL`** no longer removes a partition that only cold storage holds. While cold storage is disabled, a query that reads one fails instead of skipping it.
-- **New refusals** on cold storage tables, such as `ATTACH PARTITION`, `DETACH PARTITION`, `REBASE WAL` and `SET TYPE`, see [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables). `DETACH PARTITION` and `CONVERT PARTITION TO NATIVE` also refuse read-only partitions on every table.
+- **New refusals** on cold storage tables, such as `REBASE WAL` and `SET TYPE`, see [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables). `CONVERT PARTITION TO NATIVE` also refuses read-only partitions on every table.
 - **From 4.0.x**, no extra step: this release reads the 4.0.x manager lock.
 
 Upgrade the instance that runs the cold storage manager **last**. With a primary P and its replicas, which share one root, this also follows [Replication: upgrade order](#replication-upgrade-order):
@@ -152,7 +152,7 @@ This release adds [late rows in cold storage](/docs/concepts/cold-storage-late-r
 
 #### Deduplicated tables
 
-A transaction with rows for a read-only partition, such as one attached from a soft link or sealed by cold storage, now suspends a WAL table with deduplication, instead of dropping those rows. See [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
+A transaction with rows for a read-only partition, such as one sealed by cold storage, now suspends a WAL table with deduplication, instead of dropping those rows. See [Rows for read-only partitions](/docs/concepts/deduplication/#rows-for-read-only-partitions).
 
 #### Strict configuration validation
 
@@ -205,7 +205,7 @@ refused them, whatever it holds, with
 `only the built-in admin can manage the retention, partitions and parameters of the view audit table`:
 
 - `TRUNCATE TABLE`
-- `ALTER TABLE DROP PARTITION`, `SQUASH PARTITIONS`, and `DETACH PARTITION`
+- `ALTER TABLE DROP PARTITION` and `SQUASH PARTITIONS`
 - `ALTER TABLE SET TTL` and `SET PARAM`
 - `ALTER TABLE SET STORAGE POLICY`, with any policy, and
   `ENABLE STORAGE POLICY`
@@ -219,8 +219,8 @@ with a storage policy:
 ```questdb-sql title="On 4.1.0: who can remove rows from the trail"
 SELECT entity_name, entity_type, permission, table_name
 FROM active_permissions()
-WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'DETACH PARTITION',
-    'SET TABLE PARAM', 'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
+WHERE permission IN ('TRUNCATE TABLE', 'DROP PARTITION', 'SET TABLE PARAM',
+    'SET STORAGE POLICY', 'ENABLE STORAGE POLICY')
   AND (table_name IS NULL OR table_name = 'sys.view_audit');
 ```
 

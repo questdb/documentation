@@ -68,7 +68,6 @@ Setting `cold.storage.delta.enabled=false` stops new switches. Existing Delta pa
 
 When you enable late rows, the next storage policy pass switches the partitions already sealed, except:
 
-- soft-linked partitions,
 - the table's last partition, until a newer partition exists,
 - a cold partition with a split part, listed by [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) as the partition name with a timestamp suffix. Only a local `FORCE DROP PARTITION`, `SET FORMAT PARQUET` and a new row, together, create one.
 

@@ -21,10 +21,6 @@ SET columnName = expression [, columnName = expression ...]
   as it would be ambiguous
 - the designated timestamp column cannot be updated as it would lead to altering
   history of the [time-series data](/blog/what-is-time-series-data/)
-- If the target partition is
-  [attached by a symbolic link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
-  the partition is read-only. `UPDATE` operation on a read-only partition will
-  fail and generate an error.
 - A WAL table refuses `UPDATE` while any of its partitions is in
   [Parquet format](/docs/concepts/parquet/), with
   `cannot update table with parquet partitions [...]`. In QuestDB Enterprise,

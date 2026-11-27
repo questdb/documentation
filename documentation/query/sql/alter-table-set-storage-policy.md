@@ -107,8 +107,7 @@ Both singular and plural forms are accepted.
 - `TO REMOTE` is refused while a [`SET TYPE`](/docs/query/sql/alter-table-set-type/)
   conversion is pending, with `cannot upload a table with a pending type change,
   cancel it with SET TYPE to its current type`
-- A policy with `TO REMOTE` makes the table refuse `ATTACH PARTITION`,
-  `DETACH PARTITION` and `SET TYPE`. See
+- A policy with `TO REMOTE` makes the table refuse `SET TYPE`. See
   [Restrictions on cold storage tables](/docs/concepts/cold-storage/#restrictions-on-cold-storage-tables)
 
 ### Permissions

@@ -296,6 +296,73 @@ development but in production, pre-create tables using
 [CREATE TABLE](/docs/query/sql/create-table/) for control over partitioning,
 indexes, and column types.
 
+### Lookup enrichment
+
+Events often carry only an identifier (`instrument_id`) while the readable
+attributes (`ticker`, `market`) live in a reference table in the same QuestDB
+instance. The connector looks up those attributes and adds them to every row as
+it is written, so queries need no join. Lookup enrichment requires `ws` or `wss`
+and connector 0.26 or newer.
+
+```properties
+enrichment.sql=SELECT instrument_id, ticker, market FROM instruments LATEST ON ts PARTITION BY instrument_id
+enrichment.key.field=instrument_id
+```
+
+A record `{"instrument_id": 42, "price": 101.5}` lands as:
+
+| instrument_id | price | ticker | market |
+|---------------|-------|--------|--------|
+| 42            | 101.5 | ACME   | EQ     |
+
+The query must return the lookup key first, followed by one or more value
+columns. Each value column keeps its name and type from the query; alias it in
+the SQL to rename it (`ticker AS instrument_ticker`), or cast it to write a
+different type (`market::varchar AS market`).
+
+| Column | Supported types |
+|--------|-----------------|
+| Key (first column) | `VARCHAR`, `STRING`, `SYMBOL`, `BYTE`, `SHORT`, `INT`, `LONG` |
+| Values | `BOOLEAN`, `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `CHAR`, `TIMESTAMP`, `TIMESTAMP_NS`, `VARCHAR`, `STRING` (written as `VARCHAR`), `SYMBOL` |
+
+Other column types, such as `DATE` or `UUID`, fail the load; cast them in the
+SQL (for example, `created::timestamp AS created_ts`).
+
+`enrichment.key.field` takes the [flattened](#how-data-is-mapped) field name,
+such as `address_city`, including any `value.prefix` or `key.prefix` (for an
+unprefixed primitive key or value, use `key` or `value`). The field can hold a
+string, integer, floating-point number, or boolean. Keys match by their string
+representation: `42` and `"42"` both match key `42`, while `42.0` and `"042"`
+do not.
+
+#### Enrichment behavior
+
+The query runs with the credentials from `client.conf.string` (which need read
+access to the lookup table), and each task keeps the full result in memory. The
+first load runs at startup and must succeed (an empty table is fine). Keep the
+query small and `enrichment.query.timeout.ms` (default 10 seconds) well below
+`max.poll.interval.ms`. After startup, each task reloads the lookup in the
+background every `enrichment.refresh.ms` (default 5 seconds), even while idle,
+without blocking ingestion. If a reload fails or a value column changes type,
+the connector logs a warning and keeps the previous lookup. Restart the
+connector for a column type change to take effect.
+
+Each record is enriched from the current in-memory map at processing time. If
+the query returns duplicate keys, the last row wins (`LATEST ON` avoids that).
+Records with no matching key are written immediately and are not backfilled
+later; their enriched columns stay null, except `BOOLEAN`, `BYTE`, and `SHORT`,
+which are not nullable in QuestDB and default to `false` or `0`. Do not include
+enriched columns in `DEDUP UPSERT KEYS`, because a redelivered record can pick
+up newer values.
+
+Value column names must be unique and must not match `timestamp` or any field in
+the incoming record; alias them in the SQL if needed.
+
+If enriched columns stay null, check the connector log. Each task logs unmapped
+key counts whenever they change (enable `DEBUG` to see the keys), and warns once
+if `enrichment.key.field` is missing from records (often a misspelled or
+unflattened name) or holds an unsupported key type.
+
 <!-- Legacy anchor kept for inbound links from other docs pages -->
 ### Delivery guarantees {#fault-tolerance}
 
@@ -567,10 +634,16 @@ transforms.orderbook.mappings=buy_entries:bids:price,size;sell_entries:asks:pric
 
 The `mappings` format is `sourceField:targetField:field1,field2;...`
 
+Set `transforms.orderbook.empty.as.array=true` to store an empty source array,
+such as a book side with no orders, as an empty array instead of `NULL`. The
+result has one empty row per struct field: `[[],[]]` for `price,size`, shape
+(2, 0). The default is `false`. Available from connector version 0.26.
+
 **Behavior:**
 - All extracted values are converted to `double`
 - Missing source fields are skipped (no error)
-- Empty source arrays are skipped
+- Empty source arrays leave the target `NULL`, unless `empty.as.array` is set
+- Null source arrays always leave the target `NULL`
 - Null values inside structs cause an error
 - If the target field name already exists in the input, it is replaced
 - Works with both schema-based and schemaless messages
@@ -660,7 +733,8 @@ client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
 ```
 
 HTTP retries temporary errors for up to `retry_timeout` milliseconds (default
-10,000), then fails the task. The `qwp.*` options have no effect. You can still
+10,000), then fails the task. The `qwp.*` options have no effect, and
+[lookup enrichment](#lookup-enrichment) is not available. You can still
 use a DLQ for invalid records and deduplication to prevent duplicates on retry.
 
 To migrate an HTTP pipeline to QWP:
@@ -732,6 +806,18 @@ Pre-release builds of the QWP transport used the names `max.inflight.rows` and
 `qwp.max.inflight.rows` and `qwp.progress.timeout.ms`.
 
 </details>
+
+#### Lookup enrichment options
+
+These options apply only to `ws` and `wss`. Set `enrichment.sql` and
+`enrichment.key.field` together. See [Lookup enrichment](#lookup-enrichment).
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| enrichment.sql | `string` | N/A | Query that returns the lookup key, then one or more value columns |
+| enrichment.key.field | `string` | N/A | Flattened name of the record field to look up |
+| enrichment.refresh.ms | `long` | 5000 | Time between lookup reloads, in milliseconds, at least 100. Each task reloads in the background, also while idle |
+| enrichment.query.timeout.ms | `long` | 10000 | Maximum time for one lookup query, in milliseconds. Also caps `connect_timeout` and `auth_timeout_ms` for the query connection unless `client.conf.string` sets them |
 
 #### Client configuration string
 

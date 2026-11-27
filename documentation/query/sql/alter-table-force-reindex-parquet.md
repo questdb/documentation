@@ -96,8 +96,6 @@ runs on. It is not replicated.
   rebuild. They are skipped, and the statement fails if every selected
   partition is cold.
 - **Partitions that keep [late rows in cold storage](/docs/concepts/cold-storage-late-rows/)** are skipped. If every selected partition is one of them or cold, the statement fails with `cannot reindex Delta partitions`, or with `cannot reindex cold partitions, they have no local data` when every one of them is served from the object store.
-- **Partitions attached from a soft link** are skipped, because a new
-  directory version would move them off their attached volume.
 
 ## Automatic repair
 

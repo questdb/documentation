@@ -8,10 +8,9 @@ description:
 
 `SHOW` returns metadata about tables, columns, partitions, and configuration
 parameters and, in QuestDB Enterprise, about users, groups, service accounts,
-and permissions. It is useful for checking the
-[designated timestamp setting](/docs/concepts/designated-timestamp/) column, the
-[partition attachment settings](/docs/query/sql/alter-table-attach-partition/),
-and partition storage size on disk.
+and permissions. Use it to find a table's
+[designated timestamp](/docs/concepts/designated-timestamp/) column or check
+[partition sizes on disk](#show-partitions).
 
 ## Syntax
 
@@ -557,17 +556,17 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 SHOW PARTITIONS FROM my_table;
 ```
 
-Selected columns are shown below; the three new trailing columns are omitted.
+Selected output columns:
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 34     | false            |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 56     | false            |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | ------------------- | --------- | --------------- | ------ | ---------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | false               | false     | -1              | 12     | false            |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | false               | false     | -1              | 34     | false            |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | false               | false     | -1              | 56     | false            |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | false               | false     | -1              | 78     | false            |
 
 See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
-full column list, including `hasParquetGenerated`, `isParquet`,
+column descriptions, including `hasParquetGenerated`, `isParquet`,
 `parquetFileSize`, `seqTxn`, `isRemotelyServed`, `deadRows`,
 `lastWriteTimestamp` and `pieceCount`; see
 [monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)

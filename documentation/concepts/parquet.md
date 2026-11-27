@@ -100,10 +100,9 @@ A policy can also move Parquet partitions off local disk entirely. The `TO REMOT
 
 ### Converting to Parquet
 
-On all editions, partitions can be converted manually with `ALTER TABLE`. You
-need to pass a filter specifying the partitions to convert. The filter can be
-either a `WHERE` or a `LIST`, in the same way it is used for the
-[`DETACH` command](/docs/query/sql/alter-table-detach-partition/).
+On all editions, use `ALTER TABLE` to convert partitions manually. Select the
+partitions with a `WHERE` condition on the designated timestamp or a `LIST` of
+partition names.
 
 :::tip
 The active (most recent) partition will never be converted into Parquet, even if it matches the filter.
@@ -160,8 +159,7 @@ ALTER TABLE trades CONVERT PARTITION TO NATIVE WHERE timestamp < '2025-08-31';
 ```
 
 `CONVERT PARTITION TO NATIVE` is refused on a read-only partition, such as one
-attached from a soft link or sealed by QuestDB Enterprise
-[cold storage](/docs/concepts/cold-storage/), with
+sealed by QuestDB Enterprise [cold storage](/docs/concepts/cold-storage/), with
 `cannot convert parquet partition to native, partition is read-only`, or, for a
 partition in cold storage,
 `cannot convert parquet partition to native, partition is in cold storage and read-only`.

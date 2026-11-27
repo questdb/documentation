@@ -11,9 +11,7 @@ partition information including metadata. They are particularly useful for
 learning useful information about your instance, including:
 
 - [Designated timestamp](/docs/concepts/designated-timestamp/) columns
-- [Attached, detached, or attachable](/docs/query/sql/alter-table-attach-partition/)
-  partitions
-- Partition storage size on disk
+- [Partition sizes on disk](#table_partitions)
 - Running SQL commands
 
 :::note
@@ -1242,14 +1240,12 @@ table or a materialized view with the option to filter the partitions.
 
 **Return value:**
 
-Returns a table with the following columns:
+The result includes these columns:
 
-- `index` - _INTEGER_, index of the partition (_NaN_ when the partition is not
-  attached)
+- `index` - _INTEGER_, index of the partition, or _NaN_ if unavailable
 - `partitionBy` - _STRING_, one of _NONE_, _HOUR_, _DAY_, _WEEK_, _MONTH_ and
   _YEAR_
-- `name` - _STRING_, name of the partition, e.g. `2023-03-14`,
-  `2023-03-14.detached`, `2023-03-14.attachable`
+- `name` - _STRING_, name of the partition, e.g. `2023-03-14`
 - `minTimestamp` - _LONG_, min timestamp of the partition (_NaN_ when the table
   is not partitioned)
 - `maxTimestamp` - _LONG_, max timestamp of the partition (_NaN_ when the table
@@ -1259,21 +1255,13 @@ Returns a table with the following columns:
 - `diskSizeHuman` - _STRING_, size of the partition meant for humans to read
   (same output as function
   [size_pretty](/docs/query/functions/numeric/#size_pretty))
-- `readOnly` - _BOOLEAN_, true if the partition is
-  [attached via soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links),
-  or sealed by a storage policy's `DROP LOCAL` stage (Enterprise). False for a
-  partition that keeps
+- `readOnly` - _BOOLEAN_, true if the partition does not accept writes, such
+  as one sealed by a storage policy's `DROP LOCAL` stage (Enterprise). False
+  for a partition that keeps
   [late rows in cold storage](/docs/concepts/cold-storage-late-rows/), also
   once it is remotely served
 - `active` - _BOOLEAN_, true if the partition is the last partition, and whether
   we are writing to it (at least one record)
-- `attached` - _BOOLEAN_, true if the partition is
-  [attached](/docs/query/sql/alter-table-attach-partition/)
-- `detached` - _BOOLEAN_, true if the partition is
-  [detached](/docs/query/sql/alter-table-detach-partition/) (`name` of the
-  partition will contain the `.detached` extension)
-- `attachable` - _BOOLEAN_, true if the partition is detached and can be
-  attached (`name` of the partition will contain the `.attachable` extension)
 - `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition has
   been generated. Set by either
   [manual Parquet conversion](/docs/concepts/parquet/#in-place-conversion)
@@ -1301,10 +1289,9 @@ Returns a table with the following columns:
 - `pieceCount` - _INT_, number of pieces sharing the partition's column files;
   one for a standard native partition
 
-These columns also appear in `SHOW PARTITIONS` and are null when unavailable,
-such as for detached partitions. See
-[monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)
-for an example. Attached Parquet partitions report `deadRows=0`,
+These columns also appear in `SHOW PARTITIONS` and are null when unavailable.
+See [monitoring merge-append partitions](/docs/concepts/merge-append-partitions/#monitor-partitions)
+for an example. Parquet partitions in the table report `deadRows=0`,
 `pieceCount=1` and a null `lastWriteTimestamp`; these columns do not measure
 Parquet dead row-group space.
 
@@ -1322,17 +1309,16 @@ CREATE TABLE my_table AS (
 ```
 
 ```questdb-sql title="Get all partitions from my_table"
-table_partitions('my_table');
+SELECT name, minTimestamp, maxTimestamp, numRows, diskSizeHuman
+FROM table_partitions('my_table');
 ```
 
-Selected columns are shown below; the three new trailing columns are omitted.
-
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 34     | false            |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 56     | false            |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
+| name     | minTimestamp          | maxTimestamp          | numRows | diskSizeHuman |
+| -------- | --------------------- | --------------------- | ------- | ------------- |
+| 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 96.0 KiB      |
+| 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 96.0 KiB      |
+| 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 96.0 KiB      |
+| 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 80.0 MiB      |
 
 ```questdb-sql title="Get size of a table in disk"
 SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
@@ -1343,14 +1329,12 @@ SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
 | 80.3 MB     |
 
 ```questdb-sql title="Get active partition of a table"
-SELECT * FROM table_partitions('my_table') WHERE active = true;
+SELECT name, numRows FROM table_partitions('my_table') WHERE active;
 ```
 
-Selected columns are shown below; the three new trailing columns are omitted.
-
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
+| name     | numRows |
+| -------- | ------- |
+| 2023-W03 | 101     |
 
 ## table_storage
 

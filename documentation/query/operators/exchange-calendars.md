@@ -374,7 +374,7 @@ Custom rows are validated on load. Invalid rows are skipped with a log warning:
 - `break_start` and `break_end` must both be `NULL` or both non-`NULL`
 - When non-`NULL`: `open < break_start < break_end < close` (or `open < close`
   without a break)
-- Session duration must be less than 24 hours
+- Session duration must not exceed 24 hours
 - If multiple non-deleted rows share the same `exchange` and `session`, the last
   row wins
 
