@@ -268,14 +268,6 @@ reindexTable
 alterTableRenameColumn
   ::= 'RENAME' 'COLUMN' columnName 'TO' newColumnName
 
-alterTableAttachPartition
-  ::= 'ALTER' 'TABLE' tableName 'ATTACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
-
-alterTableDetachPartition
-  ::= 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
-   | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
-   | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn 'IN' '(' timestamp (',' timestamp)* ')'
-
 alterTableSquashPartitions
   ::= 'SQUASH' 'PARTITIONS' tableName ';'
 

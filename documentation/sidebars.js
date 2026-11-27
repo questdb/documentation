@@ -349,11 +349,9 @@ module.exports = {
                       ],
                     },
                     // Ordered by the label the sidebar renders, not the doc id
-                    "query/sql/alter-table-attach-partition", // ATTACH PARTITION
                     "query/sql/alter-table-change-column-type", // COLUMN TYPE
                     "query/sql/alter-table-disable-deduplication", // DEDUP DISABLE
                     "query/sql/alter-table-enable-deduplication", // DEDUP ENABLE
-                    "query/sql/alter-table-detach-partition", // DETACH PARTITION
                     "query/sql/alter-table-drop-column", // DROP COLUMN
                     "query/sql/alter-table-drop-partition", // DROP PARTITION
                     "query/sql/alter-table-force-reindex-parquet", // FORCE REINDEX PARQUET
